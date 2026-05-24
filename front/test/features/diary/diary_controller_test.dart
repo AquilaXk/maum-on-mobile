@@ -81,6 +81,20 @@ void main() {
       expect(controller.state.isSubmitting, isFalse);
     });
 
+    test('validates required draft fields before submit', () async {
+      final repository = _FakeDiaryRepository(pages: [_page([])]);
+      final controller = DiaryController(
+        diaryRepository: repository,
+        now: DateTime(2026, 5, 20),
+      );
+
+      await controller.load();
+      await controller.submit();
+
+      expect(repository.createdDrafts, isEmpty);
+      expect(controller.state.errorMessage, '제목과 본문을 입력해 주세요.');
+    });
+
     test('updates the editing diary and refreshes the calendar', () async {
       final original =
           _entry(id: 4, title: '원본', createDate: '2026-05-20T12:00:00');
@@ -149,6 +163,36 @@ void main() {
       expect(controller.state.selectedImage?.filename, isNull);
     });
 
+    test('clears temporary image and explains next action on upload failure',
+        () async {
+      final repository = _FakeDiaryRepository(
+        pages: [_page([])],
+        createError: const ApiClientException(
+          kind: ApiErrorKind.server,
+          message: '파일이 너무 큽니다.',
+        ),
+      );
+      final controller = DiaryController(
+        diaryRepository: repository,
+        now: DateTime(2026, 5, 20),
+      );
+
+      await controller.load();
+      controller.updateTitle('이미지 기록');
+      controller.updateContent('첨부 포함');
+      controller.attachImage(
+        const DiaryImageAttachment(filename: 'mind.png', bytes: [9]),
+      );
+      await controller.submit();
+
+      expect(controller.state.selectedImage, isNull);
+      expect(controller.state.isSubmitting, isFalse);
+      expect(
+        controller.state.errorMessage,
+        '파일이 너무 큽니다. 이미지를 다시 선택한 뒤 저장해 주세요.',
+      );
+    });
+
     test('invokes unauthorized callback on expired auth', () async {
       var unauthorizedCount = 0;
       final controller = DiaryController(
@@ -204,11 +248,13 @@ class _FakeDiaryRepository implements DiaryRepository {
     this.pages = const [],
     this.createdId = 1,
     this.fetchError,
+    this.createError,
   });
 
   final List<PageResponse<DiaryEntry>> pages;
   final int createdId;
   final Object? fetchError;
+  final Object? createError;
   final List<DiaryFetchRequest> fetchRequests = [];
   final List<DiaryDraft> createdDrafts = [];
   final List<({int id, DiaryDraft draft})> updatedDrafts = [];
@@ -234,6 +280,10 @@ class _FakeDiaryRepository implements DiaryRepository {
 
   @override
   Future<int> createDiary(DiaryDraft draft) async {
+    final error = createError;
+    if (error != null) {
+      throw error;
+    }
     createdDrafts.add(draft);
     return createdId;
   }

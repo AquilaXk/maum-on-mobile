@@ -81,6 +81,108 @@ void main() {
     expect(find.text('mind.png'), findsNothing);
     expect(repository.createdDrafts.single.image?.filename, 'mind.png');
   });
+
+  testWidgets('shows validation feedback for an empty diary', (tester) async {
+    final controller = DiaryController(
+      diaryRepository: _FakeDiaryRepository(pages: [_page([])]),
+      now: DateTime(2026, 5, 20),
+    );
+    await controller.load();
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: DiaryScreen(
+          controller: controller,
+          imagePicker: const _FakeDiaryImagePicker(),
+          onBack: () {},
+        ),
+      ),
+    );
+
+    await tester
+        .ensureVisible(find.byKey(const ValueKey('diary-submit-button')));
+    await tester.tap(find.byKey(const ValueKey('diary-submit-button')));
+    await tester.pump();
+
+    expect(find.text('제목과 본문을 입력해 주세요.'), findsOneWidget);
+  });
+
+  testWidgets('cancels editing and clears the form', (tester) async {
+    final entry = _entry(
+      id: 1,
+      title: '수정할 기록',
+      createDate: '2026-05-20T08:00:00',
+    );
+    final controller = DiaryController(
+      diaryRepository: _FakeDiaryRepository(pages: [_page([entry])]),
+      now: DateTime(2026, 5, 20),
+    );
+    await controller.load();
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: DiaryScreen(
+          controller: controller,
+          imagePicker: const _FakeDiaryImagePicker(),
+          onBack: () {},
+        ),
+      ),
+    );
+
+    await tester.tap(find.widgetWithText(TextButton, '수정'));
+    await tester.pump();
+    expect(controller.state.isEditing, isTrue);
+
+    await tester.tap(find.byKey(const ValueKey('diary-edit-cancel-button')));
+    await tester.pump();
+
+    final titleFinder = find.byKey(const ValueKey('diary-title-field'));
+    final titleField = tester.widget<TextField>(titleFinder);
+    expect(controller.state.isEditing, isFalse);
+    expect(titleField.controller?.text, isEmpty);
+  });
+
+  testWidgets('confirms deletion before removing a diary', (tester) async {
+    final entry = _entry(
+      id: 1,
+      title: '삭제할 기록',
+      createDate: '2026-05-20T08:00:00',
+    );
+    final repository = _FakeDiaryRepository(
+      pages: [_page([entry]), _page([])],
+    );
+    final controller = DiaryController(
+      diaryRepository: repository,
+      now: DateTime(2026, 5, 20),
+    );
+    await controller.load();
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: DiaryScreen(
+          controller: controller,
+          imagePicker: const _FakeDiaryImagePicker(),
+          onBack: () {},
+        ),
+      ),
+    );
+
+    await tester.tap(find.widgetWithText(TextButton, '삭제'));
+    await tester.pumpAndSettle();
+    expect(find.text('기록을 삭제할까요?'), findsOneWidget);
+
+    await tester.tap(find.byKey(const ValueKey('diary-delete-cancel-button')));
+    await tester.pumpAndSettle();
+    expect(repository.deletedIds, isEmpty);
+
+    await tester.tap(find.widgetWithText(TextButton, '삭제'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('diary-delete-confirm-button')));
+    await tester.pumpAndSettle();
+
+    expect(repository.deletedIds, [1]);
+    expect(find.text('기록이 삭제되었습니다.'), findsOneWidget);
+  });
 }
 
 PageResponse<DiaryEntry> _page(List<DiaryEntry> items) {
@@ -121,6 +223,7 @@ class _FakeDiaryRepository implements DiaryRepository {
   final List<PageResponse<DiaryEntry>> pages;
   final int createdId;
   final List<DiaryDraft> createdDrafts = [];
+  final List<int> deletedIds = [];
 
   @override
   Future<PageResponse<DiaryEntry>> fetchDiaries({
@@ -148,7 +251,8 @@ class _FakeDiaryRepository implements DiaryRepository {
 
   @override
   Future<void> deleteDiary(int id) {
-    throw UnimplementedError();
+    deletedIds.add(id);
+    return Future<void>.value();
   }
 }
 
