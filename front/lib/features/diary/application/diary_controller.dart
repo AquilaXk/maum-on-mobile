@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 
 import '../../../core/network/api_error.dart';
+import '../data/diary_image_repository.dart';
 import '../data/diary_repository.dart';
 import '../domain/diary_models.dart';
 
@@ -13,6 +14,8 @@ class DiaryState {
     this.isLoading = false,
     this.isPublicLoading = false,
     this.isSubmitting = false,
+    this.isUploadingImage = false,
+    this.imageUploadProgress,
     this.hasLoaded = false,
     this.editingDiaryId,
     this.title = '',
@@ -33,6 +36,8 @@ class DiaryState {
   final bool isLoading;
   final bool isPublicLoading;
   final bool isSubmitting;
+  final bool isUploadingImage;
+  final double? imageUploadProgress;
   final bool hasLoaded;
   final int? editingDiaryId;
   final String title;
@@ -58,7 +63,10 @@ class DiaryState {
   bool get isEditing => editingDiaryId != null;
 
   bool get canSubmit =>
-      title.trim().isNotEmpty && content.trim().isNotEmpty && !isSubmitting;
+      title.trim().isNotEmpty &&
+      content.trim().isNotEmpty &&
+      !isSubmitting &&
+      !isUploadingImage;
 
   List<DiaryEntry> get selectedDateEntries {
     return entries
@@ -82,6 +90,9 @@ class DiaryState {
     bool? isLoading,
     bool? isPublicLoading,
     bool? isSubmitting,
+    bool? isUploadingImage,
+    double? imageUploadProgress,
+    bool clearImageUploadProgress = false,
     bool? hasLoaded,
     int? editingDiaryId,
     bool clearEditingDiaryId = false,
@@ -108,6 +119,10 @@ class DiaryState {
       isLoading: isLoading ?? this.isLoading,
       isPublicLoading: isPublicLoading ?? this.isPublicLoading,
       isSubmitting: isSubmitting ?? this.isSubmitting,
+      isUploadingImage: isUploadingImage ?? this.isUploadingImage,
+      imageUploadProgress: clearImageUploadProgress
+          ? null
+          : imageUploadProgress ?? this.imageUploadProgress,
       hasLoaded: hasLoaded ?? this.hasLoaded,
       editingDiaryId:
           clearEditingDiaryId ? null : editingDiaryId ?? this.editingDiaryId,
@@ -132,9 +147,11 @@ class DiaryState {
 class DiaryController extends ChangeNotifier {
   DiaryController({
     required DiaryRepository diaryRepository,
+    required DiaryImageRepository imageRepository,
     DateTime? now,
     VoidCallback? onUnauthorized,
   })  : _diaryRepository = diaryRepository,
+        _imageRepository = imageRepository,
         _onUnauthorized = onUnauthorized,
         _state = DiaryState(
           visibleMonth: firstDayOfMonth(now ?? DateTime.now()),
@@ -142,10 +159,12 @@ class DiaryController extends ChangeNotifier {
         );
 
   final DiaryRepository _diaryRepository;
+  final DiaryImageRepository _imageRepository;
   final VoidCallback? _onUnauthorized;
 
   DiaryState _state;
   bool _isDisposed = false;
+  String? _temporaryUploadedImageUrl;
 
   DiaryState get state => _state;
 
@@ -196,11 +215,19 @@ class DiaryController extends ChangeNotifier {
     );
   }
 
-  void clearImage() {
+  Future<void> clearImage() async {
+    final temporaryUrl = _state.imageUrl == _temporaryUploadedImageUrl
+        ? _temporaryUploadedImageUrl
+        : null;
+    _temporaryUploadedImageUrl = null;
     _setState(_state.copyWith(clearSelectedImage: true, clearImageUrl: true));
+    if (temporaryUrl != null) {
+      await _deleteTemporaryImage(temporaryUrl);
+    }
   }
 
   void startEditing(DiaryEntry entry) {
+    _temporaryUploadedImageUrl = null;
     _setState(
       _state.copyWith(
         editingDiaryId: entry.id,
@@ -217,6 +244,7 @@ class DiaryController extends ChangeNotifier {
   }
 
   void resetForm() {
+    _temporaryUploadedImageUrl = null;
     _setState(
       _state.copyWith(
         clearEditingDiaryId: true,
@@ -250,24 +278,27 @@ class DiaryController extends ChangeNotifier {
     }
 
     final editingId = _state.editingDiaryId;
-    final draft = DiaryDraft(
-      title: title,
-      content: content,
-      category: _state.category,
-      isPrivate: _state.isPrivate,
-      imageUrl: _state.imageUrl,
-      image: _state.selectedImage,
-    );
 
     _setState(
       _state.copyWith(
         isSubmitting: true,
+        isUploadingImage: false,
+        clearImageUploadProgress: true,
         clearErrorMessage: true,
         clearNoticeMessage: true,
       ),
     );
 
     try {
+      final uploadedImageUrl = await _uploadSelectedImageIfNeeded();
+      final draft = DiaryDraft(
+        title: title,
+        content: content,
+        category: _state.category,
+        isPrivate: _state.isPrivate,
+        imageUrl: uploadedImageUrl,
+      );
+
       if (editingId == null) {
         await _diaryRepository.createDiary(draft);
       } else {
@@ -279,6 +310,8 @@ class DiaryController extends ChangeNotifier {
       _setState(
         _state.copyWith(
           isSubmitting: false,
+          isUploadingImage: false,
+          clearImageUploadProgress: true,
           noticeMessage:
               editingId == null ? '오늘의 기록이 저장되었습니다.' : '기록이 수정되었습니다.',
         ),
@@ -286,13 +319,45 @@ class DiaryController extends ChangeNotifier {
     } on Object catch (error) {
       _handleError(
         error,
-        clearSelectedImage: draft.image != null,
-        nextAction: draft.image == null
+        nextAction: _state.selectedImage == null
             ? '잠시 후 다시 저장해 주세요.'
-            : '이미지를 다시 선택한 뒤 저장해 주세요.',
+            : '선택한 이미지는 유지됩니다. 다시 저장해 주세요.',
       );
-      _setState(_state.copyWith(isSubmitting: false));
+      _setState(
+        _state.copyWith(
+          isSubmitting: false,
+          isUploadingImage: false,
+          clearImageUploadProgress: true,
+        ),
+      );
     }
+  }
+
+  Future<String?> _uploadSelectedImageIfNeeded() async {
+    final selectedImage = _state.selectedImage;
+    if (selectedImage == null) {
+      return _state.imageUrl;
+    }
+
+    _setState(
+      _state.copyWith(
+        isUploadingImage: true,
+        imageUploadProgress: 0.0,
+        clearErrorMessage: true,
+      ),
+    );
+
+    final uploadedImage = await _imageRepository.uploadImage(selectedImage);
+    _temporaryUploadedImageUrl = uploadedImage.imageUrl;
+    _setState(
+      _state.copyWith(
+        imageUrl: uploadedImage.imageUrl,
+        clearSelectedImage: true,
+        isUploadingImage: false,
+        imageUploadProgress: 1.0,
+      ),
+    );
+    return uploadedImage.imageUrl;
   }
 
   Future<void> deleteDiary(DiaryEntry entry) async {
@@ -373,6 +438,7 @@ class DiaryController extends ChangeNotifier {
   }
 
   void _resetFormSilently() {
+    _temporaryUploadedImageUrl = null;
     _state = _state.copyWith(
       clearEditingDiaryId: true,
       title: '',
@@ -381,7 +447,17 @@ class DiaryController extends ChangeNotifier {
       isPrivate: true,
       clearImageUrl: true,
       clearSelectedImage: true,
+      isUploadingImage: false,
+      clearImageUploadProgress: true,
     );
+  }
+
+  Future<void> _deleteTemporaryImage(String imageUrl) async {
+    try {
+      await _imageRepository.deleteImage(imageUrl);
+    } on Object {
+      // 사용자가 화면을 계속 조작할 수 있도록 임시 파일 정리 실패는 저장 흐름과 분리한다.
+    }
   }
 
   void _handleError(

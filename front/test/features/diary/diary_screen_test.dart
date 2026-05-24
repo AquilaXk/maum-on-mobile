@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:maum_on_mobile_front/core/network/api_response.dart';
 import 'package:maum_on_mobile_front/features/diary/application/diary_controller.dart';
+import 'package:maum_on_mobile_front/features/diary/data/diary_image_repository.dart';
 import 'package:maum_on_mobile_front/features/diary/data/diary_repository.dart';
 import 'package:maum_on_mobile_front/features/diary/domain/diary_models.dart';
 import 'package:maum_on_mobile_front/features/diary/presentation/diary_image_picker.dart';
@@ -28,6 +29,7 @@ void main() {
           ]),
         ],
       ),
+      imageRepository: _FakeDiaryImageRepository(),
       now: DateTime(2026, 5, 20),
     );
 
@@ -57,6 +59,7 @@ void main() {
     );
     final controller = DiaryController(
       diaryRepository: repository,
+      imageRepository: _FakeDiaryImageRepository(),
       now: DateTime(2026, 5, 20),
     );
     await controller.load();
@@ -91,12 +94,14 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('mind.png'), findsNothing);
-    expect(repository.createdDrafts.single.image?.filename, 'mind.png');
+    expect(repository.createdDrafts.single.image, isNull);
+    expect(repository.createdDrafts.single.imageUrl, '/images/uploads/mind.png');
   });
 
   testWidgets('shows validation feedback for an empty diary', (tester) async {
     final controller = DiaryController(
       diaryRepository: _FakeDiaryRepository(pages: [_page([])]),
+      imageRepository: _FakeDiaryImageRepository(),
       now: DateTime(2026, 5, 20),
     );
     await controller.load();
@@ -127,6 +132,7 @@ void main() {
     );
     final controller = DiaryController(
       diaryRepository: _FakeDiaryRepository(pages: [_page([entry])]),
+      imageRepository: _FakeDiaryImageRepository(),
       now: DateTime(2026, 5, 20),
     );
     await controller.load();
@@ -167,6 +173,7 @@ void main() {
     );
     final controller = DiaryController(
       diaryRepository: repository,
+      imageRepository: _FakeDiaryImageRepository(),
       now: DateTime(2026, 5, 20),
     );
     await controller.load();
@@ -200,6 +207,25 @@ void main() {
     expect(repository.deletedIds, [1]);
     expect(find.text('기록이 삭제되었습니다.'), findsOneWidget);
   });
+}
+
+class _FakeDiaryImageRepository implements DiaryImageRepository {
+  final List<DiaryImageAttachment> uploadedImages = [];
+
+  @override
+  Future<UploadedDiaryImage> uploadImage(DiaryImageAttachment image) async {
+    uploadedImages.add(image);
+    return UploadedDiaryImage(
+      imageUrl: '/images/uploads/${image.filename}',
+      originalFilename: image.filename,
+      contentType: 'image/png',
+      byteSize: image.bytes.length,
+      status: 'TEMPORARY',
+    );
+  }
+
+  @override
+  Future<void> deleteImage(String imageUrl) async {}
 }
 
 PageResponse<DiaryEntry> _page(List<DiaryEntry> items) {

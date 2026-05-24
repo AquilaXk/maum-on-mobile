@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
@@ -154,7 +155,9 @@ class _DiaryScreenState extends State<DiaryScreen> {
                         onCategoryChanged: widget.controller.updateCategory,
                         onPrivacyChanged: widget.controller.updatePrivacy,
                         onPickImage: _pickImage,
-                        onClearImage: widget.controller.clearImage,
+                        onClearImage: () {
+                          unawaited(widget.controller.clearImage());
+                        },
                         onReset: widget.controller.resetForm,
                         onSubmit: widget.controller.submit,
                       ),
@@ -544,6 +547,8 @@ class _DiaryForm extends StatelessWidget {
         _ImagePreview(
           selectedImage: state.selectedImage,
           imageUrl: state.imageUrl,
+          isUploadingImage: state.isUploadingImage,
+          uploadProgress: state.imageUploadProgress,
           onPickImage: onPickImage,
           onClearImage: onClearImage,
         ),
@@ -551,7 +556,13 @@ class _DiaryForm extends StatelessWidget {
         FilledButton(
           key: const ValueKey('diary-submit-button'),
           onPressed: state.isSubmitting ? null : onSubmit,
-          child: Text(state.isSubmitting ? '저장 중' : '저장'),
+          child: Text(
+            state.isUploadingImage
+                ? '이미지 업로드 중'
+                : state.isSubmitting
+                    ? '저장 중'
+                    : '저장',
+          ),
         ),
       ],
     );
@@ -562,12 +573,16 @@ class _ImagePreview extends StatelessWidget {
   const _ImagePreview({
     required this.selectedImage,
     required this.imageUrl,
+    required this.isUploadingImage,
+    required this.uploadProgress,
     required this.onPickImage,
     required this.onClearImage,
   });
 
   final DiaryImageAttachment? selectedImage;
   final String? imageUrl;
+  final bool isUploadingImage;
+  final double? uploadProgress;
   final VoidCallback onPickImage;
   final VoidCallback onClearImage;
 
@@ -580,10 +595,14 @@ class _ImagePreview extends StatelessWidget {
       children: [
         OutlinedButton.icon(
           key: const ValueKey('diary-image-pick-button'),
-          onPressed: onPickImage,
+          onPressed: isUploadingImage ? null : onPickImage,
           icon: const Icon(Icons.image_outlined),
           label: const Text('이미지 선택'),
         ),
+        if (isUploadingImage) ...[
+          const SizedBox(height: 8),
+          LinearProgressIndicator(value: uploadProgress),
+        ],
         if (image != null) ...[
           const SizedBox(height: 8),
           ClipRRect(

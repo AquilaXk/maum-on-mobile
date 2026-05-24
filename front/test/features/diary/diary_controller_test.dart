@@ -2,6 +2,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:maum_on_mobile_front/core/network/api_error.dart';
 import 'package:maum_on_mobile_front/core/network/api_response.dart';
 import 'package:maum_on_mobile_front/features/diary/application/diary_controller.dart';
+import 'package:maum_on_mobile_front/features/diary/data/diary_image_repository.dart';
 import 'package:maum_on_mobile_front/features/diary/data/diary_repository.dart';
 import 'package:maum_on_mobile_front/features/diary/domain/diary_models.dart';
 
@@ -27,6 +28,7 @@ void main() {
             ]),
           ],
         ),
+        imageRepository: _FakeDiaryImageRepository(),
         now: DateTime(2026, 5, 20),
       );
 
@@ -54,6 +56,7 @@ void main() {
             message: '공개 기록을 불러오지 못했습니다.',
           ),
         ),
+        imageRepository: _FakeDiaryImageRepository(),
         now: DateTime(2026, 5, 20),
       );
 
@@ -75,6 +78,7 @@ void main() {
       );
       final controller = DiaryController(
         diaryRepository: repository,
+        imageRepository: _FakeDiaryImageRepository(),
         now: DateTime(2026, 5, 20),
       );
 
@@ -100,6 +104,7 @@ void main() {
       );
       final controller = DiaryController(
         diaryRepository: repository,
+        imageRepository: _FakeDiaryImageRepository(),
         now: DateTime(2026, 5, 20),
       );
 
@@ -120,6 +125,7 @@ void main() {
       final repository = _FakeDiaryRepository(pages: [_page([])]);
       final controller = DiaryController(
         diaryRepository: repository,
+        imageRepository: _FakeDiaryImageRepository(),
         now: DateTime(2026, 5, 20),
       );
 
@@ -141,6 +147,7 @@ void main() {
       );
       final controller = DiaryController(
         diaryRepository: repository,
+        imageRepository: _FakeDiaryImageRepository(),
         now: DateTime(2026, 5, 20),
       );
 
@@ -165,6 +172,7 @@ void main() {
       );
       final controller = DiaryController(
         diaryRepository: repository,
+        imageRepository: _FakeDiaryImageRepository(),
         now: DateTime(2026, 5, 20),
       );
 
@@ -176,13 +184,18 @@ void main() {
       expect(controller.state.noticeMessage, '기록이 삭제되었습니다.');
     });
 
-    test('stores image attachment in the draft before submit', () async {
+    test('uploads selected image and saves diary with uploaded image URL',
+        () async {
       final repository = _FakeDiaryRepository(
         pages: [_page([]), _page([])],
         createdId: 11,
       );
+      final imageRepository = _FakeDiaryImageRepository(
+        uploadedUrl: '/images/uploads/uploaded-mind.png',
+      );
       final controller = DiaryController(
         diaryRepository: repository,
+        imageRepository: imageRepository,
         now: DateTime(2026, 5, 20),
       );
 
@@ -194,21 +207,27 @@ void main() {
       );
       await controller.submit();
 
-      expect(repository.createdDrafts.single.image?.filename, 'mind.png');
+      expect(imageRepository.uploadedImages.single.filename, 'mind.png');
+      expect(repository.createdDrafts.single.image, isNull);
+      expect(
+        repository.createdDrafts.single.imageUrl,
+        '/images/uploads/uploaded-mind.png',
+      );
       expect(controller.state.selectedImage?.filename, isNull);
     });
 
-    test('clears temporary image and explains next action on upload failure',
+    test('keeps selected image and explains retry on upload failure',
         () async {
-      final repository = _FakeDiaryRepository(
-        pages: [_page([])],
-        createError: const ApiClientException(
+      final repository = _FakeDiaryRepository(pages: [_page([])]);
+      final imageRepository = _FakeDiaryImageRepository(
+        uploadError: const ApiClientException(
           kind: ApiErrorKind.server,
           message: '파일이 너무 큽니다.',
         ),
       );
       final controller = DiaryController(
         diaryRepository: repository,
+        imageRepository: imageRepository,
         now: DateTime(2026, 5, 20),
       );
 
@@ -220,12 +239,44 @@ void main() {
       );
       await controller.submit();
 
-      expect(controller.state.selectedImage, isNull);
+      expect(repository.createdDrafts, isEmpty);
+      expect(controller.state.selectedImage?.filename, 'mind.png');
       expect(controller.state.isSubmitting, isFalse);
       expect(
         controller.state.errorMessage,
-        '파일이 너무 큽니다. 이미지를 다시 선택한 뒤 저장해 주세요.',
+        '파일이 너무 큽니다. 선택한 이미지는 유지됩니다. 다시 저장해 주세요.',
       );
+    });
+
+    test('deletes temporary uploaded image when user clears it after save failure',
+        () async {
+      final repository = _FakeDiaryRepository(
+        pages: [_page([])],
+        createError: const ApiClientException(
+          kind: ApiErrorKind.server,
+          message: '저장 실패',
+        ),
+      );
+      final imageRepository = _FakeDiaryImageRepository(
+        uploadedUrl: '/images/uploads/temp-mind.png',
+      );
+      final controller = DiaryController(
+        diaryRepository: repository,
+        imageRepository: imageRepository,
+        now: DateTime(2026, 5, 20),
+      );
+
+      await controller.load();
+      controller.updateTitle('이미지 기록');
+      controller.updateContent('첨부 포함');
+      controller.attachImage(
+        const DiaryImageAttachment(filename: 'mind.png', bytes: [9]),
+      );
+      await controller.submit();
+      await controller.clearImage();
+
+      expect(imageRepository.deletedUrls, ['/images/uploads/temp-mind.png']);
+      expect(controller.state.imageUrl, isNull);
     });
 
     test('invokes unauthorized callback on expired auth', () async {
@@ -237,6 +288,7 @@ void main() {
             message: '다시 로그인해 주세요.',
           ),
         ),
+        imageRepository: _FakeDiaryImageRepository(),
         now: DateTime(2026, 5, 20),
         onUnauthorized: () => unauthorizedCount += 1,
       );
@@ -247,6 +299,40 @@ void main() {
       expect(controller.state.errorMessage, '다시 로그인해 주세요.');
     });
   });
+}
+
+class _FakeDiaryImageRepository implements DiaryImageRepository {
+  _FakeDiaryImageRepository({
+    this.uploadedUrl = '/images/uploads/mind.png',
+    this.uploadError,
+  });
+
+  final String uploadedUrl;
+  final Object? uploadError;
+  final List<DiaryImageAttachment> uploadedImages = [];
+  final List<String> deletedUrls = [];
+
+  @override
+  Future<UploadedDiaryImage> uploadImage(DiaryImageAttachment image) async {
+    uploadedImages.add(image);
+    final error = uploadError;
+    if (error != null) {
+      throw error;
+    }
+
+    return UploadedDiaryImage(
+      imageUrl: uploadedUrl,
+      originalFilename: image.filename,
+      contentType: 'image/png',
+      byteSize: image.bytes.length,
+      status: 'TEMPORARY',
+    );
+  }
+
+  @override
+  Future<void> deleteImage(String imageUrl) async {
+    deletedUrls.add(imageUrl);
+  }
 }
 
 PageResponse<DiaryEntry> _page(List<DiaryEntry> items) {

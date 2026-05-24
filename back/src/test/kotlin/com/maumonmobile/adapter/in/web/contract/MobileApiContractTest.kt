@@ -7,10 +7,14 @@ import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc
 import org.springframework.http.MediaType
+import org.springframework.mock.web.MockMultipartFile
 import org.springframework.test.context.ActiveProfiles
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.get
 import org.springframework.test.web.servlet.post
+import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart
+import org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath
+import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
 
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -57,6 +61,17 @@ class MobileApiContractTest @Autowired constructor(
                 jsonPath("$.error.message") { value("인증이 필요합니다.") }
                 jsonPath("$.error.fieldErrors.length()") { value(0) }
             }
+    }
+
+    @Test
+    fun imageUploadRequiresAuth() {
+        mockMvc.perform(
+            multipart("/api/v1/images/upload")
+                .file(MockMultipartFile("image", "mind.png", "image/png", byteArrayOf(1, 2, 3))),
+        )
+            .andExpect(status().isUnauthorized)
+            .andExpect(jsonPath("$.success").value(false))
+            .andExpect(jsonPath("$.error.code").value("UNAUTHORIZED"))
     }
 
     @Test

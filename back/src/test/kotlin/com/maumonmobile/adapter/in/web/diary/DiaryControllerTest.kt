@@ -134,6 +134,109 @@ class DiaryControllerTest @Autowired constructor(
             }
     }
 
+    @Test
+    fun createsDiaryWithUploadedImageUrl() {
+        val accessToken = signupAndLogin("uploaded-diary-image@example.com")
+        val imageUrl = uploadImage(accessToken)
+
+        val createResult = mockMvc.perform(
+            multipart("/api/v1/diaries")
+                .file(
+                    jsonPart(
+                        "data",
+                        """{"title":"업로드 이미지","content":"본문","categoryName":"일상","imageUrl":"$imageUrl","isPrivate":true}""",
+                    ),
+                )
+                .header("Authorization", "Bearer $accessToken"),
+        )
+            .andExpect(status().isOk)
+            .andReturn()
+
+        val diaryId = createResult.response.readJsonInt("$.data")
+
+        mockMvc.get("/api/v1/diaries/$diaryId") {
+            header("Authorization", "Bearer $accessToken")
+        }
+            .andExpect {
+                status { isOk() }
+                jsonPath("$.data.imageUrl") { value(imageUrl) }
+            }
+    }
+
+    @Test
+    fun rejectsUnregisteredDiaryImageUrl() {
+        val accessToken = signupAndLogin("unregistered-diary-image@example.com")
+
+        mockMvc.perform(
+            multipart("/api/v1/diaries")
+                .file(
+                    jsonPart(
+                        "data",
+                        """{"title":"잘못된 이미지","content":"본문","categoryName":"일상","imageUrl":"/images/uploads/missing.png","isPrivate":true}""",
+                    ),
+                )
+                .header("Authorization", "Bearer $accessToken"),
+        )
+            .andExpect(status().isBadRequest)
+            .andExpect(jsonPath("$.error.code").value("INVALID_REQUEST"))
+    }
+
+    @Test
+    fun updatesDiaryImageUrlAndReleasesPreviousUpload() {
+        val accessToken = signupAndLogin("replace-diary-image@example.com")
+        val firstImageUrl = uploadImage(accessToken)
+        val secondImageUrl = uploadImage(accessToken)
+
+        val createResult = mockMvc.perform(
+            multipart("/api/v1/diaries")
+                .file(
+                    jsonPart(
+                        "data",
+                        """{"title":"첫 이미지","content":"본문","categoryName":"일상","imageUrl":"$firstImageUrl","isPrivate":true}""",
+                    ),
+                )
+                .header("Authorization", "Bearer $accessToken"),
+        )
+            .andExpect(status().isOk)
+            .andReturn()
+
+        val diaryId = createResult.response.readJsonInt("$.data")
+
+        mockMvc.perform(
+            multipart("/api/v1/diaries/$diaryId")
+                .file(
+                    jsonPart(
+                        "data",
+                        """{"title":"교체 이미지","content":"본문","categoryName":"일상","imageUrl":"$secondImageUrl","isPrivate":true}""",
+                    ),
+                )
+                .header("Authorization", "Bearer $accessToken")
+                .with { request ->
+                    request.method = "PUT"
+                    request
+                },
+        )
+            .andExpect(status().isOk)
+
+        mockMvc.get("/api/v1/diaries/$diaryId") {
+            header("Authorization", "Bearer $accessToken")
+        }
+            .andExpect {
+                status { isOk() }
+                jsonPath("$.data.imageUrl") { value(secondImageUrl) }
+            }
+
+        mockMvc.delete("/api/v1/images") {
+            header("Authorization", "Bearer $accessToken")
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"imageUrl":"$firstImageUrl"}"""
+        }
+            .andExpect {
+                status { isBadRequest() }
+                jsonPath("$.error.code") { value("INVALID_REQUEST") }
+            }
+    }
+
     private fun signupAndLogin(
         email: String = "diary@example.com",
         nickname: String = "마음이",
@@ -156,6 +259,18 @@ class DiaryControllerTest @Autowired constructor(
             .andReturn()
 
         return loginResult.response.readJsonString("$.data.accessToken")
+    }
+
+    private fun uploadImage(accessToken: String): String {
+        val uploadResult = mockMvc.perform(
+            multipart("/api/v1/images/upload")
+                .file(MockMultipartFile("image", "diary.png", "image/png", byteArrayOf(1, 2, 3)))
+                .header("Authorization", "Bearer $accessToken"),
+        )
+            .andExpect(status().isOk)
+            .andReturn()
+
+        return uploadResult.response.readJsonString("$.data.imageUrl")
     }
 }
 

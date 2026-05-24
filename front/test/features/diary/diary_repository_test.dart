@@ -60,7 +60,7 @@ void main() {
       expect(transport.requests.single.retryOnUnauthorized, isFalse);
     });
 
-    test('creates a diary with JSON data and image multipart parts', () async {
+    test('creates a diary with JSON data and uploaded image URL', () async {
       final transport = _FakeApiTransport([
         ApiTransportResponse.ok({'success': true, 'data': 7}),
       ]);
@@ -72,10 +72,7 @@ void main() {
           content: '본문입니다.',
           category: DiaryCategory.daily,
           isPrivate: true,
-          image: DiaryImageAttachment(
-            filename: 'diary.png',
-            bytes: [1, 2, 3],
-          ),
+          imageUrl: '/images/uploads/diary.png',
         ),
       );
 
@@ -88,9 +85,9 @@ void main() {
       expect(multipart.textParts.single.contentType, 'application/json');
       expect(multipart.textParts.single.value, contains('"title":"새 기록"'));
       expect(multipart.textParts.single.value, contains('"categoryName":"일상"'));
-      expect(multipart.files.single.fieldName, 'image');
-      expect(multipart.files.single.filename, 'diary.png');
-      expect(multipart.files.single.bytes, [1, 2, 3]);
+      expect(multipart.textParts.single.value,
+          contains('"imageUrl":"/images/uploads/diary.png"'));
+      expect(multipart.files, isEmpty);
     });
 
     test('updates a diary through PUT multipart', () async {
@@ -106,7 +103,7 @@ void main() {
           content: '수정 본문',
           category: DiaryCategory.family,
           isPrivate: false,
-          imageUrl: '/images/old.png',
+          imageUrl: '/images/uploads/old.png',
         ),
       );
 
@@ -114,7 +111,7 @@ void main() {
       expect(request.method, ApiMethod.put);
       expect(request.path, '/api/v1/diaries/3');
       expect(request.multipart?.textParts.single.value,
-          contains('"imageUrl":"/images/old.png"'));
+          contains('"imageUrl":"/images/uploads/old.png"'));
       expect(request.multipart?.files, isEmpty);
     });
 

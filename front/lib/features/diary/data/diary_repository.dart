@@ -94,8 +94,6 @@ class ApiDiaryRepository implements DiaryRepository {
   }
 
   MultipartBody _multipartFromDraft(DiaryDraft draft) {
-    final image = draft.image;
-
     return MultipartBody(
       textParts: [
         MultipartTextPart(
@@ -109,14 +107,6 @@ class ApiDiaryRepository implements DiaryRepository {
           }),
           contentType: 'application/json',
         ),
-      ],
-      files: [
-        if (image != null)
-          MultipartFilePart(
-            fieldName: 'image',
-            filename: image.filename,
-            bytes: image.bytes,
-          ),
       ],
     );
   }
