@@ -53,6 +53,19 @@ test("platform jobs skip cleanly before scaffolds exist", async () => {
   assert.match(jobBlock(workflow, "javascript"), /JavaScript scaffold not found; skipping JavaScript checks\./);
 });
 
+test("frontend job supports Flutter and Node scaffolds", async () => {
+  const frontend = jobBlock(await readWorkflow(), "frontend");
+
+  assert.match(frontend, /\[\[ -f front\/pubspec\.yaml \]\]/);
+  assert.match(frontend, /echo "stack=flutter"/);
+  assert.match(frontend, /subosito\/flutter-action@v2/);
+  assert.match(frontend, /flutter pub get/);
+  assert.match(frontend, /flutter analyze/);
+  assert.match(frontend, /flutter test/);
+  assert.match(frontend, /\[\[ -f front\/package\.json \]\]/);
+  assert.match(frontend, /echo "stack=node"/);
+});
+
 test("repository contracts preserve local docs and issue template policies", async () => {
   const workflow = await readWorkflow();
   const repositoryContracts = jobBlock(workflow, "repository-contracts");

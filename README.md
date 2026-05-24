@@ -10,7 +10,7 @@ Mobile app repository for Maum On, focused on Android and iOS clients.
 
 ## Workspace
 
-- `front/`: Expo/React Native TypeScript mobile app client for Android and iOS.
+- `front/`: Flutter mobile app client for Android and iOS.
 - `back/`: Kotlin/Spring Boot API server for the mobile app.
 - `docker/`: local runtime containers and operational compose files.
 - `infra/`: deployment and infrastructure assets.
@@ -19,9 +19,9 @@ Mobile app repository for Maum On, focused on Android and iOS clients.
 
 Run commands from `front/`:
 
-- `npm run lint`: validate the mobile project contract.
-- `npm test`: run simulator-free contract tests.
-- `npm run build`: run TypeScript checks and build contract validation.
+- `flutter pub get`: install Flutter dependencies.
+- `flutter analyze`: run static analysis.
+- `flutter test`: run simulator-free widget and contract tests.
 
 ## Backend Architecture
 

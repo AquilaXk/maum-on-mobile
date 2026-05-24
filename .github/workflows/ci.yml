@@ -168,21 +168,46 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          if [[ -f front/package.json ]]; then
+          if [[ -f front/pubspec.yaml ]]; then
             echo "present=true" >> "${GITHUB_OUTPUT}"
+            echo "stack=flutter" >> "${GITHUB_OUTPUT}"
+          elif [[ -f front/package.json ]]; then
+            echo "present=true" >> "${GITHUB_OUTPUT}"
+            echo "stack=node" >> "${GITHUB_OUTPUT}"
           else
             echo "present=false" >> "${GITHUB_OUTPUT}"
             echo "Frontend scaffold not found; skipping frontend checks."
           fi
 
+      - name: Set up Flutter
+        if: ${{ steps.scaffold.outputs.present == 'true' && steps.scaffold.outputs.stack == 'flutter' }}
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Install Flutter dependencies
+        if: ${{ steps.scaffold.outputs.present == 'true' && steps.scaffold.outputs.stack == 'flutter' }}
+        working-directory: front
+        run: flutter pub get
+
+      - name: Run Flutter checks
+        if: ${{ steps.scaffold.outputs.present == 'true' && steps.scaffold.outputs.stack == 'flutter' }}
+        working-directory: front
+        shell: bash
+        run: |
+          set -euo pipefail
+          flutter analyze
+          flutter test
+
       - name: Set up Node.js
-        if: ${{ steps.scaffold.outputs.present == 'true' }}
+        if: ${{ steps.scaffold.outputs.present == 'true' && steps.scaffold.outputs.stack == 'node' }}
         uses: actions/setup-node@v6
         with:
           node-version: "24"
 
       - name: Install frontend dependencies
-        if: ${{ steps.scaffold.outputs.present == 'true' }}
+        if: ${{ steps.scaffold.outputs.present == 'true' && steps.scaffold.outputs.stack == 'node' }}
         working-directory: front
         shell: bash
         run: |
@@ -194,7 +219,7 @@ jobs:
           fi
 
       - name: Run frontend checks
-        if: ${{ steps.scaffold.outputs.present == 'true' }}
+        if: ${{ steps.scaffold.outputs.present == 'true' && steps.scaffold.outputs.stack == 'node' }}
         working-directory: front
         shell: bash
         run: |

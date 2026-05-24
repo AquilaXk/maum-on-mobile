@@ -1,0 +1,19 @@
+name: maum_on_mobile_front
+description: Android and iOS Flutter app for Maum On.
+publish_to: none
+version: 0.1.0+1
+
+environment:
+  sdk: ">=3.4.0 <4.0.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+dev_dependencies:
+  flutter_lints: ^6.0.0
+  flutter_test:
+    sdk: flutter
+
+flutter:
+  uses-material-design: true
