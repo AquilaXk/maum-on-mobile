@@ -1,0 +1,240 @@
+name: CI
+
+on:
+  pull_request:
+    branches:
+      - main
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  changes:
+    name: Changes
+    runs-on: ubuntu-latest
+
+    outputs:
+      android: ${{ steps.filter.outputs.android }}
+      ios: ${{ steps.filter.outputs.ios }}
+      javascript: ${{ steps.filter.outputs.javascript }}
+      repository: ${{ steps.filter.outputs.repository }}
+      docs_only: ${{ steps.filter.outputs.docs_only }}
+      ci: ${{ steps.filter.outputs.ci }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Detect changed paths
+        id: filter
+        shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BEFORE_SHA: ${{ github.event.before }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+
+          zero_sha="0000000000000000000000000000000000000000"
+          head_sha="${HEAD_SHA}"
+
+          if [[ "${EVENT_NAME}" == "pull_request" ]]; then
+            base_sha="${BASE_SHA}"
+          elif [[ -n "${BEFORE_SHA}" && "${BEFORE_SHA}" != "${zero_sha}" ]]; then
+            base_sha="${BEFORE_SHA}"
+          else
+            base_sha="$(git rev-list --max-parents=0 HEAD)"
+          fi
+
+          git diff --name-only "${base_sha}" "${head_sha}" > changed-files.txt
+          bash tools/ci/detect-changed-paths.sh changed-files.txt
+
+  repository-contracts:
+    name: Repository Contracts
+    runs-on: ubuntu-latest
+    needs: changes
+    if: ${{ needs.changes.outputs.repository == 'true' || needs.changes.outputs.docs_only == 'true' || needs.changes.outputs.ci == 'true' }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: "24"
+
+      - name: Validate whitespace
+        shell: bash
+        run: |
+          set -euo pipefail
+          if git rev-parse HEAD^ >/dev/null 2>&1; then
+            git diff --check HEAD^ HEAD
+          else
+            git diff-tree --check --root HEAD
+          fi
+
+      - name: Validate CI contracts
+        run: node --test tools/ci/*.test.mjs
+
+      - name: Validate issue forms
+        run: ruby -e 'require "yaml"; ARGV.each { |f| YAML.load_file(f); puts f }' .github/ISSUE_TEMPLATE/*.yml
+
+      - name: Validate tracked Markdown policy
+        shell: bash
+        run: |
+          set -euo pipefail
+          unexpected_markdown="$(git ls-files '*.md' ':!:README.md' ':!:.github/pull_request_template.md')"
+          if [[ -n "${unexpected_markdown}" ]]; then
+            echo "Unexpected tracked Markdown file:"
+            echo "${unexpected_markdown}"
+            exit 1
+          fi
+
+      - name: Validate local agent docs are not tracked
+        shell: bash
+        run: |
+          set -euo pipefail
+          unexpected_agent_files="$(git ls-files AGENTS.md CLAUDE.md GEMINI.md CURSOR.md COPILOT.md docs .codex .claude .cursor .aider .windsurf .ai)"
+          if [[ -n "${unexpected_agent_files}" ]]; then
+            echo "Unexpected tracked local agent file:"
+            echo "${unexpected_agent_files}"
+            exit 1
+          fi
+
+  android:
+    name: Android
+    runs-on: ubuntu-latest
+    needs: changes
+    if: ${{ needs.changes.outputs.android == 'true' }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Detect Android scaffold
+        id: scaffold
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -f android/gradlew ]]; then
+            chmod +x android/gradlew
+            echo "present=true" >> "${GITHUB_OUTPUT}"
+            echo "working_directory=android" >> "${GITHUB_OUTPUT}"
+          elif [[ -f gradlew ]]; then
+            chmod +x gradlew
+            echo "present=true" >> "${GITHUB_OUTPUT}"
+            echo "working_directory=." >> "${GITHUB_OUTPUT}"
+          else
+            echo "present=false" >> "${GITHUB_OUTPUT}"
+            echo "Android scaffold not found; skipping Android checks."
+          fi
+
+      - name: Set up Java
+        if: ${{ steps.scaffold.outputs.present == 'true' }}
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: gradle
+
+      - name: Run Android checks
+        if: ${{ steps.scaffold.outputs.present == 'true' }}
+        working-directory: ${{ steps.scaffold.outputs.working_directory }}
+        run: ./gradlew check --no-daemon
+
+  ios:
+    name: iOS
+    runs-on: macos-latest
+    needs: changes
+    if: ${{ needs.changes.outputs.ios == 'true' }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Validate iOS project metadata
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ ! -d ios ]]; then
+            echo "iOS scaffold not found; skipping iOS checks."
+            exit 0
+          fi
+
+          workspace="$(find ios -maxdepth 4 -name '*.xcworkspace' -print -quit)"
+          project="$(find ios -maxdepth 4 -name '*.xcodeproj' -print -quit)"
+
+          if [[ -n "${workspace}" ]]; then
+            xcodebuild -list -workspace "${workspace}"
+          elif [[ -n "${project}" ]]; then
+            xcodebuild -list -project "${project}"
+          else
+            echo "iOS directory exists, but no Xcode workspace or project was found."
+            exit 1
+          fi
+
+  javascript:
+    name: JavaScript
+    runs-on: ubuntu-latest
+    needs: changes
+    if: ${{ needs.changes.outputs.javascript == 'true' }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Detect JavaScript scaffold
+        id: scaffold
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -f package.json ]]; then
+            echo "present=true" >> "${GITHUB_OUTPUT}"
+          else
+            echo "present=false" >> "${GITHUB_OUTPUT}"
+            echo "JavaScript scaffold not found; skipping JavaScript checks."
+          fi
+
+      - name: Set up Node.js
+        if: ${{ steps.scaffold.outputs.present == 'true' }}
+        uses: actions/setup-node@v6
+        with:
+          node-version: "24"
+
+      - name: Install dependencies
+        if: ${{ steps.scaffold.outputs.present == 'true' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -f package-lock.json ]]; then
+            npm ci
+          else
+            npm install
+          fi
+
+      - name: Run available JavaScript checks
+        if: ${{ steps.scaffold.outputs.present == 'true' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          for script in typecheck lint test build; do
+            if npm pkg get "scripts.${script}" | grep -vq '^{}$'; then
+              npm run "${script}"
+            else
+              echo "npm script '${script}' not found; skipping."
+            fi
+          done
