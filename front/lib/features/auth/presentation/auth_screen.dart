@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../application/auth_controller.dart';
+import '../deeplink/external_login.dart';
 
 enum AuthFormMode {
   login,
@@ -10,10 +11,12 @@ enum AuthFormMode {
 class AuthScreen extends StatefulWidget {
   const AuthScreen({
     required this.controller,
+    this.externalLoginController,
     super.key,
   });
 
   final AuthController controller;
+  final ExternalLoginController? externalLoginController;
 
   @override
   State<AuthScreen> createState() => _AuthScreenState();
@@ -37,6 +40,7 @@ class _AuthScreenState extends State<AuthScreen> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final state = widget.controller.state;
+    final externalLoginState = widget.externalLoginController?.state;
     final isSignup = _mode == AuthFormMode.signup;
 
     return Scaffold(
@@ -62,6 +66,14 @@ class _AuthScreenState extends State<AuthScreen> {
                   if (state.errorMessage != null) ...[
                     _MessagePanel(
                       message: state.errorMessage!,
+                      color: theme.colorScheme.errorContainer,
+                      textColor: theme.colorScheme.onErrorContainer,
+                    ),
+                    const SizedBox(height: 16),
+                  ],
+                  if (externalLoginState?.errorMessage != null) ...[
+                    _MessagePanel(
+                      message: externalLoginState!.errorMessage!,
                       color: theme.colorScheme.errorContainer,
                       textColor: theme.colorScheme.onErrorContainer,
                     ),
@@ -125,6 +137,21 @@ class _AuthScreenState extends State<AuthScreen> {
                     onPressed: state.isSubmitting ? null : _toggleMode,
                     child: Text(isSignup ? '이미 계정이 있어요' : '새 계정 만들기'),
                   ),
+                  if (!isSignup && widget.externalLoginController != null) ...[
+                    const SizedBox(height: 8),
+                    OutlinedButton(
+                      key: const ValueKey('external-login-kakao-button'),
+                      onPressed: externalLoginState?.isStarting == true
+                          ? null
+                          : () => widget.externalLoginController!
+                              .start(provider: 'kakao'),
+                      child: Text(
+                        externalLoginState?.isStarting == true
+                            ? '외부 로그인 준비 중'
+                            : '카카오로 계속하기',
+                      ),
+                    ),
+                  ],
                 ],
               ),
             ),

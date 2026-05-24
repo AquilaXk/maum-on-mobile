@@ -10,6 +10,7 @@ void main() {
     await tester.pumpWidget(
       MaumOnMobileApp(
         authRepository: _FakeAuthRepository(restoredSession: _session()),
+        listenForDeepLinks: false,
       ),
     );
 
@@ -35,6 +36,7 @@ void main() {
             statusCode: 401,
           ),
         ),
+        listenForDeepLinks: false,
       ),
     );
 
