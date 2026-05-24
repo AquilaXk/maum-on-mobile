@@ -1,9 +1,16 @@
 package com.maumonmobile.application.service
 
 import com.maumonmobile.application.port.`in`.ReportCreateCommand
+import com.maumonmobile.application.port.`in`.ReportStatusResult
+import com.maumonmobile.application.port.`in`.ReportStatusUpdateCommand
 import com.maumonmobile.application.port.`in`.ReportUseCase
 import com.maumonmobile.application.port.out.AuthMemberRepository
+import com.maumonmobile.application.port.out.LetterRepository
+import com.maumonmobile.application.port.out.NotificationEventPublisher
+import com.maumonmobile.application.port.out.NotificationRepository
 import com.maumonmobile.application.port.out.ReportRepository
+import com.maumonmobile.application.port.out.StoryRepository
+import com.maumonmobile.domain.moderation.ContentModerationTarget
 import com.maumonmobile.domain.report.ReportDraft
 import com.maumonmobile.domain.report.ReportReason
 import com.maumonmobile.domain.report.ReportTargetType
@@ -16,6 +23,11 @@ import org.springframework.stereotype.Service
 class ReportService(
     private val authMemberRepository: AuthMemberRepository,
     private val reportRepository: ReportRepository,
+    private val storyRepository: StoryRepository,
+    private val letterRepository: LetterRepository,
+    private val notificationRepository: NotificationRepository,
+    private val notificationEventPublisher: NotificationEventPublisher,
+    private val contentModerationService: ContentModerationService,
 ) : ReportUseCase {
 
     override fun create(user: AuthenticatedUser, command: ReportCreateCommand): Long {
@@ -35,7 +47,9 @@ class ReportService(
             throw ApiException(ErrorCode.INVALID_REQUEST, "이미 신고한 콘텐츠입니다.")
         }
 
-        return reportRepository.save(
+        contentModerationService.ensureAllowed(ContentModerationTarget.REPORT, command.content)
+
+        val report = reportRepository.save(
             ReportDraft(
                 reporterId = reporterId,
                 targetId = targetId,
@@ -43,7 +57,69 @@ class ReportService(
                 reason = reason,
                 content = command.content?.trim()?.takeIf(String::isNotEmpty),
             ),
-        ).id
+        )
+        resolveTargetOwnerId(targetType, targetId)
+            ?.takeIf { ownerId -> ownerId != reporterId }
+            ?.let { ownerId ->
+                notifyMember(
+                    memberId = ownerId,
+                    eventName = REPORT_STATUS_EVENT,
+                    message = "작성한 콘텐츠에 신고가 접수되었습니다.",
+                    reportId = report.id,
+                    status = report.status,
+                )
+            }
+
+        return report.id
+    }
+
+    override fun updateStatus(
+        user: AuthenticatedUser,
+        reportId: Long,
+        command: ReportStatusUpdateCommand,
+    ): ReportStatusResult {
+        if ("ADMIN" !in user.roles) {
+            throw ApiException(ErrorCode.FORBIDDEN)
+        }
+
+        val status = command.status.toReportStatus()
+        val report = reportRepository.updateStatus(reportId, status)
+            ?: throw ApiException(ErrorCode.NOT_FOUND, "신고 내역을 찾을 수 없습니다.")
+        notifyMember(
+            memberId = report.reporterId,
+            eventName = REPORT_STATUS_EVENT,
+            message = "신고 처리 결과가 등록되었습니다: ${report.status}",
+            reportId = report.id,
+            status = report.status,
+        )
+
+        return ReportStatusResult(
+            id = report.id,
+            status = report.status,
+        )
+    }
+
+    private fun resolveTargetOwnerId(targetType: ReportTargetType, targetId: Long): Long? {
+        return when (targetType) {
+            ReportTargetType.POST -> storyRepository.findPostById(targetId)?.authorId
+            ReportTargetType.COMMENT -> storyRepository.findCommentById(targetId)?.authorId
+            ReportTargetType.LETTER -> letterRepository.findById(targetId)?.senderId
+        }
+    }
+
+    private fun notifyMember(
+        memberId: Long,
+        eventName: String,
+        message: String,
+        reportId: Long,
+        status: String,
+    ) {
+        notificationRepository.save(memberId, message)
+        notificationEventPublisher.publish(
+            memberId,
+            eventName,
+            reportPayload(message = message, reportId = reportId, status = status),
+        )
     }
 }
 
@@ -56,3 +132,33 @@ private fun String?.toReportReason(): ReportReason {
     return enumValues<ReportReason>().firstOrNull { reason -> reason.name == this?.trim() }
         ?: throw ApiException(ErrorCode.INVALID_REQUEST, "신고 사유를 확인해 주세요.")
 }
+
+private fun String?.toReportStatus(): String {
+    val status = this?.trim()?.uppercase()
+    if (status == null || status !in REPORT_STATUSES) {
+        throw ApiException(ErrorCode.INVALID_REQUEST, "신고 처리 상태를 확인해 주세요.")
+    }
+    return status
+}
+
+private fun reportPayload(message: String, reportId: Long, status: String): String {
+    return """{"message":"${message.escapeJson()}","reportId":$reportId,"status":"${status.escapeJson()}"}"""
+}
+
+private fun String.escapeJson(): String {
+    return buildString {
+        for (character in this@escapeJson) {
+            when (character) {
+                '\\' -> append("\\\\")
+                '"' -> append("\\\"")
+                '\n' -> append("\\n")
+                '\r' -> append("\\r")
+                '\t' -> append("\\t")
+                else -> append(character)
+            }
+        }
+    }
+}
+
+private const val REPORT_STATUS_EVENT = "report_status"
+private val REPORT_STATUSES = setOf("RESOLVED", "REJECTED")

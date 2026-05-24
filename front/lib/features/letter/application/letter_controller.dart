@@ -1,6 +1,8 @@
 import 'package:flutter/foundation.dart';
 
 import '../../../core/network/api_error.dart';
+import '../../moderation/data/content_moderation_repository.dart';
+import '../../moderation/domain/content_moderation_models.dart';
 import '../data/letter_repository.dart';
 import '../domain/letter_models.dart';
 
@@ -125,13 +127,16 @@ class LetterState {
 class LetterController extends ChangeNotifier {
   LetterController({
     required LetterRepository letterRepository,
+    ContentModerationRepository? moderationRepository,
     VoidCallback? onUnauthorized,
     ValueChanged<LetterReportTarget>? onReportTargetSelected,
   })  : _letterRepository = letterRepository,
+        _moderationRepository = moderationRepository,
         _onUnauthorized = onUnauthorized,
         _onReportTargetSelected = onReportTargetSelected;
 
   final LetterRepository _letterRepository;
+  final ContentModerationRepository? _moderationRepository;
   final VoidCallback? _onUnauthorized;
   final ValueChanged<LetterReportTarget>? _onReportTargetSelected;
 
@@ -224,6 +229,10 @@ class LetterController extends ChangeNotifier {
     );
 
     try {
+      if (!await _ensureModerationAllowed('${draft.title}\n${draft.content}')) {
+        return;
+      }
+
       await _letterRepository.createLetter(draft);
       _setState(
         _state.copyWith(
@@ -388,6 +397,10 @@ class LetterController extends ChangeNotifier {
     _setState(_state.copyWith(isSubmitting: true, clearErrorMessage: true));
 
     try {
+      if (!await _ensureModerationAllowed(_state.replyContent.trim())) {
+        return;
+      }
+
       await _letterRepository.replyLetter(
           letter.id, _state.replyContent.trim());
       await _reloadSelectedLetter(letter.id);
@@ -482,6 +495,33 @@ class LetterController extends ChangeNotifier {
     final stats = await _letterRepository.fetchStats();
     final page = await _fetchPage(_state.activeTab);
     _setMailboxPage(_state.activeTab, page, stats);
+  }
+
+  Future<bool> _ensureModerationAllowed(String text) async {
+    final repository = _moderationRepository;
+    if (repository == null) {
+      return true;
+    }
+
+    final result = await repository.reviewText(
+      targetType: ContentModerationTarget.letter,
+      text: text,
+    );
+    if (result.allowed) {
+      if (result.riskLevel != ContentModerationRiskLevel.low) {
+        _setState(_state.copyWith(noticeMessage: result.message));
+      }
+      return true;
+    }
+
+    _setState(
+      _state.copyWith(
+        isSubmitting: false,
+        errorMessage: result.message,
+        clearNoticeMessage: true,
+      ),
+    );
+    return false;
   }
 
   void _handleError(Object error) {

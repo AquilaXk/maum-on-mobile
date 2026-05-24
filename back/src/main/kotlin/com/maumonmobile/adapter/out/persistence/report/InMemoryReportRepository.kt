@@ -31,6 +31,16 @@ class InMemoryReportRepository : ReportRepository {
         return report
     }
 
+    override fun findById(id: Long): Report? {
+        return reportsById[id]
+    }
+
+    override fun updateStatus(id: Long, status: String): Report? {
+        return reportsById.computeIfPresent(id) { _, report ->
+            report.copy(status = status)
+        }
+    }
+
     override fun existsByReporterAndTarget(
         reporterId: Long,
         targetId: Long,

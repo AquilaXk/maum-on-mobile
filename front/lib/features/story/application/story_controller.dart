@@ -1,6 +1,8 @@
 import 'package:flutter/foundation.dart';
 
 import '../../../core/network/api_error.dart';
+import '../../moderation/data/content_moderation_repository.dart';
+import '../../moderation/domain/content_moderation_models.dart';
 import '../data/story_repository.dart';
 import '../domain/story_models.dart';
 
@@ -139,15 +141,18 @@ class StoryController extends ChangeNotifier {
   StoryController({
     required StoryRepository storyRepository,
     required int currentMemberId,
+    ContentModerationRepository? moderationRepository,
     VoidCallback? onUnauthorized,
     ValueChanged<StoryReportTarget>? onReportTargetSelected,
   })  : _storyRepository = storyRepository,
         _currentMemberId = currentMemberId,
+        _moderationRepository = moderationRepository,
         _onUnauthorized = onUnauthorized,
         _onReportTargetSelected = onReportTargetSelected;
 
   final StoryRepository _storyRepository;
   final int _currentMemberId;
+  final ContentModerationRepository? _moderationRepository;
   final VoidCallback? _onUnauthorized;
   final ValueChanged<StoryReportTarget>? _onReportTargetSelected;
 
@@ -335,6 +340,13 @@ class StoryController extends ChangeNotifier {
     );
 
     try {
+      if (!await _ensureModerationAllowed(
+        targetType: ContentModerationTarget.story,
+        text: '${draft.title}\n${draft.content}',
+      )) {
+        return;
+      }
+
       final int storyId;
       if (editingId == null) {
         storyId = await _storyRepository.createStory(draft);
@@ -429,6 +441,13 @@ class StoryController extends ChangeNotifier {
     _setState(_state.copyWith(isSubmitting: true, clearErrorMessage: true));
 
     try {
+      if (!await _ensureModerationAllowed(
+        targetType: ContentModerationTarget.comment,
+        text: _state.commentDraft.trim(),
+      )) {
+        return;
+      }
+
       await _storyRepository.createComment(
         postId: story.id,
         authorId: _currentMemberId,
@@ -494,6 +513,13 @@ class StoryController extends ChangeNotifier {
     _setState(_state.copyWith(isSubmitting: true, clearErrorMessage: true));
 
     try {
+      if (!await _ensureModerationAllowed(
+        targetType: ContentModerationTarget.comment,
+        text: _state.editingCommentContent.trim(),
+      )) {
+        return;
+      }
+
       await _storyRepository.updateComment(
         commentId,
         _state.editingCommentContent.trim(),
@@ -580,6 +606,36 @@ class StoryController extends ChangeNotifier {
       storyContent: '',
       storyCategory: StoryCategory.worry,
     );
+  }
+
+  Future<bool> _ensureModerationAllowed({
+    required ContentModerationTarget targetType,
+    required String text,
+  }) async {
+    final repository = _moderationRepository;
+    if (repository == null) {
+      return true;
+    }
+
+    final result = await repository.reviewText(
+      targetType: targetType,
+      text: text,
+    );
+    if (result.allowed) {
+      if (result.riskLevel != ContentModerationRiskLevel.low) {
+        _setState(_state.copyWith(noticeMessage: result.message));
+      }
+      return true;
+    }
+
+    _setState(
+      _state.copyWith(
+        isSubmitting: false,
+        errorMessage: result.message,
+        clearNoticeMessage: true,
+      ),
+    );
+    return false;
   }
 
   void _handleError(Object error) {

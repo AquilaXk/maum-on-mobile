@@ -1,5 +1,6 @@
 package com.maumonmobile.adapter.out.sse.notification
 
+import com.maumonmobile.application.port.out.NotificationEventPublisher
 import com.maumonmobile.application.port.out.NotificationSubscriptionPort
 import org.springframework.stereotype.Component
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter
@@ -10,7 +11,7 @@ import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.CopyOnWriteArrayList
 
 @Component
-class NotificationStreamRegistry : NotificationSubscriptionPort {
+class NotificationStreamRegistry : NotificationSubscriptionPort, NotificationEventPublisher {
     private val emittersByMemberId = ConcurrentHashMap<Long, CopyOnWriteArrayList<SseEmitter>>()
     private val ticketsByValue = ConcurrentHashMap<String, SubscriptionTicket>()
 
@@ -49,7 +50,7 @@ class NotificationStreamRegistry : NotificationSubscriptionPort {
         return emitter
     }
 
-    fun publish(memberId: Long, eventName: String, data: String) {
+    override fun publish(memberId: Long, eventName: String, data: String) {
         emittersByMemberId[memberId]
             ?.forEach { emitter -> sendOrRemove(memberId, emitter, eventName, data) }
     }

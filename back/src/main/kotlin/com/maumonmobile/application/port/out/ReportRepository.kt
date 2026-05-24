@@ -7,6 +7,10 @@ import com.maumonmobile.domain.report.ReportTargetType
 interface ReportRepository {
     fun save(draft: ReportDraft): Report
 
+    fun findById(id: Long): Report?
+
+    fun updateStatus(id: Long, status: String): Report?
+
     fun existsByReporterAndTarget(
         reporterId: Long,
         targetId: Long,

@@ -161,6 +161,51 @@ class StoryControllerTest @Autowired constructor(
             }
     }
 
+    @Test
+    fun rejectsHighRiskStoriesAndCommentsBeforePersistence() {
+        val author = signupAndLogin("story-moderation-author@example.com", "작성자")
+        val other = signupAndLogin("story-moderation-other@example.com", "댓글이")
+
+        mockMvc.post("/api/v1/posts") {
+            header("Authorization", "Bearer ${author.accessToken}")
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"title":"화가 나는 밤","content":"너 죽어 버려","category":"WORRY"}"""
+        }
+            .andExpect {
+                status { isBadRequest() }
+                jsonPath("$.error.code") { value("INVALID_REQUEST") }
+                jsonPath("$.error.message") { value("위험도가 높은 표현이 포함되어 수정이 필요합니다.") }
+            }
+
+        val createResult = mockMvc.post("/api/v1/posts") {
+            header("Authorization", "Bearer ${author.accessToken}")
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"title":"대화가 필요해요","content":"조심스럽게 이야기하고 싶어요.","category":"WORRY"}"""
+        }
+            .andExpect {
+                status { isOk() }
+            }
+            .andReturn()
+        val postId = createResult.response.readJsonInt("$.data")
+
+        mockMvc.post("/api/v1/posts/$postId/comments") {
+            header("Authorization", "Bearer ${other.accessToken}")
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"content":"010-1234-5678로 연락해 주세요."}"""
+        }
+            .andExpect {
+                status { isBadRequest() }
+                jsonPath("$.error.code") { value("INVALID_REQUEST") }
+                jsonPath("$.error.message") { value("위험도가 높은 표현이 포함되어 수정이 필요합니다.") }
+            }
+
+        mockMvc.get("/api/v1/posts/$postId/comments?page=0&size=20")
+            .andExpect {
+                status { isOk() }
+                jsonPath("$.data.totalElements") { value(0) }
+            }
+    }
+
     private fun signupAndLogin(email: String, nickname: String): TestMember {
         val signupResult = mockMvc.post("/api/v1/auth/signup") {
             contentType = MediaType.APPLICATION_JSON
