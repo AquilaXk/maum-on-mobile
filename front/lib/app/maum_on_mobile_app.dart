@@ -10,6 +10,8 @@ import '../features/auth/application/auth_controller.dart';
 import '../features/auth/data/auth_repository.dart';
 import '../features/auth/deeplink/external_login.dart';
 import '../features/auth/presentation/auth_screen.dart';
+import '../features/home/application/home_controller.dart';
+import '../features/home/data/home_repository.dart';
 import '../features/home/home_screen.dart';
 import '../theme/app_theme.dart';
 import 'app_routes.dart';
@@ -20,6 +22,7 @@ class MaumOnMobileApp extends StatefulWidget {
     this.externalLoginLauncher,
     this.externalLoginConfig,
     this.deepLinkSource,
+    this.homeRepository,
     this.listenForDeepLinks = true,
     super.key,
   });
@@ -28,6 +31,7 @@ class MaumOnMobileApp extends StatefulWidget {
   final ExternalLoginLauncher? externalLoginLauncher;
   final ExternalLoginConfig? externalLoginConfig;
   final ExternalLoginDeepLinkSource? deepLinkSource;
+  final HomeRepository? homeRepository;
   final bool listenForDeepLinks;
 
   @override
@@ -36,8 +40,15 @@ class MaumOnMobileApp extends StatefulWidget {
 
 class _MaumOnMobileAppState extends State<MaumOnMobileApp> {
   late final ApiConfig _apiConfig = ApiConfig.fromEnvironment();
+  late final SecureAuthTokenStore _tokenStore = const SecureAuthTokenStore();
+  late final DioApiTransport _apiTransport = DioApiTransport.fromConfig(
+    _apiConfig,
+  );
   late final AuthController _authController = AuthController(
     authRepository: widget.authRepository ?? _buildDefaultAuthRepository(),
+  );
+  late final HomeController _homeController = HomeController(
+    homeRepository: widget.homeRepository ?? _buildDefaultHomeRepository(),
   );
   late final ExternalLoginController _externalLoginController =
       ExternalLoginController(
@@ -95,6 +106,7 @@ class _MaumOnMobileAppState extends State<MaumOnMobileApp> {
           return HomeScreen(
             routeTitle: initialRoute.title,
             nickname: state.member!.nickname,
+            homeController: _homeController,
             onLogout: () {
               _authController.logout();
             },
@@ -105,22 +117,29 @@ class _MaumOnMobileAppState extends State<MaumOnMobileApp> {
   }
 
   AuthRepository _buildDefaultAuthRepository() {
-    const tokenStore = SecureAuthTokenStore();
-    final transport = DioApiTransport.fromConfig(_apiConfig);
     final refreshRepository = ApiAuthRepository(
-      apiClient: ApiClient(transport: transport, tokenStore: tokenStore),
-      tokenStore: tokenStore,
+      apiClient: ApiClient(transport: _apiTransport, tokenStore: _tokenStore),
+      tokenStore: _tokenStore,
     );
 
     return ApiAuthRepository(
       apiClient: ApiClient(
-        transport: transport,
-        tokenStore: tokenStore,
+        transport: _apiTransport,
+        tokenStore: _tokenStore,
         tokenRefresher: AuthSessionTokenRefresher(
           authRepository: refreshRepository,
         ),
       ),
-      tokenStore: tokenStore,
+      tokenStore: _tokenStore,
+    );
+  }
+
+  HomeRepository _buildDefaultHomeRepository() {
+    return ApiHomeRepository(
+      apiClient: ApiClient(
+        transport: _apiTransport,
+        tokenStore: _tokenStore,
+      ),
     );
   }
 

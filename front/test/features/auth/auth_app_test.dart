@@ -4,12 +4,15 @@ import 'package:maum_on_mobile_front/app/maum_on_mobile_app.dart';
 import 'package:maum_on_mobile_front/core/network/api_error.dart';
 import 'package:maum_on_mobile_front/features/auth/data/auth_repository.dart';
 import 'package:maum_on_mobile_front/features/auth/domain/auth_models.dart';
+import 'package:maum_on_mobile_front/features/home/data/home_repository.dart';
+import 'package:maum_on_mobile_front/features/home/domain/home_models.dart';
 
 void main() {
   testWidgets('restores a session and renders the authenticated home', (tester) async {
     await tester.pumpWidget(
       MaumOnMobileApp(
         authRepository: _FakeAuthRepository(restoredSession: _session()),
+        homeRepository: const _FakeHomeRepository(),
         listenForDeepLinks: false,
       ),
     );
@@ -36,6 +39,7 @@ void main() {
             statusCode: 401,
           ),
         ),
+        homeRepository: const _FakeHomeRepository(),
         listenForDeepLinks: false,
       ),
     );
@@ -55,6 +59,26 @@ void main() {
     expect(find.text('이메일 또는 비밀번호가 맞지 않아요.'), findsOneWidget);
     expect(find.text('로그인'), findsWidgets);
   });
+}
+
+class _FakeHomeRepository implements HomeRepository {
+  const _FakeHomeRepository();
+
+  @override
+  Future<HomeStats> fetchStats() async {
+    return const HomeStats(
+      todayWorryCount: 1,
+      todayLetterCount: 2,
+      todayDiaryCount: 3,
+    );
+  }
+
+  @override
+  Future<HomeStoryPage> fetchStories({
+    HomeStoryCategory category = HomeStoryCategory.all,
+  }) async {
+    return const HomeStoryPage(items: [], last: true);
+  }
 }
 
 AuthSession _session() {
