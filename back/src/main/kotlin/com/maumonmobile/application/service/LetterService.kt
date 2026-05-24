@@ -8,6 +8,7 @@ import com.maumonmobile.application.port.`in`.LetterSummaryResult
 import com.maumonmobile.application.port.`in`.LetterUseCase
 import com.maumonmobile.application.port.out.AuthMemberRepository
 import com.maumonmobile.application.port.out.LetterRepository
+import com.maumonmobile.application.port.out.NotificationDeliveryPort
 import com.maumonmobile.domain.letter.Letter
 import com.maumonmobile.domain.letter.LetterDraft
 import com.maumonmobile.domain.moderation.ContentModerationTarget
@@ -22,6 +23,7 @@ import kotlin.math.ceil
 class LetterService(
     private val letterRepository: LetterRepository,
     private val authMemberRepository: AuthMemberRepository,
+    private val notificationDeliveryPort: NotificationDeliveryPort,
     private val contentModerationService: ContentModerationService,
 ) : LetterUseCase {
 
@@ -31,11 +33,23 @@ class LetterService(
             ?: throw ApiException(ErrorCode.UNAUTHORIZED, "다시 로그인해 주세요.")
         contentModerationService.ensureAllowed(ContentModerationTarget.LETTER, command.title, command.content)
 
-        return letterRepository.save(
+        val letter = letterRepository.save(
             senderId = member.id,
             senderNickname = member.nickname,
             draft = command.toDraft(),
-        ).id
+        )
+        authMemberRepository.findAllActive()
+            .filter { receiver -> receiver.id != member.id && receiver.randomReceiveAllowed }
+            .forEach { receiver ->
+                deliverLetterNotification(
+                    memberId = receiver.id,
+                    eventName = NEW_LETTER_EVENT,
+                    message = "새로운 랜덤 편지가 도착했습니다!",
+                    letterId = letter.id,
+                    status = letter.status,
+                )
+            }
+        return letter.id
     }
 
     override fun received(user: AuthenticatedUser, page: Int, size: Int): LetterListResult {
@@ -76,7 +90,15 @@ class LetterService(
 
     override fun accept(user: AuthenticatedUser, letterId: Long) {
         val letter = findReceivedLetter(user.memberId(), letterId)
-        letterRepository.update(letter.copy(status = "ACCEPTED"))
+        val updated = letter.copy(status = "ACCEPTED")
+        letterRepository.update(updated)
+        deliverLetterNotification(
+            memberId = updated.senderId,
+            eventName = LETTER_READ_EVENT,
+            message = "상대방이 편지를 읽었습니다.",
+            letterId = updated.id,
+            status = updated.status,
+        )
     }
 
     override fun reject(user: AuthenticatedUser, letterId: Long) {
@@ -89,18 +111,32 @@ class LetterService(
 
     override fun markWriting(user: AuthenticatedUser, letterId: Long) {
         val letter = findReceivedLetter(user.memberId(), letterId)
-        letterRepository.update(letter.copy(status = "WRITING"))
+        val updated = letter.copy(status = "WRITING")
+        letterRepository.update(updated)
+        deliverLetterNotification(
+            memberId = updated.senderId,
+            eventName = WRITING_STATUS_EVENT,
+            message = "상대방이 답장을 작성 중입니다.",
+            letterId = updated.id,
+            status = updated.status,
+        )
     }
 
     override fun reply(user: AuthenticatedUser, letterId: Long, replyContent: String) {
         val letter = findReceivedLetter(user.memberId(), letterId)
         contentModerationService.ensureAllowed(ContentModerationTarget.LETTER, replyContent)
-        letterRepository.update(
-            letter.copy(
-                status = "REPLIED",
-                replyContent = replyContent.trim(),
-                replyCreatedDate = Instant.now().toString(),
-            ),
+        val updated = letter.copy(
+            status = "REPLIED",
+            replyContent = replyContent.trim(),
+            replyCreatedDate = Instant.now().toString(),
+        )
+        letterRepository.update(updated)
+        deliverLetterNotification(
+            memberId = updated.senderId,
+            eventName = REPLY_ARRIVAL_EVENT,
+            message = "보낸 편지에 답장이 도착했습니다!",
+            letterId = updated.id,
+            status = updated.status,
         )
     }
 
@@ -128,6 +164,24 @@ class LetterService(
         }
 
         return letter
+    }
+
+    private fun deliverLetterNotification(
+        memberId: Long,
+        eventName: String,
+        message: String,
+        letterId: Long,
+        status: String,
+    ) {
+        notificationDeliveryPort.deliver(
+            memberId = memberId,
+            eventName = eventName,
+            message = message,
+            attributes = mapOf(
+                "letterId" to letterId,
+                "status" to status,
+            ),
+        )
     }
 }
 
@@ -194,3 +248,8 @@ private fun Letter.toResult(): LetterResult {
 private fun AuthenticatedUser.memberId(): Long {
     return id.toLongOrNull() ?: throw ApiException(ErrorCode.UNAUTHORIZED, "다시 로그인해 주세요.")
 }
+
+private const val NEW_LETTER_EVENT = "new_letter"
+private const val LETTER_READ_EVENT = "letter_read"
+private const val WRITING_STATUS_EVENT = "writing_status"
+private const val REPLY_ARRIVAL_EVENT = "reply_arrival"

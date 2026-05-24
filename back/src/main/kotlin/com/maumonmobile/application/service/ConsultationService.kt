@@ -11,6 +11,7 @@ import com.maumonmobile.application.port.out.ConsultationAiRequest
 import com.maumonmobile.application.port.out.ConsultationAiResponder
 import com.maumonmobile.application.port.out.ConsultationAiUnavailableException
 import com.maumonmobile.application.port.out.ConsultationRepository
+import com.maumonmobile.application.port.out.NotificationDeliveryPort
 import com.maumonmobile.domain.auth.AuthMember
 import com.maumonmobile.domain.consultation.ConsultationMessage
 import com.maumonmobile.domain.consultation.ConsultationMessageSender
@@ -30,6 +31,7 @@ class ConsultationService(
     private val authMemberRepository: AuthMemberRepository,
     private val consultationRepository: ConsultationRepository,
     private val consultationAiResponder: ConsultationAiResponder,
+    private val notificationDeliveryPort: NotificationDeliveryPort,
     @param:Value("\${app.consultation.ai.timeout:PT8S}")
     private val aiTimeout: Duration,
 ) : ConsultationUseCase {
@@ -64,6 +66,18 @@ class ConsultationService(
                 ConsultationMessageSender.SYSTEM
             },
             content = reply.content,
+        )
+        notificationDeliveryPort.deliver(
+            memberId = member.id,
+            eventName = CONSULTATION_REPLY_EVENT,
+            message = if (reply.errorMessage == null) {
+                "상담 답변이 도착했습니다."
+            } else {
+                reply.errorMessage
+            },
+            attributes = mapOf(
+                "status" to if (reply.errorMessage == null) "READY" else "FALLBACK",
+            ),
         )
 
         return ConsultationChatResult(
@@ -130,6 +144,7 @@ class ConsultationService(
 
     private companion object {
         private const val FALLBACK_MESSAGE = "지금은 답변을 만들지 못했습니다. 잠시 후 다시 시도해 주세요."
+        private const val CONSULTATION_REPLY_EVENT = "consultation_reply"
     }
 }
 

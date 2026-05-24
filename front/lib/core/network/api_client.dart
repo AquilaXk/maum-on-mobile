@@ -229,6 +229,27 @@ class ApiClient {
     );
   }
 
+  Future<T> delete<T>(
+    String path, {
+    required T Function(Object? json) parser,
+    Object? body,
+    Map<String, Object?> queryParameters = const {},
+    bool requiresAuth = true,
+    bool retryOnUnauthorized = true,
+  }) {
+    return _send(
+      ApiRequest(
+        method: ApiMethod.delete,
+        path: path,
+        body: body,
+        queryParameters: queryParameters,
+        requiresAuth: requiresAuth,
+        retryOnUnauthorized: retryOnUnauthorized,
+      ),
+      parser,
+    );
+  }
+
   Future<T> _send<T>(
     ApiRequest request,
     T Function(Object? json) parser, {

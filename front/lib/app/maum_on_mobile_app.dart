@@ -28,6 +28,7 @@ import '../features/letter/presentation/letter_screen.dart';
 import '../features/moderation/data/content_moderation_repository.dart';
 import '../features/notification/application/notification_controller.dart';
 import '../features/notification/data/notification_repository.dart';
+import '../features/notification/data/push_notification_permission_client.dart';
 import '../features/notification/presentation/notification_report_screen.dart';
 import '../features/report/application/report_controller.dart';
 import '../features/report/data/report_repository.dart';
@@ -51,6 +52,7 @@ class MaumOnMobileApp extends StatefulWidget {
     this.homeRepository,
     this.consultationRepository,
     this.notificationRepository,
+    this.pushNotificationPermissionClient,
     this.reportRepository,
     this.settingsRepository,
     this.diaryRepository,
@@ -72,6 +74,7 @@ class MaumOnMobileApp extends StatefulWidget {
   final HomeRepository? homeRepository;
   final ConsultationRepository? consultationRepository;
   final NotificationRepository? notificationRepository;
+  final PushNotificationPermissionClient? pushNotificationPermissionClient;
   final ReportRepository? reportRepository;
   final SettingsRepository? settingsRepository;
   final DiaryRepository? diaryRepository;
@@ -364,6 +367,8 @@ class _MaumOnMobileAppState extends State<MaumOnMobileApp> {
     return _notificationController = NotificationController(
       repository:
           widget.notificationRepository ?? _buildDefaultNotificationRepository(),
+      pushPermissionClient: widget.pushNotificationPermissionClient ??
+          const MethodChannelPushNotificationPermissionClient(),
       onUnauthorized: () {
         _authController.logout();
       },

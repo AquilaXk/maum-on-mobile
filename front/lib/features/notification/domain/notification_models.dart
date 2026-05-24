@@ -14,7 +14,28 @@ enum NotificationStreamEventType {
   writingStatus,
   replyArrival,
   reportStatus,
+  consultationReply,
   unknown,
+}
+
+enum NotificationDevicePlatform {
+  android,
+  ios;
+
+  String get apiValue {
+    return switch (this) {
+      NotificationDevicePlatform.android => 'ANDROID',
+      NotificationDevicePlatform.ios => 'IOS',
+    };
+  }
+
+  static NotificationDevicePlatform fromJson(Object? value) {
+    return switch (value?.toString().toUpperCase()) {
+      'ANDROID' => NotificationDevicePlatform.android,
+      'IOS' => NotificationDevicePlatform.ios,
+      _ => throw FormatException('Unknown notification platform: $value'),
+    };
+  }
 }
 
 class NotificationItem {
@@ -23,6 +44,7 @@ class NotificationItem {
     required this.content,
     required this.isRead,
     required this.createdAt,
+    this.readAt,
   });
 
   factory NotificationItem.fromJson(Object? json) {
@@ -41,6 +63,7 @@ class NotificationItem {
               map['modifyDate'] ??
               '')
           .toString(),
+      readAt: _readNullableString(map['readAt']),
     );
   }
 
@@ -48,6 +71,23 @@ class NotificationItem {
   final String content;
   final bool isRead;
   final String createdAt;
+  final String? readAt;
+
+  NotificationItem copyWith({
+    int? id,
+    String? content,
+    bool? isRead,
+    String? createdAt,
+    String? readAt,
+  }) {
+    return NotificationItem(
+      id: id ?? this.id,
+      content: content ?? this.content,
+      isRead: isRead ?? this.isRead,
+      createdAt: createdAt ?? this.createdAt,
+      readAt: readAt ?? this.readAt,
+    );
+  }
 }
 
 class NotificationSubscriptionTicket {
@@ -80,6 +120,8 @@ class NotificationStreamEvent {
     this.letterId,
     this.reportId,
     this.status,
+    this.notificationId,
+    this.createdAt,
   });
 
   const NotificationStreamEvent.connect(String data)
@@ -121,12 +163,30 @@ class NotificationStreamEvent {
     String message, {
     int? reportId,
     String? status,
+    int? notificationId,
+    String? createdAt,
   }) : this._(
           type: NotificationStreamEventType.reportStatus,
           data: message,
           message: message,
           reportId: reportId,
           status: status,
+          notificationId: notificationId,
+          createdAt: createdAt,
+        );
+
+  const NotificationStreamEvent.consultationReply(
+    String message, {
+    String? status,
+    int? notificationId,
+    String? createdAt,
+  }) : this._(
+          type: NotificationStreamEventType.consultationReply,
+          data: message,
+          message: message,
+          status: status,
+          notificationId: notificationId,
+          createdAt: createdAt,
         );
 
   const NotificationStreamEvent.unknown(String data)
@@ -151,6 +211,8 @@ class NotificationStreamEvent {
           message: message.isEmpty ? '새로운 랜덤 편지가 도착했습니다!' : message,
           letterId: payload.letterId,
           status: payload.status,
+          notificationId: payload.notificationId,
+          createdAt: payload.createdAt,
         ),
       'letter_read' => NotificationStreamEvent._(
           type: NotificationStreamEventType.letterRead,
@@ -158,6 +220,8 @@ class NotificationStreamEvent {
           message: message.isEmpty ? '상대방이 편지를 읽었습니다.' : message,
           letterId: payload.letterId,
           status: payload.status,
+          notificationId: payload.notificationId,
+          createdAt: payload.createdAt,
         ),
       'writing_status' => NotificationStreamEvent._(
           type: NotificationStreamEventType.writingStatus,
@@ -165,6 +229,8 @@ class NotificationStreamEvent {
           message: message.isEmpty ? '상대방이 답장을 작성 중입니다.' : message,
           letterId: payload.letterId,
           status: payload.status,
+          notificationId: payload.notificationId,
+          createdAt: payload.createdAt,
         ),
       'reply_arrival' => NotificationStreamEvent._(
           type: NotificationStreamEventType.replyArrival,
@@ -172,6 +238,8 @@ class NotificationStreamEvent {
           message: message.isEmpty ? '보낸 편지에 답장이 도착했습니다!' : message,
           letterId: payload.letterId,
           status: payload.status,
+          notificationId: payload.notificationId,
+          createdAt: payload.createdAt,
         ),
       'report_status' => NotificationStreamEvent._(
           type: NotificationStreamEventType.reportStatus,
@@ -179,6 +247,16 @@ class NotificationStreamEvent {
           message: message.isEmpty ? '신고 처리 결과가 등록되었습니다.' : message,
           reportId: payload.reportId,
           status: payload.status,
+          notificationId: payload.notificationId,
+          createdAt: payload.createdAt,
+        ),
+      'consultation_reply' => NotificationStreamEvent._(
+          type: NotificationStreamEventType.consultationReply,
+          data: data,
+          message: message.isEmpty ? '상담 답변이 도착했습니다.' : message,
+          status: payload.status,
+          notificationId: payload.notificationId,
+          createdAt: payload.createdAt,
         ),
       _ => NotificationStreamEvent.unknown(message),
     };
@@ -190,14 +268,74 @@ class NotificationStreamEvent {
   final int? letterId;
   final int? reportId;
   final String? status;
+  final int? notificationId;
+  final String? createdAt;
+
+  String get dedupeKey {
+    final serverId = notificationId;
+    if (serverId != null && serverId > 0) {
+      return 'notification:$serverId';
+    }
+
+    return [
+      type.name,
+      letterId,
+      reportId,
+      status,
+      message,
+      createdAt,
+    ].join('|');
+  }
 
   bool get shouldDisplay {
     return type == NotificationStreamEventType.newLetter ||
         type == NotificationStreamEventType.letterRead ||
         type == NotificationStreamEventType.writingStatus ||
         type == NotificationStreamEventType.replyArrival ||
-        type == NotificationStreamEventType.reportStatus;
+        type == NotificationStreamEventType.reportStatus ||
+        type == NotificationStreamEventType.consultationReply;
   }
+}
+
+class NotificationBulkReadResult {
+  const NotificationBulkReadResult({required this.updatedCount});
+
+  factory NotificationBulkReadResult.fromJson(Object? json) {
+    if (json is! Map) {
+      throw const FormatException('Expected notification bulk read object.');
+    }
+
+    return NotificationBulkReadResult(
+      updatedCount: _readInt(_stringKeyedMap(json), 'updatedCount'),
+    );
+  }
+
+  final int updatedCount;
+}
+
+class NotificationDeviceTokenResult {
+  const NotificationDeviceTokenResult({
+    required this.platform,
+    required this.enabled,
+    required this.updatedAt,
+  });
+
+  factory NotificationDeviceTokenResult.fromJson(Object? json) {
+    if (json is! Map) {
+      throw const FormatException('Expected notification device token object.');
+    }
+
+    final map = _stringKeyedMap(json);
+    return NotificationDeviceTokenResult(
+      platform: NotificationDevicePlatform.fromJson(map['platform']),
+      enabled: map['enabled'] == true,
+      updatedAt: map['updatedAt']?.toString() ?? '',
+    );
+  }
+
+  final NotificationDevicePlatform platform;
+  final bool enabled;
+  final String updatedAt;
 }
 
 class _NotificationPayload {
@@ -206,12 +344,16 @@ class _NotificationPayload {
     this.letterId,
     this.reportId,
     this.status,
+    this.notificationId,
+    this.createdAt,
   });
 
   final String message;
   final int? letterId;
   final int? reportId;
   final String? status;
+  final int? notificationId;
+  final String? createdAt;
 }
 
 _NotificationPayload _decodePayload(String data) {
@@ -224,6 +366,8 @@ _NotificationPayload _decodePayload(String data) {
         letterId: _readOptionalInt(map, 'letterId'),
         reportId: _readOptionalInt(map, 'reportId'),
         status: _readNullableString(map['status']),
+        notificationId: _readOptionalInt(map, 'notificationId'),
+        createdAt: _readNullableString(map['createdAt']),
       );
     }
   } on FormatException {

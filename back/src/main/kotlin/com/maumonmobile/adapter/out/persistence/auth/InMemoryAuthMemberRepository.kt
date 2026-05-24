@@ -2,6 +2,7 @@ package com.maumonmobile.adapter.out.persistence.auth
 
 import com.maumonmobile.application.port.out.AuthMemberRepository
 import com.maumonmobile.domain.auth.AuthMember
+import com.maumonmobile.domain.auth.AuthMemberStatus
 import org.springframework.context.annotation.Profile
 import org.springframework.stereotype.Repository
 import java.util.concurrent.ConcurrentHashMap
@@ -31,6 +32,12 @@ class InMemoryAuthMemberRepository : AuthMemberRepository {
     }
 
     override fun findById(id: Long): AuthMember? = membersById[id]
+
+    override fun findAllActive(): List<AuthMember> {
+        return membersById.values
+            .filter { member -> member.status == AuthMemberStatus.ACTIVE }
+            .sortedBy { member -> member.id }
+    }
 
     override fun findByEmail(email: String): AuthMember? {
         val memberId = memberIdsByEmail[email.trim().lowercase()] ?: return null

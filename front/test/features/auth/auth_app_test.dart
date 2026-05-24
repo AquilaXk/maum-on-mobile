@@ -579,6 +579,39 @@ class _FakeNotificationRepository implements NotificationRepository {
   }
 
   @override
+  Future<NotificationItem> markRead(int notificationId) async {
+    return NotificationItem(
+      id: notificationId,
+      content: '상대방이 편지를 읽었습니다.',
+      isRead: true,
+      createdAt: '2026-05-24T09:00:00',
+      readAt: '2026-05-24T09:01:00',
+    );
+  }
+
+  @override
+  Future<NotificationBulkReadResult> markAllRead() async {
+    return const NotificationBulkReadResult(updatedCount: 1);
+  }
+
+  @override
+  Future<NotificationDeviceTokenResult> registerDeviceToken({
+    required NotificationDevicePlatform platform,
+    required String token,
+  }) async {
+    return NotificationDeviceTokenResult(
+      platform: platform,
+      enabled: true,
+      updatedAt: '2026-05-24T09:02:00',
+    );
+  }
+
+  @override
+  Future<bool> unregisterDeviceToken(String token) async {
+    return true;
+  }
+
+  @override
   Future<NotificationSubscriptionTicket> requestSubscriptionTicket() async {
     ticketRequestCount += 1;
     return const NotificationSubscriptionTicket(

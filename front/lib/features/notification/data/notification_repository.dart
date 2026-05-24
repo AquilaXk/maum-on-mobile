@@ -9,6 +9,17 @@ import '../domain/notification_models.dart';
 abstract interface class NotificationRepository {
   Future<List<NotificationItem>> fetchNotifications();
 
+  Future<NotificationItem> markRead(int notificationId);
+
+  Future<NotificationBulkReadResult> markAllRead();
+
+  Future<NotificationDeviceTokenResult> registerDeviceToken({
+    required NotificationDevicePlatform platform,
+    required String token,
+  });
+
+  Future<bool> unregisterDeviceToken(String token);
+
   Future<NotificationSubscriptionTicket> requestSubscriptionTicket();
 
   Stream<NotificationStreamEvent> connect(String ticket);
@@ -39,6 +50,46 @@ class ApiNotificationRepository implements NotificationRepository {
 
         return json.map(NotificationItem.fromJson).toList(growable: false);
       },
+    );
+  }
+
+  @override
+  Future<NotificationItem> markRead(int notificationId) {
+    return _apiClient.post<NotificationItem>(
+      '/api/v1/notifications/$notificationId/read',
+      parser: NotificationItem.fromJson,
+    );
+  }
+
+  @override
+  Future<NotificationBulkReadResult> markAllRead() {
+    return _apiClient.post<NotificationBulkReadResult>(
+      '/api/v1/notifications/read-all',
+      parser: NotificationBulkReadResult.fromJson,
+    );
+  }
+
+  @override
+  Future<NotificationDeviceTokenResult> registerDeviceToken({
+    required NotificationDevicePlatform platform,
+    required String token,
+  }) {
+    return _apiClient.post<NotificationDeviceTokenResult>(
+      '/api/v1/notifications/device-tokens',
+      body: {
+        'platform': platform.apiValue,
+        'token': token,
+      },
+      parser: NotificationDeviceTokenResult.fromJson,
+    );
+  }
+
+  @override
+  Future<bool> unregisterDeviceToken(String token) {
+    return _apiClient.delete<bool>(
+      '/api/v1/notifications/device-tokens',
+      body: {'token': token},
+      parser: (json) => json == true,
     );
   }
 
