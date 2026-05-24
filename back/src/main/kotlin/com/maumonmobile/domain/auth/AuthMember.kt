@@ -5,6 +5,8 @@ data class AuthMember(
     val email: String,
     val passwordHash: String,
     val nickname: String,
+    val randomReceiveAllowed: Boolean = true,
+    val socialAccount: Boolean = false,
     val role: AuthMemberRole = AuthMemberRole.USER,
     val status: AuthMemberStatus = AuthMemberStatus.ACTIVE,
 )

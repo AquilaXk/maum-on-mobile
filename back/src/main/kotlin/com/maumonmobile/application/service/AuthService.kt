@@ -9,6 +9,7 @@ import com.maumonmobile.application.port.`in`.RefreshCommand
 import com.maumonmobile.application.port.`in`.SignupCommand
 import com.maumonmobile.application.port.out.AuthMemberRepository
 import com.maumonmobile.domain.auth.AuthMember
+import com.maumonmobile.domain.auth.AuthMemberStatus
 import com.maumonmobile.global.security.AuthenticatedUser
 import com.maumonmobile.global.security.JwtTokenProvider
 import com.maumonmobile.global.web.ApiException
@@ -46,6 +47,10 @@ class AuthService(
         val member = authMemberRepository.findByEmail(command.email.trim().lowercase())
             ?: throw ApiException(ErrorCode.UNAUTHORIZED, "이메일 또는 비밀번호가 올바르지 않습니다.")
 
+        if (member.status != AuthMemberStatus.ACTIVE) {
+            throw ApiException(ErrorCode.UNAUTHORIZED, "다시 로그인해 주세요.")
+        }
+
         if (!passwordEncoder.matches(command.password, member.passwordHash)) {
             throw ApiException(ErrorCode.UNAUTHORIZED, "이메일 또는 비밀번호가 올바르지 않습니다.")
         }
@@ -60,6 +65,10 @@ class AuthService(
     override fun refresh(command: RefreshCommand): AuthSessionResult {
         val member = authMemberRepository.findByRefreshToken(command.refreshToken)
             ?: throw ApiException(ErrorCode.UNAUTHORIZED, "다시 로그인해 주세요.")
+
+        if (member.status != AuthMemberStatus.ACTIVE) {
+            throw ApiException(ErrorCode.UNAUTHORIZED, "다시 로그인해 주세요.")
+        }
 
         authMemberRepository.revokeRefreshToken(command.refreshToken)
         return issueSession(member)
@@ -103,6 +112,10 @@ class AuthService(
     private fun findActiveMember(memberId: Long?): AuthMember {
         val member = memberId?.let(authMemberRepository::findById)
             ?: throw ApiException(ErrorCode.UNAUTHORIZED, "다시 로그인해 주세요.")
+
+        if (member.status != AuthMemberStatus.ACTIVE) {
+            throw ApiException(ErrorCode.UNAUTHORIZED, "다시 로그인해 주세요.")
+        }
 
         return member
     }
