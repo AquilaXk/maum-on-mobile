@@ -13,3 +13,8 @@ app:
       issuer: maum-on-mobile-test
       secret: test-local-change-me-change-me-change-me
       access-token-ttl: PT10M
+  images:
+    local:
+      root: ./build/test-images
+      public-base-path: /images/uploads
+    cleanup-fixed-delay-ms: 86400000

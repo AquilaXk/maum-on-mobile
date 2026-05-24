@@ -3,6 +3,7 @@ package com.maumonmobile.adapter.out.persistence
 import com.maumonmobile.application.port.out.AuthMemberRepository
 import com.maumonmobile.application.port.out.ConsultationRepository
 import com.maumonmobile.application.port.out.DiaryRepository
+import com.maumonmobile.application.port.out.ImageAssetRepository
 import com.maumonmobile.application.port.out.LetterRepository
 import com.maumonmobile.application.port.out.NotificationRepository
 import com.maumonmobile.application.port.out.ReportRepository
@@ -24,6 +25,7 @@ class PersistentRepositoryContextTest @Autowired constructor(
     private val authMemberRepository: AuthMemberRepository,
     private val consultationRepository: ConsultationRepository,
     private val diaryRepository: DiaryRepository,
+    private val imageAssetRepository: ImageAssetRepository,
     private val storyRepository: StoryRepository,
     private val letterRepository: LetterRepository,
     private val notificationRepository: NotificationRepository,
@@ -35,6 +37,7 @@ class PersistentRepositoryContextTest @Autowired constructor(
         assertNotInMemoryRepository(authMemberRepository)
         assertNotInMemoryRepository(consultationRepository)
         assertNotInMemoryRepository(diaryRepository)
+        assertNotInMemoryRepository(imageAssetRepository)
         assertNotInMemoryRepository(storyRepository)
         assertNotInMemoryRepository(letterRepository)
         assertNotInMemoryRepository(notificationRepository)
@@ -42,6 +45,7 @@ class PersistentRepositoryContextTest @Autowired constructor(
 
         assertThat(tableExists("auth_members")).isTrue()
         assertThat(tableExists("diaries")).isTrue()
+        assertThat(tableExists("image_assets")).isTrue()
         assertThat(tableExists("story_posts")).isTrue()
         assertThat(tableExists("story_comments")).isTrue()
         assertThat(tableExists("letters")).isTrue()

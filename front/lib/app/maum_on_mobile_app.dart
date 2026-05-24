@@ -14,6 +14,7 @@ import '../features/consultation/application/consultation_controller.dart';
 import '../features/consultation/data/consultation_repository.dart';
 import '../features/consultation/presentation/consultation_screen.dart';
 import '../features/diary/application/diary_controller.dart';
+import '../features/diary/data/diary_image_repository.dart';
 import '../features/diary/data/diary_repository.dart';
 import '../features/diary/presentation/diary_image_picker.dart';
 import '../features/diary/presentation/diary_screen.dart';
@@ -52,6 +53,7 @@ class MaumOnMobileApp extends StatefulWidget {
     this.reportRepository,
     this.settingsRepository,
     this.diaryRepository,
+    this.diaryImageRepository,
     this.diaryImagePicker,
     this.storyRepository,
     this.onStoryReportTarget,
@@ -71,6 +73,7 @@ class MaumOnMobileApp extends StatefulWidget {
   final ReportRepository? reportRepository;
   final SettingsRepository? settingsRepository;
   final DiaryRepository? diaryRepository;
+  final DiaryImageRepository? diaryImageRepository;
   final DiaryImagePicker? diaryImagePicker;
   final StoryRepository? storyRepository;
   final ValueChanged<StoryReportTarget>? onStoryReportTarget;
@@ -426,6 +429,8 @@ class _MaumOnMobileAppState extends State<MaumOnMobileApp> {
     _diaryMemberId = memberId;
     return _diaryController = DiaryController(
       diaryRepository: widget.diaryRepository ?? _buildDefaultDiaryRepository(),
+      imageRepository:
+          widget.diaryImageRepository ?? _buildDefaultDiaryImageRepository(),
       onUnauthorized: () {
         _authController.logout();
       },
@@ -520,6 +525,23 @@ class _MaumOnMobileAppState extends State<MaumOnMobileApp> {
     );
 
     return ApiDiaryRepository(
+      apiClient: ApiClient(
+        transport: _apiTransport,
+        tokenStore: _tokenStore,
+        tokenRefresher: AuthSessionTokenRefresher(
+          authRepository: refreshRepository,
+        ),
+      ),
+    );
+  }
+
+  DiaryImageRepository _buildDefaultDiaryImageRepository() {
+    final refreshRepository = ApiAuthRepository(
+      apiClient: ApiClient(transport: _apiTransport, tokenStore: _tokenStore),
+      tokenStore: _tokenStore,
+    );
+
+    return ApiDiaryImageRepository(
       apiClient: ApiClient(
         transport: _apiTransport,
         tokenStore: _tokenStore,

@@ -6,29 +6,38 @@ import com.maumonmobile.application.port.`in`.DiarySaveCommand
 import com.maumonmobile.application.port.`in`.DiaryUseCase
 import com.maumonmobile.application.port.out.AuthMemberRepository
 import com.maumonmobile.application.port.out.DiaryRepository
+import com.maumonmobile.application.port.out.ImageLifecyclePort
 import com.maumonmobile.domain.diary.Diary
 import com.maumonmobile.domain.diary.DiaryDraft
 import com.maumonmobile.global.security.AuthenticatedUser
 import com.maumonmobile.global.web.ApiException
 import com.maumonmobile.global.web.ErrorCode
 import org.springframework.stereotype.Service
+import org.springframework.transaction.annotation.Transactional
 import kotlin.math.ceil
 
 @Service
 class DiaryService(
     private val diaryRepository: DiaryRepository,
     private val authMemberRepository: AuthMemberRepository,
+    private val imageLifecyclePort: ImageLifecyclePort,
 ) : DiaryUseCase {
 
+    @Transactional
     override fun create(user: AuthenticatedUser, command: DiarySaveCommand): Long {
         val member = authMemberRepository.findById(user.memberId())
             ?: throw ApiException(ErrorCode.UNAUTHORIZED, "다시 로그인해 주세요.")
+        val draft = command.toDraft()
+        imageLifecyclePort.validateDiaryImage(member.id, draft.imageUrl)
 
-        return diaryRepository.save(
+        val diary = diaryRepository.save(
             memberId = member.id,
             nickname = member.nickname,
-            draft = command.toDraft(),
-        ).id
+            draft = draft,
+        )
+        imageLifecyclePort.attachToDiary(member.id, diary.imageUrl, diary.id)
+
+        return diary.id
     }
 
     override fun list(user: AuthenticatedUser, page: Int, size: Int): DiaryPageResult {
@@ -68,14 +77,26 @@ class DiaryService(
         return findOwnedDiary(user, diaryId).toResult()
     }
 
+    @Transactional
     override fun update(user: AuthenticatedUser, diaryId: Long, command: DiarySaveCommand) {
         val diary = findOwnedDiary(user, diaryId)
-        diaryRepository.update(diary, command.toDraft())
+        val draft = command.toDraft()
+        imageLifecyclePort.validateDiaryImage(diary.memberId, draft.imageUrl)
+
+        val updatedDiary = diaryRepository.update(diary, draft)
+        imageLifecyclePort.replaceDiaryImage(
+            memberId = diary.memberId,
+            previousImageUrl = diary.imageUrl,
+            nextImageUrl = updatedDiary.imageUrl,
+            diaryId = diary.id,
+        )
     }
 
+    @Transactional
     override fun delete(user: AuthenticatedUser, diaryId: Long) {
-        findOwnedDiary(user, diaryId)
+        val diary = findOwnedDiary(user, diaryId)
         diaryRepository.delete(diaryId)
+        imageLifecyclePort.deleteDiaryImage(diary.memberId, diary.imageUrl)
     }
 
     private fun findOwnedDiary(user: AuthenticatedUser, diaryId: Long): Diary {
@@ -95,15 +116,22 @@ private fun AuthenticatedUser.memberId(): Long {
 }
 
 private fun DiarySaveCommand.toDraft(): DiaryDraft {
+    val normalizedImageUrl = imageUrl?.trim()?.takeIf(String::isNotEmpty)
+    if (normalizedImageUrl != null && !normalizedImageUrl.startsWith(MANAGED_IMAGE_URL_PREFIX)) {
+        throw ApiException(ErrorCode.INVALID_REQUEST, "등록되지 않은 이미지 URL입니다.")
+    }
+
     return DiaryDraft(
         title = title.trim(),
         content = content.trim(),
         categoryName = categoryName.trim(),
-        imageUrl = imageUrl?.trim()?.takeIf(String::isNotEmpty),
+        imageUrl = normalizedImageUrl,
         isPrivate = isPrivate,
         imageFilename = imageFilename?.trim()?.takeIf(String::isNotEmpty),
     )
 }
+
+private const val MANAGED_IMAGE_URL_PREFIX = "/images/uploads/"
 
 private fun Diary.toResult(): DiaryResult {
     return DiaryResult(
