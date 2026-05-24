@@ -363,8 +363,10 @@ class _ReportForm extends StatelessWidget {
             SizedBox(
               width: 132,
               child: DropdownButtonFormField<ReportTargetType>(
-                key: const ValueKey('report-target-type-field'),
-                value: selectedTargetType,
+                key: ValueKey(
+                  'report-target-type-field-${selectedTargetType.name}',
+                ),
+                initialValue: selectedTargetType,
                 decoration: const InputDecoration(
                   labelText: '유형',
                   border: OutlineInputBorder(),

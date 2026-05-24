@@ -66,7 +66,7 @@ void main() {
   group('ApiReportRepository', () {
     test('submits a report payload and returns the report id', () async {
       final transport = _FakeApiTransport([
-        ApiTransportResponse(
+        const ApiTransportResponse(
           statusCode: 201,
           body: {
             'resultCode': '201-1',
@@ -143,6 +143,6 @@ class _FakeNotificationStreamClient implements NotificationStreamClient {
   @override
   Stream<NotificationStreamEvent> connect(String ticket) {
     tickets.add(ticket);
-    return Stream<NotificationStreamEvent>.empty();
+    return const Stream<NotificationStreamEvent>.empty();
   }
 }
