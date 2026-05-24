@@ -23,6 +23,7 @@ void main() {
           onWriteLetter: () {},
           onViewStory: () {},
           onOpenConsultation: () {},
+          onOpenNotifications: () {},
           onLogout: () {},
         ),
       ),
@@ -50,6 +51,7 @@ void main() {
     var letterTaps = 0;
     var storyTaps = 0;
     var consultationTaps = 0;
+    var notificationTaps = 0;
 
     await tester.pumpWidget(
       MaterialApp(
@@ -61,6 +63,7 @@ void main() {
           onWriteLetter: () => letterTaps += 1,
           onViewStory: () => storyTaps += 1,
           onOpenConsultation: () => consultationTaps += 1,
+          onOpenNotifications: () => notificationTaps += 1,
           onLogout: () {},
         ),
       ),
@@ -70,11 +73,13 @@ void main() {
     await tester.tap(find.text('편지 쓰기'));
     await tester.tap(find.text('스토리 보기'));
     await tester.tap(find.text('상담하기'));
+    await tester.tap(find.text('알림/신고'));
 
     expect(diaryTaps, 1);
     expect(letterTaps, 1);
     expect(storyTaps, 1);
     expect(consultationTaps, 1);
+    expect(notificationTaps, 1);
   });
 }
 

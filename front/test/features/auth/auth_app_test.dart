@@ -16,6 +16,10 @@ import 'package:maum_on_mobile_front/features/home/data/home_repository.dart';
 import 'package:maum_on_mobile_front/features/home/domain/home_models.dart';
 import 'package:maum_on_mobile_front/features/letter/data/letter_repository.dart';
 import 'package:maum_on_mobile_front/features/letter/domain/letter_models.dart';
+import 'package:maum_on_mobile_front/features/notification/data/notification_repository.dart';
+import 'package:maum_on_mobile_front/features/notification/domain/notification_models.dart';
+import 'package:maum_on_mobile_front/features/report/data/report_repository.dart';
+import 'package:maum_on_mobile_front/features/report/domain/report_models.dart';
 import 'package:maum_on_mobile_front/features/story/data/story_repository.dart';
 import 'package:maum_on_mobile_front/features/story/domain/story_models.dart';
 
@@ -133,6 +137,39 @@ void main() {
     expect(find.text('실시간 상담'), findsOneWidget);
     expect(find.text('연결됨'), findsOneWidget);
     expect(consultationRepository.connectCount, 1);
+  });
+
+  testWidgets('navigates authenticated users from home to notifications',
+      (tester) async {
+    final notificationRepository = _FakeNotificationRepository();
+    await tester.pumpWidget(
+      MaumOnMobileApp(
+        authRepository: _FakeAuthRepository(restoredSession: _session()),
+        homeRepository: const _FakeHomeRepository(),
+        consultationRepository: _FakeConsultationRepository(),
+        notificationRepository: notificationRepository,
+        reportRepository: _FakeReportRepository(),
+        diaryRepository: _FakeDiaryRepository(),
+        diaryImagePicker: const _FakeDiaryImagePicker(),
+        storyRepository: _FakeStoryRepository(),
+        letterRepository: _FakeLetterRepository(),
+        listenForDeepLinks: false,
+      ),
+    );
+
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('알림/신고'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('알림/신고'));
+    await tester.pump();
+    notificationRepository.emit(
+      const NotificationStreamEvent.connect('연결되었습니다!'),
+    );
+    await tester.pump();
+
+    expect(find.text('알림/신고'), findsWidgets);
+    expect(find.text('연결됨'), findsOneWidget);
+    expect(notificationRepository.ticketRequestCount, 1);
   });
 
   testWidgets('navigates authenticated users from home to story list',
@@ -298,6 +335,52 @@ class _FakeConsultationRepository implements ConsultationRepository {
 
   void emit(ConsultationStreamEvent event) {
     _controller?.add(event);
+  }
+}
+
+class _FakeNotificationRepository implements NotificationRepository {
+  int ticketRequestCount = 0;
+  StreamController<NotificationStreamEvent>? _controller;
+
+  @override
+  Future<List<NotificationItem>> fetchNotifications() async {
+    return const [
+      NotificationItem(
+        id: 1,
+        content: '상대방이 편지를 읽었습니다.',
+        isRead: false,
+        createdAt: '2026-05-24T09:00:00',
+      ),
+    ];
+  }
+
+  @override
+  Future<NotificationSubscriptionTicket> requestSubscriptionTicket() async {
+    ticketRequestCount += 1;
+    return const NotificationSubscriptionTicket(
+      ticket: 'ticket-1',
+      expiresInSeconds: 60,
+    );
+  }
+
+  @override
+  Stream<NotificationStreamEvent> connect(String ticket) {
+    _controller = StreamController<NotificationStreamEvent>(sync: true);
+    return _controller!.stream;
+  }
+
+  void emit(NotificationStreamEvent event) {
+    _controller?.add(event);
+  }
+}
+
+class _FakeReportRepository implements ReportRepository {
+  final List<ReportDraft> drafts = [];
+
+  @override
+  Future<int> createReport(ReportDraft draft) async {
+    drafts.add(draft);
+    return drafts.length;
   }
 }
 
