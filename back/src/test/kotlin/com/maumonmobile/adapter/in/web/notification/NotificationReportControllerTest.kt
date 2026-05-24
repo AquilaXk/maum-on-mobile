@@ -1,6 +1,7 @@
 package com.maumonmobile.adapter.`in`.web.notification
 
 import com.jayway.jsonpath.JsonPath
+import org.hamcrest.Matchers.greaterThan
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
@@ -12,12 +13,7 @@ import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.get
 import org.springframework.test.web.servlet.post
 
-@SpringBootTest(
-    properties = [
-        "spring.flyway.enabled=false",
-        "spring.autoconfigure.exclude=org.springframework.boot.jdbc.autoconfigure.DataSourceAutoConfiguration",
-    ],
-)
+@SpringBootTest
 @AutoConfigureMockMvc
 @ActiveProfiles("test")
 class NotificationReportControllerTest @Autowired constructor(
@@ -71,7 +67,7 @@ class NotificationReportControllerTest @Autowired constructor(
             .andExpect {
                 status { isOk() }
                 jsonPath("$.success") { value(true) }
-                jsonPath("$.data") { value(1) }
+                jsonPath("$.data") { value(greaterThan(0)) }
             }
 
         mockMvc.post("/api/v1/reports") {

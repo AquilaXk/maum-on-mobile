@@ -1,6 +1,7 @@
 package com.maumonmobile.adapter.`in`.web.story
 
 import com.jayway.jsonpath.JsonPath
+import org.hamcrest.Matchers.greaterThan
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
@@ -15,12 +16,7 @@ import org.springframework.test.web.servlet.patch
 import org.springframework.test.web.servlet.post
 import org.springframework.test.web.servlet.put
 
-@SpringBootTest(
-    properties = [
-        "spring.flyway.enabled=false",
-        "spring.autoconfigure.exclude=org.springframework.boot.jdbc.autoconfigure.DataSourceAutoConfiguration",
-    ],
-)
+@SpringBootTest
 @AutoConfigureMockMvc
 @ActiveProfiles("test")
 class StoryControllerTest @Autowired constructor(
@@ -46,7 +42,7 @@ class StoryControllerTest @Autowired constructor(
             .andExpect {
                 status { isOk() }
                 jsonPath("$.success") { value(true) }
-                jsonPath("$.data") { value(1) }
+                jsonPath("$.data") { value(greaterThan(0)) }
             }
             .andReturn()
         val postId = createResult.response.readJsonInt("$.data")

@@ -2,11 +2,13 @@ package com.maumonmobile.adapter.out.persistence.auth
 
 import com.maumonmobile.application.port.out.AuthMemberRepository
 import com.maumonmobile.domain.auth.AuthMember
+import org.springframework.context.annotation.Profile
 import org.springframework.stereotype.Repository
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicLong
 
 @Repository
+@Profile("memory")
 class InMemoryAuthMemberRepository : AuthMemberRepository {
     private val sequence = AtomicLong(1L)
     private val membersById = ConcurrentHashMap<Long, AuthMember>()

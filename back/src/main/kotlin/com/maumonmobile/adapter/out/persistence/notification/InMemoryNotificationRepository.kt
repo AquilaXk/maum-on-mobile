@@ -2,12 +2,14 @@ package com.maumonmobile.adapter.out.persistence.notification
 
 import com.maumonmobile.application.port.out.NotificationRepository
 import com.maumonmobile.domain.notification.Notification
+import org.springframework.context.annotation.Profile
 import org.springframework.stereotype.Repository
 import java.time.Instant
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicLong
 
 @Repository
+@Profile("memory")
 class InMemoryNotificationRepository : NotificationRepository {
     private val sequence = AtomicLong(1L)
     private val notificationsById = ConcurrentHashMap<Long, Notification>()

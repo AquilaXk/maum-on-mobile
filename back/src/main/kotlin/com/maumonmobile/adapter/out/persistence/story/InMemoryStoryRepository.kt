@@ -4,12 +4,14 @@ import com.maumonmobile.application.port.out.StoryRepository
 import com.maumonmobile.domain.story.StoryComment
 import com.maumonmobile.domain.story.StoryPost
 import com.maumonmobile.domain.story.StoryPostDraft
+import org.springframework.context.annotation.Profile
 import org.springframework.stereotype.Repository
 import java.time.Instant
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicLong
 
 @Repository
+@Profile("memory")
 class InMemoryStoryRepository : StoryRepository {
     private val postSequence = AtomicLong(1L)
     private val commentSequence = AtomicLong(1L)

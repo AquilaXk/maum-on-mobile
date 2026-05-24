@@ -3,12 +3,14 @@ package com.maumonmobile.adapter.out.persistence.letter
 import com.maumonmobile.application.port.out.LetterRepository
 import com.maumonmobile.domain.letter.Letter
 import com.maumonmobile.domain.letter.LetterDraft
+import org.springframework.context.annotation.Profile
 import org.springframework.stereotype.Repository
 import java.time.Instant
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicLong
 
 @Repository
+@Profile("memory")
 class InMemoryLetterRepository : LetterRepository {
     private val sequence = AtomicLong(1L)
     private val lettersById = ConcurrentHashMap<Long, Letter>()
