@@ -64,6 +64,6 @@ test("front uses a Flutter Android/iOS app scaffold", () => {
   );
   assert.match(read("front/ios/Runner/Info.plist"), /Maum On/, "iOS display name must be configured");
   assert.match(read("front/ios/Runner.xcodeproj/project.pbxproj"), /com\.aquilaxk\.maumonmobile/, "iOS bundle id must be configured");
-  assert.match(read("front/ios/Runner.xcodeproj/project.pbxproj"), /IPHONEOS_DEPLOYMENT_TARGET = 13\.0;/, "iOS deployment target must be configured");
+  assert.match(read("front/ios/Runner.xcodeproj/project.pbxproj"), /IPHONEOS_DEPLOYMENT_TARGET = 15\.0;/, "iOS deployment target must be configured");
   assert.ok(!existsSync(path.join(root, "front/package.json")), "React Native package.json must not remain");
 });
