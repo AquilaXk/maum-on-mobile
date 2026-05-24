@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../shared/ui/app_design_system.dart';
 import '../application/story_controller.dart';
 import '../domain/story_models.dart';
 
@@ -45,97 +46,47 @@ class _StoryScreenState extends State<StoryScreen> {
       builder: (context, _) {
         final state = widget.controller.state;
 
-        return Scaffold(
-          body: SafeArea(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(20),
-              child: Center(
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 560),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      _StoryHeader(
-                        onBack: widget.onBack,
-                        onCreate: widget.controller.startCreate,
-                      ),
-                      const SizedBox(height: 16),
-                      if (state.errorMessage != null) ...[
-                        _InlineNotice(message: state.errorMessage!),
-                        const SizedBox(height: 12),
-                      ],
-                      if (state.noticeMessage != null) ...[
-                        _InlineNotice(message: state.noticeMessage!),
-                        const SizedBox(height: 12),
-                      ],
-                      switch (state.mode) {
-                        StoryViewMode.list => _StoryListView(
-                            state: state,
-                            controller: widget.controller,
-                          ),
-                        StoryViewMode.detail => _StoryDetailView(
-                            state: state,
-                            controller: widget.controller,
-                          ),
-                        StoryViewMode.editor => _StoryEditorView(
-                            state: state,
-                            controller: widget.controller,
-                          ),
-                      },
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          ),
-        );
-      },
-    );
-  }
-}
-
-class _StoryHeader extends StatelessWidget {
-  const _StoryHeader({
-    required this.onBack,
-    required this.onCreate,
-  });
-
-  final VoidCallback onBack;
-  final VoidCallback onCreate;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Row(
-          children: [
-            IconButton(
-              key: const ValueKey('story-home-back-button'),
-              tooltip: '홈으로',
-              onPressed: onBack,
-              icon: const Icon(Icons.arrow_back),
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Text(
-                '스토리',
-                style: theme.textTheme.headlineSmall,
-              ),
-            ),
-            SizedBox(
-              width: 96,
-              child: FilledButton(
-                key: const ValueKey('story-create-button'),
-                onPressed: onCreate,
-                child: const Text('글쓰기'),
-              ),
+        return AppScreen(
+          title: '스토리',
+          subtitle: '서로의 고민과 답변을 살펴봅니다.',
+          onBack: widget.onBack,
+          actions: [
+            FilledButton.icon(
+              key: const ValueKey('story-create-button'),
+              onPressed: widget.controller.startCreate,
+              icon: const Icon(Icons.edit_outlined),
+              label: const Text('글쓰기'),
             ),
           ],
-        ),
-      ],
+          children: [
+            if (state.errorMessage != null) ...[
+              AppNotice(
+                message: state.errorMessage!,
+                tone: AppNoticeTone.error,
+              ),
+              const SizedBox(height: AppSpacing.md),
+            ],
+            if (state.noticeMessage != null) ...[
+              AppNotice(message: state.noticeMessage!),
+              const SizedBox(height: AppSpacing.md),
+            ],
+            switch (state.mode) {
+              StoryViewMode.list => _StoryListView(
+                  state: state,
+                  controller: widget.controller,
+                ),
+              StoryViewMode.detail => _StoryDetailView(
+                  state: state,
+                  controller: widget.controller,
+                ),
+              StoryViewMode.editor => _StoryEditorView(
+                  state: state,
+                  controller: widget.controller,
+                ),
+            },
+          ],
+        );
+      },
     );
   }
 }
@@ -163,29 +114,29 @@ class _StoryListView extends StatelessWidget {
           onChanged: controller.updateSearchQuery,
           onSubmitted: (_) => controller.loadStories(),
         ),
-        const SizedBox(height: 10),
+        const SizedBox(height: AppSpacing.sm),
         FilledButton.tonal(
           key: const ValueKey('story-search-button'),
           onPressed: state.isListLoading ? null : controller.loadStories,
           child: const Text('검색'),
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: AppSpacing.md),
         _StoryCategoryFilter(
           selectedCategory: state.selectedCategory,
           onSelected: controller.selectCategory,
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: AppSpacing.lg),
         if (state.isListLoading)
-          const _InlineNotice(message: '스토리를 불러오는 중입니다.')
+          const AppNotice(message: '스토리를 불러오는 중입니다.')
         else if (state.isEmpty)
-          const _InlineNotice(message: '조건에 맞는 스토리가 없습니다.')
+          const AppNotice(message: '조건에 맞는 스토리가 없습니다.')
         else
           for (final story in state.stories) ...[
             _StoryListCard(
               story: story,
               onTap: () => controller.openStory(story),
             ),
-            const SizedBox(height: 10),
+            const SizedBox(height: AppSpacing.sm),
           ],
       ],
     );
@@ -204,8 +155,8 @@ class _StoryCategoryFilter extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Wrap(
-      spacing: 8,
-      runSpacing: 8,
+      spacing: AppSpacing.xs,
+      runSpacing: AppSpacing.xs,
       children: [
         for (final category in StoryCategory.values)
           ChoiceChip(
@@ -251,18 +202,18 @@ class _StoryListCard extends StatelessWidget {
                   _Pill(label: story.resolutionStatus.label),
                 ],
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: AppSpacing.xs),
               Text(
                 story.title,
                 style: theme.textTheme.titleMedium,
               ),
-              const SizedBox(height: 6),
+              const SizedBox(height: AppSpacing.xs),
               Text(
                 story.summary,
                 maxLines: 3,
                 overflow: TextOverflow.ellipsis,
               ),
-              const SizedBox(height: 10),
+              const SizedBox(height: AppSpacing.sm),
               Text(
                 '${story.authorNickname} · 조회 ${story.viewCount}',
                 style: theme.textTheme.bodySmall,
@@ -289,11 +240,11 @@ class _StoryDetailView extends StatelessWidget {
     final story = state.selectedStory;
 
     if (state.isDetailLoading) {
-      return const _InlineNotice(message: '스토리를 불러오는 중입니다.');
+      return const AppNotice(message: '스토리를 불러오는 중입니다.');
     }
 
     if (story == null) {
-      return const _InlineNotice(message: '스토리를 선택해 주세요.');
+      return const AppNotice(message: '스토리를 선택해 주세요.');
     }
 
     final canEdit = story.canEdit(controller.currentMemberId);
@@ -318,29 +269,29 @@ class _StoryDetailView extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Wrap(
-                  spacing: 8,
-                  runSpacing: 4,
+                  spacing: AppSpacing.xs,
+                  runSpacing: AppSpacing.xxs,
                   children: [
                     _Pill(label: story.category.label),
                     _Pill(label: story.resolutionStatus.label),
                   ],
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: AppSpacing.md),
                 Text(
                   story.title,
                   style: Theme.of(context).textTheme.headlineSmall,
                 ),
-                const SizedBox(height: 8),
+                const SizedBox(height: AppSpacing.xs),
                 Text(
                   '${story.authorNickname} · 조회 ${story.viewCount}',
                   style: Theme.of(context).textTheme.bodySmall,
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: AppSpacing.lg),
                 Text(story.content),
-                const SizedBox(height: 16),
+                const SizedBox(height: AppSpacing.lg),
                 Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
+                  spacing: AppSpacing.xs,
+                  runSpacing: AppSpacing.xs,
                   children: [
                     OutlinedButton(
                       key: const ValueKey('story-report-button'),
@@ -374,9 +325,9 @@ class _StoryDetailView extends StatelessWidget {
             ),
           ),
         ),
-        const SizedBox(height: 18),
+        const SizedBox(height: AppSpacing.xl),
         _CommentComposer(state: state, controller: controller),
-        const SizedBox(height: 14),
+        const SizedBox(height: AppSpacing.md),
         _CommentList(state: state, controller: controller),
       ],
     );
@@ -433,7 +384,7 @@ class _CommentComposerState extends State<_CommentComposer> {
               ),
               onChanged: widget.controller.updateCommentDraft,
             ),
-            const SizedBox(height: 10),
+            const SizedBox(height: AppSpacing.sm),
             FilledButton(
               key: const ValueKey('story-comment-submit-button'),
               onPressed: widget.state.canSubmitComment
@@ -460,7 +411,7 @@ class _CommentList extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (state.comments.isEmpty) {
-      return const _InlineNotice(message: '아직 댓글이 없습니다.');
+      return const AppNotice(message: '아직 댓글이 없습니다.');
     }
 
     return Column(
@@ -473,7 +424,7 @@ class _CommentList extends StatelessWidget {
             controller: controller,
             depth: 0,
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: AppSpacing.sm),
         ],
       ],
     );
@@ -511,7 +462,7 @@ class _CommentTile extends StatelessWidget {
                 comment.authorNickname,
                 style: Theme.of(context).textTheme.labelLarge,
               ),
-              const SizedBox(height: 6),
+              const SizedBox(height: AppSpacing.xs),
               if (isEditing) ...[
                 TextFormField(
                   key: ValueKey('story-comment-edit-field-${comment.id}'),
@@ -523,10 +474,10 @@ class _CommentTile extends StatelessWidget {
                   ),
                   onChanged: controller.updateEditingCommentContent,
                 ),
-                const SizedBox(height: 8),
+                const SizedBox(height: AppSpacing.xs),
                 Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
+                  spacing: AppSpacing.xs,
+                  runSpacing: AppSpacing.xs,
                   children: [
                     FilledButton.tonal(
                       key: ValueKey('story-comment-save-button-${comment.id}'),
@@ -543,10 +494,10 @@ class _CommentTile extends StatelessWidget {
                 ),
               ] else ...[
                 Text(comment.content),
-                const SizedBox(height: 8),
+                const SizedBox(height: AppSpacing.xs),
                 Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
+                  spacing: AppSpacing.xs,
+                  runSpacing: AppSpacing.xs,
                   children: [
                     TextButton(
                       key:
@@ -578,7 +529,7 @@ class _CommentTile extends StatelessWidget {
                 ),
               ],
               if (comment.replies.isNotEmpty) ...[
-                const SizedBox(height: 10),
+                const SizedBox(height: AppSpacing.sm),
                 for (final reply in comment.replies) ...[
                   _CommentTile(
                     comment: reply,
@@ -586,7 +537,7 @@ class _CommentTile extends StatelessWidget {
                     controller: controller,
                     depth: depth + 1,
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: AppSpacing.xs),
                 ],
               ],
             ],
@@ -608,19 +559,12 @@ class _StoryEditorView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
+    return AppSectionCard(
       key: ValueKey('story-editor-${state.editingStoryId ?? 'new'}'),
-      margin: EdgeInsets.zero,
-      child: Padding(
-        padding: const EdgeInsets.all(18),
-        child: Column(
+      title: state.isEditingStory ? '스토리 수정' : '스토리 작성',
+      child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Text(
-              state.isEditingStory ? '스토리 수정' : '스토리 작성',
-              style: Theme.of(context).textTheme.titleLarge,
-            ),
-            const SizedBox(height: 14),
             TextFormField(
               key: const ValueKey('story-title-field'),
               initialValue: state.storyTitle,
@@ -630,7 +574,7 @@ class _StoryEditorView extends StatelessWidget {
               ),
               onChanged: controller.updateStoryTitle,
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: AppSpacing.md),
             TextFormField(
               key: const ValueKey('story-content-field'),
               initialValue: state.storyContent,
@@ -642,10 +586,10 @@ class _StoryEditorView extends StatelessWidget {
               ),
               onChanged: controller.updateStoryContent,
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: AppSpacing.md),
             Wrap(
-              spacing: 8,
-              runSpacing: 8,
+              spacing: AppSpacing.xs,
+              runSpacing: AppSpacing.xs,
               children: [
                 for (final category in StoryCategory.values.where(
                   (category) => category != StoryCategory.all,
@@ -658,10 +602,10 @@ class _StoryEditorView extends StatelessWidget {
                   ),
               ],
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: AppSpacing.lg),
             Wrap(
-              spacing: 8,
-              runSpacing: 8,
+              spacing: AppSpacing.xs,
+              runSpacing: AppSpacing.xs,
               children: [
                 FilledButton(
                   key: const ValueKey('story-submit-button'),
@@ -677,7 +621,6 @@ class _StoryEditorView extends StatelessWidget {
               ],
             ),
           ],
-        ),
       ),
     );
   }
@@ -690,45 +633,6 @@ class _Pill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: colorScheme.primaryContainer,
-        borderRadius: BorderRadius.circular(6),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-        child: Text(
-          label,
-          style: TextStyle(
-            color: colorScheme.onPrimaryContainer,
-            fontWeight: FontWeight.w700,
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _InlineNotice extends StatelessWidget {
-  const _InlineNotice({required this.message});
-
-  final String message;
-
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: colorScheme.surfaceContainerHighest,
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(14),
-        child: Text(message),
-      ),
-    );
+    return AppStatusPill(label: label, tone: AppStatusTone.success);
   }
 }
