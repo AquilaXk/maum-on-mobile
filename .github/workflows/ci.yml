@@ -298,6 +298,40 @@ jobs:
           flutter pub get
           flutter build apk --debug
 
+      - name: Validate mobile release contracts
+        if: ${{ steps.scaffold.outputs.present == 'true' && steps.scaffold.outputs.stack == 'flutter' }}
+        run: node --test tools/ci/mobile-release-config-contract.test.mjs
+
+      - name: Build Flutter Android release appbundle
+        if: ${{ github.event_name == 'workflow_dispatch' && steps.scaffold.outputs.present == 'true' && steps.scaffold.outputs.stack == 'flutter' }}
+        env:
+          MAUMON_ANDROID_KEYSTORE_BASE64: ${{ secrets.MAUMON_ANDROID_KEYSTORE_BASE64 }}
+          MAUMON_ANDROID_KEYSTORE_PASSWORD: ${{ secrets.MAUMON_ANDROID_KEYSTORE_PASSWORD }}
+          MAUMON_ANDROID_KEY_ALIAS: ${{ secrets.MAUMON_ANDROID_KEY_ALIAS }}
+          MAUMON_ANDROID_KEY_PASSWORD: ${{ secrets.MAUMON_ANDROID_KEY_PASSWORD }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          missing=false
+          for name in MAUMON_ANDROID_KEYSTORE_BASE64 MAUMON_ANDROID_KEYSTORE_PASSWORD MAUMON_ANDROID_KEY_ALIAS MAUMON_ANDROID_KEY_PASSWORD; do
+            if [[ -z "${!name:-}" ]]; then
+              echo "Skipping Android release appbundle; missing ${name}."
+              missing=true
+            fi
+          done
+
+          if [[ "${missing}" == "true" ]]; then
+            exit 0
+          fi
+
+          release_keystore="${RUNNER_TEMP}/maumon-release.keystore"
+          printf '%s' "${MAUMON_ANDROID_KEYSTORE_BASE64}" | base64 --decode > "${release_keystore}"
+          export MAUMON_ANDROID_KEYSTORE_PATH="${release_keystore}"
+
+          cd front
+          flutter build appbundle --release
+
       - name: Run Android checks
         if: ${{ steps.scaffold.outputs.present == 'true' && steps.scaffold.outputs.stack == 'gradle' }}
         working-directory: ${{ steps.scaffold.outputs.working_directory }}
@@ -346,6 +380,18 @@ jobs:
           set -euo pipefail
           flutter pub get
           flutter build ios --simulator --no-codesign
+
+      - name: Validate mobile release contracts
+        if: ${{ steps.scaffold.outputs.present == 'true' && steps.scaffold.outputs.stack == 'flutter' }}
+        run: node --test tools/ci/mobile-release-config-contract.test.mjs
+
+      - name: Build Flutter iOS release without code signing
+        if: ${{ github.event_name == 'workflow_dispatch' && steps.scaffold.outputs.present == 'true' && steps.scaffold.outputs.stack == 'flutter' }}
+        working-directory: front
+        shell: bash
+        run: |
+          set -euo pipefail
+          flutter build ios --no-codesign
 
       - name: Validate iOS project metadata
         if: ${{ steps.scaffold.outputs.present == 'true' && steps.scaffold.outputs.stack == 'xcode' }}
