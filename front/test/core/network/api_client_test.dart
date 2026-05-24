@@ -307,6 +307,29 @@ void main() {
       expect(transport.requests.single.method, ApiMethod.delete);
       expect(transport.requests.single.path, '/diaries/1');
     });
+
+    test('sends JSON put and patch void requests through the transport',
+        () async {
+      final transport = _FakeApiTransport([
+        ApiTransportResponse.ok({'resultCode': '200-3'}),
+        ApiTransportResponse.ok({'resultCode': '200-5'}),
+      ]);
+      final client = ApiClient(
+        transport: transport,
+        tokenStore: MemoryAuthTokenStore(),
+      );
+
+      await client.putVoid('/posts/1', body: {'title': '수정'});
+      await client.patchVoid(
+        '/posts/1/resolution-status',
+        body: {'resolutionStatus': 'RESOLVED'},
+      );
+
+      expect(transport.requests[0].method, ApiMethod.put);
+      expect(transport.requests[0].body, {'title': '수정'});
+      expect(transport.requests[1].method, ApiMethod.patch);
+      expect(transport.requests[1].body, {'resolutionStatus': 'RESOLVED'});
+    });
   });
 }
 

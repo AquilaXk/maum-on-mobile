@@ -10,6 +10,8 @@ import 'package:maum_on_mobile_front/features/diary/presentation/diary_image_pic
 import 'package:maum_on_mobile_front/core/network/api_response.dart';
 import 'package:maum_on_mobile_front/features/home/data/home_repository.dart';
 import 'package:maum_on_mobile_front/features/home/domain/home_models.dart';
+import 'package:maum_on_mobile_front/features/story/data/story_repository.dart';
+import 'package:maum_on_mobile_front/features/story/domain/story_models.dart';
 
 void main() {
   testWidgets('restores a session and renders the authenticated home',
@@ -20,6 +22,7 @@ void main() {
         homeRepository: const _FakeHomeRepository(),
         diaryRepository: _FakeDiaryRepository(),
         diaryImagePicker: const _FakeDiaryImagePicker(),
+        storyRepository: _FakeStoryRepository(),
         listenForDeepLinks: false,
       ),
     );
@@ -39,6 +42,7 @@ void main() {
         homeRepository: const _FakeHomeRepository(),
         diaryRepository: _FakeDiaryRepository(),
         diaryImagePicker: const _FakeDiaryImagePicker(),
+        storyRepository: _FakeStoryRepository(),
         listenForDeepLinks: false,
       ),
     );
@@ -48,6 +52,50 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('나의 기록'), findsOneWidget);
+  });
+
+  testWidgets('navigates authenticated users from home to story list',
+      (tester) async {
+    await tester.pumpWidget(
+      MaumOnMobileApp(
+        authRepository: _FakeAuthRepository(restoredSession: _session()),
+        homeRepository: const _FakeHomeRepository(),
+        diaryRepository: _FakeDiaryRepository(),
+        diaryImagePicker: const _FakeDiaryImagePicker(),
+        storyRepository: _FakeStoryRepository(
+          storyPages: [
+            const PageResponse(
+              items: [
+                StorySummary(
+                  id: 1,
+                  title: '오늘의 스토리',
+                  summary: '요약',
+                  authorNickname: '마음이',
+                  category: StoryCategory.worry,
+                  resolutionStatus: StoryResolutionStatus.ongoing,
+                  viewCount: 1,
+                  createDate: '2026-05-24T08:00:00',
+                  modifyDate: '2026-05-24T08:00:00',
+                ),
+              ],
+              page: 0,
+              size: 20,
+              totalElements: 1,
+              totalPages: 1,
+              last: true,
+            ),
+          ],
+        ),
+        listenForDeepLinks: false,
+      ),
+    );
+
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('스토리 보기'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('스토리'), findsOneWidget);
+    expect(find.text('오늘의 스토리'), findsOneWidget);
   });
 
   testWidgets('shows a login failure message on the auth screen',
@@ -69,6 +117,7 @@ void main() {
         homeRepository: const _FakeHomeRepository(),
         diaryRepository: _FakeDiaryRepository(),
         diaryImagePicker: const _FakeDiaryImagePicker(),
+        storyRepository: _FakeStoryRepository(),
         listenForDeepLinks: false,
       ),
     );
@@ -147,6 +196,99 @@ class _FakeDiaryImagePicker implements DiaryImagePicker {
   @override
   Future<DiaryImageAttachment?> pickImage() async {
     return null;
+  }
+}
+
+class _FakeStoryRepository implements StoryRepository {
+  _FakeStoryRepository({
+    List<PageResponse<StorySummary>> storyPages = const [
+      PageResponse(
+        items: [],
+        page: 0,
+        size: 20,
+        totalElements: 0,
+        totalPages: 1,
+        last: true,
+      ),
+    ],
+  }) : _storyPages = List<PageResponse<StorySummary>>.of(storyPages);
+
+  final List<PageResponse<StorySummary>> _storyPages;
+
+  @override
+  Future<PageResponse<StorySummary>> fetchStories({
+    String? title,
+    StoryCategory category = StoryCategory.all,
+    int page = 0,
+    int size = 20,
+  }) async {
+    return _storyPages.isEmpty
+        ? const PageResponse(
+            items: [],
+            page: 0,
+            size: 20,
+            totalElements: 0,
+            totalPages: 1,
+            last: true,
+          )
+        : _storyPages.removeAt(0);
+  }
+
+  @override
+  Future<StoryDetail> fetchStory(int id) {
+    throw UnimplementedError();
+  }
+
+  @override
+  Future<int> createStory(StoryDraft draft) {
+    throw UnimplementedError();
+  }
+
+  @override
+  Future<void> updateStory(int id, StoryDraft draft) {
+    throw UnimplementedError();
+  }
+
+  @override
+  Future<void> deleteStory(int id) {
+    throw UnimplementedError();
+  }
+
+  @override
+  Future<void> updateResolutionStatus(
+    int id,
+    StoryResolutionStatus status,
+  ) {
+    throw UnimplementedError();
+  }
+
+  @override
+  Future<PageResponse<StoryComment>> fetchComments(
+    int postId, {
+    int page = 0,
+    int size = 20,
+  }) {
+    throw UnimplementedError();
+  }
+
+  @override
+  Future<void> createComment({
+    required int postId,
+    required int authorId,
+    required String content,
+    int? parentCommentId,
+  }) {
+    throw UnimplementedError();
+  }
+
+  @override
+  Future<void> updateComment(int commentId, String content) {
+    throw UnimplementedError();
+  }
+
+  @override
+  Future<void> deleteComment(int commentId) {
+    throw UnimplementedError();
   }
 }
 
