@@ -1,13 +1,17 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:maum_on_mobile_front/app/maum_on_mobile_app.dart';
 import 'package:maum_on_mobile_front/core/network/api_error.dart';
+import 'package:maum_on_mobile_front/core/network/api_response.dart';
 import 'package:maum_on_mobile_front/features/auth/data/auth_repository.dart';
 import 'package:maum_on_mobile_front/features/auth/domain/auth_models.dart';
+import 'package:maum_on_mobile_front/features/consultation/data/consultation_repository.dart';
+import 'package:maum_on_mobile_front/features/consultation/domain/consultation_models.dart';
 import 'package:maum_on_mobile_front/features/diary/data/diary_repository.dart';
 import 'package:maum_on_mobile_front/features/diary/domain/diary_models.dart';
 import 'package:maum_on_mobile_front/features/diary/presentation/diary_image_picker.dart';
-import 'package:maum_on_mobile_front/core/network/api_response.dart';
 import 'package:maum_on_mobile_front/features/home/data/home_repository.dart';
 import 'package:maum_on_mobile_front/features/home/domain/home_models.dart';
 import 'package:maum_on_mobile_front/features/letter/data/letter_repository.dart';
@@ -100,6 +104,35 @@ void main() {
 
     expect(find.text('편지함'), findsOneWidget);
     expect(find.byKey(const ValueKey('letter-title-field')), findsOneWidget);
+  });
+
+  testWidgets('navigates authenticated users from home to consultation',
+      (tester) async {
+    final consultationRepository = _FakeConsultationRepository();
+    await tester.pumpWidget(
+      MaumOnMobileApp(
+        authRepository: _FakeAuthRepository(restoredSession: _session()),
+        homeRepository: const _FakeHomeRepository(),
+        consultationRepository: consultationRepository,
+        diaryRepository: _FakeDiaryRepository(),
+        diaryImagePicker: const _FakeDiaryImagePicker(),
+        storyRepository: _FakeStoryRepository(),
+        letterRepository: _FakeLetterRepository(),
+        listenForDeepLinks: false,
+      ),
+    );
+
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('상담하기'));
+    await tester.pump();
+    consultationRepository.emit(
+      const ConsultationStreamEvent.connect('connected'),
+    );
+    await tester.pump();
+
+    expect(find.text('실시간 상담'), findsOneWidget);
+    expect(find.text('연결됨'), findsOneWidget);
+    expect(consultationRepository.connectCount, 1);
   });
 
   testWidgets('navigates authenticated users from home to story list',
@@ -246,6 +279,25 @@ class _FakeDiaryImagePicker implements DiaryImagePicker {
   @override
   Future<DiaryImageAttachment?> pickImage() async {
     return null;
+  }
+}
+
+class _FakeConsultationRepository implements ConsultationRepository {
+  int connectCount = 0;
+  StreamController<ConsultationStreamEvent>? _controller;
+
+  @override
+  Stream<ConsultationStreamEvent> connect() {
+    connectCount += 1;
+    _controller = StreamController<ConsultationStreamEvent>(sync: true);
+    return _controller!.stream;
+  }
+
+  @override
+  Future<void> sendMessage(String message) async {}
+
+  void emit(ConsultationStreamEvent event) {
+    _controller?.add(event);
   }
 }
 

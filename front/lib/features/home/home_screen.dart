@@ -12,6 +12,7 @@ class HomeScreen extends StatefulWidget {
     required this.onWriteDiary,
     required this.onWriteLetter,
     required this.onViewStory,
+    required this.onOpenConsultation,
     required this.onLogout,
     super.key,
   });
@@ -22,6 +23,7 @@ class HomeScreen extends StatefulWidget {
   final VoidCallback onWriteDiary;
   final VoidCallback onWriteLetter;
   final VoidCallback onViewStory;
+  final VoidCallback onOpenConsultation;
   final VoidCallback onLogout;
 
   @override
@@ -79,6 +81,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         onWriteDiary: widget.onWriteDiary,
                         onWriteLetter: widget.onWriteLetter,
                         onViewStory: widget.onViewStory,
+                        onOpenConsultation: widget.onOpenConsultation,
                         onLogout: widget.onLogout,
                       ),
                       const SizedBox(height: 20),
@@ -269,12 +272,14 @@ class _ActionGrid extends StatelessWidget {
     required this.onWriteDiary,
     required this.onWriteLetter,
     required this.onViewStory,
+    required this.onOpenConsultation,
     required this.onLogout,
   });
 
   final VoidCallback onWriteDiary;
   final VoidCallback onWriteLetter;
   final VoidCallback onViewStory;
+  final VoidCallback onOpenConsultation;
   final VoidCallback onLogout;
 
   @override
@@ -294,6 +299,11 @@ class _ActionGrid extends StatelessWidget {
         OutlinedButton(
           onPressed: onViewStory,
           child: const Text('스토리 보기'),
+        ),
+        FilledButton.tonalIcon(
+          onPressed: onOpenConsultation,
+          icon: const Icon(Icons.chat_bubble_outline),
+          label: const Text('상담하기'),
         ),
         OutlinedButton(
           onPressed: onLogout,
