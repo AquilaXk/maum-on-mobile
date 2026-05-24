@@ -4,7 +4,10 @@ class ApiConfig {
   });
 
   factory ApiConfig.fromEnvironment({
-    String baseUrl = const String.fromEnvironment('API_BASE_URL'),
+    String baseUrl = const String.fromEnvironment(
+      'API_BASE_URL',
+      defaultValue: 'http://localhost:8080',
+    ),
   }) {
     final normalizedBaseUrl = baseUrl.trim();
 

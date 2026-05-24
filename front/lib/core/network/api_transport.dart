@@ -17,6 +17,7 @@ class ApiRequest {
     this.body,
     this.multipart,
     this.requiresAuth = true,
+    this.retryOnUnauthorized = true,
   });
 
   final ApiMethod method;
@@ -26,6 +27,7 @@ class ApiRequest {
   final Object? body;
   final MultipartBody? multipart;
   final bool requiresAuth;
+  final bool retryOnUnauthorized;
 
   ApiRequest copyWith({
     Map<String, String>? headers,
@@ -38,6 +40,7 @@ class ApiRequest {
       body: body,
       multipart: multipart,
       requiresAuth: requiresAuth,
+      retryOnUnauthorized: retryOnUnauthorized,
     );
   }
 }

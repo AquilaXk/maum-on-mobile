@@ -52,8 +52,9 @@ class ApiErrorBody {
     final rawFieldErrors = map['fieldErrors'] ?? map['errors'];
 
     return ApiErrorBody(
-      code: map['code']?.toString(),
-      message: map['message']?.toString() ?? '요청을 처리하지 못했습니다.',
+      code: (map['code'] ?? map['resultCode'])?.toString(),
+      message: (map['message'] ?? map['msg'])?.toString() ??
+          '요청을 처리하지 못했습니다.',
       fieldErrors: rawFieldErrors is List
           ? rawFieldErrors.map(ApiFieldError.fromJson).toList(growable: false)
           : const [],

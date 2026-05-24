@@ -5,10 +5,14 @@ import '../../app/supported_platforms.dart';
 class HomeScreen extends StatelessWidget {
   const HomeScreen({
     required this.routeTitle,
+    required this.nickname,
+    required this.onLogout,
     super.key,
   });
 
   final String routeTitle;
+  final String nickname;
+  final VoidCallback onLogout;
 
   @override
   Widget build(BuildContext context) {
@@ -36,7 +40,7 @@ class HomeScreen extends StatelessWidget {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    '마음 기록을 이어갈 준비가 되었습니다.',
+                    '$nickname님, 오늘의 마음을 이어가세요.',
                     style: theme.textTheme.bodyLarge,
                   ),
                   const SizedBox(height: 20),
@@ -44,9 +48,14 @@ class HomeScreen extends StatelessWidget {
                   const SizedBox(height: 20),
                   const _PlatformRow(),
                   const SizedBox(height: 20),
-                  const FilledButton(
-                    onPressed: null,
-                    child: Text('체크인 시작'),
+                  FilledButton(
+                    onPressed: () {},
+                    child: const Text('체크인 시작'),
+                  ),
+                  const SizedBox(height: 8),
+                  OutlinedButton(
+                    onPressed: onLogout,
+                    child: const Text('로그아웃'),
                   ),
                 ],
               ),
