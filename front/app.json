@@ -1,0 +1,17 @@
+{
+  "expo": {
+    "name": "Maum On Mobile",
+    "slug": "maum-on-mobile",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "newArchEnabled": true,
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.maumon.mobile"
+    },
+    "android": {
+      "package": "com.maumon.mobile"
+    }
+  }
+}

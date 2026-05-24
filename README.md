@@ -10,10 +10,18 @@ Mobile app repository for Maum On, focused on Android and iOS clients.
 
 ## Workspace
 
-- `front/`: Android/iOS mobile app client.
+- `front/`: Expo/React Native TypeScript mobile app client for Android and iOS.
 - `back/`: Kotlin/Spring Boot API server for the mobile app.
 - `docker/`: local runtime containers and operational compose files.
 - `infra/`: deployment and infrastructure assets.
+
+## Frontend Commands
+
+Run commands from `front/`:
+
+- `npm run lint`: validate the mobile project contract.
+- `npm test`: run simulator-free contract tests.
+- `npm run build`: run TypeScript checks and build contract validation.
 
 ## Backend Architecture
 
