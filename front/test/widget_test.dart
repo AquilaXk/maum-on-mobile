@@ -8,7 +8,10 @@ import 'package:maum_on_mobile_front/features/auth/domain/auth_models.dart';
 void main() {
   testWidgets('renders the initial auth screen contract', (tester) async {
     await tester.pumpWidget(
-      MaumOnMobileApp(authRepository: _UnauthenticatedRepository()),
+      MaumOnMobileApp(
+        authRepository: _UnauthenticatedRepository(),
+        listenForDeepLinks: false,
+      ),
     );
     await tester.pumpAndSettle();
 
