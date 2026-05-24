@@ -22,6 +22,10 @@ Run Flutter commands from `front/`:
 - `flutter pub get`: install Flutter dependencies.
 - `flutter analyze`: run static analysis.
 - `flutter test`: run simulator-free widget and unit tests.
+- `flutter run -d android`: run the app on an Android emulator or device.
+- `flutter run -d ios`: run the app on an iOS simulator or device.
+- `flutter build apk --debug`: build the Android debug app without release signing.
+- `flutter build ios --simulator --no-codesign`: build the iOS simulator app without code signing.
 
 Run repository contract tests from the repository root:
 

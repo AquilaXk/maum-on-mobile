@@ -66,6 +66,26 @@ test("frontend job supports Flutter and Node scaffolds", async () => {
   assert.match(frontend, /echo "stack=node"/);
 });
 
+test("android job builds a Flutter Android scaffold under front", async () => {
+  const android = jobBlock(await readWorkflow(), "android");
+
+  assert.match(android, /\[\[ -f front\/pubspec\.yaml && -d front\/android \]\]/);
+  assert.match(android, /echo "stack=flutter"/);
+  assert.match(android, /subosito\/flutter-action@[a-f0-9]{40}/);
+  assert.match(android, /flutter pub get/);
+  assert.match(android, /flutter build apk --debug/);
+});
+
+test("ios job validates a Flutter iOS scaffold under front", async () => {
+  const ios = jobBlock(await readWorkflow(), "ios");
+
+  assert.match(ios, /\[\[ -f front\/pubspec\.yaml && -d front\/ios \]\]/);
+  assert.match(ios, /echo "stack=flutter"/);
+  assert.match(ios, /subosito\/flutter-action@[a-f0-9]{40}/);
+  assert.match(ios, /flutter pub get/);
+  assert.match(ios, /flutter build ios --simulator --no-codesign/);
+});
+
 test("ci pins GitHub Action references to immutable commits", async () => {
   const workflow = await readWorkflow();
 
@@ -137,6 +157,17 @@ test("path classifier enables Android checks for Android or Gradle changes", asy
   assert.equal(outputs.javascript, "false");
 });
 
+test("path classifier enables Android and frontend checks for Flutter Android changes", async () => {
+  const outputs = await classifyChangedFiles(["front/android/app/build.gradle.kts"]);
+
+  assert.equal(outputs.docs_only, "false");
+  assert.equal(outputs.android, "true");
+  assert.equal(outputs.backend, "false");
+  assert.equal(outputs.frontend, "true");
+  assert.equal(outputs.ios, "false");
+  assert.equal(outputs.javascript, "false");
+});
+
 test("path classifier enables iOS checks for iOS changes", async () => {
   const outputs = await classifyChangedFiles(["ios/MaumOn/AppDelegate.swift"]);
 
@@ -144,6 +175,17 @@ test("path classifier enables iOS checks for iOS changes", async () => {
   assert.equal(outputs.android, "false");
   assert.equal(outputs.backend, "false");
   assert.equal(outputs.frontend, "false");
+  assert.equal(outputs.ios, "true");
+  assert.equal(outputs.javascript, "false");
+});
+
+test("path classifier enables iOS and frontend checks for Flutter iOS changes", async () => {
+  const outputs = await classifyChangedFiles(["front/ios/Runner/AppDelegate.swift"]);
+
+  assert.equal(outputs.docs_only, "false");
+  assert.equal(outputs.android, "false");
+  assert.equal(outputs.backend, "false");
+  assert.equal(outputs.frontend, "true");
   assert.equal(outputs.ios, "true");
   assert.equal(outputs.javascript, "false");
 });
