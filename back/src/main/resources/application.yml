@@ -9,5 +9,5 @@ app:
   security:
     jwt:
       issuer: maum-on-mobile
-      secret: ${APP_JWT_SECRET:dev-local-change-me-change-me-change-me}
+      secret: ${APP_JWT_SECRET}
       access-token-ttl: PT1H

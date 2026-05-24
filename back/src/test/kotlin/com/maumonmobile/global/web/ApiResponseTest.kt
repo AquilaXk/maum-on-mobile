@@ -31,4 +31,9 @@ class ApiResponseTest {
         assertNull(response.data)
         assertEquals(error, response.error)
     }
+
+    @Test
+    fun constructorIsNotPublic() {
+        assertTrue(ApiResponse::class.java.constructors.isEmpty())
+    }
 }

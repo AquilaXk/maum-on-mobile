@@ -1,6 +1,6 @@
 package com.maumonmobile.global.web
 
-data class ApiResponse<T>(
+class ApiResponse<T> private constructor(
     val success: Boolean,
     val data: T? = null,
     val error: ApiError? = null,
