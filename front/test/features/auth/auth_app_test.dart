@@ -10,6 +10,8 @@ import 'package:maum_on_mobile_front/features/diary/presentation/diary_image_pic
 import 'package:maum_on_mobile_front/core/network/api_response.dart';
 import 'package:maum_on_mobile_front/features/home/data/home_repository.dart';
 import 'package:maum_on_mobile_front/features/home/domain/home_models.dart';
+import 'package:maum_on_mobile_front/features/letter/data/letter_repository.dart';
+import 'package:maum_on_mobile_front/features/letter/domain/letter_models.dart';
 import 'package:maum_on_mobile_front/features/story/data/story_repository.dart';
 import 'package:maum_on_mobile_front/features/story/domain/story_models.dart';
 
@@ -23,6 +25,7 @@ void main() {
         diaryRepository: _FakeDiaryRepository(),
         diaryImagePicker: const _FakeDiaryImagePicker(),
         storyRepository: _FakeStoryRepository(),
+        letterRepository: _FakeLetterRepository(),
         listenForDeepLinks: false,
       ),
     );
@@ -43,6 +46,7 @@ void main() {
         diaryRepository: _FakeDiaryRepository(),
         diaryImagePicker: const _FakeDiaryImagePicker(),
         storyRepository: _FakeStoryRepository(),
+        letterRepository: _FakeLetterRepository(),
         listenForDeepLinks: false,
       ),
     );
@@ -52,6 +56,50 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('나의 기록'), findsOneWidget);
+  });
+
+  testWidgets('navigates authenticated users from home to letters',
+      (tester) async {
+    await tester.pumpWidget(
+      MaumOnMobileApp(
+        authRepository: _FakeAuthRepository(restoredSession: _session()),
+        homeRepository: const _FakeHomeRepository(),
+        diaryRepository: _FakeDiaryRepository(),
+        diaryImagePicker: const _FakeDiaryImagePicker(),
+        storyRepository: _FakeStoryRepository(),
+        letterRepository: _FakeLetterRepository(
+          statsQueue: [
+            const LetterStats(receivedCount: 1),
+          ],
+          receivedPages: [
+            const LetterListPage(
+              items: [
+                LetterSummary(
+                  id: 1,
+                  title: '도착한 편지',
+                  content: '요약',
+                  createdDate: '2026-05-24T08:00:00',
+                  status: LetterStatus.sent,
+                ),
+              ],
+              totalPages: 1,
+              totalElements: 1,
+              currentPage: 0,
+              isFirst: true,
+              isLast: true,
+            ),
+          ],
+        ),
+        listenForDeepLinks: false,
+      ),
+    );
+
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('편지 쓰기'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('편지함'), findsOneWidget);
+    expect(find.byKey(const ValueKey('letter-title-field')), findsOneWidget);
   });
 
   testWidgets('navigates authenticated users from home to story list',
@@ -86,6 +134,7 @@ void main() {
             ),
           ],
         ),
+        letterRepository: _FakeLetterRepository(),
         listenForDeepLinks: false,
       ),
     );
@@ -118,6 +167,7 @@ void main() {
         diaryRepository: _FakeDiaryRepository(),
         diaryImagePicker: const _FakeDiaryImagePicker(),
         storyRepository: _FakeStoryRepository(),
+        letterRepository: _FakeLetterRepository(),
         listenForDeepLinks: false,
       ),
     );
@@ -288,6 +338,116 @@ class _FakeStoryRepository implements StoryRepository {
 
   @override
   Future<void> deleteComment(int commentId) {
+    throw UnimplementedError();
+  }
+}
+
+class _FakeLetterRepository implements LetterRepository {
+  _FakeLetterRepository({
+    List<LetterStats> statsQueue = const [
+      LetterStats(receivedCount: 0),
+    ],
+    List<LetterListPage> receivedPages = const [
+      LetterListPage(
+        items: [],
+        totalPages: 1,
+        totalElements: 0,
+        currentPage: 0,
+        isFirst: true,
+        isLast: true,
+      ),
+    ],
+    List<LetterListPage> sentPages = const [
+      LetterListPage(
+        items: [],
+        totalPages: 1,
+        totalElements: 0,
+        currentPage: 0,
+        isFirst: true,
+        isLast: true,
+      ),
+    ],
+  })  : _statsQueue = List<LetterStats>.of(statsQueue),
+        _receivedPages = List<LetterListPage>.of(receivedPages),
+        _sentPages = List<LetterListPage>.of(sentPages);
+
+  final List<LetterStats> _statsQueue;
+  final List<LetterListPage> _receivedPages;
+  final List<LetterListPage> _sentPages;
+
+  @override
+  Future<int> createLetter(LetterDraft draft) {
+    throw UnimplementedError();
+  }
+
+  @override
+  Future<LetterListPage> fetchReceivedLetters({
+    int page = 0,
+    int size = 20,
+  }) async {
+    return _receivedPages.isEmpty
+        ? const LetterListPage(
+            items: [],
+            totalPages: 1,
+            totalElements: 0,
+            currentPage: 0,
+            isFirst: true,
+            isLast: true,
+          )
+        : _receivedPages.removeAt(0);
+  }
+
+  @override
+  Future<LetterListPage> fetchSentLetters({
+    int page = 0,
+    int size = 20,
+  }) async {
+    return _sentPages.isEmpty
+        ? const LetterListPage(
+            items: [],
+            totalPages: 1,
+            totalElements: 0,
+            currentPage: 0,
+            isFirst: true,
+            isLast: true,
+          )
+        : _sentPages.removeAt(0);
+  }
+
+  @override
+  Future<LetterDetail> fetchLetter(int id) {
+    throw UnimplementedError();
+  }
+
+  @override
+  Future<LetterStats> fetchStats() async {
+    return _statsQueue.isEmpty
+        ? const LetterStats(receivedCount: 0)
+        : _statsQueue.removeAt(0);
+  }
+
+  @override
+  Future<void> replyLetter(int id, String replyContent) {
+    throw UnimplementedError();
+  }
+
+  @override
+  Future<void> acceptLetter(int id) {
+    throw UnimplementedError();
+  }
+
+  @override
+  Future<void> rejectLetter(int id) {
+    throw UnimplementedError();
+  }
+
+  @override
+  Future<void> markWriting(int id) {
+    throw UnimplementedError();
+  }
+
+  @override
+  Future<LetterStatus> fetchLiveStatus(int id) {
     throw UnimplementedError();
   }
 }

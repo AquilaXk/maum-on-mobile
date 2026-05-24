@@ -17,6 +17,10 @@ import '../features/diary/presentation/diary_screen.dart';
 import '../features/home/application/home_controller.dart';
 import '../features/home/data/home_repository.dart';
 import '../features/home/home_screen.dart';
+import '../features/letter/application/letter_controller.dart';
+import '../features/letter/data/letter_repository.dart';
+import '../features/letter/domain/letter_models.dart';
+import '../features/letter/presentation/letter_screen.dart';
 import '../features/story/application/story_controller.dart';
 import '../features/story/data/story_repository.dart';
 import '../features/story/domain/story_models.dart';
@@ -35,6 +39,8 @@ class MaumOnMobileApp extends StatefulWidget {
     this.diaryImagePicker,
     this.storyRepository,
     this.onStoryReportTarget,
+    this.letterRepository,
+    this.onLetterReportTarget,
     this.listenForDeepLinks = true,
     super.key,
   });
@@ -48,6 +54,8 @@ class MaumOnMobileApp extends StatefulWidget {
   final DiaryImagePicker? diaryImagePicker;
   final StoryRepository? storyRepository;
   final ValueChanged<StoryReportTarget>? onStoryReportTarget;
+  final LetterRepository? letterRepository;
+  final ValueChanged<LetterReportTarget>? onLetterReportTarget;
   final bool listenForDeepLinks;
 
   @override
@@ -77,6 +85,9 @@ class _MaumOnMobileAppState extends State<MaumOnMobileApp> {
   int? _diaryMemberId;
   StoryController? _storyController;
   int? _storyMemberId;
+  LetterController? _letterController;
+  int? _letterMemberId;
+  bool _openLetterComposer = false;
   _AuthenticatedDestination _destination = _AuthenticatedDestination.home;
 
   @override
@@ -96,6 +107,7 @@ class _MaumOnMobileAppState extends State<MaumOnMobileApp> {
     _disposeHomeController();
     _disposeDiaryController();
     _disposeStoryController();
+    _disposeLetterController();
     super.dispose();
   }
 
@@ -123,6 +135,7 @@ class _MaumOnMobileAppState extends State<MaumOnMobileApp> {
             _disposeHomeController();
             _disposeDiaryController();
             _disposeStoryController();
+            _disposeLetterController();
             _destination = _AuthenticatedDestination.home;
             return AuthScreen(
               controller: _authController,
@@ -135,6 +148,22 @@ class _MaumOnMobileAppState extends State<MaumOnMobileApp> {
               controller: _diaryControllerFor(state.member!.id),
               imagePicker:
                   widget.diaryImagePicker ?? const FilePickerDiaryImagePicker(),
+              onBack: () {
+                setState(() {
+                  _destination = _AuthenticatedDestination.home;
+                });
+              },
+            );
+          }
+
+          if (_destination == _AuthenticatedDestination.letter) {
+            final letterController = _letterControllerFor(state.member!.id);
+            final startsInCompose = _openLetterComposer;
+            _openLetterComposer = false;
+
+            return LetterScreen(
+              controller: letterController,
+              initiallyCompose: startsInCompose,
               onBack: () {
                 setState(() {
                   _destination = _AuthenticatedDestination.home;
@@ -164,10 +193,12 @@ class _MaumOnMobileAppState extends State<MaumOnMobileApp> {
                 _destination = _AuthenticatedDestination.diary;
               });
             },
-            onWriteLetter: () => _showHomeActionMessage(
-              context,
-              '편지 화면을 준비 중입니다.',
-            ),
+            onWriteLetter: () {
+              setState(() {
+                _openLetterComposer = true;
+                _destination = _AuthenticatedDestination.letter;
+              });
+            },
             onViewStory: () {
               setState(() {
                 _destination = _AuthenticatedDestination.story;
@@ -177,6 +208,7 @@ class _MaumOnMobileAppState extends State<MaumOnMobileApp> {
               _disposeHomeController();
               _disposeDiaryController();
               _disposeStoryController();
+              _disposeLetterController();
               _destination = _AuthenticatedDestination.home;
               _authController.logout();
             },
@@ -251,10 +283,28 @@ class _MaumOnMobileAppState extends State<MaumOnMobileApp> {
     _storyMemberId = null;
   }
 
-  void _showHomeActionMessage(BuildContext context, String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message)),
+  LetterController _letterControllerFor(int memberId) {
+    final currentController = _letterController;
+    if (currentController != null && _letterMemberId == memberId) {
+      return currentController;
+    }
+
+    currentController?.dispose();
+    _letterMemberId = memberId;
+    return _letterController = LetterController(
+      letterRepository:
+          widget.letterRepository ?? _buildDefaultLetterRepository(),
+      onUnauthorized: () {
+        _authController.logout();
+      },
+      onReportTargetSelected: widget.onLetterReportTarget,
     );
+  }
+
+  void _disposeLetterController() {
+    _letterController?.dispose();
+    _letterController = null;
+    _letterMemberId = null;
   }
 
   AuthRepository _buildDefaultAuthRepository() {
@@ -301,6 +351,23 @@ class _MaumOnMobileAppState extends State<MaumOnMobileApp> {
     );
   }
 
+  LetterRepository _buildDefaultLetterRepository() {
+    final refreshRepository = ApiAuthRepository(
+      apiClient: ApiClient(transport: _apiTransport, tokenStore: _tokenStore),
+      tokenStore: _tokenStore,
+    );
+
+    return ApiLetterRepository(
+      apiClient: ApiClient(
+        transport: _apiTransport,
+        tokenStore: _tokenStore,
+        tokenRefresher: AuthSessionTokenRefresher(
+          authRepository: refreshRepository,
+        ),
+      ),
+    );
+  }
+
   StoryRepository _buildDefaultStoryRepository() {
     final refreshRepository = ApiAuthRepository(
       apiClient: ApiClient(transport: _apiTransport, tokenStore: _tokenStore),
@@ -335,6 +402,7 @@ class _MaumOnMobileAppState extends State<MaumOnMobileApp> {
 enum _AuthenticatedDestination {
   home,
   diary,
+  letter,
   story,
 }
 
