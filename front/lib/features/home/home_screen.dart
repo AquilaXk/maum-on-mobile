@@ -13,6 +13,7 @@ class HomeScreen extends StatefulWidget {
     required this.onWriteLetter,
     required this.onViewStory,
     required this.onOpenConsultation,
+    required this.onOpenNotifications,
     required this.onLogout,
     super.key,
   });
@@ -24,6 +25,7 @@ class HomeScreen extends StatefulWidget {
   final VoidCallback onWriteLetter;
   final VoidCallback onViewStory;
   final VoidCallback onOpenConsultation;
+  final VoidCallback onOpenNotifications;
   final VoidCallback onLogout;
 
   @override
@@ -82,6 +84,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         onWriteLetter: widget.onWriteLetter,
                         onViewStory: widget.onViewStory,
                         onOpenConsultation: widget.onOpenConsultation,
+                        onOpenNotifications: widget.onOpenNotifications,
                         onLogout: widget.onLogout,
                       ),
                       const SizedBox(height: 20),
@@ -273,6 +276,7 @@ class _ActionGrid extends StatelessWidget {
     required this.onWriteLetter,
     required this.onViewStory,
     required this.onOpenConsultation,
+    required this.onOpenNotifications,
     required this.onLogout,
   });
 
@@ -280,6 +284,7 @@ class _ActionGrid extends StatelessWidget {
   final VoidCallback onWriteLetter;
   final VoidCallback onViewStory;
   final VoidCallback onOpenConsultation;
+  final VoidCallback onOpenNotifications;
   final VoidCallback onLogout;
 
   @override
@@ -304,6 +309,11 @@ class _ActionGrid extends StatelessWidget {
           onPressed: onOpenConsultation,
           icon: const Icon(Icons.chat_bubble_outline),
           label: const Text('상담하기'),
+        ),
+        OutlinedButton.icon(
+          onPressed: onOpenNotifications,
+          icon: const Icon(Icons.notifications_none),
+          label: const Text('알림/신고'),
         ),
         OutlinedButton(
           onPressed: onLogout,

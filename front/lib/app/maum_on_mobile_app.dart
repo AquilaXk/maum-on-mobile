@@ -24,6 +24,12 @@ import '../features/letter/application/letter_controller.dart';
 import '../features/letter/data/letter_repository.dart';
 import '../features/letter/domain/letter_models.dart';
 import '../features/letter/presentation/letter_screen.dart';
+import '../features/notification/application/notification_controller.dart';
+import '../features/notification/data/notification_repository.dart';
+import '../features/notification/presentation/notification_report_screen.dart';
+import '../features/report/application/report_controller.dart';
+import '../features/report/data/report_repository.dart';
+import '../features/report/domain/report_models.dart';
 import '../features/story/application/story_controller.dart';
 import '../features/story/data/story_repository.dart';
 import '../features/story/domain/story_models.dart';
@@ -39,6 +45,8 @@ class MaumOnMobileApp extends StatefulWidget {
     this.deepLinkSource,
     this.homeRepository,
     this.consultationRepository,
+    this.notificationRepository,
+    this.reportRepository,
     this.diaryRepository,
     this.diaryImagePicker,
     this.storyRepository,
@@ -55,6 +63,8 @@ class MaumOnMobileApp extends StatefulWidget {
   final ExternalLoginDeepLinkSource? deepLinkSource;
   final HomeRepository? homeRepository;
   final ConsultationRepository? consultationRepository;
+  final NotificationRepository? notificationRepository;
+  final ReportRepository? reportRepository;
   final DiaryRepository? diaryRepository;
   final DiaryImagePicker? diaryImagePicker;
   final StoryRepository? storyRepository;
@@ -88,6 +98,10 @@ class _MaumOnMobileAppState extends State<MaumOnMobileApp> {
   int? _homeMemberId;
   ConsultationController? _consultationController;
   int? _consultationMemberId;
+  NotificationController? _notificationController;
+  int? _notificationMemberId;
+  ReportController? _reportController;
+  int? _reportMemberId;
   DiaryController? _diaryController;
   int? _diaryMemberId;
   StoryController? _storyController;
@@ -95,6 +109,7 @@ class _MaumOnMobileAppState extends State<MaumOnMobileApp> {
   LetterController? _letterController;
   int? _letterMemberId;
   bool _openLetterComposer = false;
+  ReportTarget? _pendingReportTarget;
   _AuthenticatedDestination _destination = _AuthenticatedDestination.home;
 
   @override
@@ -113,6 +128,8 @@ class _MaumOnMobileAppState extends State<MaumOnMobileApp> {
     _authController.dispose();
     _disposeHomeController();
     _disposeConsultationController();
+    _disposeNotificationController();
+    _disposeReportController();
     _disposeDiaryController();
     _disposeStoryController();
     _disposeLetterController();
@@ -142,6 +159,8 @@ class _MaumOnMobileAppState extends State<MaumOnMobileApp> {
           if (!state.isAuthenticated || state.member == null) {
             _disposeHomeController();
             _disposeConsultationController();
+            _disposeNotificationController();
+            _disposeReportController();
             _disposeDiaryController();
             _disposeStoryController();
             _disposeLetterController();
@@ -168,6 +187,26 @@ class _MaumOnMobileAppState extends State<MaumOnMobileApp> {
           if (_destination == _AuthenticatedDestination.consultation) {
             return ConsultationScreen(
               controller: _consultationControllerFor(state.member!.id),
+              onBack: () {
+                setState(() {
+                  _destination = _AuthenticatedDestination.home;
+                });
+              },
+            );
+          }
+
+          if (_destination == _AuthenticatedDestination.notifications) {
+            final reportController = _reportControllerFor(state.member!.id);
+            final pendingTarget = _pendingReportTarget;
+            if (pendingTarget != null) {
+              reportController.selectTarget(pendingTarget);
+              _pendingReportTarget = null;
+            }
+
+            return NotificationReportScreen(
+              notificationController:
+                  _notificationControllerFor(state.member!.id),
+              reportController: reportController,
               onBack: () {
                 setState(() {
                   _destination = _AuthenticatedDestination.home;
@@ -229,9 +268,16 @@ class _MaumOnMobileAppState extends State<MaumOnMobileApp> {
                 _destination = _AuthenticatedDestination.consultation;
               });
             },
+            onOpenNotifications: () {
+              setState(() {
+                _destination = _AuthenticatedDestination.notifications;
+              });
+            },
             onLogout: () {
               _disposeHomeController();
               _disposeConsultationController();
+              _disposeNotificationController();
+              _disposeReportController();
               _disposeDiaryController();
               _disposeStoryController();
               _disposeLetterController();
@@ -286,6 +332,51 @@ class _MaumOnMobileAppState extends State<MaumOnMobileApp> {
     _consultationMemberId = null;
   }
 
+  NotificationController _notificationControllerFor(int memberId) {
+    final currentController = _notificationController;
+    if (currentController != null && _notificationMemberId == memberId) {
+      return currentController;
+    }
+
+    currentController?.dispose();
+    _notificationMemberId = memberId;
+    return _notificationController = NotificationController(
+      repository:
+          widget.notificationRepository ?? _buildDefaultNotificationRepository(),
+      onUnauthorized: () {
+        _authController.logout();
+      },
+    );
+  }
+
+  void _disposeNotificationController() {
+    _notificationController?.dispose();
+    _notificationController = null;
+    _notificationMemberId = null;
+  }
+
+  ReportController _reportControllerFor(int memberId) {
+    final currentController = _reportController;
+    if (currentController != null && _reportMemberId == memberId) {
+      return currentController;
+    }
+
+    currentController?.dispose();
+    _reportMemberId = memberId;
+    return _reportController = ReportController(
+      repository: widget.reportRepository ?? _buildDefaultReportRepository(),
+      onUnauthorized: () {
+        _authController.logout();
+      },
+    );
+  }
+
+  void _disposeReportController() {
+    _reportController?.dispose();
+    _reportController = null;
+    _reportMemberId = null;
+  }
+
   DiaryController _diaryControllerFor(int memberId) {
     final currentController = _diaryController;
     if (currentController != null && _diaryMemberId == memberId) {
@@ -322,7 +413,7 @@ class _MaumOnMobileAppState extends State<MaumOnMobileApp> {
       onUnauthorized: () {
         _authController.logout();
       },
-      onReportTargetSelected: widget.onStoryReportTarget,
+      onReportTargetSelected: _handleStoryReportTarget,
     );
   }
 
@@ -346,7 +437,7 @@ class _MaumOnMobileAppState extends State<MaumOnMobileApp> {
       onUnauthorized: () {
         _authController.logout();
       },
-      onReportTargetSelected: widget.onLetterReportTarget,
+      onReportTargetSelected: _handleLetterReportTarget,
     );
   }
 
@@ -438,6 +529,41 @@ class _MaumOnMobileAppState extends State<MaumOnMobileApp> {
     );
   }
 
+  NotificationRepository _buildDefaultNotificationRepository() {
+    final refreshRepository = ApiAuthRepository(
+      apiClient: ApiClient(transport: _apiTransport, tokenStore: _tokenStore),
+      tokenStore: _tokenStore,
+    );
+
+    return ApiNotificationRepository(
+      apiClient: ApiClient(
+        transport: _apiTransport,
+        tokenStore: _tokenStore,
+        tokenRefresher: AuthSessionTokenRefresher(
+          authRepository: refreshRepository,
+        ),
+      ),
+      streamClient: DioNotificationStreamClient(apiConfig: _apiConfig),
+    );
+  }
+
+  ReportRepository _buildDefaultReportRepository() {
+    final refreshRepository = ApiAuthRepository(
+      apiClient: ApiClient(transport: _apiTransport, tokenStore: _tokenStore),
+      tokenStore: _tokenStore,
+    );
+
+    return ApiReportRepository(
+      apiClient: ApiClient(
+        transport: _apiTransport,
+        tokenStore: _tokenStore,
+        tokenRefresher: AuthSessionTokenRefresher(
+          authRepository: refreshRepository,
+        ),
+      ),
+    );
+  }
+
   StoryRepository _buildDefaultStoryRepository() {
     final refreshRepository = ApiAuthRepository(
       apiClient: ApiClient(transport: _apiTransport, tokenStore: _tokenStore),
@@ -467,11 +593,41 @@ class _MaumOnMobileAppState extends State<MaumOnMobileApp> {
       _externalLoginController.handleIncomingUri,
     );
   }
+
+  void _handleStoryReportTarget(StoryReportTarget target) {
+    widget.onStoryReportTarget?.call(target);
+    _openReportTarget(
+      ReportTarget.fromRaw(
+        targetType: target.targetType,
+        targetId: target.targetId,
+        label: target.label,
+      ),
+    );
+  }
+
+  void _handleLetterReportTarget(LetterReportTarget target) {
+    widget.onLetterReportTarget?.call(target);
+    _openReportTarget(
+      ReportTarget.fromRaw(
+        targetType: target.targetType,
+        targetId: target.targetId,
+        label: target.label,
+      ),
+    );
+  }
+
+  void _openReportTarget(ReportTarget target) {
+    setState(() {
+      _pendingReportTarget = target;
+      _destination = _AuthenticatedDestination.notifications;
+    });
+  }
 }
 
 enum _AuthenticatedDestination {
   home,
   consultation,
+  notifications,
   diary,
   letter,
   story,
