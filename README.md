@@ -11,9 +11,18 @@ Mobile app repository for Maum On, focused on Android and iOS clients.
 ## Workspace
 
 - `front/`: Android/iOS mobile app client.
-- `back/`: API server for the mobile app.
+- `back/`: Kotlin/Spring Boot API server for the mobile app.
 - `docker/`: local runtime containers and operational compose files.
 - `infra/`: deployment and infrastructure assets.
+
+## Backend Architecture
+
+The backend follows hexagonal architecture package boundaries:
+
+- `domain`: domain models and business rules.
+- `application`: use cases, input ports, and application services.
+- `adapter`: external input/output adapters such as web controllers.
+- `global`: shared configuration and cross-cutting infrastructure.
 
 ## Initial Scope
 
