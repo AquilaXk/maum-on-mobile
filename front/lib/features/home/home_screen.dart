@@ -44,9 +44,9 @@ class HomeScreen extends StatelessWidget {
                   const SizedBox(height: 20),
                   const _PlatformRow(),
                   const SizedBox(height: 20),
-                  FilledButton(
+                  const FilledButton(
                     onPressed: null,
-                    child: const Text('체크인 시작'),
+                    child: Text('체크인 시작'),
                   ),
                 ],
               ),
