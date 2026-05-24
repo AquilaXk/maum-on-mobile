@@ -39,7 +39,12 @@ void main() {
       final transport = _FakeApiTransport([
         ApiTransportResponse.ok(_tokenEnvelope(accessToken: 'restored-token')),
       ]);
-      final tokenStore = MemoryAuthTokenStore();
+      final tokenStore = MemoryAuthTokenStore(
+        initialTokens: const TokenPair(
+          accessToken: 'saved-access',
+          refreshToken: 'saved-refresh',
+        ),
+      );
       final repository = ApiAuthRepository(
         apiClient: ApiClient(transport: transport, tokenStore: tokenStore),
         tokenStore: tokenStore,
@@ -51,7 +56,42 @@ void main() {
       expect(await tokenStore.readAccessToken(), 'restored-token');
       expect(transport.requests.single.method, ApiMethod.get);
       expect(transport.requests.single.path, '/api/v1/auth/session');
+      expect(transport.requests.single.requiresAuth, isTrue);
+      expect(
+        transport.requests.single.headers['Authorization'],
+        'Bearer saved-access',
+      );
+    });
+
+    test('refreshSession sends the stored refresh token and stores rotation',
+        () async {
+      final transport = _FakeApiTransport([
+        ApiTransportResponse.ok(_tokenEnvelope(
+          accessToken: 'new-access',
+          refreshToken: 'new-refresh',
+        )),
+      ]);
+      final tokenStore = MemoryAuthTokenStore(
+        initialTokens: const TokenPair(
+          accessToken: 'old-access',
+          refreshToken: 'old-refresh',
+        ),
+      );
+      final repository = ApiAuthRepository(
+        apiClient: ApiClient(transport: transport, tokenStore: tokenStore),
+        tokenStore: tokenStore,
+      );
+
+      final session = await repository.refreshSession();
+
+      expect(session.accessToken, 'new-access');
+      expect(await tokenStore.readAccessToken(), 'new-access');
+      expect(await tokenStore.readRefreshToken(), 'new-refresh');
+      expect(transport.requests.single.method, ApiMethod.post);
+      expect(transport.requests.single.path, '/api/v1/auth/refresh');
       expect(transport.requests.single.requiresAuth, isFalse);
+      expect(transport.requests.single.retryOnUnauthorized, isFalse);
+      expect(transport.requests.single.body, {'refreshToken': 'old-refresh'});
     });
 
     test('refreshSession clears stored tokens when refresh fails', () async {
@@ -67,7 +107,7 @@ void main() {
       final tokenStore = MemoryAuthTokenStore(
         initialTokens: const TokenPair(
           accessToken: 'old-access',
-          refreshToken: 'server-managed',
+          refreshToken: 'old-refresh',
         ),
       );
       final repository = ApiAuthRepository(
@@ -87,6 +127,7 @@ void main() {
       );
       expect(await tokenStore.readAccessToken(), isNull);
       expect(await tokenStore.readRefreshToken(), isNull);
+      expect(transport.requests.single.body, {'refreshToken': 'old-refresh'});
     });
 
     test('logout clears local tokens after calling logout endpoint', () async {
@@ -98,7 +139,7 @@ void main() {
       final tokenStore = MemoryAuthTokenStore(
         initialTokens: const TokenPair(
           accessToken: 'access-token',
-          refreshToken: 'server-managed',
+          refreshToken: 'refresh-token',
         ),
       );
       final repository = ApiAuthRepository(
@@ -110,17 +151,22 @@ void main() {
 
       expect(transport.requests.single.method, ApiMethod.post);
       expect(transport.requests.single.path, '/api/v1/auth/logout');
+      expect(transport.requests.single.body, {'refreshToken': 'refresh-token'});
       expect(await tokenStore.readAccessToken(), isNull);
       expect(await tokenStore.readRefreshToken(), isNull);
     });
   });
 }
 
-Map<String, Object?> _tokenEnvelope({required String accessToken}) {
+Map<String, Object?> _tokenEnvelope({
+  required String accessToken,
+  String refreshToken = 'refresh-token',
+}) {
   return {
     'success': true,
     'data': {
       'accessToken': accessToken,
+      'refreshToken': refreshToken,
       'tokenType': 'Bearer',
       'expiresInSeconds': 3600,
       'member': _memberJson(),

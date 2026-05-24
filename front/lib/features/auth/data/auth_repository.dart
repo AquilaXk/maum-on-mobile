@@ -1,4 +1,5 @@
 import '../../../core/network/api_client.dart';
+import '../../../core/network/api_error.dart';
 import '../../../core/network/auth_token_store.dart';
 import '../domain/auth_models.dart';
 
@@ -56,7 +57,6 @@ class ApiAuthRepository implements AuthRepository {
   Future<AuthSession> restoreSession() async {
     final session = await _apiClient.get<AuthSession>(
       '/api/v1/auth/session',
-      requiresAuth: false,
       retryOnUnauthorized: false,
       parser: AuthSession.fromJson,
     );
@@ -66,9 +66,20 @@ class ApiAuthRepository implements AuthRepository {
 
   @override
   Future<AuthSession> refreshSession() async {
+    final refreshToken = await _tokenStore.readRefreshToken();
+    if (refreshToken == null || refreshToken.isEmpty) {
+      await _tokenStore.clear();
+      throw const ApiClientException(
+        kind: ApiErrorKind.unauthorized,
+        message: '다시 로그인해 주세요.',
+        statusCode: 401,
+      );
+    }
+
     try {
       final session = await _apiClient.post<AuthSession>(
         '/api/v1/auth/refresh',
+        body: {'refreshToken': refreshToken},
         requiresAuth: false,
         retryOnUnauthorized: false,
         parser: AuthSession.fromJson,
@@ -91,9 +102,13 @@ class ApiAuthRepository implements AuthRepository {
 
   @override
   Future<void> logout() async {
+    final refreshToken = await _tokenStore.readRefreshToken();
     try {
       await _apiClient.postVoid(
         '/api/v1/auth/logout',
+        body: refreshToken == null || refreshToken.isEmpty
+            ? null
+            : {'refreshToken': refreshToken},
         requiresAuth: false,
         retryOnUnauthorized: false,
       );
