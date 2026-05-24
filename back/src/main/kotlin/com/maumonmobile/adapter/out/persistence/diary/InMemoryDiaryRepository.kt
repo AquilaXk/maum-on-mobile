@@ -3,12 +3,14 @@ package com.maumonmobile.adapter.out.persistence.diary
 import com.maumonmobile.application.port.out.DiaryRepository
 import com.maumonmobile.domain.diary.Diary
 import com.maumonmobile.domain.diary.DiaryDraft
+import org.springframework.context.annotation.Profile
 import org.springframework.stereotype.Repository
 import java.time.Instant
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicLong
 
 @Repository
+@Profile("memory")
 class InMemoryDiaryRepository : DiaryRepository {
     private val sequence = AtomicLong(1L)
     private val diariesById = ConcurrentHashMap<Long, Diary>()

@@ -4,12 +4,14 @@ import com.maumonmobile.application.port.out.ReportRepository
 import com.maumonmobile.domain.report.Report
 import com.maumonmobile.domain.report.ReportDraft
 import com.maumonmobile.domain.report.ReportTargetType
+import org.springframework.context.annotation.Profile
 import org.springframework.stereotype.Repository
 import java.time.Instant
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicLong
 
 @Repository
+@Profile("memory")
 class InMemoryReportRepository : ReportRepository {
     private val sequence = AtomicLong(1L)
     private val reportsById = ConcurrentHashMap<Long, Report>()

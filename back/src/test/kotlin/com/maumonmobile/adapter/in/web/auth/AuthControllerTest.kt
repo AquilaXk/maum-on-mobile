@@ -15,12 +15,7 @@ import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.get
 import org.springframework.test.web.servlet.post
 
-@SpringBootTest(
-    properties = [
-        "spring.flyway.enabled=false",
-        "spring.autoconfigure.exclude=org.springframework.boot.jdbc.autoconfigure.DataSourceAutoConfiguration",
-    ],
-)
+@SpringBootTest
 @AutoConfigureMockMvc
 @ActiveProfiles("test")
 class AuthControllerTest @Autowired constructor(

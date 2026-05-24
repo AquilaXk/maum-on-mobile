@@ -19,12 +19,7 @@ import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multi
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
 
-@SpringBootTest(
-    properties = [
-        "spring.flyway.enabled=false",
-        "spring.autoconfigure.exclude=org.springframework.boot.jdbc.autoconfigure.DataSourceAutoConfiguration",
-    ],
-)
+@SpringBootTest
 @AutoConfigureMockMvc
 @ActiveProfiles("test")
 class DiaryControllerTest @Autowired constructor(
