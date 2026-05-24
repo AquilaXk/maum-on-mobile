@@ -109,6 +109,63 @@ class ApiClient {
     );
   }
 
+  Future<T> putMultipart<T>(
+    String path, {
+    required MultipartBody multipart,
+    required T Function(Object? json) parser,
+    Map<String, Object?> queryParameters = const {},
+    bool requiresAuth = true,
+    bool retryOnUnauthorized = true,
+  }) {
+    return _send(
+      ApiRequest(
+        method: ApiMethod.put,
+        path: path,
+        queryParameters: queryParameters,
+        multipart: multipart,
+        requiresAuth: requiresAuth,
+        retryOnUnauthorized: retryOnUnauthorized,
+      ),
+      parser,
+    );
+  }
+
+  Future<void> putMultipartVoid(
+    String path, {
+    required MultipartBody multipart,
+    Map<String, Object?> queryParameters = const {},
+    bool requiresAuth = true,
+    bool retryOnUnauthorized = true,
+  }) {
+    return _sendVoid(
+      ApiRequest(
+        method: ApiMethod.put,
+        path: path,
+        queryParameters: queryParameters,
+        multipart: multipart,
+        requiresAuth: requiresAuth,
+        retryOnUnauthorized: retryOnUnauthorized,
+      ),
+    );
+  }
+
+  Future<void> deleteVoid(
+    String path, {
+    Map<String, Object?> queryParameters = const {},
+    bool requiresAuth = true,
+    bool retryOnUnauthorized = true,
+  }) {
+    return _sendVoid(
+      ApiRequest(
+        method: ApiMethod.delete,
+        path: path,
+        queryParameters: queryParameters,
+        requiresAuth: requiresAuth,
+        retryOnUnauthorized: retryOnUnauthorized,
+      ),
+    );
+  }
+
   Future<T> _send<T>(
     ApiRequest request,
     T Function(Object? json) parser, {

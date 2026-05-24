@@ -85,8 +85,10 @@ void main() {
 
       expect(result, {'id': 1});
       expect(transport.requests, hasLength(2));
-      expect(transport.requests[0].headers['Authorization'], 'Bearer old-access');
-      expect(transport.requests[1].headers['Authorization'], 'Bearer new-access');
+      expect(
+          transport.requests[0].headers['Authorization'], 'Bearer old-access');
+      expect(
+          transport.requests[1].headers['Authorization'], 'Bearer new-access');
       expect(await tokenStore.readAccessToken(), 'new-access');
       expect(await tokenStore.readRefreshToken(), 'new-refresh');
     });
@@ -209,7 +211,8 @@ void main() {
 
       final page = await client.getPage<String>(
         '/stories',
-        itemParser: (json) => (json as Map<String, Object?>)['title']! as String,
+        itemParser: (json) =>
+            (json as Map<String, Object?>)['title']! as String,
       );
 
       expect(page.items, ['first', 'second']);
@@ -243,8 +246,66 @@ void main() {
 
       expect(result, {'uploaded': true});
       expect(transport.requests.single.method, ApiMethod.post);
-      expect(transport.requests.single.multipart?.files.single.filename, 'diary.png');
-      expect(transport.requests.single.multipart?.files.single.bytes, [1, 2, 3]);
+      expect(transport.requests.single.multipart?.files.single.filename,
+          'diary.png');
+      expect(
+          transport.requests.single.multipart?.files.single.bytes, [1, 2, 3]);
+    });
+
+    test('sends JSON and image multipart parts through the transport',
+        () async {
+      final transport = _FakeApiTransport([
+        ApiTransportResponse.ok({
+          'success': true,
+          'data': {'updated': true},
+        }),
+      ]);
+      final client = ApiClient(
+        transport: transport,
+        tokenStore: MemoryAuthTokenStore(),
+      );
+
+      await client.putMultipart<Map<String, Object?>>(
+        '/diaries/1',
+        multipart: MultipartBody(
+          textParts: const [
+            MultipartTextPart(
+              fieldName: 'data',
+              value: '{"title":"오늘"}',
+              contentType: 'application/json',
+            ),
+          ],
+          files: [
+            MultipartFilePart(
+              fieldName: 'image',
+              filename: 'diary.png',
+              bytes: Uint8List.fromList([1, 2, 3]),
+            ),
+          ],
+        ),
+        parser: (json) => json as Map<String, Object?>,
+      );
+
+      final multipart = transport.requests.single.multipart!;
+      expect(transport.requests.single.method, ApiMethod.put);
+      expect(multipart.textParts.single.fieldName, 'data');
+      expect(multipart.textParts.single.contentType, 'application/json');
+      expect(multipart.files.single.fieldName, 'image');
+    });
+
+    test('sends delete requests through the transport', () async {
+      final transport = _FakeApiTransport([
+        ApiTransportResponse.ok({'success': true}),
+      ]);
+      final client = ApiClient(
+        transport: transport,
+        tokenStore: MemoryAuthTokenStore(),
+      );
+
+      await client.deleteVoid('/diaries/1');
+
+      expect(transport.requests.single.method, ApiMethod.delete);
+      expect(transport.requests.single.path, '/diaries/1');
     });
   });
 }

@@ -10,6 +10,10 @@ import '../features/auth/application/auth_controller.dart';
 import '../features/auth/data/auth_repository.dart';
 import '../features/auth/deeplink/external_login.dart';
 import '../features/auth/presentation/auth_screen.dart';
+import '../features/diary/application/diary_controller.dart';
+import '../features/diary/data/diary_repository.dart';
+import '../features/diary/presentation/diary_image_picker.dart';
+import '../features/diary/presentation/diary_screen.dart';
 import '../features/home/application/home_controller.dart';
 import '../features/home/data/home_repository.dart';
 import '../features/home/home_screen.dart';
@@ -23,6 +27,8 @@ class MaumOnMobileApp extends StatefulWidget {
     this.externalLoginConfig,
     this.deepLinkSource,
     this.homeRepository,
+    this.diaryRepository,
+    this.diaryImagePicker,
     this.listenForDeepLinks = true,
     super.key,
   });
@@ -32,6 +38,8 @@ class MaumOnMobileApp extends StatefulWidget {
   final ExternalLoginConfig? externalLoginConfig;
   final ExternalLoginDeepLinkSource? deepLinkSource;
   final HomeRepository? homeRepository;
+  final DiaryRepository? diaryRepository;
+  final DiaryImagePicker? diaryImagePicker;
   final bool listenForDeepLinks;
 
   @override
@@ -57,6 +65,9 @@ class _MaumOnMobileAppState extends State<MaumOnMobileApp> {
   StreamSubscription<Uri>? _deepLinkSubscription;
   HomeController? _homeController;
   int? _homeMemberId;
+  DiaryController? _diaryController;
+  int? _diaryMemberId;
+  _AuthenticatedDestination _destination = _AuthenticatedDestination.home;
 
   @override
   void initState() {
@@ -73,6 +84,7 @@ class _MaumOnMobileAppState extends State<MaumOnMobileApp> {
     _externalLoginController.dispose();
     _authController.dispose();
     _disposeHomeController();
+    _disposeDiaryController();
     super.dispose();
   }
 
@@ -98,9 +110,24 @@ class _MaumOnMobileAppState extends State<MaumOnMobileApp> {
 
           if (!state.isAuthenticated || state.member == null) {
             _disposeHomeController();
+            _disposeDiaryController();
+            _destination = _AuthenticatedDestination.home;
             return AuthScreen(
               controller: _authController,
               externalLoginController: _externalLoginController,
+            );
+          }
+
+          if (_destination == _AuthenticatedDestination.diary) {
+            return DiaryScreen(
+              controller: _diaryControllerFor(state.member!.id),
+              imagePicker:
+                  widget.diaryImagePicker ?? const FilePickerDiaryImagePicker(),
+              onBack: () {
+                setState(() {
+                  _destination = _AuthenticatedDestination.home;
+                });
+              },
             );
           }
 
@@ -109,10 +136,11 @@ class _MaumOnMobileAppState extends State<MaumOnMobileApp> {
             routeTitle: initialRoute.title,
             nickname: state.member!.nickname,
             homeController: homeController,
-            onWriteDiary: () => _showHomeActionMessage(
-              context,
-              '다이어리 화면을 준비 중입니다.',
-            ),
+            onWriteDiary: () {
+              setState(() {
+                _destination = _AuthenticatedDestination.diary;
+              });
+            },
             onWriteLetter: () => _showHomeActionMessage(
               context,
               '편지 화면을 준비 중입니다.',
@@ -122,6 +150,9 @@ class _MaumOnMobileAppState extends State<MaumOnMobileApp> {
               '스토리 화면을 준비 중입니다.',
             ),
             onLogout: () {
+              _disposeHomeController();
+              _disposeDiaryController();
+              _destination = _AuthenticatedDestination.home;
               _authController.logout();
             },
           );
@@ -147,6 +178,28 @@ class _MaumOnMobileAppState extends State<MaumOnMobileApp> {
     _homeController?.dispose();
     _homeController = null;
     _homeMemberId = null;
+  }
+
+  DiaryController _diaryControllerFor(int memberId) {
+    final currentController = _diaryController;
+    if (currentController != null && _diaryMemberId == memberId) {
+      return currentController;
+    }
+
+    currentController?.dispose();
+    _diaryMemberId = memberId;
+    return _diaryController = DiaryController(
+      diaryRepository: widget.diaryRepository ?? _buildDefaultDiaryRepository(),
+      onUnauthorized: () {
+        _authController.logout();
+      },
+    );
+  }
+
+  void _disposeDiaryController() {
+    _diaryController?.dispose();
+    _diaryController = null;
+    _diaryMemberId = null;
   }
 
   void _showHomeActionMessage(BuildContext context, String message) {
@@ -182,6 +235,23 @@ class _MaumOnMobileAppState extends State<MaumOnMobileApp> {
     );
   }
 
+  DiaryRepository _buildDefaultDiaryRepository() {
+    final refreshRepository = ApiAuthRepository(
+      apiClient: ApiClient(transport: _apiTransport, tokenStore: _tokenStore),
+      tokenStore: _tokenStore,
+    );
+
+    return ApiDiaryRepository(
+      apiClient: ApiClient(
+        transport: _apiTransport,
+        tokenStore: _tokenStore,
+        tokenRefresher: AuthSessionTokenRefresher(
+          authRepository: refreshRepository,
+        ),
+      ),
+    );
+  }
+
   Future<void> _bindDeepLinks() async {
     final source =
         widget.deepLinkSource ?? AppLinksExternalLoginDeepLinkSource();
@@ -194,6 +264,11 @@ class _MaumOnMobileAppState extends State<MaumOnMobileApp> {
       _externalLoginController.handleIncomingUri,
     );
   }
+}
+
+enum _AuthenticatedDestination {
+  home,
+  diary,
 }
 
 class _SessionRestoreScreen extends StatelessWidget {
