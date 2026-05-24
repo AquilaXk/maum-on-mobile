@@ -1,0 +1,13 @@
+spring:
+  application:
+    name: maum-on-mobile-back
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+
+app:
+  security:
+    jwt:
+      issuer: maum-on-mobile
+      secret: ${APP_JWT_SECRET:dev-local-change-me-change-me-change-me}
+      access-token-ttl: PT1H

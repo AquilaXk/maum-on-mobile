@@ -1,0 +1,1 @@
+-- Bootstrap migration placeholder for future mobile API schema.

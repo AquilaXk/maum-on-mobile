@@ -1,6 +1,7 @@
 package com.maumonmobile.adapter.`in`.web.health
 
 import com.maumonmobile.application.port.`in`.CheckHealthUseCase
+import com.maumonmobile.global.web.ApiResponse
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.RestController
 
@@ -10,9 +11,9 @@ class HealthController(
 ) {
 
     @GetMapping("/api/health")
-    fun health(): HealthResponse {
+    fun health(): ApiResponse<HealthResponse> {
         val healthStatus = checkHealthUseCase.check()
-        return HealthResponse(status = healthStatus.status)
+        return ApiResponse.success(HealthResponse(status = healthStatus.status))
     }
 }
 
