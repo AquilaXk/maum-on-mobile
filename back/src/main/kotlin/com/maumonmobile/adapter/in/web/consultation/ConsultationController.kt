@@ -2,6 +2,8 @@ package com.maumonmobile.adapter.`in`.web.consultation
 
 import com.maumonmobile.adapter.out.sse.consultation.ConsultationStreamRegistry
 import com.maumonmobile.application.port.`in`.ConsultationChatCommand
+import com.maumonmobile.application.port.`in`.ConsultationHistoryResult
+import com.maumonmobile.application.port.`in`.ConsultationMessageResult
 import com.maumonmobile.application.port.`in`.ConsultationUseCase
 import com.maumonmobile.global.security.AuthenticatedUser
 import com.maumonmobile.global.web.ApiResponse
@@ -30,6 +32,13 @@ class ConsultationController(
         return streamRegistry.open(session.memberId)
     }
 
+    @GetMapping("/recent")
+    fun recent(authentication: Authentication): ApiResponse<ConsultationHistoryResponse> {
+        return ApiResponse.success(
+            consultationUseCase.history(authentication.authenticatedUser()).toResponse(),
+        )
+    }
+
     @PostMapping("/chat")
     fun chat(
         authentication: Authentication,
@@ -39,7 +48,11 @@ class ConsultationController(
             user = authentication.authenticatedUser(),
             command = request.toCommand(),
         )
-        streamRegistry.publishReply(result.memberId, result.chunks)
+        if (result.errorMessage == null) {
+            streamRegistry.publishReply(result.memberId, result.chunks)
+        } else {
+            streamRegistry.publishError(result.memberId, result.errorMessage)
+        }
         return ApiResponse.success(true)
     }
 }
@@ -50,8 +63,32 @@ data class ConsultationChatRequest(
     val message: String,
 )
 
+data class ConsultationHistoryResponse(
+    val messages: List<ConsultationMessageResponse>,
+)
+
+data class ConsultationMessageResponse(
+    val id: Long,
+    val role: String,
+    val content: String,
+    val createdAt: String,
+)
+
 private fun ConsultationChatRequest.toCommand(): ConsultationChatCommand {
     return ConsultationChatCommand(message = message)
+}
+
+private fun ConsultationHistoryResult.toResponse(): ConsultationHistoryResponse {
+    return ConsultationHistoryResponse(messages = messages.map(ConsultationMessageResult::toResponse))
+}
+
+private fun ConsultationMessageResult.toResponse(): ConsultationMessageResponse {
+    return ConsultationMessageResponse(
+        id = id,
+        role = role,
+        content = content,
+        createdAt = createdAt,
+    )
 }
 
 private fun Authentication.authenticatedUser(): AuthenticatedUser {

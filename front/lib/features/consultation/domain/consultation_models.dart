@@ -27,6 +27,21 @@ class ConsultationMessage {
     required this.createdAt,
   });
 
+  factory ConsultationMessage.fromJson(Object? json) {
+    if (json is! Map) {
+      throw const FormatException('Expected consultation message object.');
+    }
+
+    final map = _stringKeyedMap(json);
+    return ConsultationMessage(
+      id: map['id']?.toString() ?? '',
+      role: _roleFromJson(map['role']),
+      content: map['content']?.toString() ?? '',
+      createdAt: DateTime.tryParse(map['createdAt']?.toString() ?? '') ??
+          DateTime.fromMillisecondsSinceEpoch(0),
+    );
+  }
+
   final String id;
   final ConsultationMessageRole role;
   final String content;
@@ -78,4 +93,16 @@ class ConsultationStreamEvent {
 
   final ConsultationStreamEventType type;
   final String data;
+}
+
+ConsultationMessageRole _roleFromJson(Object? value) {
+  return switch (value?.toString()) {
+    'USER' || 'user' => ConsultationMessageRole.user,
+    'ASSISTANT' || 'assistant' => ConsultationMessageRole.assistant,
+    _ => ConsultationMessageRole.system,
+  };
+}
+
+Map<String, Object?> _stringKeyedMap(Map<Object?, Object?> map) {
+  return map.map((key, value) => MapEntry(key.toString(), value));
 }
