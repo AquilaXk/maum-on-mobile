@@ -298,6 +298,12 @@ jobs:
           flutter pub get
           flutter build apk --debug
 
+      - name: Set up Node.js
+        if: ${{ steps.scaffold.outputs.present == 'true' && steps.scaffold.outputs.stack == 'flutter' }}
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+        with:
+          node-version: "24"
+
       - name: Validate mobile release contracts
         if: ${{ steps.scaffold.outputs.present == 'true' && steps.scaffold.outputs.stack == 'flutter' }}
         run: node --test tools/ci/mobile-release-config-contract.test.mjs
@@ -380,6 +386,12 @@ jobs:
           set -euo pipefail
           flutter pub get
           flutter build ios --simulator --no-codesign
+
+      - name: Set up Node.js
+        if: ${{ steps.scaffold.outputs.present == 'true' && steps.scaffold.outputs.stack == 'flutter' }}
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+        with:
+          node-version: "24"
 
       - name: Validate mobile release contracts
         if: ${{ steps.scaffold.outputs.present == 'true' && steps.scaffold.outputs.stack == 'flutter' }}

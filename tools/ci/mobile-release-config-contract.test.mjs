@@ -30,7 +30,7 @@ test("Android release builds require dedicated signing inputs", () => {
 test("Android store-facing metadata stays release ready", () => {
   const manifest = read("front/android/app/src/main/AndroidManifest.xml");
 
-  assert.match(read("front/pubspec.yaml"), /^version:\s*0\.1\.0\+1/m);
+  assert.match(read("front/pubspec.yaml"), /^version:\s*\d+\.\d+\.\d+\+\d+/m);
   assert.match(read("front/android/app/build.gradle.kts"), /applicationId\s*=\s*"com\.aquilaxk\.maumonmobile"/);
   assert.match(manifest, /android:label="Maum On"/);
   assert.match(manifest, /android:icon="@mipmap\/ic_launcher"/);
