@@ -7,12 +7,16 @@ void main() {
     final manifest = File(
       'android/app/src/main/AndroidManifest.xml',
     ).readAsStringSync();
+    final debugManifest = File(
+      'android/app/src/debug/AndroidManifest.xml',
+    ).readAsStringSync();
 
     expect(manifest, contains('flutter_deeplinking_enabled'));
     expect(manifest, contains('android.permission.INTERNET'));
     expect(manifest, contains('android.permission.READ_MEDIA_IMAGES'));
     expect(manifest, contains('android.permission.READ_EXTERNAL_STORAGE'));
-    expect(manifest, contains('android:usesCleartextTraffic="true"'));
+    expect(manifest, isNot(contains('android:usesCleartextTraffic="true"')));
+    expect(debugManifest, contains('android:usesCleartextTraffic="true"'));
     expect(manifest, contains('android:scheme="maumon"'));
     expect(manifest, contains('android:host="auth"'));
     expect(manifest, contains('android:path="/callback"'));
@@ -30,8 +34,12 @@ void main() {
     expect(plist, contains('<string>maumon</string>'));
     expect(plist, contains('<key>LSApplicationQueriesSchemes</key>'));
     expect(plist, contains('<string>https</string>'));
+    expect(plist, contains('<string>http</string>'));
     expect(plist, contains('<key>NSAppTransportSecurity</key>'));
-    expect(plist, contains('<key>NSAllowsLocalNetworking</key>'));
+    expect(
+      plist,
+      matches(RegExp(r'<key>NSAllowsLocalNetworking</key>\s*<true/>')),
+    );
     expect(plist, contains('<key>NSPhotoLibraryUsageDescription</key>'));
   });
 }
