@@ -17,6 +17,7 @@ import com.maumonmobile.domain.report.ReportTargetType
 import com.maumonmobile.global.security.AuthenticatedUser
 import com.maumonmobile.global.web.ApiException
 import com.maumonmobile.global.web.ErrorCode
+import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
 
 @Service
@@ -48,6 +49,8 @@ class ReportService(
         }
 
         contentModerationService.ensureAllowed(ContentModerationTarget.REPORT, command.content)
+        val ownerId = resolveTargetOwnerId(targetType, targetId)
+            ?: throw ApiException(ErrorCode.NOT_FOUND, "신고 대상을 찾을 수 없습니다.")
 
         val report = reportRepository.save(
             ReportDraft(
@@ -58,8 +61,8 @@ class ReportService(
                 content = command.content?.trim()?.takeIf(String::isNotEmpty),
             ),
         )
-        resolveTargetOwnerId(targetType, targetId)
-            ?.takeIf { ownerId -> ownerId != reporterId }
+        ownerId
+            .takeIf { id -> id != reporterId }
             ?.let { ownerId ->
                 notifyMember(
                     memberId = ownerId,
@@ -115,11 +118,25 @@ class ReportService(
         status: String,
     ) {
         notificationRepository.save(memberId, message)
-        notificationEventPublisher.publish(
-            memberId,
-            eventName,
-            reportPayload(message = message, reportId = reportId, status = status),
-        )
+        runCatching {
+            notificationEventPublisher.publish(
+                memberId,
+                eventName,
+                reportPayload(message = message, reportId = reportId, status = status),
+            )
+        }.onFailure { exception ->
+            log.warn(
+                "Failed to publish report notification event. memberId={}, reportId={}, eventName={}",
+                memberId,
+                reportId,
+                eventName,
+                exception,
+            )
+        }
+    }
+
+    private companion object {
+        private val log = LoggerFactory.getLogger(ReportService::class.java)
     }
 }
 

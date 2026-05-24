@@ -4,7 +4,9 @@ import com.maumonmobile.application.port.`in`.ContentModerationCommand
 import com.maumonmobile.application.port.`in`.ContentModerationUseCase
 import com.maumonmobile.domain.moderation.ContentModerationResult
 import com.maumonmobile.global.security.AuthenticatedUser
+import com.maumonmobile.global.web.ApiException
 import com.maumonmobile.global.web.ApiResponse
+import com.maumonmobile.global.web.ErrorCode
 import org.springframework.security.core.Authentication
 import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.RequestBody
@@ -44,5 +46,6 @@ private fun ContentModerationRequest.toCommand(): ContentModerationCommand {
 }
 
 private fun Authentication.authenticatedUser(): AuthenticatedUser {
-    return principal as AuthenticatedUser
+    return principal as? AuthenticatedUser
+        ?: throw ApiException(ErrorCode.UNAUTHORIZED, "다시 로그인해 주세요.")
 }

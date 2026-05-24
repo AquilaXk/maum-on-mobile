@@ -72,10 +72,12 @@ class NotificationReportControllerTest @Autowired constructor(
                 jsonPath("$.error.code") { value("UNAUTHORIZED") }
             }
 
+        val postId = createPost(member.accessToken, "신고 대상 글")
+
         mockMvc.post("/api/v1/reports") {
             header("Authorization", "Bearer ${member.accessToken}")
             contentType = MediaType.APPLICATION_JSON
-            content = """{"targetId":12,"targetType":"LETTER","reason":"SPAM","content":"반복 광고입니다."}"""
+            content = """{"targetId":$postId,"targetType":"POST","reason":"SPAM","content":"반복 광고입니다."}"""
         }
             .andExpect {
                 status { isOk() }
@@ -86,7 +88,7 @@ class NotificationReportControllerTest @Autowired constructor(
         mockMvc.post("/api/v1/reports") {
             header("Authorization", "Bearer ${member.accessToken}")
             contentType = MediaType.APPLICATION_JSON
-            content = """{"targetId":12,"targetType":"LETTER","reason":"SPAM","content":"반복 광고입니다."}"""
+            content = """{"targetId":$postId,"targetType":"POST","reason":"SPAM","content":"반복 광고입니다."}"""
         }
             .andExpect {
                 status { isBadRequest() }
@@ -130,6 +132,16 @@ class NotificationReportControllerTest @Autowired constructor(
             .andExpect {
                 status { isBadRequest() }
                 jsonPath("$.error.code") { value("INVALID_REQUEST") }
+            }
+
+        mockMvc.post("/api/v1/reports") {
+            header("Authorization", "Bearer ${member.accessToken}")
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"targetId":999999,"targetType":"POST","reason":"SPAM","content":"대상이 없는 신고입니다."}"""
+        }
+            .andExpect {
+                status { isNotFound() }
+                jsonPath("$.error.code") { value("NOT_FOUND") }
             }
     }
 
@@ -195,6 +207,59 @@ class NotificationReportControllerTest @Autowired constructor(
         assertThat(latestEvent.data).contains(""""status":"RESOLVED"""")
     }
 
+    @Test
+    fun reportStatusUpdateSucceedsWhenRealtimePublishFails() {
+        notificationEventPublisher.clear()
+        val owner = signupAndLogin("report-publish-owner@example.com", "작성자")
+        val reporter = signupAndLogin("report-publish-reporter@example.com", "신고자")
+        val adminToken = adminAccessToken()
+        val postId = createPost(owner.accessToken, "발행 실패 신고 대상")
+        val reportResult = mockMvc.post("/api/v1/reports") {
+            header("Authorization", "Bearer ${reporter.accessToken}")
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"targetId":$postId,"targetType":"POST","reason":"SPAM","content":"반복 광고입니다."}"""
+        }
+            .andExpect {
+                status { isOk() }
+            }
+            .andReturn()
+        val reportId = reportResult.response.readJsonInt("$.data")
+        notificationEventPublisher.clear()
+        notificationEventPublisher.failNextPublish = true
+
+        mockMvc.patch("/api/v1/admin/reports/$reportId/status") {
+            header("Authorization", "Bearer $adminToken")
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"status":"RESOLVED"}"""
+        }
+            .andExpect {
+                status { isOk() }
+                jsonPath("$.success") { value(true) }
+            }
+
+        mockMvc.get("/api/v1/notifications") {
+            header("Authorization", "Bearer ${reporter.accessToken}")
+        }
+            .andExpect {
+                status { isOk() }
+                jsonPath("$.data[0].content") { value("신고 처리 결과가 등록되었습니다: RESOLVED") }
+            }
+        assertThat(notificationEventPublisher.events).isEmpty()
+    }
+
+    private fun createPost(accessToken: String, title: String): Int {
+        val postResult = mockMvc.post("/api/v1/posts") {
+            header("Authorization", "Bearer $accessToken")
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"title":"$title","content":"확인이 필요한 글입니다.","category":"WORRY"}"""
+        }
+            .andExpect {
+                status { isOk() }
+            }
+            .andReturn()
+        return postResult.response.readJsonInt("$.data")
+    }
+
     private fun signupAndLogin(email: String, nickname: String): TestMember {
         val signupResult = mockMvc.post("/api/v1/auth/signup") {
             contentType = MediaType.APPLICATION_JSON
@@ -255,13 +320,19 @@ private data class TestMember(
 
 class CapturingNotificationEventPublisher : NotificationEventPublisher {
     val events = mutableListOf<PublishedNotificationEvent>()
+    var failNextPublish = false
 
     override fun publish(memberId: Long, eventName: String, data: String) {
+        if (failNextPublish) {
+            failNextPublish = false
+            throw IllegalStateException("publish failed")
+        }
         events += PublishedNotificationEvent(memberId, eventName, data)
     }
 
     fun clear() {
         events.clear()
+        failNextPublish = false
     }
 }
 

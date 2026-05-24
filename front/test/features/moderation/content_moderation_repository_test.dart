@@ -32,6 +32,7 @@ void main() {
 
     expect(result.allowed, isFalse);
     expect(result.riskLevel, ContentModerationRiskLevel.high);
+    expect(result.message, '위험도가 높은 표현이 포함되어 수정이 필요합니다.');
     expect(result.categories, [ContentModerationCategory.profanity]);
     expect(transport.requests.single.path, '/api/v1/moderation/text');
     expect(transport.requests.single.method, ApiMethod.post);

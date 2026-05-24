@@ -80,6 +80,7 @@ void main() {
       expect(repository.createdDrafts, isEmpty);
       expect(moderationRepository.requests.single.targetType,
           ContentModerationTarget.story);
+      expect(moderationRepository.requests.single.text, contains('너 죽어 버려'));
       expect(controller.state.errorMessage, '위험도가 높은 표현이 포함되어 수정이 필요합니다.');
       expect(controller.state.isSubmitting, isFalse);
     });
@@ -110,7 +111,41 @@ void main() {
       expect(repository.createdComments, isEmpty);
       expect(moderationRepository.requests.single.targetType,
           ContentModerationTarget.comment);
+      expect(
+        moderationRepository.requests.single.text,
+        contains('010-1234-5678'),
+      );
       expect(controller.state.errorMessage, '위험도가 높은 표현이 포함되어 수정이 필요합니다.');
+    });
+
+    test('clears moderation notice when story submission fails', () async {
+      final repository = _FakeStoryRepository(
+        createError: const ApiClientException(
+          kind: ApiErrorKind.server,
+          message: '등록하지 못했습니다.',
+        ),
+      );
+      final moderationRepository = _FakeContentModerationRepository(
+        result: const ContentModerationResult(
+          allowed: true,
+          riskLevel: ContentModerationRiskLevel.high,
+          message: '표현을 순화해 주세요.',
+          categories: [ContentModerationCategory.profanity],
+        ),
+      );
+      final controller = StoryController(
+        storyRepository: repository,
+        currentMemberId: 7,
+        moderationRepository: moderationRepository,
+      );
+
+      controller.startCreate();
+      controller.updateStoryTitle('새 글');
+      controller.updateStoryContent('조금 거친 본문');
+      await controller.submitStory();
+
+      expect(controller.state.errorMessage, '등록하지 못했습니다.');
+      expect(controller.state.noticeMessage, isNull);
     });
 
     test(
@@ -316,6 +351,7 @@ class _FakeStoryRepository implements StoryRepository {
     this.commentPages = const [],
     this.createdStoryId = 1,
     this.fetchError,
+    this.createError,
   });
 
   final List<PageResponse<StorySummary>> storyPages;
@@ -323,6 +359,7 @@ class _FakeStoryRepository implements StoryRepository {
   final List<PageResponse<StoryComment>> commentPages;
   final int createdStoryId;
   final Object? fetchError;
+  final Object? createError;
   final List<({String? title, StoryCategory category})> fetchStoryRequests = [];
   final List<StoryDraft> createdDrafts = [];
   final List<({int id, StoryDraft draft})> updatedDrafts = [];
@@ -355,6 +392,10 @@ class _FakeStoryRepository implements StoryRepository {
   @override
   Future<int> createStory(StoryDraft draft) async {
     createdDrafts.add(draft);
+    final error = createError;
+    if (error != null) {
+      throw error;
+    }
     return createdStoryId;
   }
 

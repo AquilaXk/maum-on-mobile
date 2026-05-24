@@ -529,11 +529,21 @@ class LetterController extends ChangeNotifier {
       if (error.kind == ApiErrorKind.unauthorized) {
         _onUnauthorized?.call();
       }
-      _setState(_state.copyWith(errorMessage: error.message));
+      _setState(
+        _state.copyWith(
+          errorMessage: error.message,
+          clearNoticeMessage: true,
+        ),
+      );
       return;
     }
 
-    _setState(_state.copyWith(errorMessage: '요청을 처리하지 못했습니다.'));
+    _setState(
+      _state.copyWith(
+        errorMessage: '요청을 처리하지 못했습니다.',
+        clearNoticeMessage: true,
+      ),
+    );
   }
 
   void _setState(LetterState nextState) {
