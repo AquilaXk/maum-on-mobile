@@ -76,6 +76,17 @@ test("ci pins GitHub Action references to immutable commits", async () => {
   assert.match(workflow, /subosito\/flutter-action@[a-f0-9]{40}/);
 });
 
+test("checkout steps do not persist GitHub credentials", async () => {
+  const workflow = await readWorkflow();
+  const checkoutSteps = workflow.match(/      - name: Checkout\n[\s\S]*?(?=\n      - name:|\n\n  [a-z-]+:|\n$)/g) ?? [];
+
+  assert.ok(checkoutSteps.length > 0);
+  for (const step of checkoutSteps) {
+    assert.match(step, /uses: actions\/checkout@[a-f0-9]{40}/);
+    assert.match(step, /persist-credentials: false/);
+  }
+});
+
 test("repository contracts preserve local docs and issue template policies", async () => {
   const workflow = await readWorkflow();
   const repositoryContracts = jobBlock(workflow, "repository-contracts");
