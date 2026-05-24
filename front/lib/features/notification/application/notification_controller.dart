@@ -417,6 +417,10 @@ class NotificationController extends ChangeNotifier {
     List<NotificationItem> current,
     List<NotificationItem> fetched,
   ) {
+    if (fetched.isEmpty) {
+      return current;
+    }
+
     final localOnly = current.where((notification) => notification.id < 0);
     final fetchedIds = fetched.map((notification) => notification.id).toSet();
     final stillLocal = localOnly.where(
