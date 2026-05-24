@@ -90,7 +90,9 @@ class ConsultationController extends ChangeNotifier {
     }
 
     _shouldRestoreConnection = true;
-    await _loadRecentMessages();
+    if (!_hasLoadedRecentMessages) {
+      await _loadRecentMessages();
+    }
     _setState(
       _state.copyWith(
         connectionState: ConsultationConnectionState.connecting,
