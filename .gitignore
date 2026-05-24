@@ -1,5 +1,10 @@
 .DS_Store
 
+# Documentation policy
+*.md
+!/README.md
+!/.github/pull_request_template.md
+
 # Local environment
 .env
 .env.*
@@ -8,6 +13,26 @@
 # Editors
 .idea/
 .vscode/
+.fleet/
+*.iws
+*.iml
+*.ipr
+
+# Agent-only local docs and state
+AGENTS.md
+CLAUDE.md
+GEMINI.md
+CURSOR.md
+COPILOT.md
+docs/
+.codex/
+.claude/
+.cursor/
+.aider/
+.aider*
+.windsurf/
+.ai/
+.playwright-mcp/
 
 # JavaScript / TypeScript
 node_modules/
@@ -20,6 +45,11 @@ pnpm-debug.log*
 build/
 dist/
 coverage/
+logs/
+*.log
+tmp/
+temp/
+.cache/
 
 # Android / Gradle
 .gradle/
