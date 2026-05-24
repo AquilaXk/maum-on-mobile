@@ -30,6 +30,9 @@ import '../features/notification/presentation/notification_report_screen.dart';
 import '../features/report/application/report_controller.dart';
 import '../features/report/data/report_repository.dart';
 import '../features/report/domain/report_models.dart';
+import '../features/settings/application/settings_controller.dart';
+import '../features/settings/data/settings_repository.dart';
+import '../features/settings/presentation/settings_screen.dart';
 import '../features/story/application/story_controller.dart';
 import '../features/story/data/story_repository.dart';
 import '../features/story/domain/story_models.dart';
@@ -47,6 +50,7 @@ class MaumOnMobileApp extends StatefulWidget {
     this.consultationRepository,
     this.notificationRepository,
     this.reportRepository,
+    this.settingsRepository,
     this.diaryRepository,
     this.diaryImagePicker,
     this.storyRepository,
@@ -65,6 +69,7 @@ class MaumOnMobileApp extends StatefulWidget {
   final ConsultationRepository? consultationRepository;
   final NotificationRepository? notificationRepository;
   final ReportRepository? reportRepository;
+  final SettingsRepository? settingsRepository;
   final DiaryRepository? diaryRepository;
   final DiaryImagePicker? diaryImagePicker;
   final StoryRepository? storyRepository;
@@ -102,6 +107,8 @@ class _MaumOnMobileAppState extends State<MaumOnMobileApp> {
   int? _notificationMemberId;
   ReportController? _reportController;
   int? _reportMemberId;
+  SettingsController? _settingsController;
+  int? _settingsMemberId;
   DiaryController? _diaryController;
   int? _diaryMemberId;
   StoryController? _storyController;
@@ -130,6 +137,7 @@ class _MaumOnMobileAppState extends State<MaumOnMobileApp> {
     _disposeConsultationController();
     _disposeNotificationController();
     _disposeReportController();
+    _disposeSettingsController();
     _disposeDiaryController();
     _disposeStoryController();
     _disposeLetterController();
@@ -161,6 +169,7 @@ class _MaumOnMobileAppState extends State<MaumOnMobileApp> {
             _disposeConsultationController();
             _disposeNotificationController();
             _disposeReportController();
+            _disposeSettingsController();
             _disposeDiaryController();
             _disposeStoryController();
             _disposeLetterController();
@@ -207,6 +216,17 @@ class _MaumOnMobileAppState extends State<MaumOnMobileApp> {
               notificationController:
                   _notificationControllerFor(state.member!.id),
               reportController: reportController,
+              onBack: () {
+                setState(() {
+                  _destination = _AuthenticatedDestination.home;
+                });
+              },
+            );
+          }
+
+          if (_destination == _AuthenticatedDestination.settings) {
+            return SettingsScreen(
+              controller: _settingsControllerFor(state.member!.id),
               onBack: () {
                 setState(() {
                   _destination = _AuthenticatedDestination.home;
@@ -273,11 +293,17 @@ class _MaumOnMobileAppState extends State<MaumOnMobileApp> {
                 _destination = _AuthenticatedDestination.notifications;
               });
             },
+            onOpenSettings: () {
+              setState(() {
+                _destination = _AuthenticatedDestination.settings;
+              });
+            },
             onLogout: () {
               _disposeHomeController();
               _disposeConsultationController();
               _disposeNotificationController();
               _disposeReportController();
+              _disposeSettingsController();
               _disposeDiaryController();
               _disposeStoryController();
               _disposeLetterController();
@@ -375,6 +401,30 @@ class _MaumOnMobileAppState extends State<MaumOnMobileApp> {
     _reportController?.dispose();
     _reportController = null;
     _reportMemberId = null;
+  }
+
+  SettingsController _settingsControllerFor(int memberId) {
+    final currentController = _settingsController;
+    if (currentController != null && _settingsMemberId == memberId) {
+      return currentController;
+    }
+
+    currentController?.dispose();
+    _settingsMemberId = memberId;
+    return _settingsController = SettingsController(
+      repository:
+          widget.settingsRepository ?? _buildDefaultSettingsRepository(),
+      onUnauthorized: () {
+        _authController.logout();
+      },
+      onWithdrawn: _authController.clearSession,
+    );
+  }
+
+  void _disposeSettingsController() {
+    _settingsController?.dispose();
+    _settingsController = null;
+    _settingsMemberId = null;
   }
 
   DiaryController _diaryControllerFor(int memberId) {
@@ -564,6 +614,23 @@ class _MaumOnMobileAppState extends State<MaumOnMobileApp> {
     );
   }
 
+  SettingsRepository _buildDefaultSettingsRepository() {
+    final refreshRepository = ApiAuthRepository(
+      apiClient: ApiClient(transport: _apiTransport, tokenStore: _tokenStore),
+      tokenStore: _tokenStore,
+    );
+
+    return ApiSettingsRepository(
+      apiClient: ApiClient(
+        transport: _apiTransport,
+        tokenStore: _tokenStore,
+        tokenRefresher: AuthSessionTokenRefresher(
+          authRepository: refreshRepository,
+        ),
+      ),
+    );
+  }
+
   StoryRepository _buildDefaultStoryRepository() {
     final refreshRepository = ApiAuthRepository(
       apiClient: ApiClient(transport: _apiTransport, tokenStore: _tokenStore),
@@ -628,6 +695,7 @@ enum _AuthenticatedDestination {
   home,
   consultation,
   notifications,
+  settings,
   diary,
   letter,
   story,

@@ -293,7 +293,8 @@ void main() {
       expect(multipart.files.single.fieldName, 'image');
     });
 
-    test('sends delete requests through the transport', () async {
+    test('sends delete requests with optional bodies through the transport',
+        () async {
       final transport = _FakeApiTransport([
         ApiTransportResponse.ok({'success': true}),
       ]);
@@ -302,10 +303,16 @@ void main() {
         tokenStore: MemoryAuthTokenStore(),
       );
 
-      await client.deleteVoid('/diaries/1');
+      await client.deleteVoid(
+        '/members/me',
+        body: {'currentPassword': 'old-password'},
+      );
 
       expect(transport.requests.single.method, ApiMethod.delete);
-      expect(transport.requests.single.path, '/diaries/1');
+      expect(transport.requests.single.path, '/members/me');
+      expect(transport.requests.single.body, {
+        'currentPassword': 'old-password',
+      });
     });
 
     test('sends JSON put and patch void requests through the transport',

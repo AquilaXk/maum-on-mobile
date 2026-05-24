@@ -112,6 +112,27 @@ class ApiClient {
     );
   }
 
+  Future<T> patch<T>(
+    String path, {
+    required T Function(Object? json) parser,
+    Object? body,
+    Map<String, Object?> queryParameters = const {},
+    bool requiresAuth = true,
+    bool retryOnUnauthorized = true,
+  }) {
+    return _send(
+      ApiRequest(
+        method: ApiMethod.patch,
+        path: path,
+        body: body,
+        queryParameters: queryParameters,
+        requiresAuth: requiresAuth,
+        retryOnUnauthorized: retryOnUnauthorized,
+      ),
+      parser,
+    );
+  }
+
   Future<PageResponse<T>> getPage<T>(
     String path, {
     required T Function(Object? json) itemParser,
@@ -191,6 +212,7 @@ class ApiClient {
 
   Future<void> deleteVoid(
     String path, {
+    Object? body,
     Map<String, Object?> queryParameters = const {},
     bool requiresAuth = true,
     bool retryOnUnauthorized = true,
@@ -199,6 +221,7 @@ class ApiClient {
       ApiRequest(
         method: ApiMethod.delete,
         path: path,
+        body: body,
         queryParameters: queryParameters,
         requiresAuth: requiresAuth,
         retryOnUnauthorized: retryOnUnauthorized,
