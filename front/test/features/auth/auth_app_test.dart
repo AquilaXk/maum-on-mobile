@@ -155,6 +155,39 @@ void main() {
     await _returnHome(tester);
   });
 
+  testWidgets('switches primary authenticated tabs through bottom navigation',
+      (tester) async {
+    await tester.pumpWidget(
+      MaumOnMobileApp(
+        authRepository: _FakeAuthRepository(restoredSession: _session()),
+        homeRepository: const _FakeHomeRepository(),
+        diaryRepository: _FakeDiaryRepository(),
+        diaryImagePicker: const _FakeDiaryImagePicker(),
+        storyRepository: _FakeStoryRepository(),
+        letterRepository: _FakeLetterRepository(),
+        consultationRepository: _FakeConsultationRepository(),
+        listenForDeepLinks: false,
+      ),
+    );
+
+    await tester.pumpAndSettle();
+
+    expect(find.byType(NavigationBar), findsOneWidget);
+
+    await tester.tap(find.byKey(const ValueKey('route-tab-story')));
+    await tester.pumpAndSettle();
+    expect(find.text('스토리'), findsOneWidget);
+
+    await tester.tap(find.byKey(const ValueKey('route-tab-letter')));
+    await tester.pumpAndSettle();
+    expect(find.text('편지함'), findsOneWidget);
+    expect(find.byKey(const ValueKey('letter-title-field')), findsNothing);
+
+    await tester.tap(find.byKey(const ValueKey('route-tab-home')));
+    await tester.pumpAndSettle();
+    expect(find.text('마음이님, 오늘의 마음을 이어가세요.'), findsOneWidget);
+  });
+
   testWidgets('navigates authenticated users from home to diary',
       (tester) async {
     await tester.pumpWidget(
