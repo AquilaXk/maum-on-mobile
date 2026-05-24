@@ -1,0 +1,10 @@
+spring:
+  flyway:
+    enabled: true
+
+app:
+  security:
+    jwt:
+      issuer: maum-on-mobile-test
+      secret: test-local-change-me-change-me-change-me
+      access-token-ttl: PT10M
