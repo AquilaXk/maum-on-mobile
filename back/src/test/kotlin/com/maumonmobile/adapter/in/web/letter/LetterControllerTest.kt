@@ -24,6 +24,15 @@ class LetterControllerTest @Autowired constructor(
     fun usersSendReceiveReplyAndReadLetterStatus() {
         val sender = signupAndLogin("letter-sender@example.com", "보낸이")
         val receiver = signupAndLogin("letter-receiver@example.com", "받는이")
+        val baselineReceivedCount = mockMvc.get("/api/v1/letters/stats") {
+            header("Authorization", "Bearer ${receiver.accessToken}")
+        }
+            .andExpect {
+                status { isOk() }
+            }
+            .andReturn()
+            .response
+            .readJsonInt("$.data.receivedCount")
 
         val createResult = mockMvc.post("/api/v1/letters") {
             header("Authorization", "Bearer ${sender.accessToken}")
@@ -53,7 +62,7 @@ class LetterControllerTest @Autowired constructor(
         }
             .andExpect {
                 status { isOk() }
-                jsonPath("$.data.receivedCount") { value(1) }
+                jsonPath("$.data.receivedCount") { value(baselineReceivedCount + 1) }
                 jsonPath("$.data.latestReceivedLetter.title") { value("비밀 편지") }
             }
 

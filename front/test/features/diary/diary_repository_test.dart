@@ -33,6 +33,33 @@ void main() {
       expect(transport.requests.single.requiresAuth, isTrue);
     });
 
+    test('loads public diary page without auth retry', () async {
+      final transport = _FakeApiTransport([
+        ApiTransportResponse.ok({
+          'success': true,
+          'data': {
+            'content': [_diaryJson(id: 2, title: '공개 기록')],
+            'page': 0,
+            'size': 20,
+            'totalElements': 1,
+            'totalPages': 1,
+            'last': true,
+          },
+        }),
+      ]);
+      final repository = _repository(transport);
+
+      final page = await repository.fetchPublicDiaries(page: 0, size: 20);
+
+      expect(page.items.single.title, '공개 기록');
+      expect(transport.requests.single.method, ApiMethod.get);
+      expect(transport.requests.single.path, '/api/v1/diaries/public');
+      expect(
+          transport.requests.single.queryParameters, {'page': 0, 'size': 20});
+      expect(transport.requests.single.requiresAuth, isFalse);
+      expect(transport.requests.single.retryOnUnauthorized, isFalse);
+    });
+
     test('creates a diary with JSON data and image multipart parts', () async {
       final transport = _FakeApiTransport([
         ApiTransportResponse.ok({'success': true, 'data': 7}),

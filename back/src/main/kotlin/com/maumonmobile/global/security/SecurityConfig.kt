@@ -35,6 +35,8 @@ class SecurityConfig(
                         "/api/v1/posts",
                         "/api/v1/posts/*",
                         "/api/v1/posts/*/comments",
+                        "/api/v1/home/stats",
+                        "/api/v1/diaries/public",
                         "/api/v1/letters/*/status",
                         "/api/v1/notifications/subscribe",
                     )

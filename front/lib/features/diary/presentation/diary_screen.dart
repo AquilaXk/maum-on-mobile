@@ -142,6 +142,8 @@ class _DiaryScreenState extends State<DiaryScreen> {
                         onEdit: widget.controller.startEditing,
                         onDelete: _confirmDelete,
                       ),
+                      const SizedBox(height: 16),
+                      _PublicEntriesSection(state: state),
                       const SizedBox(height: 20),
                       _DiaryForm(
                         state: state,
@@ -374,6 +376,61 @@ class _SelectedEntriesSection extends StatelessWidget {
                           label: const Text('삭제'),
                         ),
                       ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 8),
+          ],
+      ],
+    );
+  }
+}
+
+class _PublicEntriesSection extends StatelessWidget {
+  const _PublicEntriesSection({required this.state});
+
+  final DiaryState state;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text('공개 기록', style: theme.textTheme.titleMedium),
+        const SizedBox(height: 8),
+        if (state.isPublicLoading)
+          const _Notice(message: '공개 기록을 불러오는 중입니다.')
+        else if (state.publicErrorMessage != null)
+          _Notice(message: state.publicErrorMessage!, isError: true)
+        else if (state.isPublicEmpty)
+          const _Notice(message: '아직 공개된 기록이 없습니다.')
+        else
+          for (final entry in state.publicEntries) ...[
+            Card(
+              child: Padding(
+                padding: const EdgeInsets.all(14),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Wrap(
+                      spacing: 8,
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      children: [
+                        Chip(label: Text(entry.category.label)),
+                        Text(entry.nickname, style: theme.textTheme.bodySmall),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Text(entry.title, style: theme.textTheme.titleMedium),
+                    const SizedBox(height: 6),
+                    Text(
+                      entry.content,
+                      maxLines: 3,
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ],
                 ),

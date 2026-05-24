@@ -109,6 +109,22 @@ class JdbcDiaryRepository(
         )
     }
 
+    override fun findPublic(): List<Diary> {
+        return jdbc.query(
+            "select * from diaries where is_private = false order by create_date desc, id desc",
+            emptyMap<String, Any>(),
+            rowMapper,
+        )
+    }
+
+    override fun findAllPublicAndPrivate(): List<Diary> {
+        return jdbc.query(
+            "select * from diaries order by create_date desc, id desc",
+            emptyMap<String, Any>(),
+            rowMapper,
+        )
+    }
+
     override fun delete(id: Long) {
         jdbc.update(
             "delete from diaries where id = :id",

@@ -33,9 +33,17 @@ class DiaryService(
 
     override fun list(user: AuthenticatedUser, page: Int, size: Int): DiaryPageResult {
         val memberId = user.memberId()
+        return pageResult(diaryRepository.findByMemberId(memberId), page, size)
+    }
+
+    override fun listPublic(page: Int, size: Int): DiaryPageResult {
+        return pageResult(diaryRepository.findPublic(), page, size)
+    }
+
+    private fun pageResult(items: List<Diary>, page: Int, size: Int): DiaryPageResult {
         val safePage = page.coerceAtLeast(0)
         val safeSize = size.coerceAtLeast(1)
-        val allItems = diaryRepository.findByMemberId(memberId)
+        val allItems = items
             .sortedByDescending { diary -> diary.createDate }
         val fromIndex = (safePage * safeSize).coerceAtMost(allItems.size)
         val toIndex = (fromIndex + safeSize).coerceAtMost(allItems.size)

@@ -17,6 +17,16 @@ void main() {
             _entry(id: 1, title: '오늘의 기록', createDate: '2026-05-20T08:00:00'),
           ]),
         ],
+        publicPages: [
+          _page([
+            _entry(
+              id: 2,
+              title: '함께 읽는 기록',
+              createDate: '2026-05-19T08:00:00',
+              isPrivate: false,
+            ),
+          ]),
+        ],
       ),
       now: DateTime(2026, 5, 20),
     );
@@ -34,6 +44,8 @@ void main() {
 
     expect(find.text('2026년 5월'), findsOneWidget);
     expect(find.text('오늘의 기록'), findsWidgets);
+    expect(find.text('공개 기록'), findsOneWidget);
+    expect(find.text('함께 읽는 기록'), findsOneWidget);
     expect(find.byKey(const ValueKey('diary-title-field')), findsOneWidget);
     expect(find.byKey(const ValueKey('diary-submit-button')), findsOneWidget);
   });
@@ -205,6 +217,7 @@ DiaryEntry _entry({
   required int id,
   required String title,
   required String createDate,
+  bool isPrivate = true,
 }) {
   return DiaryEntry(
     id: id,
@@ -213,7 +226,7 @@ DiaryEntry _entry({
     category: DiaryCategory.daily,
     nickname: '마음이',
     imageUrl: null,
-    isPrivate: true,
+    isPrivate: isPrivate,
     createDate: createDate,
     modifyDate: createDate,
   );
@@ -222,10 +235,12 @@ DiaryEntry _entry({
 class _FakeDiaryRepository implements DiaryRepository {
   _FakeDiaryRepository({
     required this.pages,
+    this.publicPages = const [],
     this.createdId = 1,
   });
 
   final List<PageResponse<DiaryEntry>> pages;
+  final List<PageResponse<DiaryEntry>> publicPages;
   final int createdId;
   final List<DiaryDraft> createdDrafts = [];
   final List<int> deletedIds = [];
@@ -236,6 +251,17 @@ class _FakeDiaryRepository implements DiaryRepository {
     int size = 100,
   }) async {
     return pages.removeAt(0);
+  }
+
+  @override
+  Future<PageResponse<DiaryEntry>> fetchPublicDiaries({
+    int page = 0,
+    int size = 20,
+  }) async {
+    if (publicPages.isEmpty) {
+      return _page([]);
+    }
+    return publicPages.removeAt(0);
   }
 
   @override

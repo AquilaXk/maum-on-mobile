@@ -502,6 +502,21 @@ class _FakeDiaryRepository implements DiaryRepository {
   }
 
   @override
+  Future<PageResponse<DiaryEntry>> fetchPublicDiaries({
+    int page = 0,
+    int size = 20,
+  }) async {
+    return PageResponse(
+      items: const [],
+      page: page,
+      size: size,
+      totalElements: 0,
+      totalPages: 1,
+      last: true,
+    );
+  }
+
+  @override
   Future<DiaryEntry> fetchDiary(int id) {
     throw UnimplementedError();
   }
