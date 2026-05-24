@@ -152,168 +152,157 @@ class _MaumOnMobileAppState extends State<MaumOnMobileApp> {
       title: 'Maum On',
       debugShowCheckedModeBanner: false,
       theme: buildAppTheme(),
-      home: AnimatedBuilder(
-        animation: Listenable.merge([
-          _authController,
-          _externalLoginController,
-        ]),
-        builder: (context, _) {
-          final state = _authController.state;
-
-          if (state.isRestoring) {
-            return const _SessionRestoreScreen();
+      home: PopScope<void>(
+        canPop: _destination == _AuthenticatedDestination.home,
+        onPopInvokedWithResult: (didPop, _) {
+          if (didPop || _destination == _AuthenticatedDestination.home) {
+            return;
           }
 
-          if (!state.isAuthenticated || state.member == null) {
-            _disposeHomeController();
-            _disposeConsultationController();
-            _disposeNotificationController();
-            _disposeReportController();
-            _disposeSettingsController();
-            _disposeDiaryController();
-            _disposeStoryController();
-            _disposeLetterController();
-            _destination = _AuthenticatedDestination.home;
-            return AuthScreen(
-              controller: _authController,
-              externalLoginController: _externalLoginController,
-            );
-          }
+          _returnHome();
+        },
+        child: AnimatedBuilder(
+          animation: Listenable.merge([
+            _authController,
+            _externalLoginController,
+          ]),
+          builder: (context, _) {
+            final state = _authController.state;
 
-          if (_destination == _AuthenticatedDestination.diary) {
-            return DiaryScreen(
-              controller: _diaryControllerFor(state.member!.id),
-              imagePicker:
-                  widget.diaryImagePicker ?? const FilePickerDiaryImagePicker(),
-              onBack: () {
-                setState(() {
-                  _destination = _AuthenticatedDestination.home;
-                });
-              },
-            );
-          }
-
-          if (_destination == _AuthenticatedDestination.consultation) {
-            return ConsultationScreen(
-              controller: _consultationControllerFor(state.member!.id),
-              onBack: () {
-                setState(() {
-                  _destination = _AuthenticatedDestination.home;
-                });
-              },
-            );
-          }
-
-          if (_destination == _AuthenticatedDestination.notifications) {
-            final reportController = _reportControllerFor(state.member!.id);
-            final pendingTarget = _pendingReportTarget;
-            if (pendingTarget != null) {
-              reportController.selectTarget(pendingTarget);
-              _pendingReportTarget = null;
+            if (state.isRestoring) {
+              return const _SessionRestoreScreen();
             }
 
-            return NotificationReportScreen(
-              notificationController:
-                  _notificationControllerFor(state.member!.id),
-              reportController: reportController,
-              onBack: () {
-                setState(() {
-                  _destination = _AuthenticatedDestination.home;
-                });
-              },
-            );
-          }
-
-          if (_destination == _AuthenticatedDestination.settings) {
-            return SettingsScreen(
-              controller: _settingsControllerFor(state.member!.id),
-              onBack: () {
-                setState(() {
-                  _destination = _AuthenticatedDestination.home;
-                });
-              },
-            );
-          }
-
-          if (_destination == _AuthenticatedDestination.letter) {
-            final letterController = _letterControllerFor(state.member!.id);
-            final startsInCompose = _openLetterComposer;
-            _openLetterComposer = false;
-
-            return LetterScreen(
-              controller: letterController,
-              initiallyCompose: startsInCompose,
-              onBack: () {
-                setState(() {
-                  _destination = _AuthenticatedDestination.home;
-                });
-              },
-            );
-          }
-
-          if (_destination == _AuthenticatedDestination.story) {
-            return StoryScreen(
-              controller: _storyControllerFor(state.member!.id),
-              onBack: () {
-                setState(() {
-                  _destination = _AuthenticatedDestination.home;
-                });
-              },
-            );
-          }
-
-          final homeController = _homeControllerFor(state.member!.id);
-          return HomeScreen(
-            routeTitle: initialRoute.title,
-            nickname: state.member!.nickname,
-            homeController: homeController,
-            onWriteDiary: () {
-              setState(() {
-                _destination = _AuthenticatedDestination.diary;
-              });
-            },
-            onWriteLetter: () {
-              setState(() {
-                _openLetterComposer = true;
-                _destination = _AuthenticatedDestination.letter;
-              });
-            },
-            onViewStory: () {
-              setState(() {
-                _destination = _AuthenticatedDestination.story;
-              });
-            },
-            onOpenConsultation: () {
-              setState(() {
-                _destination = _AuthenticatedDestination.consultation;
-              });
-            },
-            onOpenNotifications: () {
-              setState(() {
-                _destination = _AuthenticatedDestination.notifications;
-              });
-            },
-            onOpenSettings: () {
-              setState(() {
-                _destination = _AuthenticatedDestination.settings;
-              });
-            },
-            onLogout: () {
-              _disposeHomeController();
-              _disposeConsultationController();
-              _disposeNotificationController();
-              _disposeReportController();
-              _disposeSettingsController();
-              _disposeDiaryController();
-              _disposeStoryController();
-              _disposeLetterController();
+            if (!state.isAuthenticated || state.member == null) {
+              _disposeAuthenticatedControllers();
               _destination = _AuthenticatedDestination.home;
-              _authController.logout();
-            },
-          );
-        },
+              return AuthScreen(
+                controller: _authController,
+                externalLoginController: _externalLoginController,
+              );
+            }
+
+            if (_destination == _AuthenticatedDestination.diary) {
+              return DiaryScreen(
+                controller: _diaryControllerFor(state.member!.id),
+                imagePicker: widget.diaryImagePicker ??
+                    const FilePickerDiaryImagePicker(),
+                onBack: _returnHome,
+              );
+            }
+
+            if (_destination == _AuthenticatedDestination.consultation) {
+              return ConsultationScreen(
+                controller: _consultationControllerFor(state.member!.id),
+                onBack: _returnHome,
+              );
+            }
+
+            if (_destination == _AuthenticatedDestination.notifications) {
+              final reportController = _reportControllerFor(state.member!.id);
+              final pendingTarget = _pendingReportTarget;
+              if (pendingTarget != null) {
+                reportController.selectTarget(pendingTarget);
+                _pendingReportTarget = null;
+              }
+
+              return NotificationReportScreen(
+                notificationController:
+                    _notificationControllerFor(state.member!.id),
+                reportController: reportController,
+                onBack: _returnHome,
+              );
+            }
+
+            if (_destination == _AuthenticatedDestination.settings) {
+              return SettingsScreen(
+                controller: _settingsControllerFor(state.member!.id),
+                onBack: _returnHome,
+              );
+            }
+
+            if (_destination == _AuthenticatedDestination.letter) {
+              final letterController = _letterControllerFor(state.member!.id);
+              final startsInCompose = _openLetterComposer;
+              _openLetterComposer = false;
+
+              return LetterScreen(
+                controller: letterController,
+                initiallyCompose: startsInCompose,
+                onBack: _returnHome,
+              );
+            }
+
+            if (_destination == _AuthenticatedDestination.story) {
+              return StoryScreen(
+                controller: _storyControllerFor(state.member!.id),
+                onBack: _returnHome,
+              );
+            }
+
+            final homeController = _homeControllerFor(state.member!.id);
+            return HomeScreen(
+              routeTitle: initialRoute.title,
+              nickname: state.member!.nickname,
+              homeController: homeController,
+              onWriteDiary: () {
+                setState(() {
+                  _destination = _AuthenticatedDestination.diary;
+                });
+              },
+              onWriteLetter: () {
+                setState(() {
+                  _openLetterComposer = true;
+                  _destination = _AuthenticatedDestination.letter;
+                });
+              },
+              onViewStory: () {
+                setState(() {
+                  _destination = _AuthenticatedDestination.story;
+                });
+              },
+              onOpenConsultation: () {
+                setState(() {
+                  _destination = _AuthenticatedDestination.consultation;
+                });
+              },
+              onOpenNotifications: () {
+                setState(() {
+                  _destination = _AuthenticatedDestination.notifications;
+                });
+              },
+              onOpenSettings: () {
+                setState(() {
+                  _destination = _AuthenticatedDestination.settings;
+                });
+              },
+              onLogout: () {
+                _disposeAuthenticatedControllers();
+                _destination = _AuthenticatedDestination.home;
+                _authController.logout();
+              },
+            );
+          },
+        ),
       ),
     );
+  }
+
+  void _returnHome() {
+    setState(() {
+      _destination = _AuthenticatedDestination.home;
+    });
+  }
+
+  void _disposeAuthenticatedControllers() {
+    _disposeHomeController();
+    _disposeConsultationController();
+    _disposeNotificationController();
+    _disposeReportController();
+    _disposeSettingsController();
+    _disposeDiaryController();
+    _disposeStoryController();
+    _disposeLetterController();
   }
 
   HomeController _homeControllerFor(int memberId) {
