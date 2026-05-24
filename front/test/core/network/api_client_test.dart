@@ -159,6 +159,47 @@ void main() {
       expect(await tokenStore.readRefreshToken(), isNull);
     });
 
+    test('does not retry unauthorized responses when retry is disabled',
+        () async {
+      final transport = _FakeApiTransport([
+        const ApiTransportResponse(statusCode: 401),
+      ]);
+      final tokenStore = MemoryAuthTokenStore(
+        initialTokens: const TokenPair(
+          accessToken: 'old-access',
+          refreshToken: 'refresh-token',
+        ),
+      );
+      final client = ApiClient(
+        transport: transport,
+        tokenStore: tokenStore,
+        tokenRefresher: const _StaticTokenRefresher(
+          TokenPair(
+            accessToken: 'new-access',
+            refreshToken: 'new-refresh',
+          ),
+        ),
+      );
+
+      await expectLater(
+        client.get<Map<String, Object?>>(
+          '/me',
+          retryOnUnauthorized: false,
+          parser: (json) => json as Map<String, Object?>,
+        ),
+        throwsA(
+          isA<ApiClientException>().having(
+            (error) => error.kind,
+            'kind',
+            ApiErrorKind.unauthorized,
+          ),
+        ),
+      );
+      expect(transport.requests, hasLength(1));
+      expect(await tokenStore.readAccessToken(), isNull);
+      expect(await tokenStore.readRefreshToken(), isNull);
+    });
+
     test('maps forbidden response to a screen-ready error', () async {
       final transport = _FakeApiTransport([
         const ApiTransportResponse(
@@ -183,6 +224,56 @@ void main() {
           isA<ApiClientException>()
               .having((error) => error.kind, 'kind', ApiErrorKind.forbidden)
               .having((error) => error.message, 'message', '권한이 없습니다.'),
+        ),
+      );
+    });
+
+    test('maps failed envelopes with field errors to client exceptions',
+        () async {
+      final transport = _FakeApiTransport([
+        const ApiTransportResponse(
+          statusCode: 200,
+          body: {
+            'success': false,
+            'error': {
+              'code': 'VALIDATION_ERROR',
+              'message': '요청 값 검증에 실패했습니다.',
+              'fieldErrors': [
+                {'field': 'email', 'message': 'must not be blank'},
+              ],
+            },
+          },
+        ),
+      ]);
+      final client = ApiClient(
+        transport: transport,
+        tokenStore: MemoryAuthTokenStore(),
+      );
+
+      await expectLater(
+        client.post<Map<String, Object?>>(
+          '/auth/signup',
+          parser: (json) => json as Map<String, Object?>,
+          body: {'email': ''},
+        ),
+        throwsA(
+          isA<ApiClientException>()
+              .having((error) => error.kind, 'kind', ApiErrorKind.server)
+              .having(
+                (error) => error.code,
+                'code',
+                'VALIDATION_ERROR',
+              )
+              .having(
+                (error) => error.message,
+                'message',
+                '요청 값 검증에 실패했습니다.',
+              )
+              .having(
+                (error) => error.fieldErrors.single.field,
+                'field',
+                'email',
+              ),
         ),
       );
     });
