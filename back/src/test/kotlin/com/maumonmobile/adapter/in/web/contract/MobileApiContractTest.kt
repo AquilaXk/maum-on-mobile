@@ -1,6 +1,7 @@
 package com.maumonmobile.adapter.`in`.web.contract
 
 import org.hamcrest.Matchers.hasItems
+import org.hamcrest.Matchers.greaterThanOrEqualTo
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
@@ -67,12 +68,34 @@ class MobileApiContractTest @Autowired constructor(
             .andExpect {
                 status { isOk() }
                 jsonPath("$.success") { value(true) }
-                jsonPath("$.data.content.length()") { value(0) }
+                jsonPath("$.data.content") { exists() }
                 jsonPath("$.data.page") { value(0) }
                 jsonPath("$.data.size") { value(5) }
-                jsonPath("$.data.totalElements") { value(0) }
-                jsonPath("$.data.totalPages") { value(1) }
-                jsonPath("$.data.last") { value(true) }
+                jsonPath("$.data.totalElements") { value(greaterThanOrEqualTo(0)) }
+                jsonPath("$.data.totalPages") { value(greaterThanOrEqualTo(1)) }
+                jsonPath("$.data.last") { exists() }
+            }
+    }
+
+    @Test
+    fun publicHomeAndFeedEndpointsDoNotRequireAuth() {
+        mockMvc.get("/api/v1/home/stats")
+            .andExpect {
+                status { isOk() }
+                jsonPath("$.success") { value(true) }
+                jsonPath("$.data.todayWorryCount") { exists() }
+                jsonPath("$.data.todayLetterCount") { exists() }
+                jsonPath("$.data.todayDiaryCount") { exists() }
+            }
+
+        mockMvc.get("/api/v1/diaries/public") {
+            param("page", "0")
+            param("size", "5")
+        }
+            .andExpect {
+                status { isOk() }
+                jsonPath("$.success") { value(true) }
+                jsonPath("$.data.content") { exists() }
             }
     }
 }

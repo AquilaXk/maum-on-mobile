@@ -12,5 +12,9 @@ interface DiaryRepository {
 
     fun findByMemberId(memberId: Long): List<Diary>
 
+    fun findPublic(): List<Diary>
+
+    fun findAllPublicAndPrivate(): List<Diary>
+
     fun delete(id: Long)
 }

@@ -8,6 +8,8 @@ interface DiaryUseCase {
 
     fun list(user: AuthenticatedUser, page: Int, size: Int): DiaryPageResult
 
+    fun listPublic(page: Int, size: Int): DiaryPageResult
+
     fun get(user: AuthenticatedUser, diaryId: Long): DiaryResult
 
     fun update(user: AuthenticatedUser, diaryId: Long, command: DiarySaveCommand)

@@ -16,6 +16,16 @@ void main() {
               _entry(id: 2, title: '다음달', createDate: '2026-06-01T08:00:00'),
             ]),
           ],
+          publicPages: [
+            _page([
+              _entry(
+                id: 3,
+                title: '공개 기록',
+                createDate: '2026-05-19T08:00:00',
+                isPrivate: false,
+              ),
+            ]),
+          ],
         ),
         now: DateTime(2026, 5, 20),
       );
@@ -26,7 +36,32 @@ void main() {
       expect(controller.state.visibleMonthKey, '2026-05');
       expect(controller.state.entries, hasLength(1));
       expect(controller.state.selectedDateEntries.single.title, '월요일');
+      expect(controller.state.publicEntries.single.title, '공개 기록');
       expect(controller.state.isLoading, isFalse);
+      expect(controller.state.isPublicLoading, isFalse);
+    });
+
+    test('keeps my diary data visible when public diary load fails', () async {
+      final controller = DiaryController(
+        diaryRepository: _FakeDiaryRepository(
+          pages: [
+            _page([
+              _entry(id: 1, title: '내 기록', createDate: '2026-05-20T08:00:00'),
+            ]),
+          ],
+          publicFetchError: const ApiClientException(
+            kind: ApiErrorKind.network,
+            message: '공개 기록을 불러오지 못했습니다.',
+          ),
+        ),
+        now: DateTime(2026, 5, 20),
+      );
+
+      await controller.load();
+
+      expect(controller.state.entries.single.title, '내 기록');
+      expect(controller.state.publicEntries, isEmpty);
+      expect(controller.state.publicErrorMessage, '공개 기록을 불러오지 못했습니다.');
     });
 
     test('moves months and reloads the visible month', () async {
@@ -229,6 +264,7 @@ DiaryEntry _entry({
   required int id,
   required String title,
   required String createDate,
+  bool isPrivate = true,
 }) {
   return DiaryEntry(
     id: id,
@@ -237,7 +273,7 @@ DiaryEntry _entry({
     category: DiaryCategory.daily,
     nickname: '마음이',
     imageUrl: null,
-    isPrivate: true,
+    isPrivate: isPrivate,
     createDate: createDate,
     modifyDate: createDate,
   );
@@ -246,16 +282,21 @@ DiaryEntry _entry({
 class _FakeDiaryRepository implements DiaryRepository {
   _FakeDiaryRepository({
     this.pages = const [],
+    this.publicPages = const [],
     this.createdId = 1,
     this.fetchError,
+    this.publicFetchError,
     this.createError,
   });
 
   final List<PageResponse<DiaryEntry>> pages;
+  final List<PageResponse<DiaryEntry>> publicPages;
   final int createdId;
   final Object? fetchError;
+  final Object? publicFetchError;
   final Object? createError;
   final List<DiaryFetchRequest> fetchRequests = [];
+  final List<DiaryFetchRequest> publicFetchRequests = [];
   final List<DiaryDraft> createdDrafts = [];
   final List<({int id, DiaryDraft draft})> updatedDrafts = [];
   final List<int> deletedIds = [];
@@ -271,6 +312,22 @@ class _FakeDiaryRepository implements DiaryRepository {
       throw error;
     }
     return pages.removeAt(0);
+  }
+
+  @override
+  Future<PageResponse<DiaryEntry>> fetchPublicDiaries({
+    int page = 0,
+    int size = 20,
+  }) async {
+    publicFetchRequests.add(DiaryFetchRequest(page: page, size: size));
+    final error = publicFetchError;
+    if (error != null) {
+      throw error;
+    }
+    if (publicPages.isEmpty) {
+      return _page([]);
+    }
+    return publicPages.removeAt(0);
   }
 
   @override

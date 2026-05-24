@@ -56,6 +56,14 @@ class DiaryController(
         )
     }
 
+    @GetMapping("/public")
+    fun listPublic(
+        @RequestParam(defaultValue = "0") page: Int,
+        @RequestParam(defaultValue = "20") size: Int,
+    ): ApiResponse<DiaryPageResult> {
+        return ApiResponse.success(diaryUseCase.listPublic(page = page, size = size))
+    }
+
     @GetMapping("/{id}")
     fun get(
         authentication: Authentication,

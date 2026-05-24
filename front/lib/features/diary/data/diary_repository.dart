@@ -11,6 +11,11 @@ abstract interface class DiaryRepository {
     int size = 100,
   });
 
+  Future<PageResponse<DiaryEntry>> fetchPublicDiaries({
+    int page = 0,
+    int size = 20,
+  });
+
   Future<DiaryEntry> fetchDiary(int id);
 
   Future<int> createDiary(DiaryDraft draft);
@@ -38,6 +43,23 @@ class ApiDiaryRepository implements DiaryRepository {
         'page': page,
         'size': size,
       },
+    );
+  }
+
+  @override
+  Future<PageResponse<DiaryEntry>> fetchPublicDiaries({
+    int page = 0,
+    int size = 20,
+  }) {
+    return _apiClient.getPage<DiaryEntry>(
+      '/api/v1/diaries/public',
+      itemParser: DiaryEntry.fromJson,
+      queryParameters: {
+        'page': page,
+        'size': size,
+      },
+      requiresAuth: false,
+      retryOnUnauthorized: false,
     );
   }
 

@@ -9,7 +9,9 @@ class DiaryState {
     required this.visibleMonth,
     required this.selectedDate,
     this.entries = const [],
+    this.publicEntries = const [],
     this.isLoading = false,
+    this.isPublicLoading = false,
     this.isSubmitting = false,
     this.hasLoaded = false,
     this.editingDiaryId,
@@ -20,13 +22,16 @@ class DiaryState {
     this.imageUrl,
     this.selectedImage,
     this.errorMessage,
+    this.publicErrorMessage,
     this.noticeMessage,
   });
 
   final DateTime visibleMonth;
   final DateTime selectedDate;
   final List<DiaryEntry> entries;
+  final List<DiaryEntry> publicEntries;
   final bool isLoading;
+  final bool isPublicLoading;
   final bool isSubmitting;
   final bool hasLoaded;
   final int? editingDiaryId;
@@ -37,7 +42,14 @@ class DiaryState {
   final String? imageUrl;
   final DiaryImageAttachment? selectedImage;
   final String? errorMessage;
+  final String? publicErrorMessage;
   final String? noticeMessage;
+
+  bool get isPublicEmpty =>
+      hasLoaded &&
+      !isPublicLoading &&
+      publicErrorMessage == null &&
+      publicEntries.isEmpty;
 
   String get visibleMonthKey => monthKeyFromDate(visibleMonth);
 
@@ -66,7 +78,9 @@ class DiaryState {
     DateTime? visibleMonth,
     DateTime? selectedDate,
     List<DiaryEntry>? entries,
+    List<DiaryEntry>? publicEntries,
     bool? isLoading,
+    bool? isPublicLoading,
     bool? isSubmitting,
     bool? hasLoaded,
     int? editingDiaryId,
@@ -81,6 +95,8 @@ class DiaryState {
     bool clearSelectedImage = false,
     String? errorMessage,
     bool clearErrorMessage = false,
+    String? publicErrorMessage,
+    bool clearPublicErrorMessage = false,
     String? noticeMessage,
     bool clearNoticeMessage = false,
   }) {
@@ -88,7 +104,9 @@ class DiaryState {
       visibleMonth: visibleMonth ?? this.visibleMonth,
       selectedDate: selectedDate ?? this.selectedDate,
       entries: entries ?? this.entries,
+      publicEntries: publicEntries ?? this.publicEntries,
       isLoading: isLoading ?? this.isLoading,
+      isPublicLoading: isPublicLoading ?? this.isPublicLoading,
       isSubmitting: isSubmitting ?? this.isSubmitting,
       hasLoaded: hasLoaded ?? this.hasLoaded,
       editingDiaryId:
@@ -102,6 +120,9 @@ class DiaryState {
           clearSelectedImage ? null : selectedImage ?? this.selectedImage,
       errorMessage:
           clearErrorMessage ? null : errorMessage ?? this.errorMessage,
+      publicErrorMessage: clearPublicErrorMessage
+          ? null
+          : publicErrorMessage ?? this.publicErrorMessage,
       noticeMessage:
           clearNoticeMessage ? null : noticeMessage ?? this.noticeMessage,
     );
@@ -289,12 +310,27 @@ class DiaryController extends ChangeNotifier {
       _setState(
         _state.copyWith(
           isLoading: true,
+          isPublicLoading: true,
           clearErrorMessage: true,
+          clearPublicErrorMessage: true,
           clearNoticeMessage: true,
         ),
       );
     }
 
+    await _loadMyDiaries(month);
+    await _loadPublicDiaries();
+
+    _setState(
+      _state.copyWith(
+        isLoading: false,
+        isPublicLoading: false,
+        hasLoaded: true,
+      ),
+    );
+  }
+
+  Future<void> _loadMyDiaries(DateTime month) async {
     try {
       final page = await _diaryRepository.fetchDiaries(page: 0, size: 100);
       final monthKey = monthKeyFromDate(month);
@@ -306,14 +342,33 @@ class DiaryController extends ChangeNotifier {
         _state.copyWith(
           visibleMonth: firstDayOfMonth(month),
           entries: filtered,
-          isLoading: false,
-          hasLoaded: true,
           clearErrorMessage: true,
         ),
       );
     } on Object catch (error) {
       _handleError(error);
-      _setState(_state.copyWith(isLoading: false));
+    }
+  }
+
+  Future<void> _loadPublicDiaries() async {
+    try {
+      final page = await _diaryRepository.fetchPublicDiaries(page: 0, size: 20);
+      _setState(
+        _state.copyWith(
+          publicEntries: page.items,
+          clearPublicErrorMessage: true,
+        ),
+      );
+    } on Object catch (error) {
+      _setState(
+        _state.copyWith(
+          publicEntries: const [],
+          publicErrorMessage: _messageFromError(
+            error,
+            '공개 기록을 불러오지 못했습니다.',
+          ),
+        ),
+      );
     }
   }
 
@@ -358,6 +413,14 @@ class DiaryController extends ChangeNotifier {
         clearNoticeMessage: true,
       ),
     );
+  }
+
+  String _messageFromError(Object error, String fallback) {
+    if (error is ApiClientException) {
+      return error.message;
+    }
+
+    return fallback;
   }
 
   void _setState(DiaryState nextState) {

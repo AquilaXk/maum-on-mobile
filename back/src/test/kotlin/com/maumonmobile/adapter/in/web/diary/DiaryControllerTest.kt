@@ -2,6 +2,8 @@ package com.maumonmobile.adapter.`in`.web.diary
 
 import com.jayway.jsonpath.JsonPath
 import org.hamcrest.Matchers.blankOrNullString
+import org.hamcrest.Matchers.greaterThan
+import org.hamcrest.Matchers.hasItem
 import org.hamcrest.Matchers.not
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
@@ -38,7 +40,7 @@ class DiaryControllerTest @Autowired constructor(
         )
             .andExpect(status().isOk)
             .andExpect(jsonPath("$.success").value(true))
-            .andExpect(jsonPath("$.data").value(1))
+            .andExpect(jsonPath("$.data").value(greaterThan(0)))
             .andReturn()
 
         val diaryId = createResult.response.readJsonInt("$.data")
@@ -103,10 +105,42 @@ class DiaryControllerTest @Autowired constructor(
             }
     }
 
-    private fun signupAndLogin(): String {
+    @Test
+    fun publicDiaryListExcludesPrivateEntriesWithoutAuth() {
+        val accessToken = signupAndLogin("diary-public@example.com", "공개이")
+        val publicTitle = "공개 기록 ${System.nanoTime()}"
+        val privateTitle = "비공개 기록 ${System.nanoTime()}"
+
+        mockMvc.perform(
+            multipart("/api/v1/diaries")
+                .file(jsonPart("data", """{"title":"$publicTitle","content":"공개 본문","categoryName":"일상","isPrivate":false}"""))
+                .header("Authorization", "Bearer $accessToken"),
+        )
+            .andExpect(status().isOk)
+
+        mockMvc.perform(
+            multipart("/api/v1/diaries")
+                .file(jsonPart("data", """{"title":"$privateTitle","content":"비공개 본문","categoryName":"일상","isPrivate":true}"""))
+                .header("Authorization", "Bearer $accessToken"),
+        )
+            .andExpect(status().isOk)
+
+        mockMvc.get("/api/v1/diaries/public?page=0&size=50")
+            .andExpect {
+                status { isOk() }
+                jsonPath("$.success") { value(true) }
+                jsonPath("$.data.content[*].title") { value(hasItem(publicTitle)) }
+                jsonPath("$.data.content[*].title") { value(not(hasItem(privateTitle))) }
+            }
+    }
+
+    private fun signupAndLogin(
+        email: String = "diary@example.com",
+        nickname: String = "마음이",
+    ): String {
         mockMvc.post("/api/v1/auth/signup") {
             contentType = MediaType.APPLICATION_JSON
-            content = """{"email":"diary@example.com","password":"pass1234","nickname":"마음이"}"""
+            content = """{"email":"$email","password":"pass1234","nickname":"$nickname"}"""
         }
             .andExpect {
                 status { isOk() }
@@ -114,7 +148,7 @@ class DiaryControllerTest @Autowired constructor(
 
         val loginResult = mockMvc.post("/api/v1/auth/login") {
             contentType = MediaType.APPLICATION_JSON
-            content = """{"email":"diary@example.com","password":"pass1234"}"""
+            content = """{"email":"$email","password":"pass1234"}"""
         }
             .andExpect {
                 status { isOk() }

@@ -61,6 +61,16 @@ class InMemoryDiaryRepository : DiaryRepository {
             .toList()
     }
 
+    override fun findPublic(): List<Diary> {
+        return diariesById.values
+            .filterNot { diary -> diary.isPrivate }
+            .toList()
+    }
+
+    override fun findAllPublicAndPrivate(): List<Diary> {
+        return diariesById.values.toList()
+    }
+
     override fun delete(id: Long) {
         diariesById.remove(id)
     }
