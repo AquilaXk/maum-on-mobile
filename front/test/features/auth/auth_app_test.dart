@@ -68,6 +68,35 @@ void main() {
     expect(find.text('나의 기록'), findsOneWidget);
   });
 
+  testWidgets('system back returns authenticated users from diary to home',
+      (tester) async {
+    await tester.pumpWidget(
+      MaumOnMobileApp(
+        authRepository: _FakeAuthRepository(restoredSession: _session()),
+        homeRepository: const _FakeHomeRepository(),
+        diaryRepository: _FakeDiaryRepository(),
+        diaryImagePicker: const _FakeDiaryImagePicker(),
+        storyRepository: _FakeStoryRepository(),
+        letterRepository: _FakeLetterRepository(),
+        listenForDeepLinks: false,
+      ),
+    );
+
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('다이어리 쓰기'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('나의 기록'), findsOneWidget);
+
+    final handled = await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+
+    expect(handled, isTrue);
+    expect(find.text('홈'), findsOneWidget);
+    expect(find.text('마음이님, 오늘의 마음을 이어가세요.'), findsOneWidget);
+    expect(find.text('나의 기록'), findsNothing);
+  });
+
   testWidgets('navigates authenticated users from home to letters',
       (tester) async {
     await tester.pumpWidget(
