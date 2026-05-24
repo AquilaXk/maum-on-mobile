@@ -129,7 +129,9 @@ void main() {
       ),
     );
 
-    await tester.tap(find.widgetWithText(TextButton, '수정'));
+    final editButton = find.widgetWithText(TextButton, '수정');
+    await tester.ensureVisible(editButton);
+    await tester.tap(editButton);
     await tester.pump();
     expect(controller.state.isEditing, isTrue);
 
@@ -167,7 +169,9 @@ void main() {
       ),
     );
 
-    await tester.tap(find.widgetWithText(TextButton, '삭제'));
+    final deleteButton = find.widgetWithText(TextButton, '삭제');
+    await tester.ensureVisible(deleteButton);
+    await tester.tap(deleteButton);
     await tester.pumpAndSettle();
     expect(find.text('기록을 삭제할까요?'), findsOneWidget);
 
@@ -175,7 +179,8 @@ void main() {
     await tester.pumpAndSettle();
     expect(repository.deletedIds, isEmpty);
 
-    await tester.tap(find.widgetWithText(TextButton, '삭제'));
+    await tester.ensureVisible(deleteButton);
+    await tester.tap(deleteButton);
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey('diary-delete-confirm-button')));
     await tester.pumpAndSettle();
