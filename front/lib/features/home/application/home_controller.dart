@@ -27,7 +27,8 @@ class HomeState {
 
   bool get isLoading => isStatsLoading || isFeedLoading;
 
-  bool get isFeedEmpty => hasLoaded && feedErrorMessage == null && visibleStories.isEmpty;
+  bool get isFeedEmpty =>
+      hasLoaded && feedErrorMessage == null && visibleStories.isEmpty;
 
   List<HomeStory> get visibleStories {
     if (selectedCategory == HomeStoryCategory.all) {
@@ -75,10 +76,17 @@ class HomeController extends ChangeNotifier {
   final HomeRepository _homeRepository;
 
   HomeState _state = const HomeState();
+  bool _isLoading = false;
+  bool _isDisposed = false;
 
   HomeState get state => _state;
 
   Future<void> load() async {
+    if (_isLoading) {
+      return;
+    }
+
+    _isLoading = true;
     _setState(
       _state.copyWith(
         isStatsLoading: true,
@@ -88,18 +96,21 @@ class HomeController extends ChangeNotifier {
       ),
     );
 
-    await Future.wait([
-      _loadStats(),
-      _loadStories(),
-    ]);
-
-    _setState(
-      _state.copyWith(
-        hasLoaded: true,
-        isStatsLoading: false,
-        isFeedLoading: false,
-      ),
-    );
+    try {
+      await Future.wait([
+        _loadStats(),
+        _loadStories(),
+      ]);
+    } finally {
+      _isLoading = false;
+      _setState(
+        _state.copyWith(
+          hasLoaded: true,
+          isStatsLoading: false,
+          isFeedLoading: false,
+        ),
+      );
+    }
   }
 
   void selectCategory(HomeStoryCategory category) {
@@ -153,7 +164,17 @@ class HomeController extends ChangeNotifier {
   }
 
   void _setState(HomeState nextState) {
+    if (_isDisposed) {
+      return;
+    }
+
     _state = nextState;
     notifyListeners();
+  }
+
+  @override
+  void dispose() {
+    _isDisposed = true;
+    super.dispose();
   }
 }

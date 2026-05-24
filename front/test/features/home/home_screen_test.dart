@@ -6,7 +6,8 @@ import 'package:maum_on_mobile_front/features/home/domain/home_models.dart';
 import 'package:maum_on_mobile_front/features/home/home_screen.dart';
 
 void main() {
-  testWidgets('renders stats, story feed, and category filter in a scroll view', (tester) async {
+  testWidgets('renders stats, story feed, and category filter in a scroll view',
+      (tester) async {
     final controller = HomeController(
       homeRepository: const _FakeHomeRepository(),
     );
@@ -18,6 +19,9 @@ void main() {
           routeTitle: '홈',
           nickname: '마음이',
           homeController: controller,
+          onWriteDiary: () {},
+          onWriteLetter: () {},
+          onViewStory: () {},
           onLogout: () {},
         ),
       ),
@@ -34,6 +38,38 @@ void main() {
 
     expect(find.text('어떻게 말해야 할까요?'), findsOneWidget);
     expect(find.text('오늘 너무 지쳐요'), findsNothing);
+  });
+
+  testWidgets('runs home action callbacks', (tester) async {
+    final controller = HomeController(
+      homeRepository: const _FakeHomeRepository(),
+    );
+    await controller.load();
+    var diaryTaps = 0;
+    var letterTaps = 0;
+    var storyTaps = 0;
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: HomeScreen(
+          routeTitle: '홈',
+          nickname: '마음이',
+          homeController: controller,
+          onWriteDiary: () => diaryTaps += 1,
+          onWriteLetter: () => letterTaps += 1,
+          onViewStory: () => storyTaps += 1,
+          onLogout: () {},
+        ),
+      ),
+    );
+
+    await tester.tap(find.text('다이어리 쓰기'));
+    await tester.tap(find.text('편지 쓰기'));
+    await tester.tap(find.text('스토리 보기'));
+
+    expect(diaryTaps, 1);
+    expect(letterTaps, 1);
+    expect(storyTaps, 1);
   });
 }
 

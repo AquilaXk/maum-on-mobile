@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:maum_on_mobile_front/core/network/api_client.dart';
+import 'package:maum_on_mobile_front/core/network/api_error.dart';
 import 'package:maum_on_mobile_front/core/network/api_transport.dart';
 import 'package:maum_on_mobile_front/core/network/auth_token_store.dart';
 import 'package:maum_on_mobile_front/features/home/data/home_repository.dart';
@@ -55,6 +56,8 @@ void main() {
       expect(page.items.single.title, '오늘 너무 지쳐요');
       expect(page.items.single.category, HomeStoryCategory.worry);
       expect(transport.requests.single.path, '/api/v1/posts');
+      expect(transport.requests.single.requiresAuth, isFalse);
+      expect(transport.requests.single.retryOnUnauthorized, isFalse);
       expect(transport.requests.single.queryParameters, {
         'page': 0,
         'size': 8,
@@ -80,7 +83,44 @@ void main() {
 
       await repository.fetchStories(category: HomeStoryCategory.question);
 
+      expect(transport.requests.single.requiresAuth, isFalse);
+      expect(transport.requests.single.retryOnUnauthorized, isFalse);
       expect(transport.requests.single.queryParameters['category'], 'QUESTION');
+    });
+
+    test('fails when a story category is unsupported', () async {
+      final transport = _FakeApiTransport([
+        ApiTransportResponse.ok({
+          'success': true,
+          'data': {
+            'content': [_postJson(id: 1, category: 'UNKNOWN')],
+            'last': true,
+          },
+        }),
+      ]);
+      final repository = ApiHomeRepository(
+        apiClient: ApiClient(
+          transport: transport,
+          tokenStore: MemoryAuthTokenStore(),
+        ),
+      );
+
+      expect(
+        repository.fetchStories(),
+        throwsA(
+          isA<ApiClientException>()
+              .having((error) => error.kind, 'kind', ApiErrorKind.unknown)
+              .having(
+                (error) => error.cause,
+                'cause',
+                isA<FormatException>().having(
+                  (error) => error.message,
+                  'message',
+                  contains('UNKNOWN'),
+                ),
+              ),
+        ),
+      );
     });
   });
 }

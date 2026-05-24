@@ -16,7 +16,8 @@ enum HomeStoryCategory {
     return switch (value?.toString()) {
       'DAILY' => HomeStoryCategory.daily,
       'QUESTION' => HomeStoryCategory.question,
-      'WORRY' || _ => HomeStoryCategory.worry,
+      'WORRY' => HomeStoryCategory.worry,
+      _ => throw FormatException('Unknown home story category: $value'),
     };
   }
 }

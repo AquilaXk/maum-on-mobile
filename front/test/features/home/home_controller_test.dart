@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:maum_on_mobile_front/core/network/api_error.dart';
 import 'package:maum_on_mobile_front/features/home/application/home_controller.dart';
@@ -83,7 +85,31 @@ void main() {
       controller.selectCategory(HomeStoryCategory.question);
 
       expect(controller.state.visibleStories, hasLength(1));
-      expect(controller.state.visibleStories.single.category, HomeStoryCategory.question);
+      expect(controller.state.visibleStories.single.category,
+          HomeStoryCategory.question);
+    });
+
+    test('ignores duplicate load calls while a request is in flight', () async {
+      final statsCompleter = Completer<HomeStats>();
+      final storiesCompleter = Completer<HomeStoryPage>();
+      final repository = _FakeHomeRepository(
+        statsCompleter: statsCompleter,
+        storiesCompleter: storiesCompleter,
+      );
+      final controller = HomeController(homeRepository: repository);
+
+      final firstLoad = controller.load();
+      final secondLoad = controller.load();
+
+      expect(repository.statsCallCount, 1);
+      expect(repository.storiesCallCount, 1);
+
+      statsCompleter.complete(_stats());
+      storiesCompleter.complete(HomeStoryPage(items: _stories(), last: true));
+      await Future.wait([firstLoad, secondLoad]);
+
+      expect(controller.state.isLoading, isFalse);
+      expect(controller.state.visibleStories, hasLength(3));
     });
   });
 }
@@ -129,20 +155,32 @@ List<HomeStory> _stories() {
 }
 
 class _FakeHomeRepository implements HomeRepository {
-  const _FakeHomeRepository({
+  _FakeHomeRepository({
     this.stats,
     this.stories,
     this.statsError,
     this.storiesError,
+    this.statsCompleter,
+    this.storiesCompleter,
   });
 
   final HomeStats? stats;
   final List<HomeStory>? stories;
   final Object? statsError;
   final Object? storiesError;
+  final Completer<HomeStats>? statsCompleter;
+  final Completer<HomeStoryPage>? storiesCompleter;
+  int statsCallCount = 0;
+  int storiesCallCount = 0;
 
   @override
   Future<HomeStats> fetchStats() async {
+    statsCallCount += 1;
+    final completer = statsCompleter;
+    if (completer != null) {
+      return completer.future;
+    }
+
     final error = statsError;
     if (error != null) {
       throw error;
@@ -154,6 +192,12 @@ class _FakeHomeRepository implements HomeRepository {
   Future<HomeStoryPage> fetchStories({
     HomeStoryCategory category = HomeStoryCategory.all,
   }) async {
+    storiesCallCount += 1;
+    final completer = storiesCompleter;
+    if (completer != null) {
+      return completer.future;
+    }
+
     final error = storiesError;
     if (error != null) {
       throw error;

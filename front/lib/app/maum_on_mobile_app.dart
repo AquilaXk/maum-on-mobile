@@ -47,9 +47,6 @@ class _MaumOnMobileAppState extends State<MaumOnMobileApp> {
   late final AuthController _authController = AuthController(
     authRepository: widget.authRepository ?? _buildDefaultAuthRepository(),
   );
-  late final HomeController _homeController = HomeController(
-    homeRepository: widget.homeRepository ?? _buildDefaultHomeRepository(),
-  );
   late final ExternalLoginController _externalLoginController =
       ExternalLoginController(
     authController: _authController,
@@ -58,6 +55,8 @@ class _MaumOnMobileAppState extends State<MaumOnMobileApp> {
         ExternalLoginConfig(apiBaseUrl: _apiConfig.baseUrl),
   );
   StreamSubscription<Uri>? _deepLinkSubscription;
+  HomeController? _homeController;
+  int? _homeMemberId;
 
   @override
   void initState() {
@@ -73,6 +72,7 @@ class _MaumOnMobileAppState extends State<MaumOnMobileApp> {
     _deepLinkSubscription?.cancel();
     _externalLoginController.dispose();
     _authController.dispose();
+    _disposeHomeController();
     super.dispose();
   }
 
@@ -97,22 +97,61 @@ class _MaumOnMobileAppState extends State<MaumOnMobileApp> {
           }
 
           if (!state.isAuthenticated || state.member == null) {
+            _disposeHomeController();
             return AuthScreen(
               controller: _authController,
               externalLoginController: _externalLoginController,
             );
           }
 
+          final homeController = _homeControllerFor(state.member!.id);
           return HomeScreen(
             routeTitle: initialRoute.title,
             nickname: state.member!.nickname,
-            homeController: _homeController,
+            homeController: homeController,
+            onWriteDiary: () => _showHomeActionMessage(
+              context,
+              '다이어리 화면을 준비 중입니다.',
+            ),
+            onWriteLetter: () => _showHomeActionMessage(
+              context,
+              '편지 화면을 준비 중입니다.',
+            ),
+            onViewStory: () => _showHomeActionMessage(
+              context,
+              '스토리 화면을 준비 중입니다.',
+            ),
             onLogout: () {
               _authController.logout();
             },
           );
         },
       ),
+    );
+  }
+
+  HomeController _homeControllerFor(int memberId) {
+    final currentController = _homeController;
+    if (currentController != null && _homeMemberId == memberId) {
+      return currentController;
+    }
+
+    currentController?.dispose();
+    _homeMemberId = memberId;
+    return _homeController = HomeController(
+      homeRepository: widget.homeRepository ?? _buildDefaultHomeRepository(),
+    );
+  }
+
+  void _disposeHomeController() {
+    _homeController?.dispose();
+    _homeController = null;
+    _homeMemberId = null;
+  }
+
+  void _showHomeActionMessage(BuildContext context, String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message)),
     );
   }
 

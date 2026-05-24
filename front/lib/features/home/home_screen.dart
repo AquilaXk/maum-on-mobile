@@ -9,6 +9,9 @@ class HomeScreen extends StatefulWidget {
     required this.routeTitle,
     required this.nickname,
     required this.homeController,
+    required this.onWriteDiary,
+    required this.onWriteLetter,
+    required this.onViewStory,
     required this.onLogout,
     super.key,
   });
@@ -16,6 +19,9 @@ class HomeScreen extends StatefulWidget {
   final String routeTitle;
   final String nickname;
   final HomeController homeController;
+  final VoidCallback onWriteDiary;
+  final VoidCallback onWriteLetter;
+  final VoidCallback onViewStory;
   final VoidCallback onLogout;
 
   @override
@@ -26,6 +32,18 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
+    _loadIfNeeded();
+  }
+
+  @override
+  void didUpdateWidget(covariant HomeScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.homeController != widget.homeController) {
+      _loadIfNeeded();
+    }
+  }
+
+  void _loadIfNeeded() {
     if (!widget.homeController.state.hasLoaded) {
       Future<void>.microtask(widget.homeController.load);
     }
@@ -57,7 +75,12 @@ class _HomeScreenState extends State<HomeScreen> {
                       const SizedBox(height: 16),
                       const _HealingQuote(),
                       const SizedBox(height: 16),
-                      _ActionGrid(onLogout: widget.onLogout),
+                      _ActionGrid(
+                        onWriteDiary: widget.onWriteDiary,
+                        onWriteLetter: widget.onWriteLetter,
+                        onViewStory: widget.onViewStory,
+                        onLogout: widget.onLogout,
+                      ),
                       const SizedBox(height: 20),
                       _CategoryFilter(
                         selectedCategory: state.selectedCategory,
@@ -242,8 +265,16 @@ class _HealingQuote extends StatelessWidget {
 }
 
 class _ActionGrid extends StatelessWidget {
-  const _ActionGrid({required this.onLogout});
+  const _ActionGrid({
+    required this.onWriteDiary,
+    required this.onWriteLetter,
+    required this.onViewStory,
+    required this.onLogout,
+  });
 
+  final VoidCallback onWriteDiary;
+  final VoidCallback onWriteLetter;
+  final VoidCallback onViewStory;
   final VoidCallback onLogout;
 
   @override
@@ -253,15 +284,15 @@ class _ActionGrid extends StatelessWidget {
       runSpacing: 8,
       children: [
         FilledButton(
-          onPressed: () {},
+          onPressed: onWriteDiary,
           child: const Text('다이어리 쓰기'),
         ),
         FilledButton.tonal(
-          onPressed: () {},
+          onPressed: onWriteLetter,
           child: const Text('편지 쓰기'),
         ),
         OutlinedButton(
-          onPressed: () {},
+          onPressed: onViewStory,
           child: const Text('스토리 보기'),
         ),
         OutlinedButton(
