@@ -1,0 +1,212 @@
+import 'package:flutter/foundation.dart';
+
+import '../../../core/network/api_error.dart';
+import '../data/auth_repository.dart';
+import '../domain/auth_models.dart';
+
+enum AuthStatus {
+  restoring,
+  unauthenticated,
+  authenticated,
+}
+
+class AuthState {
+  const AuthState({
+    required this.status,
+    this.member,
+    this.isSubmitting = false,
+    this.hasRestored = false,
+    this.errorMessage,
+    this.infoMessage,
+    this.sessionRevision = 0,
+  });
+
+  const AuthState.initial()
+      : status = AuthStatus.restoring,
+        member = null,
+        isSubmitting = false,
+        hasRestored = false,
+        errorMessage = null,
+        infoMessage = null,
+        sessionRevision = 0;
+
+  final AuthStatus status;
+  final AuthMember? member;
+  final bool isSubmitting;
+  final bool hasRestored;
+  final String? errorMessage;
+  final String? infoMessage;
+  final int sessionRevision;
+
+  bool get isAuthenticated => status == AuthStatus.authenticated;
+
+  bool get isRestoring => status == AuthStatus.restoring;
+
+  AuthState copyWith({
+    AuthStatus? status,
+    AuthMember? member,
+    bool clearMember = false,
+    bool? isSubmitting,
+    bool? hasRestored,
+    String? errorMessage,
+    bool clearErrorMessage = false,
+    String? infoMessage,
+    bool clearInfoMessage = false,
+    int? sessionRevision,
+  }) {
+    return AuthState(
+      status: status ?? this.status,
+      member: clearMember ? null : member ?? this.member,
+      isSubmitting: isSubmitting ?? this.isSubmitting,
+      hasRestored: hasRestored ?? this.hasRestored,
+      errorMessage:
+          clearErrorMessage ? null : errorMessage ?? this.errorMessage,
+      infoMessage: clearInfoMessage ? null : infoMessage ?? this.infoMessage,
+      sessionRevision: sessionRevision ?? this.sessionRevision,
+    );
+  }
+}
+
+class AuthController extends ChangeNotifier {
+  AuthController({
+    required AuthRepository authRepository,
+  }) : _authRepository = authRepository;
+
+  final AuthRepository _authRepository;
+
+  AuthState _state = const AuthState.initial();
+
+  AuthState get state => _state;
+
+  Future<void> restoreSession() async {
+    _setState(
+      _state.copyWith(
+        status: AuthStatus.restoring,
+        clearErrorMessage: true,
+        clearInfoMessage: true,
+      ),
+    );
+
+    try {
+      final session = await _authRepository.restoreSession();
+      _setAuthenticated(session.member, hasRestored: true);
+    } on Object {
+      _setState(
+        AuthState(
+          status: AuthStatus.unauthenticated,
+          hasRestored: true,
+          sessionRevision: _state.sessionRevision + 1,
+        ),
+      );
+    }
+  }
+
+  Future<void> login({
+    required String email,
+    required String password,
+  }) async {
+    _setState(
+      _state.copyWith(
+        isSubmitting: true,
+        clearErrorMessage: true,
+        clearInfoMessage: true,
+      ),
+    );
+
+    try {
+      final session = await _authRepository.login(
+        LoginRequest(email: email.trim(), password: password),
+      );
+      _setAuthenticated(session.member, hasRestored: true);
+    } on Object catch (error) {
+      _setState(
+        _state.copyWith(
+          status: AuthStatus.unauthenticated,
+          clearMember: true,
+          isSubmitting: false,
+          hasRestored: true,
+          errorMessage: _messageFromError(error),
+          sessionRevision: _state.sessionRevision + 1,
+        ),
+      );
+    }
+  }
+
+  Future<void> signup({
+    required String email,
+    required String password,
+    required String nickname,
+  }) async {
+    _setState(
+      _state.copyWith(
+        isSubmitting: true,
+        clearErrorMessage: true,
+        clearInfoMessage: true,
+      ),
+    );
+
+    try {
+      await _authRepository.signup(
+        SignupRequest(
+          email: email.trim(),
+          password: password,
+          nickname: nickname.trim(),
+        ),
+      );
+      _setState(
+        _state.copyWith(
+          status: AuthStatus.unauthenticated,
+          clearMember: true,
+          isSubmitting: false,
+          hasRestored: true,
+          infoMessage: '가입이 완료되었습니다. 로그인해 주세요.',
+        ),
+      );
+    } on Object catch (error) {
+      _setState(
+        _state.copyWith(
+          status: AuthStatus.unauthenticated,
+          clearMember: true,
+          isSubmitting: false,
+          hasRestored: true,
+          errorMessage: _messageFromError(error),
+        ),
+      );
+    }
+  }
+
+  Future<void> logout() async {
+    await _authRepository.logout();
+    _setState(
+      AuthState(
+        status: AuthStatus.unauthenticated,
+        hasRestored: true,
+        sessionRevision: _state.sessionRevision + 1,
+      ),
+    );
+  }
+
+  void _setAuthenticated(AuthMember member, {required bool hasRestored}) {
+    _setState(
+      AuthState(
+        status: AuthStatus.authenticated,
+        member: member,
+        hasRestored: hasRestored,
+        sessionRevision: _state.sessionRevision + 1,
+      ),
+    );
+  }
+
+  void _setState(AuthState nextState) {
+    _state = nextState;
+    notifyListeners();
+  }
+
+  String _messageFromError(Object error) {
+    if (error is ApiClientException) {
+      return error.message;
+    }
+
+    return '요청을 처리하지 못했습니다.';
+  }
+}

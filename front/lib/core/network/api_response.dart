@@ -18,15 +18,59 @@ class ApiEnvelope<T> {
     final map = _stringKeyedMap(json);
     final success = map['success'];
 
-    if (success is! bool) {
-      throw const FormatException('Expected API envelope success flag.');
+    if (success is bool) {
+      return ApiEnvelope<T>(
+        success: success,
+        data: success ? parser(map['data']) : null,
+        error: success ? null : ApiErrorBody.fromJson(map['error']),
+      );
     }
 
-    return ApiEnvelope<T>(
-      success: success,
-      data: success ? parser(map['data']) : null,
-      error: success ? null : ApiErrorBody.fromJson(map['error']),
-    );
+    final resultCode = map['resultCode'];
+    if (resultCode is String) {
+      return ApiEnvelope<T>(
+        success: resultCode.startsWith('2'),
+        data: resultCode.startsWith('2') ? parser(map['data']) : null,
+        error: resultCode.startsWith('2')
+            ? null
+            : ApiErrorBody(
+                code: resultCode,
+                message: map['msg']?.toString() ?? '요청을 처리하지 못했습니다.',
+              ),
+      );
+    }
+
+    throw const FormatException('Expected API envelope success flag.');
+  }
+
+  static ApiEnvelope<void> voidEnvelope(Object? json) {
+    if (json is! Map) {
+      throw const FormatException('Expected API envelope object.');
+    }
+
+    final map = _stringKeyedMap(json);
+    final success = map['success'];
+    if (success is bool) {
+      return ApiEnvelope<void>(
+        success: success,
+        error: success ? null : ApiErrorBody.fromJson(map['error']),
+      );
+    }
+
+    final resultCode = map['resultCode'];
+    if (resultCode is String) {
+      return ApiEnvelope<void>(
+        success: resultCode.startsWith('2'),
+        error: resultCode.startsWith('2')
+            ? null
+            : ApiErrorBody(
+                code: resultCode,
+                message: map['msg']?.toString() ?? '요청을 처리하지 못했습니다.',
+              ),
+      );
+    }
+
+    throw const FormatException('Expected API envelope success flag.');
   }
 
   final bool success;
