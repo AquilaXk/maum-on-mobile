@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:maum_on_mobile_front/core/network/api_error.dart';
 import 'package:maum_on_mobile_front/features/consultation/application/consultation_controller.dart';
 import 'package:maum_on_mobile_front/features/consultation/data/consultation_repository.dart';
 import 'package:maum_on_mobile_front/features/consultation/domain/consultation_models.dart';
@@ -65,6 +66,35 @@ void main() {
       expect(repository.connectCount, 2);
       expect(controller.state.connectionState,
           ConsultationConnectionState.connecting);
+    });
+
+    test('clears expired sessions when the stream rejects authorization',
+        () async {
+      final repository = _FakeConsultationRepository();
+      var unauthorizedCount = 0;
+      final controller = ConsultationController(
+        repository: repository,
+        onUnauthorized: () {
+          unauthorizedCount += 1;
+        },
+      );
+
+      await controller.connect();
+      repository.emitError(
+        const ApiClientException(
+          kind: ApiErrorKind.unauthorized,
+          message: '다시 로그인해 주세요.',
+          statusCode: 401,
+        ),
+      );
+      await Future<void>.delayed(Duration.zero);
+
+      expect(unauthorizedCount, 1);
+      expect(
+          controller.state.connectionState, ConsultationConnectionState.error);
+      expect(controller.state.errorMessage, '다시 로그인해 주세요.');
+      expect(
+          controller.state.messages.last.role, ConsultationMessageRole.system);
     });
 
     test('cleans up and restores stream around app lifecycle changes',
