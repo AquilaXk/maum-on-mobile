@@ -53,7 +53,11 @@ void main() {
       '반복 광고입니다.',
     );
     final submitButton = find.byKey(const ValueKey('report-submit-button'));
-    await tester.ensureVisible(submitButton);
+    await tester.scrollUntilVisible(
+      submitButton,
+      500,
+      scrollable: find.byKey(const ValueKey('report-form')),
+    );
     await tester.pumpAndSettle();
     await tester.tap(submitButton);
     await tester.pump();
