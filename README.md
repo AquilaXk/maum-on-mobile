@@ -8,6 +8,13 @@ Mobile app repository for Maum On, focused on Android and iOS clients.
 - Use the existing Maum On product behavior and API contracts as the source of truth.
 - Keep mobile client work isolated from the existing web/backend repository.
 
+## Workspace
+
+- `front/`: Android/iOS mobile app client.
+- `back/`: API server for the mobile app.
+- `docker/`: local runtime containers and operational compose files.
+- `infra/`: deployment and infrastructure assets.
+
 ## Initial Scope
 
 - Choose the mobile stack.
