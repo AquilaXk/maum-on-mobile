@@ -1,9 +1,33 @@
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
     // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
     id("dev.flutter.flutter-gradle-plugin")
 }
+
+val releaseSigningProperties = Properties()
+val releaseSigningPropertiesFile = rootProject.file("key.properties")
+if (releaseSigningPropertiesFile.isFile) {
+    releaseSigningPropertiesFile.inputStream().use { releaseSigningProperties.load(it) }
+}
+
+fun releaseSigningValue(name: String): String? =
+    providers.gradleProperty(name).orNull
+        ?: providers.environmentVariable(name).orNull
+        ?: releaseSigningProperties.getProperty(name)
+
+val androidReleaseKeystorePath = releaseSigningValue("MAUMON_ANDROID_KEYSTORE_PATH")
+val androidReleaseKeystorePassword = releaseSigningValue("MAUMON_ANDROID_KEYSTORE_PASSWORD")
+val androidReleaseKeyAlias = releaseSigningValue("MAUMON_ANDROID_KEY_ALIAS")
+val androidReleaseKeyPassword = releaseSigningValue("MAUMON_ANDROID_KEY_PASSWORD")
+val hasAndroidReleaseSigning = listOf(
+    androidReleaseKeystorePath,
+    androidReleaseKeystorePassword,
+    androidReleaseKeyAlias,
+    androidReleaseKeyPassword,
+).all { !it.isNullOrBlank() }
 
 android {
     namespace = "com.aquilaxk.maumonmobile"
@@ -25,12 +49,37 @@ android {
         versionName = flutter.versionName
     }
 
+    signingConfigs {
+        create("release") {
+            if (hasAndroidReleaseSigning) {
+                storeFile = rootProject.file(androidReleaseKeystorePath!!)
+                storePassword = androidReleaseKeystorePassword
+                keyAlias = androidReleaseKeyAlias
+                keyPassword = androidReleaseKeyPassword
+            }
+        }
+    }
+
     buildTypes {
         release {
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
-            signingConfig = signingConfigs.getByName("debug")
+            if (hasAndroidReleaseSigning) {
+                signingConfig = signingConfigs.getByName("release")
+            }
         }
+    }
+}
+
+gradle.taskGraph.whenReady {
+    val releaseTaskRequested = allTasks.any { task ->
+        task.name.contains("Release", ignoreCase = true)
+    }
+
+    if (releaseTaskRequested && !hasAndroidReleaseSigning) {
+        throw GradleException(
+            "Android release signing requires MAUMON_ANDROID_KEYSTORE_PATH, " +
+                "MAUMON_ANDROID_KEYSTORE_PASSWORD, MAUMON_ANDROID_KEY_ALIAS, " +
+                "and MAUMON_ANDROID_KEY_PASSWORD."
+        )
     }
 }
 
