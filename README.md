@@ -10,10 +10,22 @@ Mobile app repository for Maum On, focused on Android and iOS clients.
 
 ## Workspace
 
-- `front/`: Android/iOS mobile app client.
+- `front/`: Flutter mobile app client for Android and iOS.
 - `back/`: Kotlin/Spring Boot API server for the mobile app.
 - `docker/`: local runtime containers and operational compose files.
 - `infra/`: deployment and infrastructure assets.
+
+## Frontend Commands
+
+Run Flutter commands from `front/`:
+
+- `flutter pub get`: install Flutter dependencies.
+- `flutter analyze`: run static analysis.
+- `flutter test`: run simulator-free widget and unit tests.
+
+Run repository contract tests from the repository root:
+
+- `node --test tools/ci/*.test.mjs`: run repository and Flutter scaffold contract tests.
 
 ## Backend Architecture
 

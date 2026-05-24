@@ -53,6 +53,43 @@ test("platform jobs skip cleanly before scaffolds exist", async () => {
   assert.match(jobBlock(workflow, "javascript"), /JavaScript scaffold not found; skipping JavaScript checks\./);
 });
 
+test("frontend job supports Flutter and Node scaffolds", async () => {
+  const frontend = jobBlock(await readWorkflow(), "frontend");
+
+  assert.match(frontend, /\[\[ -f front\/pubspec\.yaml \]\]/);
+  assert.match(frontend, /echo "stack=flutter"/);
+  assert.match(frontend, /subosito\/flutter-action@[a-f0-9]{40}/);
+  assert.match(frontend, /flutter pub get/);
+  assert.match(frontend, /flutter analyze/);
+  assert.match(frontend, /flutter test/);
+  assert.match(frontend, /\[\[ -f front\/package\.json \]\]/);
+  assert.match(frontend, /echo "stack=node"/);
+});
+
+test("ci pins GitHub Action references to immutable commits", async () => {
+  const workflow = await readWorkflow();
+
+  assert.doesNotMatch(workflow, /uses: [^\s]+@v\d/m);
+  assert.match(workflow, /actions\/checkout@[a-f0-9]{40}/);
+  assert.match(workflow, /actions\/setup-node@[a-f0-9]{40}/);
+  assert.match(workflow, /actions\/setup-java@[a-f0-9]{40}/);
+  assert.match(workflow, /subosito\/flutter-action@[a-f0-9]{40}/);
+});
+
+test("checkout steps do not persist GitHub credentials", async () => {
+  const workflow = await readWorkflow();
+  const stepBlocks = workflow
+    .split(/\n(?=      - (?:name|uses): )/)
+    .filter((block) => block.startsWith("      - "));
+  const checkoutSteps = stepBlocks.filter((step) => /uses: actions\/checkout@[a-f0-9]{40}/.test(step));
+
+  assert.ok(checkoutSteps.length > 0);
+  for (const step of checkoutSteps) {
+    assert.match(step, /uses: actions\/checkout@[a-f0-9]{40}/);
+    assert.match(step, /persist-credentials: false/);
+  }
+});
+
 test("repository contracts preserve local docs and issue template policies", async () => {
   const workflow = await readWorkflow();
   const repositoryContracts = jobBlock(workflow, "repository-contracts");
