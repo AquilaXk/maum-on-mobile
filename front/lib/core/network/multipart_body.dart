@@ -1,8 +1,10 @@
 class MultipartBody {
   MultipartBody({
     Map<String, String> fields = const {},
+    List<MultipartTextPart> textParts = const [],
     List<MultipartFilePart> files = const [],
   })  : fields = Map.unmodifiable(fields),
+        textParts = List.unmodifiable(textParts),
         files = List.unmodifiable(files);
 
   factory MultipartBody.image(
@@ -13,7 +15,20 @@ class MultipartBody {
   }
 
   final Map<String, String> fields;
+  final List<MultipartTextPart> textParts;
   final List<MultipartFilePart> files;
+}
+
+class MultipartTextPart {
+  const MultipartTextPart({
+    required this.fieldName,
+    required this.value,
+    this.contentType,
+  });
+
+  final String fieldName;
+  final String value;
+  final String? contentType;
 }
 
 class MultipartFilePart {

@@ -55,6 +55,20 @@ class DioApiTransport implements ApiTransport {
     final formData = FormData();
 
     formData.fields.addAll(body.fields.entries);
+    for (final textPart in body.textParts) {
+      formData.files.add(
+        MapEntry(
+          textPart.fieldName,
+          MultipartFile.fromString(
+            textPart.value,
+            contentType: textPart.contentType == null
+                ? null
+                : DioMediaType.parse(textPart.contentType!),
+          ),
+        ),
+      );
+    }
+
     for (final file in body.files) {
       formData.files.add(
         MapEntry(
