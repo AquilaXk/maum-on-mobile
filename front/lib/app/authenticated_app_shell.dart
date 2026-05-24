@@ -37,7 +37,7 @@ class AuthenticatedAppShell extends StatelessWidget {
               key: ValueKey('route-tab-${route.key}'),
               icon: Icon(route.icon),
               selectedIcon: Icon(route.selectedIcon),
-              label: route.navLabel,
+              label: '${route.navLabel} 탭',
             ),
         ],
       ),
