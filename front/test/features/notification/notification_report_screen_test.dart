@@ -53,10 +53,9 @@ void main() {
       '반복 광고입니다.',
     );
     final submitButton = find.byKey(const ValueKey('report-submit-button'));
-    await tester.scrollUntilVisible(
-      submitButton,
-      500,
-      scrollable: find.byKey(const ValueKey('report-form')),
+    await tester.drag(
+      find.byKey(const ValueKey('report-form')),
+      const Offset(0, -1000),
     );
     await tester.pumpAndSettle();
     await tester.tap(submitButton);
