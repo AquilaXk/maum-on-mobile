@@ -77,6 +77,7 @@ class ConsultationController extends ChangeNotifier {
   ConsultationState _state;
   StreamSubscription<ConsultationStreamEvent>? _streamSubscription;
   bool _shouldRestoreConnection = false;
+  bool _hasLoadedRecentMessages = false;
   bool _isDisposed = false;
   int _messageSequence = 0;
   String? _activeAssistantMessageId;
@@ -89,6 +90,7 @@ class ConsultationController extends ChangeNotifier {
     }
 
     _shouldRestoreConnection = true;
+    await _loadRecentMessages();
     _setState(
       _state.copyWith(
         connectionState: ConsultationConnectionState.connecting,
@@ -214,8 +216,14 @@ class ConsultationController extends ChangeNotifier {
         _finishStreaming();
         return;
       case ConsultationStreamEventType.error:
-        _appendSystemMessage(
-          event.data.isEmpty ? '상담 응답 생성 중 오류가 발생했습니다.' : event.data,
+        final message = event.data.isEmpty
+            ? '상담 응답 생성 중 오류가 발생했습니다.'
+            : event.data;
+        _replaceActiveAssistantWithSystem(message);
+        _setState(
+          _state.copyWith(
+            errorMessage: message,
+          ),
         );
         _finishStreaming();
         return;
@@ -330,6 +338,32 @@ class ConsultationController extends ChangeNotifier {
   void _finishStreaming() {
     _activeAssistantMessageId = null;
     _setState(_state.copyWith(isStreaming: false));
+  }
+
+  Future<void> _loadRecentMessages() async {
+    if (_hasLoadedRecentMessages) {
+      return;
+    }
+
+    _hasLoadedRecentMessages = true;
+    try {
+      final messages = await _repository.loadRecentMessages();
+      if (messages.isNotEmpty) {
+        _setState(
+          _state.copyWith(
+            messages: messages,
+            clearErrorMessage: true,
+          ),
+        );
+      }
+    } on Object catch (error) {
+      _hasLoadedRecentMessages = false;
+      _setState(
+        _state.copyWith(
+          errorMessage: _messageFromError(error),
+        ),
+      );
+    }
   }
 
   Future<void> _cancelStream({

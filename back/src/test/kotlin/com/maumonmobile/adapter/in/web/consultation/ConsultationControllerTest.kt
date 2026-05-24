@@ -1,10 +1,17 @@
 package com.maumonmobile.adapter.`in`.web.consultation
 
 import com.jayway.jsonpath.JsonPath
+import com.maumonmobile.application.port.out.ConsultationAiRequest
+import com.maumonmobile.application.port.out.ConsultationAiResponder
+import com.maumonmobile.application.port.out.ConsultationAiResponse
+import com.maumonmobile.application.port.out.ConsultationAiUnavailableException
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
+import org.springframework.boot.test.context.TestConfiguration
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc
+import org.springframework.context.annotation.Bean
+import org.springframework.context.annotation.Primary
 import org.springframework.http.MediaType
 import org.springframework.mock.web.MockHttpServletResponse
 import org.springframework.test.context.ActiveProfiles
@@ -40,6 +47,59 @@ class ConsultationControllerTest @Autowired constructor(
                 status { isOk() }
                 jsonPath("$.success") { value(true) }
                 jsonPath("$.data") { value(true) }
+            }
+    }
+
+    @Test
+    fun chatStoresAiReplyAndLoadsRecentHistory() {
+        val member = signupAndLogin("consultation-history@example.com", "기록이")
+
+        mockMvc.post("/api/v1/consultations/chat") {
+            header("Authorization", "Bearer ${member.accessToken}")
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"message":"오늘 마음이 복잡해요."}"""
+        }
+            .andExpect {
+                status { isOk() }
+                jsonPath("$.success") { value(true) }
+            }
+
+        mockMvc.get("/api/v1/consultations/recent") {
+            header("Authorization", "Bearer ${member.accessToken}")
+        }
+            .andExpect {
+                status { isOk() }
+                jsonPath("$.data.messages[0].role") { value("USER") }
+                jsonPath("$.data.messages[0].content") { value("오늘 마음이 복잡해요.") }
+                jsonPath("$.data.messages[1].role") { value("ASSISTANT") }
+                jsonPath("$.data.messages[1].content") { value("함께 살펴볼게요.") }
+            }
+    }
+
+    @Test
+    fun chatFailureStoresFallbackMessageInRecentHistory() {
+        val member = signupAndLogin("consultation-fallback@example.com", "복구이")
+
+        mockMvc.post("/api/v1/consultations/chat") {
+            header("Authorization", "Bearer ${member.accessToken}")
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"message":"응답 실패를 재현해요."}"""
+        }
+            .andExpect {
+                status { isOk() }
+                jsonPath("$.success") { value(true) }
+            }
+
+        mockMvc.get("/api/v1/consultations/recent") {
+            header("Authorization", "Bearer ${member.accessToken}")
+        }
+            .andExpect {
+                status { isOk() }
+                jsonPath("$.data.messages[0].role") { value("USER") }
+                jsonPath("$.data.messages[1].role") { value("SYSTEM") }
+                jsonPath("$.data.messages[1].content") {
+                    value("지금은 답변을 만들지 못했습니다. 잠시 후 다시 시도해 주세요.")
+                }
             }
     }
 
@@ -85,6 +145,20 @@ class ConsultationControllerTest @Autowired constructor(
             .andReturn()
 
         return TestMember(accessToken = loginResult.response.readJsonString("$.data.accessToken"))
+    }
+
+    @TestConfiguration(proxyBeanMethods = false)
+    class ConsultationAiTestConfig {
+        @Bean
+        @Primary
+        fun consultationAiResponder(): ConsultationAiResponder = object : ConsultationAiResponder {
+            override fun generate(request: ConsultationAiRequest): ConsultationAiResponse {
+                if (request.message.contains("응답 실패")) {
+                    throw ConsultationAiUnavailableException("fake failure")
+                }
+                return ConsultationAiResponse(chunks = listOf("함께 ", "살펴볼게요."))
+            }
+        }
     }
 }
 

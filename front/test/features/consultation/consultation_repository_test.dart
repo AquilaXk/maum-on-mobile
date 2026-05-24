@@ -37,6 +37,42 @@ void main() {
       expect(streamClient.connectCount, 1);
       expect(event.type, ConsultationStreamEventType.connect);
     });
+
+    test('loads recent consultation messages from the API', () async {
+      final transport = _FakeApiTransport([
+        ApiTransportResponse.ok({
+          'success': true,
+          'data': {
+            'messages': [
+              {
+                'id': 11,
+                'role': 'USER',
+                'content': '불안해요',
+                'createdAt': '2026-05-25T00:00:00Z',
+              },
+              {
+                'id': 12,
+                'role': 'ASSISTANT',
+                'content': '천천히 볼게요.',
+                'createdAt': '2026-05-25T00:00:01Z',
+              },
+            ],
+          },
+        }),
+      ]);
+      final repository = _repository(
+        transport,
+        streamClient: _FakeConsultationStreamClient(),
+      );
+
+      final messages = await repository.loadRecentMessages();
+
+      expect(transport.requests.single.path, '/api/v1/consultations/recent');
+      expect(transport.requests.single.method, ApiMethod.get);
+      expect(messages, hasLength(2));
+      expect(messages.first.role, ConsultationMessageRole.user);
+      expect(messages.last.content, '천천히 볼게요.');
+    });
   });
 }
 

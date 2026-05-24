@@ -30,6 +30,10 @@ class ConsultationStreamRegistry {
         publish(memberId, "chat_done", "done")
     }
 
+    fun publishError(memberId: Long, message: String) {
+        publish(memberId, "chat_error", message)
+    }
+
     private fun publish(memberId: Long, eventName: String, data: String) {
         emittersByMemberId[memberId]
             ?.forEach { emitter -> sendOrRemove(memberId, emitter, eventName, data) }

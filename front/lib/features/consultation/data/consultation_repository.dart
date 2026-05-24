@@ -11,6 +11,8 @@ abstract interface class ConsultationRepository {
   Stream<ConsultationStreamEvent> connect();
 
   Future<void> sendMessage(String message);
+
+  Future<List<ConsultationMessage>> loadRecentMessages();
 }
 
 abstract interface class ConsultationStreamClient {
@@ -37,6 +39,25 @@ class ApiConsultationRepository implements ConsultationRepository {
     return _apiClient.postVoid(
       '/api/v1/consultations/chat',
       body: {'message': message},
+    );
+  }
+
+  @override
+  Future<List<ConsultationMessage>> loadRecentMessages() {
+    return _apiClient.get<List<ConsultationMessage>>(
+      '/api/v1/consultations/recent',
+      parser: (json) {
+        if (json is! Map) {
+          throw const FormatException('Expected consultation history object.');
+        }
+        final messages = json['messages'];
+        if (messages is! List) {
+          throw const FormatException('Expected consultation messages list.');
+        }
+        return messages
+            .map(ConsultationMessage.fromJson)
+            .toList(growable: false);
+      },
     );
   }
 }

@@ -36,6 +36,63 @@ void main() {
       expect(controller.state.messages.last.content, '천천히 호흡해 볼까요?');
     });
 
+    test('loads recent messages before opening a stream', () async {
+      final repository = _FakeConsultationRepository(
+        recentMessages: [
+          ConsultationMessage(
+            id: 'remote-1',
+            role: ConsultationMessageRole.user,
+            content: '어제 불안했어요',
+            createdAt: DateTime.parse('2026-05-25T00:00:00Z'),
+          ),
+          ConsultationMessage(
+            id: 'remote-2',
+            role: ConsultationMessageRole.assistant,
+            content: '그 마음을 같이 정리해 볼게요.',
+            createdAt: DateTime.parse('2026-05-25T00:00:01Z'),
+          ),
+        ],
+      );
+      final controller = ConsultationController(repository: repository);
+
+      await controller.connect();
+
+      expect(repository.loadRecentCount, 1);
+      expect(repository.connectCount, 1);
+      expect(controller.state.messages.first.id, 'remote-1');
+      expect(controller.state.messages.last.content, '그 마음을 같이 정리해 볼게요.');
+    });
+
+    test('chat error replaces the pending assistant message', () async {
+      final repository = _FakeConsultationRepository();
+      final controller = ConsultationController(repository: repository);
+
+      await controller.connect();
+      repository.emit(const ConsultationStreamEvent.connect('connected'));
+      controller.updateDraft('응답 실패를 보여 주세요');
+      await controller.submitMessage();
+      repository.emit(
+        const ConsultationStreamEvent.error(
+          '지금은 답변을 만들지 못했습니다. 잠시 후 다시 시도해 주세요.',
+        ),
+      );
+
+      expect(controller.state.isStreaming, isFalse);
+      expect(
+        controller.state.messages.where(
+          (message) =>
+              message.role == ConsultationMessageRole.assistant &&
+              message.content.isEmpty,
+        ),
+        isEmpty,
+      );
+      expect(controller.state.messages.last.role, ConsultationMessageRole.system);
+      expect(
+        controller.state.messages.last.content,
+        '지금은 답변을 만들지 못했습니다. 잠시 후 다시 시도해 주세요.',
+      );
+    });
+
     test('does not create duplicate stream connections', () async {
       final repository = _FakeConsultationRepository();
       final controller = ConsultationController(repository: repository);
@@ -134,9 +191,15 @@ void main() {
 }
 
 class _FakeConsultationRepository implements ConsultationRepository {
+  _FakeConsultationRepository({
+    this.recentMessages = const [],
+  });
+
+  final List<ConsultationMessage> recentMessages;
   final List<String> sentMessages = [];
   int connectCount = 0;
   int cancelCount = 0;
+  int loadRecentCount = 0;
   StreamController<ConsultationStreamEvent>? _controller;
 
   @override
@@ -154,6 +217,12 @@ class _FakeConsultationRepository implements ConsultationRepository {
   @override
   Future<void> sendMessage(String message) async {
     sentMessages.add(message);
+  }
+
+  @override
+  Future<List<ConsultationMessage>> loadRecentMessages() async {
+    loadRecentCount += 1;
+    return recentMessages;
   }
 
   void emit(ConsultationStreamEvent event) {

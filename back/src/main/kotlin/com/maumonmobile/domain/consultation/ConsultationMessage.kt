@@ -11,4 +11,5 @@ data class ConsultationMessage(
 enum class ConsultationMessageSender {
     USER,
     ASSISTANT,
+    SYSTEM,
 }
