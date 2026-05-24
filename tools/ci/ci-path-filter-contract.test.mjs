@@ -58,12 +58,22 @@ test("frontend job supports Flutter and Node scaffolds", async () => {
 
   assert.match(frontend, /\[\[ -f front\/pubspec\.yaml \]\]/);
   assert.match(frontend, /echo "stack=flutter"/);
-  assert.match(frontend, /subosito\/flutter-action@v2/);
+  assert.match(frontend, /subosito\/flutter-action@[a-f0-9]{40}/);
   assert.match(frontend, /flutter pub get/);
   assert.match(frontend, /flutter analyze/);
   assert.match(frontend, /flutter test/);
   assert.match(frontend, /\[\[ -f front\/package\.json \]\]/);
   assert.match(frontend, /echo "stack=node"/);
+});
+
+test("ci pins GitHub Action references to immutable commits", async () => {
+  const workflow = await readWorkflow();
+
+  assert.doesNotMatch(workflow, /uses: [^\s]+@v\d/m);
+  assert.match(workflow, /actions\/checkout@[a-f0-9]{40}/);
+  assert.match(workflow, /actions\/setup-node@[a-f0-9]{40}/);
+  assert.match(workflow, /actions\/setup-java@[a-f0-9]{40}/);
+  assert.match(workflow, /subosito\/flutter-action@[a-f0-9]{40}/);
 });
 
 test("repository contracts preserve local docs and issue template policies", async () => {

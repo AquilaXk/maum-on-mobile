@@ -22,5 +22,8 @@ const appRoutes = <AppRoute>[
 ];
 
 AppRoute getInitialRoute() {
-  return appRoutes.firstWhere((route) => route.initial);
+  return appRoutes.firstWhere(
+    (route) => route.initial,
+    orElse: () => appRoutes.first,
+  );
 }

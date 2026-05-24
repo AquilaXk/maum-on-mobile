@@ -17,11 +17,15 @@ Mobile app repository for Maum On, focused on Android and iOS clients.
 
 ## Frontend Commands
 
-Run commands from `front/`:
+Run Flutter commands from `front/`:
 
 - `flutter pub get`: install Flutter dependencies.
 - `flutter analyze`: run static analysis.
-- `flutter test`: run simulator-free widget and contract tests.
+- `flutter test`: run simulator-free widget and unit tests.
+
+Run repository contract tests from the repository root:
+
+- `node --test tools/ci/*.test.mjs`: run repository and Flutter scaffold contract tests.
 
 ## Backend Architecture
 
