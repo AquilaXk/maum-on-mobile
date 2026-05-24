@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:maum_on_mobile_front/core/network/api_error.dart';
 import 'package:maum_on_mobile_front/features/letter/application/letter_controller.dart';
@@ -73,10 +75,21 @@ void main() {
       await controller.load();
       await controller.openLetterById(3);
       await controller.acceptSelectedLetter();
+
+      expect(controller.state.selectedLetter?.status, LetterStatus.accepted);
+      expect(controller.state.noticeMessage, '편지를 수락했습니다.');
+
       controller.updateReplyContent('답장');
       await Future<void>.delayed(Duration.zero);
       await controller.submitReply();
+
+      expect(controller.state.selectedLetter?.status, LetterStatus.replied);
+      expect(controller.state.noticeMessage, '답장이 전송되었습니다.');
+
       await controller.refreshSelectedStatus();
+
+      expect(controller.state.selectedLetter?.status, LetterStatus.writing);
+
       controller.selectReportTarget();
 
       expect(repository.acceptedIds, [3]);
@@ -101,6 +114,54 @@ void main() {
       expect(repository.rejectedIds, [4]);
       expect(controller.state.mode, LetterViewMode.mailbox);
       expect(controller.state.noticeMessage, '편지를 다른 수신자에게 전달했습니다.');
+    });
+
+    test('ignores stale mailbox loads after a newer tab load completes',
+        () async {
+      final repository = _DeferredLoadRepository();
+      final controller = LetterController(letterRepository: repository);
+
+      final firstLoad = controller.load();
+      await Future<void>.delayed(Duration.zero);
+
+      final secondLoad = controller.selectTab(LetterMailboxTab.sent);
+      await Future<void>.delayed(Duration.zero);
+
+      repository.statsCompleters[1].complete(_stats());
+      await Future<void>.delayed(Duration.zero);
+      repository.sentCompleters.single.complete(
+        _page([_summary(id: 8, title: '최신 보낸 편지')]),
+      );
+      await secondLoad;
+
+      repository.statsCompleters[0].complete(_stats());
+      await Future<void>.delayed(Duration.zero);
+      repository.receivedCompleters.single.complete(
+        _page([_summary(id: 7, title: '늦은 받은 편지')]),
+      );
+      await firstLoad;
+
+      expect(controller.state.activeTab, LetterMailboxTab.sent);
+      expect(controller.state.sentLetters.single.title, '최신 보낸 편지');
+      expect(controller.state.receivedLetters, isEmpty);
+    });
+
+    test('retries writing status after a failed writing notification',
+        () async {
+      final repository = _FakeLetterRepository(
+        details: [_detail(id: 5, status: LetterStatus.accepted)],
+        markWritingErrors: [Exception('writing failed')],
+      );
+      final controller = LetterController(letterRepository: repository);
+
+      await controller.openLetterById(5);
+      controller.updateReplyContent('첫 답장');
+      await Future<void>.delayed(Duration.zero);
+      controller.updateReplyContent('두 번째 답장');
+      await Future<void>.delayed(Duration.zero);
+
+      expect(repository.writingIds, [5, 5]);
+      expect(controller.state.selectedLetter?.status, LetterStatus.writing);
     });
 
     test('invokes unauthorized callback on expired auth', () async {
@@ -179,6 +240,7 @@ class _FakeLetterRepository implements LetterRepository {
     this.sentPages = const [],
     this.details = const [],
     this.liveStatuses = const [],
+    this.markWritingErrors = const [],
     this.createdId = 1,
     this.fetchError,
   });
@@ -188,6 +250,7 @@ class _FakeLetterRepository implements LetterRepository {
   final List<LetterListPage> sentPages;
   final List<LetterDetail> details;
   final List<LetterStatus> liveStatuses;
+  final List<Object> markWritingErrors;
   final int createdId;
   final Object? fetchError;
   final List<LetterDraft> createdDrafts = [];
@@ -251,6 +314,9 @@ class _FakeLetterRepository implements LetterRepository {
   @override
   Future<void> markWriting(int id) async {
     writingIds.add(id);
+    if (markWritingErrors.isNotEmpty) {
+      throw markWritingErrors.removeAt(0);
+    }
   }
 
   @override
@@ -258,4 +324,60 @@ class _FakeLetterRepository implements LetterRepository {
     liveStatusRequests.add(id);
     return liveStatuses.isEmpty ? LetterStatus.sent : liveStatuses.removeAt(0);
   }
+}
+
+class _DeferredLoadRepository implements LetterRepository {
+  final List<Completer<LetterStats>> statsCompleters = [];
+  final List<Completer<LetterListPage>> receivedCompleters = [];
+  final List<Completer<LetterListPage>> sentCompleters = [];
+
+  @override
+  Future<int> createLetter(LetterDraft draft) async => 1;
+
+  @override
+  Future<LetterDetail> fetchLetter(int id) async {
+    return _detail(id: id, status: LetterStatus.sent);
+  }
+
+  @override
+  Future<LetterListPage> fetchReceivedLetters({
+    int page = 0,
+    int size = 20,
+  }) {
+    final completer = Completer<LetterListPage>();
+    receivedCompleters.add(completer);
+    return completer.future;
+  }
+
+  @override
+  Future<LetterListPage> fetchSentLetters({
+    int page = 0,
+    int size = 20,
+  }) {
+    final completer = Completer<LetterListPage>();
+    sentCompleters.add(completer);
+    return completer.future;
+  }
+
+  @override
+  Future<LetterStats> fetchStats() {
+    final completer = Completer<LetterStats>();
+    statsCompleters.add(completer);
+    return completer.future;
+  }
+
+  @override
+  Future<LetterStatus> fetchLiveStatus(int id) async => LetterStatus.sent;
+
+  @override
+  Future<void> acceptLetter(int id) async {}
+
+  @override
+  Future<void> markWriting(int id) async {}
+
+  @override
+  Future<void> rejectLetter(int id) async {}
+
+  @override
+  Future<void> replyLetter(int id, String replyContent) async {}
 }

@@ -7,11 +7,13 @@ class LetterScreen extends StatefulWidget {
   const LetterScreen({
     required this.controller,
     required this.onBack,
+    this.initiallyCompose = false,
     super.key,
   });
 
   final LetterController controller;
   final VoidCallback onBack;
+  final bool initiallyCompose;
 
   @override
   State<LetterScreen> createState() => _LetterScreenState();
@@ -21,13 +23,21 @@ class _LetterScreenState extends State<LetterScreen> {
   @override
   void initState() {
     super.initState();
+    if (widget.initiallyCompose) {
+      widget.controller.startCompose();
+    }
     _loadIfNeeded();
   }
 
   @override
   void didUpdateWidget(covariant LetterScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.controller != widget.controller) {
+    final shouldStartCompose =
+        !oldWidget.initiallyCompose && widget.initiallyCompose;
+    if (oldWidget.controller != widget.controller || shouldStartCompose) {
+      if (widget.initiallyCompose) {
+        widget.controller.startCompose();
+      }
       _loadIfNeeded();
     }
   }
@@ -418,7 +428,7 @@ class _LetterDetailView extends StatelessWidget {
   }
 }
 
-class _ReplyComposer extends StatelessWidget {
+class _ReplyComposer extends StatefulWidget {
   const _ReplyComposer({
     required this.state,
     required this.controller,
@@ -428,9 +438,34 @@ class _ReplyComposer extends StatelessWidget {
   final LetterController controller;
 
   @override
+  State<_ReplyComposer> createState() => _ReplyComposerState();
+}
+
+class _ReplyComposerState extends State<_ReplyComposer> {
+  late final TextEditingController _replyController;
+
+  @override
+  void initState() {
+    super.initState();
+    _replyController = TextEditingController(text: widget.state.replyContent);
+  }
+
+  @override
+  void didUpdateWidget(covariant _ReplyComposer oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    _syncText(_replyController, widget.state.replyContent);
+  }
+
+  @override
+  void dispose() {
+    _replyController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Card(
-      key: ValueKey('letter-reply-${state.selectedLetter?.id ?? 0}'),
+      key: ValueKey('letter-reply-${widget.state.selectedLetter?.id ?? 0}'),
       margin: EdgeInsets.zero,
       child: Padding(
         padding: const EdgeInsets.all(14),
@@ -439,19 +474,21 @@ class _ReplyComposer extends StatelessWidget {
           children: [
             TextFormField(
               key: const ValueKey('letter-reply-field'),
-              initialValue: state.replyContent,
+              controller: _replyController,
               minLines: 4,
               maxLines: 8,
               decoration: const InputDecoration(
                 labelText: '답장',
                 border: OutlineInputBorder(),
               ),
-              onChanged: controller.updateReplyContent,
+              onChanged: widget.controller.updateReplyContent,
             ),
             const SizedBox(height: 10),
             FilledButton(
               key: const ValueKey('letter-reply-submit-button'),
-              onPressed: state.canSubmitReply ? controller.submitReply : null,
+              onPressed: widget.state.canSubmitReply
+                  ? widget.controller.submitReply
+                  : null,
               child: const Text('답장 보내기'),
             ),
           ],
@@ -461,7 +498,7 @@ class _ReplyComposer extends StatelessWidget {
   }
 }
 
-class _LetterComposeView extends StatelessWidget {
+class _LetterComposeView extends StatefulWidget {
   const _LetterComposeView({
     required this.state,
     required this.controller,
@@ -469,6 +506,35 @@ class _LetterComposeView extends StatelessWidget {
 
   final LetterState state;
   final LetterController controller;
+
+  @override
+  State<_LetterComposeView> createState() => _LetterComposeViewState();
+}
+
+class _LetterComposeViewState extends State<_LetterComposeView> {
+  late final TextEditingController _titleController;
+  late final TextEditingController _contentController;
+
+  @override
+  void initState() {
+    super.initState();
+    _titleController = TextEditingController(text: widget.state.title);
+    _contentController = TextEditingController(text: widget.state.content);
+  }
+
+  @override
+  void didUpdateWidget(covariant _LetterComposeView oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    _syncText(_titleController, widget.state.title);
+    _syncText(_contentController, widget.state.content);
+  }
+
+  @override
+  void dispose() {
+    _titleController.dispose();
+    _contentController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -487,24 +553,24 @@ class _LetterComposeView extends StatelessWidget {
             const SizedBox(height: 14),
             TextFormField(
               key: const ValueKey('letter-title-field'),
-              initialValue: state.title,
+              controller: _titleController,
               decoration: const InputDecoration(
                 labelText: '제목',
                 border: OutlineInputBorder(),
               ),
-              onChanged: controller.updateTitle,
+              onChanged: widget.controller.updateTitle,
             ),
             const SizedBox(height: 12),
             TextFormField(
               key: const ValueKey('letter-content-field'),
-              initialValue: state.content,
+              controller: _contentController,
               minLines: 8,
               maxLines: 14,
               decoration: const InputDecoration(
                 labelText: '본문',
                 border: OutlineInputBorder(),
               ),
-              onChanged: controller.updateContent,
+              onChanged: widget.controller.updateContent,
             ),
             const SizedBox(height: 16),
             Wrap(
@@ -513,13 +579,14 @@ class _LetterComposeView extends StatelessWidget {
               children: [
                 FilledButton(
                   key: const ValueKey('letter-submit-button'),
-                  onPressed:
-                      state.canSubmitLetter ? controller.submitLetter : null,
+                  onPressed: widget.state.canSubmitLetter
+                      ? widget.controller.submitLetter
+                      : null,
                   child: const Text('보내기'),
                 ),
                 OutlinedButton(
                   key: const ValueKey('letter-compose-cancel-button'),
-                  onPressed: controller.cancelCompose,
+                  onPressed: widget.controller.cancelCompose,
                   child: const Text('취소'),
                 ),
               ],
@@ -529,6 +596,17 @@ class _LetterComposeView extends StatelessWidget {
       ),
     );
   }
+}
+
+void _syncText(TextEditingController controller, String nextText) {
+  if (controller.text == nextText) {
+    return;
+  }
+
+  controller.value = TextEditingValue(
+    text: nextText,
+    selection: TextSelection.collapsed(offset: nextText.length),
+  );
 }
 
 class _StatusPill extends StatelessWidget {

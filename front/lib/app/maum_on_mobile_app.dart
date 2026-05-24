@@ -158,13 +158,12 @@ class _MaumOnMobileAppState extends State<MaumOnMobileApp> {
 
           if (_destination == _AuthenticatedDestination.letter) {
             final letterController = _letterControllerFor(state.member!.id);
-            if (_openLetterComposer) {
-              _openLetterComposer = false;
-              Future<void>.microtask(letterController.startCompose);
-            }
+            final startsInCompose = _openLetterComposer;
+            _openLetterComposer = false;
 
             return LetterScreen(
               controller: letterController,
+              initiallyCompose: startsInCompose,
               onBack: () {
                 setState(() {
                   _destination = _AuthenticatedDestination.home;

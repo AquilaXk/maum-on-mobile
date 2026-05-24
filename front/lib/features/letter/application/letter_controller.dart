@@ -49,7 +49,7 @@ class LetterState {
       title.trim().isNotEmpty && content.trim().isNotEmpty && !isSubmitting;
 
   bool get canSubmitReply =>
-      replyContent.trim().isNotEmpty && !isSubmitting && selectedLetter != null;
+      canReply && replyContent.trim().isNotEmpty && !isSubmitting;
 
   bool get canReply {
     final letter = selectedLetter;
@@ -138,10 +138,14 @@ class LetterController extends ChangeNotifier {
   LetterState _state = const LetterState();
   bool _isDisposed = false;
   int? _writingNotifiedLetterId;
+  int _loadRequestId = 0;
 
   LetterState get state => _state;
 
   Future<void> load() async {
+    final requestId = ++_loadRequestId;
+    final tab = _state.activeTab;
+
     _setState(
       _state.copyWith(
         isLoading: true,
@@ -152,9 +156,17 @@ class LetterController extends ChangeNotifier {
 
     try {
       final stats = await _letterRepository.fetchStats();
-      final page = await _fetchPage(_state.activeTab);
-      _setMailboxPage(_state.activeTab, page, stats);
+      final page = await _fetchPage(tab);
+      if (requestId != _loadRequestId) {
+        return;
+      }
+
+      _setMailboxPage(tab, page, stats);
     } on Object catch (error) {
+      if (requestId != _loadRequestId) {
+        return;
+      }
+
       _handleError(error);
       _setState(_state.copyWith(isLoading: false, hasLoaded: true));
     }
@@ -359,6 +371,9 @@ class LetterController extends ChangeNotifier {
           );
         }
       } on Object catch (error) {
+        if (_writingNotifiedLetterId == letter.id) {
+          _writingNotifiedLetterId = null;
+        }
         _handleError(error);
       }
     });

@@ -132,6 +132,11 @@ class ApiLetterRepository implements LetterRepository {
       return json.toInt();
     }
 
-    return int.tryParse(json?.toString() ?? '') ?? 0;
+    final createdId = int.tryParse(json?.toString() ?? '');
+    if (createdId == null) {
+      throw const FormatException('Expected created letter id.');
+    }
+
+    return createdId;
   }
 }

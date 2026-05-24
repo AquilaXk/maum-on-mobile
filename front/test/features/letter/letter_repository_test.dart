@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:maum_on_mobile_front/core/network/api_client.dart';
+import 'package:maum_on_mobile_front/core/network/api_error.dart';
 import 'package:maum_on_mobile_front/core/network/api_transport.dart';
 import 'package:maum_on_mobile_front/core/network/auth_token_store.dart';
 import 'package:maum_on_mobile_front/features/letter/data/letter_repository.dart';
@@ -100,6 +101,26 @@ void main() {
       expect(transport.requests[3].path, '/api/v1/letters/10/reject');
       expect(transport.requests[4].path, '/api/v1/letters/10/writing');
       expect(transport.requests[5].requiresAuth, isFalse);
+    });
+
+    test('fails when the create response omits a valid id', () async {
+      final transport = _FakeApiTransport([
+        ApiTransportResponse.ok({'resultCode': '200-1', 'data': 'invalid'}),
+      ]);
+      final repository = _repository(transport);
+
+      expect(
+        () => repository.createLetter(
+          const LetterDraft(title: '제목', content: '본문'),
+        ),
+        throwsA(
+          isA<ApiClientException>().having(
+            (error) => error.kind,
+            'kind',
+            ApiErrorKind.unknown,
+          ),
+        ),
+      );
     });
   });
 }

@@ -70,6 +70,29 @@ void main() {
     expect(find.text('보낸 편지함'), findsOneWidget);
   });
 
+  testWidgets('opens compose mode immediately when requested', (tester) async {
+    final controller = LetterController(
+      letterRepository: _FakeLetterRepository(
+        statsQueue: [_stats()],
+        receivedPages: [_page([])],
+      ),
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: LetterScreen(
+          controller: controller,
+          initiallyCompose: true,
+          onBack: () {},
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const ValueKey('letter-title-field')), findsOneWidget);
+    expect(find.byKey(const ValueKey('letter-content-field')), findsOneWidget);
+  });
+
   testWidgets('accepts a letter, writes a reply, and selects report target',
       (tester) async {
     LetterReportTarget? reportTarget;
@@ -145,6 +168,9 @@ void main() {
     await tester.pumpWidget(
       MaterialApp(home: LetterScreen(controller: controller, onBack: () {})),
     );
+    await tester.pumpAndSettle();
+
+    await tester.drag(find.byType(Scrollable).first, const Offset(0, -420));
     await tester.pumpAndSettle();
 
     expect(find.text('편지'), findsWidgets);
