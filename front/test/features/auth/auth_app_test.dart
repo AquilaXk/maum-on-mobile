@@ -158,6 +158,8 @@ void main() {
     );
 
     await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('알림/신고'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('알림/신고'));
     await tester.pump();
     notificationRepository.emit(

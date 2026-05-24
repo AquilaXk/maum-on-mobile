@@ -52,7 +52,10 @@ void main() {
       find.byKey(const ValueKey('report-content-field')),
       '반복 광고입니다.',
     );
-    await tester.tap(find.byKey(const ValueKey('report-submit-button')));
+    final submitButton = find.byKey(const ValueKey('report-submit-button'));
+    await tester.ensureVisible(submitButton);
+    await tester.pumpAndSettle();
+    await tester.tap(submitButton);
     await tester.pump();
 
     expect(reportRepository.drafts, hasLength(1));

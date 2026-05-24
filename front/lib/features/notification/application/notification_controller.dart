@@ -151,11 +151,9 @@ class NotificationController extends ChangeNotifier {
 
   void close() {
     _shouldRestoreConnection = false;
-    unawaited(
-      _cancelStreamForLifecycle(
-        connectionState: NotificationConnectionState.idle,
-        clearErrorMessage: true,
-      ),
+    _cancelStreamForLifecycle(
+      connectionState: NotificationConnectionState.idle,
+      clearErrorMessage: true,
     );
   }
 
@@ -174,11 +172,9 @@ class NotificationController extends ChangeNotifier {
         lifecycleState == AppLifecycleState.detached) {
       if (_streamSubscription != null || _isConnecting) {
         _shouldRestoreConnection = true;
-        unawaited(
-          _cancelStreamForLifecycle(
-            connectionState: NotificationConnectionState.idle,
-            clearErrorMessage: true,
-          ),
+        _cancelStreamForLifecycle(
+          connectionState: NotificationConnectionState.idle,
+          clearErrorMessage: true,
         );
       }
     }
@@ -266,11 +262,16 @@ class NotificationController extends ChangeNotifier {
     }
   }
 
-  Future<void> _cancelStreamForLifecycle({
+  void _cancelStreamForLifecycle({
     required NotificationConnectionState connectionState,
     required bool clearErrorMessage,
-  }) async {
-    await _cancelStream();
+  }) {
+    final subscription = _streamSubscription;
+    _streamSubscription = null;
+    _isConnecting = false;
+    if (subscription != null) {
+      unawaited(subscription.cancel());
+    }
     _setState(
       _state.copyWith(
         connectionState: connectionState,
