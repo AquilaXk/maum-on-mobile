@@ -10,6 +10,7 @@ import org.springframework.context.annotation.Profile
 import org.springframework.jdbc.core.RowMapper
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate
 import org.springframework.stereotype.Repository
+import org.springframework.transaction.annotation.Transactional
 import java.time.Instant
 
 @Repository
@@ -18,6 +19,7 @@ class JdbcDiaryRepository(
     private val jdbc: NamedParameterJdbcTemplate,
 ) : DiaryRepository {
 
+    @Transactional
     override fun save(memberId: Long, nickname: String, draft: DiaryDraft): Diary {
         val now = Instant.now().toString()
         val id = jdbc.insertAndReturnId(

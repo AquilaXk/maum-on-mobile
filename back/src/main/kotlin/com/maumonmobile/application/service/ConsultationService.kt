@@ -26,11 +26,12 @@ class ConsultationService(
 
     override fun chat(user: AuthenticatedUser, command: ConsultationChatCommand): ConsultationChatResult {
         val member = findActiveMember(user)
-        val reply = ConsultationReply.forMessage(command.message)
+        val normalizedMessage = command.message.trim()
+        val reply = ConsultationReply.forMessage(normalizedMessage)
         consultationRepository.appendMessage(
             memberId = member.id,
             sender = ConsultationMessageSender.USER,
-            content = command.message.trim(),
+            content = normalizedMessage,
         )
         consultationRepository.appendMessage(
             memberId = member.id,
