@@ -258,7 +258,7 @@ class NotificationController extends ChangeNotifier {
 
       _streamSubscription = _repository.connect(ticket.ticket).listen(
             _handleStreamEvent,
-            onError: _handleStreamError,
+            onError: (Object error) => _handleStreamError(error),
             onDone: _handleStreamDone,
           );
     } on Object catch (error) {

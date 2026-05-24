@@ -15,9 +15,11 @@ import UserNotifications
 
   func didInitializeImplicitFlutterEngine(_ engineBridge: FlutterImplicitEngineBridge) {
     GeneratedPluginRegistrant.register(with: engineBridge.pluginRegistry)
-    let registrar = engineBridge.pluginRegistry.registrar(
+    guard let registrar = engineBridge.pluginRegistry.registrar(
       forPlugin: "PushNotificationPermissionChannel"
-    )
+    ) else {
+      return
+    }
     pushNotificationChannel = FlutterMethodChannel(
       name: "maum_on_mobile/push_notifications",
       binaryMessenger: registrar.messenger()
