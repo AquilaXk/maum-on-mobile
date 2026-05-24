@@ -264,7 +264,7 @@ class AppSectionCard extends StatelessWidget {
     required this.child,
     this.title,
     this.subtitle,
-    this.padding = const EdgeInsets.all(AppSpacing.lg),
+    this.padding = const EdgeInsets.all(AppSpacing.md),
     super.key,
   });
 
@@ -285,12 +285,12 @@ class AppSectionCard extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             if (title != null) ...[
-              Text(title!, style: theme.textTheme.titleLarge),
+              Text(title!, style: theme.textTheme.titleMedium),
               if (subtitle != null) ...[
                 const SizedBox(height: AppSpacing.xxs),
                 Text(subtitle!, style: theme.textTheme.bodyMedium),
               ],
-              const SizedBox(height: AppSpacing.md),
+              const SizedBox(height: AppSpacing.sm),
             ],
             child,
           ],
