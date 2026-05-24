@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../shared/ui/app_design_system.dart';
 import '../application/letter_controller.dart';
 import '../domain/letter_models.dart';
 
@@ -55,90 +56,47 @@ class _LetterScreenState extends State<LetterScreen> {
       builder: (context, _) {
         final state = widget.controller.state;
 
-        return Scaffold(
-          body: SafeArea(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(20),
-              child: Center(
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 560),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      _LetterHeader(
-                        onBack: widget.onBack,
-                        onCompose: widget.controller.startCompose,
-                      ),
-                      const SizedBox(height: 16),
-                      if (state.errorMessage != null) ...[
-                        _InlineNotice(message: state.errorMessage!),
-                        const SizedBox(height: 12),
-                      ],
-                      if (state.noticeMessage != null) ...[
-                        _InlineNotice(message: state.noticeMessage!),
-                        const SizedBox(height: 12),
-                      ],
-                      switch (state.mode) {
-                        LetterViewMode.mailbox => _MailboxView(
-                            state: state,
-                            controller: widget.controller,
-                          ),
-                        LetterViewMode.detail => _LetterDetailView(
-                            state: state,
-                            controller: widget.controller,
-                          ),
-                        LetterViewMode.compose => _LetterComposeView(
-                            state: state,
-                            controller: widget.controller,
-                          ),
-                      },
-                    ],
-                  ),
-                ),
-              ),
+        return AppScreen(
+          title: '편지함',
+          subtitle: '받은 편지와 보낸 마음을 확인합니다.',
+          onBack: widget.onBack,
+          actions: [
+            FilledButton.icon(
+              key: const ValueKey('letter-compose-button'),
+              onPressed: widget.controller.startCompose,
+              icon: const Icon(Icons.edit_outlined),
+              label: const Text('새 편지'),
             ),
-          ),
+          ],
+          children: [
+            if (state.errorMessage != null) ...[
+              AppNotice(
+                message: state.errorMessage!,
+                tone: AppNoticeTone.error,
+              ),
+              const SizedBox(height: AppSpacing.md),
+            ],
+            if (state.noticeMessage != null) ...[
+              AppNotice(message: state.noticeMessage!),
+              const SizedBox(height: AppSpacing.md),
+            ],
+            switch (state.mode) {
+              LetterViewMode.mailbox => _MailboxView(
+                  state: state,
+                  controller: widget.controller,
+                ),
+              LetterViewMode.detail => _LetterDetailView(
+                  state: state,
+                  controller: widget.controller,
+                ),
+              LetterViewMode.compose => _LetterComposeView(
+                  state: state,
+                  controller: widget.controller,
+                ),
+            },
+          ],
         );
       },
-    );
-  }
-}
-
-class _LetterHeader extends StatelessWidget {
-  const _LetterHeader({
-    required this.onBack,
-    required this.onCompose,
-  });
-
-  final VoidCallback onBack;
-  final VoidCallback onCompose;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        IconButton(
-          key: const ValueKey('letter-home-back-button'),
-          tooltip: '홈으로',
-          onPressed: onBack,
-          icon: const Icon(Icons.arrow_back),
-        ),
-        const SizedBox(width: 8),
-        Expanded(
-          child: Text(
-            '편지함',
-            style: Theme.of(context).textTheme.headlineSmall,
-          ),
-        ),
-        SizedBox(
-          width: 104,
-          child: FilledButton(
-            key: const ValueKey('letter-compose-button'),
-            onPressed: onCompose,
-            child: const Text('새 편지'),
-          ),
-        ),
-      ],
     );
   }
 }
@@ -158,10 +116,10 @@ class _MailboxView extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         _StatsSection(stats: state.stats),
-        const SizedBox(height: 14),
+        const SizedBox(height: AppSpacing.md),
         Wrap(
-          spacing: 8,
-          runSpacing: 8,
+          spacing: AppSpacing.xs,
+          runSpacing: AppSpacing.xs,
           children: [
             for (final tab in LetterMailboxTab.values)
               ChoiceChip(
@@ -172,18 +130,18 @@ class _MailboxView extends StatelessWidget {
               ),
           ],
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: AppSpacing.lg),
         if (state.isLoading)
-          const _InlineNotice(message: '편지를 불러오는 중입니다.')
+          const AppNotice(message: '편지를 불러오는 중입니다.')
         else if (state.isEmpty)
-          const _InlineNotice(message: '아직 편지가 없습니다.')
+          const AppNotice(message: '아직 편지가 없습니다.')
         else
           for (final letter in state.visibleLetters) ...[
             _LetterCard(
               letter: letter,
               onTap: () => controller.openLetter(letter),
             ),
-            const SizedBox(height: 10),
+            const SizedBox(height: AppSpacing.sm),
           ],
       ],
     );
@@ -201,63 +159,21 @@ class _StatsSection extends StatelessWidget {
     final latestSent = stats?.latestSentLetter?.title ?? '-';
 
     return Wrap(
-      spacing: 8,
-      runSpacing: 8,
+      spacing: AppSpacing.xs,
+      runSpacing: AppSpacing.xs,
       children: [
-        _StatTile(
+        AppMetricTile(
           label: '받은 편지',
           value: (stats?.receivedCount ?? 0).toString(),
+          tone: AppStatusTone.success,
         ),
-        _StatTile(label: '최근 받은 편지', value: latestReceived),
-        _StatTile(label: '최근 보낸 편지', value: latestSent),
+        AppMetricTile(label: '최근 받은 편지', value: latestReceived),
+        AppMetricTile(
+          label: '최근 보낸 편지',
+          value: latestSent,
+          tone: AppStatusTone.warning,
+        ),
       ],
-    );
-  }
-}
-
-class _StatTile extends StatelessWidget {
-  const _StatTile({
-    required this.label,
-    required this.value,
-  });
-
-  final String label;
-  final String value;
-
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-
-    return SizedBox(
-      width: 176,
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          color: colorScheme.secondaryContainer,
-          borderRadius: BorderRadius.circular(8),
-        ),
-        child: Padding(
-          padding: const EdgeInsets.all(14),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                label,
-                style: TextStyle(
-                  color: colorScheme.onSecondaryContainer,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                value,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: Theme.of(context).textTheme.titleMedium,
-              ),
-            ],
-          ),
-        ),
-      ),
     );
   }
 }
@@ -287,20 +203,20 @@ class _LetterCard extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               _StatusPill(status: letter.status),
-              const SizedBox(height: 8),
+              const SizedBox(height: AppSpacing.xs),
               Text(
                 letter.title.isEmpty ? '제목 없는 편지' : letter.title,
                 style: theme.textTheme.titleMedium,
               ),
               if (letter.content.isNotEmpty) ...[
-                const SizedBox(height: 6),
+                const SizedBox(height: AppSpacing.xs),
                 Text(
                   letter.content,
                   maxLines: 3,
                   overflow: TextOverflow.ellipsis,
                 ),
               ],
-              const SizedBox(height: 10),
+              const SizedBox(height: AppSpacing.sm),
               Text(
                 letter.createdDate,
                 style: theme.textTheme.bodySmall,
@@ -327,11 +243,11 @@ class _LetterDetailView extends StatelessWidget {
     final letter = state.selectedLetter;
 
     if (state.isLoading) {
-      return const _InlineNotice(message: '편지를 불러오는 중입니다.');
+      return const AppNotice(message: '편지를 불러오는 중입니다.');
     }
 
     if (letter == null) {
-      return const _InlineNotice(message: '편지를 선택해 주세요.');
+      return const AppNotice(message: '편지를 선택해 주세요.');
     }
 
     return Column(
@@ -354,22 +270,22 @@ class _LetterDetailView extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 _StatusPill(status: letter.status),
-                const SizedBox(height: 12),
+                const SizedBox(height: AppSpacing.md),
                 Text(
                   letter.title,
                   style: Theme.of(context).textTheme.headlineSmall,
                 ),
-                const SizedBox(height: 8),
+                const SizedBox(height: AppSpacing.xs),
                 Text(
                   letter.createdDate,
                   style: Theme.of(context).textTheme.bodySmall,
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: AppSpacing.lg),
                 Text(letter.content),
-                const SizedBox(height: 16),
+                const SizedBox(height: AppSpacing.lg),
                 Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
+                  spacing: AppSpacing.xs,
+                  runSpacing: AppSpacing.xs,
                   children: [
                     OutlinedButton(
                       key: const ValueKey('letter-report-button'),
@@ -400,7 +316,7 @@ class _LetterDetailView extends StatelessWidget {
           ),
         ),
         if (letter.replied && letter.replyContent != null) ...[
-          const SizedBox(height: 14),
+          const SizedBox(height: AppSpacing.md),
           Card(
             margin: EdgeInsets.zero,
             child: Padding(
@@ -412,7 +328,7 @@ class _LetterDetailView extends StatelessWidget {
                     '답장',
                     style: Theme.of(context).textTheme.titleMedium,
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: AppSpacing.xs),
                   Text(letter.replyContent!),
                 ],
               ),
@@ -420,7 +336,7 @@ class _LetterDetailView extends StatelessWidget {
           ),
         ],
         if (state.canReply) ...[
-          const SizedBox(height: 14),
+          const SizedBox(height: AppSpacing.md),
           _ReplyComposer(state: state, controller: controller),
         ],
       ],
@@ -483,7 +399,7 @@ class _ReplyComposerState extends State<_ReplyComposer> {
               ),
               onChanged: widget.controller.updateReplyContent,
             ),
-            const SizedBox(height: 10),
+            const SizedBox(height: AppSpacing.sm),
             FilledButton(
               key: const ValueKey('letter-reply-submit-button'),
               onPressed: widget.state.canSubmitReply
@@ -550,7 +466,7 @@ class _LetterComposeViewState extends State<_LetterComposeView> {
               '편지 쓰기',
               style: Theme.of(context).textTheme.titleLarge,
             ),
-            const SizedBox(height: 14),
+            const SizedBox(height: AppSpacing.md),
             TextFormField(
               key: const ValueKey('letter-title-field'),
               controller: _titleController,
@@ -560,7 +476,7 @@ class _LetterComposeViewState extends State<_LetterComposeView> {
               ),
               onChanged: widget.controller.updateTitle,
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: AppSpacing.md),
             TextFormField(
               key: const ValueKey('letter-content-field'),
               controller: _contentController,
@@ -572,10 +488,10 @@ class _LetterComposeViewState extends State<_LetterComposeView> {
               ),
               onChanged: widget.controller.updateContent,
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: AppSpacing.lg),
             Wrap(
-              spacing: 8,
-              runSpacing: 8,
+              spacing: AppSpacing.xs,
+              runSpacing: AppSpacing.xs,
               children: [
                 FilledButton(
                   key: const ValueKey('letter-submit-button'),
@@ -616,45 +532,6 @@ class _StatusPill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: colorScheme.primaryContainer,
-        borderRadius: BorderRadius.circular(6),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-        child: Text(
-          status.label,
-          style: TextStyle(
-            color: colorScheme.onPrimaryContainer,
-            fontWeight: FontWeight.w700,
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _InlineNotice extends StatelessWidget {
-  const _InlineNotice({required this.message});
-
-  final String message;
-
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: colorScheme.surfaceContainerHighest,
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(14),
-        child: Text(message),
-      ),
-    );
+    return AppStatusPill(label: status.label, tone: AppStatusTone.success);
   }
 }

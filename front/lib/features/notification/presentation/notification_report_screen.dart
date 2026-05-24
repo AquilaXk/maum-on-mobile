@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../../report/application/report_controller.dart';
 import '../../report/domain/report_models.dart';
+import '../../../shared/ui/app_design_system.dart';
 import '../application/notification_controller.dart';
 import '../domain/notification_models.dart';
 
@@ -224,29 +225,17 @@ class _Header extends StatelessWidget {
         : '$statusText · 읽지 않음 $unreadCount · $lastReceivedAt';
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
-      child: Row(
-        children: [
-          IconButton(
-            key: const ValueKey('notification-back-button'),
-            tooltip: '홈으로',
-            onPressed: onBack,
-            icon: const Icon(Icons.arrow_back),
-          ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  '알림/신고',
-                  style: Theme.of(context).textTheme.titleLarge,
-                ),
-                const SizedBox(height: 2),
-                Text(summary),
-              ],
-            ),
-          ),
+      padding: const EdgeInsets.fromLTRB(
+        AppSpacing.md,
+        AppSpacing.xs,
+        AppSpacing.md,
+        AppSpacing.xs,
+      ),
+      child: AppScreenHeader(
+        title: '알림/신고',
+        subtitle: summary,
+        onBack: onBack,
+        actions: [
           if (unreadCount > 0)
             IconButton(
               key: const ValueKey('notification-mark-all-read-button'),
@@ -296,15 +285,15 @@ class _NotificationCenter extends StatelessWidget {
       onRefresh: () => onRefresh(silent: false),
       child: ListView(
         key: const ValueKey('notification-list'),
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(AppSpacing.lg),
         children: [
           if (state.errorMessage != null) ...[
             _InlineNotice(message: state.errorMessage!, isError: true),
-            const SizedBox(height: 12),
+            const SizedBox(height: AppSpacing.md),
           ],
           if (state.noticeMessage != null) ...[
             _InlineNotice(message: state.noticeMessage!),
-            const SizedBox(height: 12),
+            const SizedBox(height: AppSpacing.md),
           ],
           if (state.isEmpty)
             const _InlineNotice(message: '아직 도착한 알림이 없습니다.'),
@@ -313,7 +302,7 @@ class _NotificationCenter extends StatelessWidget {
               notification: notification,
               onMarkRead: onMarkRead,
             ),
-            const SizedBox(height: 10),
+            const SizedBox(height: AppSpacing.sm),
           ],
         ],
       ),
@@ -338,12 +327,12 @@ class _NotificationTile extends StatelessWidget {
       color: notification.isRead
           ? colorScheme.surfaceContainerHighest
           : colorScheme.primaryContainer,
-      borderRadius: BorderRadius.circular(8),
+      borderRadius: AppRadii.card,
       child: InkWell(
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: AppRadii.card,
         onTap: notification.isRead ? null : () => onMarkRead(notification),
         child: Padding(
-          padding: const EdgeInsets.all(14),
+          padding: const EdgeInsets.all(AppSpacing.md),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -352,7 +341,7 @@ class _NotificationTile extends StatelessWidget {
                     ? Icons.notifications_none
                     : Icons.notifications_active_outlined,
               ),
-              const SizedBox(width: 10),
+              const SizedBox(width: AppSpacing.sm),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -362,7 +351,7 @@ class _NotificationTile extends StatelessWidget {
                       style: const TextStyle(fontWeight: FontWeight.w700),
                     ),
                     if (notification.createdAt.isNotEmpty) ...[
-                      const SizedBox(height: 4),
+                      const SizedBox(height: AppSpacing.xxs),
                       Text(
                         notification.createdAt,
                         style: Theme.of(context).textTheme.bodySmall,
@@ -408,13 +397,13 @@ class _ReportForm extends StatelessWidget {
 
     return ListView(
       key: const ValueKey('report-form'),
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(AppSpacing.lg),
       children: [
         Text(
           '신고 대상',
           style: Theme.of(context).textTheme.titleMedium,
         ),
-        const SizedBox(height: 10),
+        const SizedBox(height: AppSpacing.sm),
         Row(
           children: [
             SizedBox(
@@ -438,7 +427,7 @@ class _ReportForm extends StatelessWidget {
                 onChanged: state.isSubmitted ? null : onTargetTypeChanged,
               ),
             ),
-            const SizedBox(width: 10),
+            const SizedBox(width: AppSpacing.sm),
             Expanded(
               child: TextField(
                 key: const ValueKey('report-target-id-field'),
@@ -455,21 +444,21 @@ class _ReportForm extends StatelessWidget {
           ],
         ),
         if (state.target != null) ...[
-          const SizedBox(height: 8),
+          const SizedBox(height: AppSpacing.xs),
           _InlineNotice(
             message:
                 '${state.target!.type.label} #${state.target!.id} · ${state.target!.label}',
           ),
         ],
-        const SizedBox(height: 20),
+        const SizedBox(height: AppSpacing.xl),
         Text(
           '신고 사유',
           style: Theme.of(context).textTheme.titleMedium,
         ),
-        const SizedBox(height: 10),
+        const SizedBox(height: AppSpacing.sm),
         Wrap(
-          spacing: 8,
-          runSpacing: 8,
+          spacing: AppSpacing.xs,
+          runSpacing: AppSpacing.xs,
           children: [
             for (final reason in ReportReasonCode.values)
               ChoiceChip(
@@ -481,9 +470,9 @@ class _ReportForm extends StatelessWidget {
               ),
           ],
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: AppSpacing.md),
         _InlineNotice(message: state.reason.hint),
-        const SizedBox(height: 12),
+        const SizedBox(height: AppSpacing.md),
         TextField(
           key: const ValueKey('report-content-field'),
           controller: contentController,
@@ -501,18 +490,18 @@ class _ReportForm extends StatelessWidget {
           onChanged: onContentChanged,
         ),
         if (validationMessage != null) ...[
-          const SizedBox(height: 8),
+          const SizedBox(height: AppSpacing.xs),
           _InlineNotice(message: validationMessage, isError: true),
         ],
         if (state.errorMessage != null) ...[
-          const SizedBox(height: 8),
+          const SizedBox(height: AppSpacing.xs),
           _InlineNotice(message: state.errorMessage!, isError: true),
         ],
         if (state.noticeMessage != null) ...[
-          const SizedBox(height: 8),
+          const SizedBox(height: AppSpacing.xs),
           _InlineNotice(message: state.noticeMessage!),
         ],
-        const SizedBox(height: 12),
+        const SizedBox(height: AppSpacing.md),
         FilledButton.icon(
           key: const ValueKey('report-submit-button'),
           onPressed: state.canSubmit ? () => onSubmit() : null,
@@ -543,24 +532,9 @@ class _InlineNotice extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: isError
-            ? colorScheme.errorContainer
-            : colorScheme.surfaceContainerHighest,
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Text(
-          message,
-          style: TextStyle(
-            color: isError ? colorScheme.onErrorContainer : null,
-          ),
-        ),
-      ),
+    return AppNotice(
+      message: message,
+      tone: isError ? AppNoticeTone.error : AppNoticeTone.neutral,
     );
   }
 }

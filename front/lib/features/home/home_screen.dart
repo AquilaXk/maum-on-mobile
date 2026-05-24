@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../app/supported_platforms.dart';
+import '../../shared/ui/app_design_system.dart';
 import 'application/home_controller.dart';
 import 'domain/home_models.dart';
 
@@ -62,86 +63,37 @@ class _HomeScreenState extends State<HomeScreen> {
       builder: (context, _) {
         final state = widget.homeController.state;
 
-        return Scaffold(
-          body: SafeArea(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(20),
-              child: Center(
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 520),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      _HomeHeader(
-                        routeTitle: widget.routeTitle,
-                        nickname: widget.nickname,
-                      ),
-                      const SizedBox(height: 20),
-                      _StatsSection(state: state),
-                      const SizedBox(height: 16),
-                      const _HealingQuote(),
-                      const SizedBox(height: 16),
-                      _ActionGrid(
-                        onWriteDiary: widget.onWriteDiary,
-                        onWriteLetter: widget.onWriteLetter,
-                        onViewStory: widget.onViewStory,
-                        onOpenConsultation: widget.onOpenConsultation,
-                        onOpenNotifications: widget.onOpenNotifications,
-                        onOpenSettings: widget.onOpenSettings,
-                        onLogout: widget.onLogout,
-                      ),
-                      const SizedBox(height: 20),
-                      _CategoryFilter(
-                        selectedCategory: state.selectedCategory,
-                        onSelected: widget.homeController.selectCategory,
-                      ),
-                      const SizedBox(height: 12),
-                      _FeedSection(state: state),
-                      const SizedBox(height: 20),
-                      const _PlatformRow(),
-                    ],
-                  ),
-                ),
-              ),
+        return AppScreen(
+          eyebrow: widget.routeTitle,
+          title: 'Maum On',
+          subtitle: '${widget.nickname}님, 오늘의 마음을 이어가세요.',
+          maxWidth: AppBreakpoints.compactContentMaxWidth,
+          children: [
+            _StatsSection(state: state),
+            const SizedBox(height: AppSpacing.lg),
+            const _HealingQuote(),
+            const SizedBox(height: AppSpacing.lg),
+            _ActionGrid(
+              onWriteDiary: widget.onWriteDiary,
+              onWriteLetter: widget.onWriteLetter,
+              onViewStory: widget.onViewStory,
+              onOpenConsultation: widget.onOpenConsultation,
+              onOpenNotifications: widget.onOpenNotifications,
+              onOpenSettings: widget.onOpenSettings,
+              onLogout: widget.onLogout,
             ),
-          ),
+            const SizedBox(height: AppSpacing.xl),
+            _CategoryFilter(
+              selectedCategory: state.selectedCategory,
+              onSelected: widget.homeController.selectCategory,
+            ),
+            const SizedBox(height: AppSpacing.md),
+            _FeedSection(state: state),
+            const SizedBox(height: AppSpacing.xl),
+            const _PlatformRow(),
+          ],
         );
       },
-    );
-  }
-}
-
-class _HomeHeader extends StatelessWidget {
-  const _HomeHeader({
-    required this.routeTitle,
-    required this.nickname,
-  });
-
-  final String routeTitle;
-  final String nickname;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          routeTitle,
-          style: theme.textTheme.labelLarge,
-        ),
-        const SizedBox(height: 8),
-        Text(
-          'Maum On',
-          style: theme.textTheme.displaySmall,
-        ),
-        const SizedBox(height: 8),
-        Text(
-          '$nickname님, 오늘의 마음을 이어가세요.',
-          style: theme.textTheme.bodyLarge,
-        ),
-      ],
     );
   }
 }
@@ -159,33 +111,35 @@ class _StatsSection extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         if (state.statsErrorMessage != null) ...[
-          _InlineNotice(message: state.statsErrorMessage!),
-          const SizedBox(height: 8),
+          AppNotice(message: state.statsErrorMessage!, tone: AppNoticeTone.error),
+          const SizedBox(height: AppSpacing.xs),
         ],
         Wrap(
-          spacing: 8,
-          runSpacing: 8,
+          spacing: AppSpacing.xs,
+          runSpacing: AppSpacing.xs,
           children: [
-            _StatTile(
+            AppMetricTile(
               label: '오늘 올라온 고민',
               value: _formatStatValue(
                 stats?.todayWorryCount,
                 state.isStatsLoading,
               ),
+              tone: AppStatusTone.success,
             ),
-            _StatTile(
+            AppMetricTile(
               label: '전달된 비밀 편지',
               value: _formatStatValue(
                 stats?.todayLetterCount,
                 state.isStatsLoading,
               ),
             ),
-            _StatTile(
+            AppMetricTile(
               label: '오늘의 기록',
               value: _formatStatValue(
                 stats?.todayDiaryCount,
                 state.isStatsLoading,
               ),
+              tone: AppStatusTone.warning,
             ),
           ],
         ),
@@ -202,73 +156,14 @@ class _StatsSection extends StatelessWidget {
   }
 }
 
-class _StatTile extends StatelessWidget {
-  const _StatTile({
-    required this.label,
-    required this.value,
-  });
-
-  final String label;
-  final String value;
-
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-
-    return SizedBox(
-      width: 156,
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          color: colorScheme.primaryContainer,
-          borderRadius: BorderRadius.circular(8),
-        ),
-        child: Padding(
-          padding: const EdgeInsets.all(14),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                label,
-                style: TextStyle(
-                  color: colorScheme.onPrimaryContainer,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                value,
-                style: Theme.of(context).textTheme.headlineSmall,
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
 class _HealingQuote extends StatelessWidget {
   const _HealingQuote();
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: theme.colorScheme.secondaryContainer,
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Text(
-          '조금 느려도 괜찮아요. 오늘의 마음을 하나씩 살펴보세요.',
-          style: theme.textTheme.bodyLarge?.copyWith(
-            color: theme.colorScheme.onSecondaryContainer,
-            fontWeight: FontWeight.w700,
-          ),
-        ),
-      ),
+    return const AppNotice(
+      message: '조금 느려도 괜찮아요. 오늘의 마음을 하나씩 살펴보세요.',
+      tone: AppNoticeTone.success,
     );
   }
 }
@@ -295,8 +190,8 @@ class _ActionGrid extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Wrap(
-      spacing: 8,
-      runSpacing: 8,
+      spacing: AppSpacing.xs,
+      runSpacing: AppSpacing.xs,
       children: [
         FilledButton(
           onPressed: onWriteDiary,
@@ -346,8 +241,8 @@ class _CategoryFilter extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Wrap(
-      spacing: 8,
-      runSpacing: 8,
+      spacing: AppSpacing.xs,
+      runSpacing: AppSpacing.xs,
       children: [
         for (final category in HomeStoryCategory.values)
           ChoiceChip(
@@ -369,15 +264,18 @@ class _FeedSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (state.isFeedLoading) {
-      return const _InlineNotice(message: '스토리를 불러오는 중입니다.');
+      return const AppNotice(message: '스토리를 불러오는 중입니다.');
     }
 
     if (state.feedErrorMessage != null) {
-      return _InlineNotice(message: state.feedErrorMessage!);
+      return AppNotice(
+        message: state.feedErrorMessage!,
+        tone: AppNoticeTone.error,
+      );
     }
 
     if (state.isFeedEmpty) {
-      return const _InlineNotice(message: '아직 공개된 스토리가 없습니다.');
+      return const AppNotice(message: '아직 공개된 스토리가 없습니다.');
     }
 
     return Column(
@@ -385,7 +283,7 @@ class _FeedSection extends StatelessWidget {
       children: [
         for (final story in state.visibleStories) ...[
           _StoryCard(story: story),
-          const SizedBox(height: 10),
+          const SizedBox(height: AppSpacing.sm),
         ],
       ],
     );
@@ -410,20 +308,22 @@ class _StoryCard extends StatelessWidget {
           children: [
             Text(
               '#${story.category.label}',
-              style: theme.textTheme.labelLarge,
+              style: theme.textTheme.labelLarge?.copyWith(
+                color: theme.colorScheme.primary,
+              ),
             ),
-            const SizedBox(height: 6),
+            const SizedBox(height: AppSpacing.xs),
             Text(
               story.title,
               style: theme.textTheme.titleMedium,
             ),
-            const SizedBox(height: 6),
+            const SizedBox(height: AppSpacing.xs),
             Text(
               story.summary,
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
             ),
-            const SizedBox(height: 10),
+            const SizedBox(height: AppSpacing.sm),
             Text(
               '${story.authorNickname} · 조회 ${story.viewCount}',
               style: theme.textTheme.bodySmall,
@@ -435,58 +335,19 @@ class _StoryCard extends StatelessWidget {
   }
 }
 
-class _InlineNotice extends StatelessWidget {
-  const _InlineNotice({required this.message});
-
-  final String message;
-
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: colorScheme.surfaceContainerHighest,
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(14),
-        child: Text(message),
-      ),
-    );
-  }
-}
-
 class _PlatformRow extends StatelessWidget {
   const _PlatformRow();
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-
     return Wrap(
-      spacing: 8,
-      runSpacing: 8,
+      spacing: AppSpacing.xs,
+      runSpacing: AppSpacing.xs,
       children: [
         for (final platform in supportedPlatforms)
-          DecoratedBox(
-            decoration: BoxDecoration(
-              color: colorScheme.primaryContainer,
-              borderRadius: BorderRadius.circular(6),
-            ),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(
-                horizontal: 12,
-                vertical: 8,
-              ),
-              child: Text(
-                platform.toUpperCase(),
-                style: TextStyle(
-                  color: colorScheme.onPrimaryContainer,
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-            ),
+          AppStatusPill(
+            label: platform.toUpperCase(),
+            tone: AppStatusTone.success,
           ),
       ],
     );

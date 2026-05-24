@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../../../shared/ui/app_design_system.dart';
 import '../application/settings_controller.dart';
 
 class SettingsScreen extends StatefulWidget {
@@ -111,7 +112,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 Expanded(
                   child: SingleChildScrollView(
                     key: const ValueKey('settings-scroll'),
-                    padding: const EdgeInsets.all(20),
+                    padding: const EdgeInsets.all(AppSpacing.xl),
                     child: Center(
                       child: ConstrainedBox(
                         constraints: const BoxConstraints(maxWidth: 560),
@@ -123,11 +124,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                 message: state.errorMessage!,
                                 isError: true,
                               ),
-                              const SizedBox(height: 12),
+                              const SizedBox(height: AppSpacing.md),
                             ],
                             if (state.noticeMessage != null) ...[
                               _InlineNotice(message: state.noticeMessage!),
-                              const SizedBox(height: 12),
+                              const SizedBox(height: AppSpacing.md),
                             ],
                             if (settings == null)
                               _InlineNotice(
@@ -142,7 +143,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                 nickname: settings.nickname,
                                 isSocialAccount: settings.socialAccount,
                               ),
-                              const SizedBox(height: 16),
+                              const SizedBox(height: AppSpacing.lg),
                               _ProfileSection(
                                 nicknameController: _nicknameController,
                                 isSubmitting: state.isSubmitting,
@@ -150,7 +151,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                     widget.controller.updateNicknameDraft,
                                 onSave: widget.controller.saveNickname,
                               ),
-                              const SizedBox(height: 16),
+                              const SizedBox(height: AppSpacing.lg),
                               _EmailSection(
                                 emailController: _emailController,
                                 isSocialAccount: settings.socialAccount,
@@ -158,7 +159,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                 onChanged: widget.controller.updateEmailDraft,
                                 onSave: widget.controller.saveEmail,
                               ),
-                              const SizedBox(height: 16),
+                              const SizedBox(height: AppSpacing.lg),
                               _PasswordSection(
                                 currentPasswordController:
                                     _currentPasswordController,
@@ -171,14 +172,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                     widget.controller.updateNewPasswordDraft,
                                 onSave: widget.controller.savePassword,
                               ),
-                              const SizedBox(height: 16),
+                              const SizedBox(height: AppSpacing.lg),
                               _RandomReceiveSection(
                                 value: settings.randomReceiveAllowed,
                                 isSubmitting: state.isSubmitting,
                                 onChanged: (_) =>
                                     widget.controller.toggleRandomSetting(),
                               ),
-                              const SizedBox(height: 16),
+                              const SizedBox(height: AppSpacing.lg),
                               _WithdrawalSection(
                                 state: state,
                                 withdrawPasswordController:
@@ -215,33 +216,16 @@ class _SettingsHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
-      child: Row(
-        children: [
-          IconButton(
-            key: const ValueKey('settings-back-button'),
-            tooltip: '홈으로',
-            onPressed: onBack,
-            icon: const Icon(Icons.arrow_back),
-          ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  '설정',
-                  style: Theme.of(context).textTheme.labelLarge,
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  '계정 설정',
-                  style: Theme.of(context).textTheme.titleLarge,
-                ),
-              ],
-            ),
-          ),
-        ],
+      padding: const EdgeInsets.fromLTRB(
+        AppSpacing.md,
+        AppSpacing.xs,
+        AppSpacing.md,
+        AppSpacing.xs,
+      ),
+      child: AppScreenHeader(
+        eyebrow: '설정',
+        title: '계정 설정',
+        onBack: onBack,
       ),
     );
   }
@@ -260,26 +244,17 @@ class _AccountSummary extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: colorScheme.primaryContainer,
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              nickname,
-              style: Theme.of(context).textTheme.titleMedium,
-            ),
-            const SizedBox(height: 4),
-            Text('$email · ${isSocialAccount ? '소셜 계정' : '이메일 계정'}'),
-          ],
-        ),
+    return AppSectionCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            nickname,
+            style: Theme.of(context).textTheme.titleMedium,
+          ),
+          const SizedBox(height: AppSpacing.xxs),
+          Text('$email · ${isSocialAccount ? '소셜 계정' : '이메일 계정'}'),
+        ],
       ),
     );
   }
@@ -310,7 +285,7 @@ class _ProfileSection extends StatelessWidget {
           textInputAction: TextInputAction.done,
           onChanged: onChanged,
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: AppSpacing.md),
         Align(
           alignment: Alignment.centerRight,
           child: FilledButton(
@@ -356,7 +331,7 @@ class _EmailSection extends StatelessWidget {
           textInputAction: TextInputAction.done,
           onChanged: onChanged,
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: AppSpacing.md),
         Align(
           alignment: Alignment.centerRight,
           child: FilledButton(
@@ -406,7 +381,7 @@ class _PasswordSection extends StatelessWidget {
           textInputAction: TextInputAction.next,
           onChanged: onCurrentPasswordChanged,
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: AppSpacing.md),
         TextField(
           key: const ValueKey('settings-new-password-field'),
           controller: newPasswordController,
@@ -416,7 +391,7 @@ class _PasswordSection extends StatelessWidget {
           textInputAction: TextInputAction.done,
           onChanged: onNewPasswordChanged,
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: AppSpacing.md),
         Align(
           alignment: Alignment.centerRight,
           child: FilledButton(
@@ -496,7 +471,7 @@ class _WithdrawalSection extends StatelessWidget {
         else ...[
           const Text('탈퇴하면 계정과 세션이 정리됩니다.'),
           if (!state.isSocialAccount) ...[
-            const SizedBox(height: 12),
+            const SizedBox(height: AppSpacing.md),
             TextField(
               key: const ValueKey('settings-withdraw-password'),
               controller: withdrawPasswordController,
@@ -506,10 +481,10 @@ class _WithdrawalSection extends StatelessWidget {
               onChanged: onPasswordChanged,
             ),
           ],
-          const SizedBox(height: 12),
+          const SizedBox(height: AppSpacing.md),
           Wrap(
-            spacing: 8,
-            runSpacing: 8,
+            spacing: AppSpacing.xs,
+            runSpacing: AppSpacing.xs,
             children: [
               OutlinedButton(
                 onPressed: state.isSubmitting ? null : onCancel,
@@ -539,27 +514,11 @@ class _SettingsSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: colorScheme.surface,
-        border: Border.all(color: colorScheme.outlineVariant),
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Text(
-              title,
-              style: Theme.of(context).textTheme.titleMedium,
-            ),
-            const SizedBox(height: 12),
-            ...children,
-          ],
-        ),
+    return AppSectionCard(
+      title: title,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: children,
       ),
     );
   }
@@ -576,28 +535,9 @@ class _InlineNotice extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    final backgroundColor =
-        isError ? colorScheme.errorContainer : colorScheme.secondaryContainer;
-    final foregroundColor = isError
-        ? colorScheme.onErrorContainer
-        : colorScheme.onSecondaryContainer;
-
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: backgroundColor,
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(14),
-        child: Text(
-          message,
-          style: TextStyle(
-            color: foregroundColor,
-            fontWeight: FontWeight.w700,
-          ),
-        ),
-      ),
+    return AppNotice(
+      message: message,
+      tone: isError ? AppNoticeTone.error : AppNoticeTone.success,
     );
   }
 }

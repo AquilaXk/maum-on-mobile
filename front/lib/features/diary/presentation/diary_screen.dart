@@ -3,6 +3,7 @@ import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 
+import '../../../shared/ui/app_design_system.dart';
 import '../application/diary_controller.dart';
 import '../domain/diary_models.dart';
 import 'diary_image_picker.dart';
@@ -107,121 +108,68 @@ class _DiaryScreenState extends State<DiaryScreen> {
       builder: (context, _) {
         final state = widget.controller.state;
 
-        return Scaffold(
-          body: SafeArea(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(20),
-              child: Center(
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 560),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      _DiaryHeader(
-                        monthLabel: _formatMonthLabel(state.visibleMonth),
-                        onBack: widget.onBack,
-                        onPrevious: () => widget.controller.moveMonth(-1),
-                        onNext: () => widget.controller.moveMonth(1),
-                      ),
-                      const SizedBox(height: 16),
-                      if (state.errorMessage != null) ...[
-                        _Notice(message: state.errorMessage!, isError: true),
-                        const SizedBox(height: 10),
-                      ],
-                      if (state.noticeMessage != null) ...[
-                        _Notice(message: state.noticeMessage!),
-                        const SizedBox(height: 10),
-                      ],
-                      _CalendarSection(
-                        state: state,
-                        onSelectDate: widget.controller.selectDate,
-                      ),
-                      const SizedBox(height: 16),
-                      _SelectedEntriesSection(
-                        entries: state.selectedDateEntries,
-                        selectedDateLabel: _formatDateLabel(state.selectedDate),
-                        onEdit: widget.controller.startEditing,
-                        onDelete: _confirmDelete,
-                      ),
-                      const SizedBox(height: 16),
-                      _PublicEntriesSection(state: state),
-                      const SizedBox(height: 20),
-                      _DiaryForm(
-                        state: state,
-                        titleController: _titleController,
-                        contentController: _contentController,
-                        onTitleChanged: widget.controller.updateTitle,
-                        onContentChanged: widget.controller.updateContent,
-                        onCategoryChanged: widget.controller.updateCategory,
-                        onPrivacyChanged: widget.controller.updatePrivacy,
-                        onPickImage: _pickImage,
-                        onClearImage: () {
-                          unawaited(widget.controller.clearImage());
-                        },
-                        onReset: widget.controller.resetForm,
-                        onSubmit: widget.controller.submit,
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          ),
-        );
-      },
-    );
-  }
-}
-
-class _DiaryHeader extends StatelessWidget {
-  const _DiaryHeader({
-    required this.monthLabel,
-    required this.onBack,
-    required this.onPrevious,
-    required this.onNext,
-  });
-
-  final String monthLabel;
-  final VoidCallback onBack;
-  final VoidCallback onPrevious;
-  final VoidCallback onNext;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        IconButton(
-          tooltip: '홈으로',
-          onPressed: onBack,
-          icon: const Icon(Icons.arrow_back),
-        ),
-        Text('나의 기록', style: theme.textTheme.displaySmall),
-        const SizedBox(height: 10),
-        Row(
-          children: [
+        return AppScreen(
+          title: '나의 기록',
+          subtitle: _formatMonthLabel(state.visibleMonth),
+          onBack: widget.onBack,
+          actions: [
             IconButton(
               key: const ValueKey('diary-prev-month-button'),
               tooltip: '이전 달',
-              onPressed: onPrevious,
+              onPressed: () => widget.controller.moveMonth(-1),
               icon: const Icon(Icons.chevron_left),
-            ),
-            Expanded(
-              child: Center(
-                child: Text(monthLabel, style: theme.textTheme.titleLarge),
-              ),
             ),
             IconButton(
               key: const ValueKey('diary-next-month-button'),
               tooltip: '다음 달',
-              onPressed: onNext,
+              onPressed: () => widget.controller.moveMonth(1),
               icon: const Icon(Icons.chevron_right),
             ),
           ],
-        ),
-      ],
+          children: [
+            if (state.errorMessage != null) ...[
+              _Notice(message: state.errorMessage!, isError: true),
+              const SizedBox(height: AppSpacing.sm),
+            ],
+            if (state.noticeMessage != null) ...[
+              _Notice(message: state.noticeMessage!),
+              const SizedBox(height: AppSpacing.sm),
+            ],
+            AppSectionCard(
+              title: '월간 기록',
+              child: _CalendarSection(
+                state: state,
+                onSelectDate: widget.controller.selectDate,
+              ),
+            ),
+            const SizedBox(height: AppSpacing.lg),
+            _SelectedEntriesSection(
+              entries: state.selectedDateEntries,
+              selectedDateLabel: _formatDateLabel(state.selectedDate),
+              onEdit: widget.controller.startEditing,
+              onDelete: _confirmDelete,
+            ),
+            const SizedBox(height: AppSpacing.lg),
+            _PublicEntriesSection(state: state),
+            const SizedBox(height: AppSpacing.xl),
+            _DiaryForm(
+              state: state,
+              titleController: _titleController,
+              contentController: _contentController,
+              onTitleChanged: widget.controller.updateTitle,
+              onContentChanged: widget.controller.updateContent,
+              onCategoryChanged: widget.controller.updateCategory,
+              onPrivacyChanged: widget.controller.updatePrivacy,
+              onPickImage: _pickImage,
+              onClearImage: () {
+                unawaited(widget.controller.clearImage());
+              },
+              onReset: widget.controller.resetForm,
+              onSubmit: widget.controller.submit,
+            ),
+          ],
+        );
+      },
     );
   }
 }
@@ -260,7 +208,7 @@ class _CalendarSection extends StatelessWidget {
             Text('토'),
           ],
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: AppSpacing.xs),
         GridView.count(
           crossAxisCount: 7,
           crossAxisSpacing: 6,
@@ -345,7 +293,7 @@ class _SelectedEntriesSection extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Text(selectedDateLabel, style: Theme.of(context).textTheme.titleMedium),
-        const SizedBox(height: 8),
+        const SizedBox(height: AppSpacing.xs),
         if (entries.isEmpty)
           const _Notice(message: '선택한 날짜에 작성한 기록이 없습니다.')
         else
@@ -358,12 +306,12 @@ class _SelectedEntriesSection extends StatelessWidget {
                   children: [
                     Text(entry.title,
                         style: Theme.of(context).textTheme.titleMedium),
-                    const SizedBox(height: 6),
+                    const SizedBox(height: AppSpacing.xs),
                     Text(entry.content,
                         maxLines: 3, overflow: TextOverflow.ellipsis),
-                    const SizedBox(height: 8),
+                    const SizedBox(height: AppSpacing.xs),
                     Wrap(
-                      spacing: 8,
+                      spacing: AppSpacing.xs,
                       crossAxisAlignment: WrapCrossAlignment.center,
                       children: [
                         Chip(label: Text(entry.category.label)),
@@ -384,7 +332,7 @@ class _SelectedEntriesSection extends StatelessWidget {
                 ),
               ),
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: AppSpacing.xs),
           ],
       ],
     );
@@ -404,7 +352,7 @@ class _PublicEntriesSection extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Text('공개 기록', style: theme.textTheme.titleMedium),
-        const SizedBox(height: 8),
+        const SizedBox(height: AppSpacing.xs),
         if (state.isPublicLoading)
           const _Notice(message: '공개 기록을 불러오는 중입니다.')
         else if (state.publicErrorMessage != null)
@@ -420,16 +368,16 @@ class _PublicEntriesSection extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Wrap(
-                      spacing: 8,
+                      spacing: AppSpacing.xs,
                       crossAxisAlignment: WrapCrossAlignment.center,
                       children: [
                         Chip(label: Text(entry.category.label)),
                         Text(entry.nickname, style: theme.textTheme.bodySmall),
                       ],
                     ),
-                    const SizedBox(height: 8),
+                    const SizedBox(height: AppSpacing.xs),
                     Text(entry.title, style: theme.textTheme.titleMedium),
-                    const SizedBox(height: 6),
+                    const SizedBox(height: AppSpacing.xs),
                     Text(
                       entry.content,
                       maxLines: 3,
@@ -439,7 +387,7 @@ class _PublicEntriesSection extends StatelessWidget {
                 ),
               ),
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: AppSpacing.xs),
           ],
       ],
     );
@@ -475,17 +423,14 @@ class _DiaryForm extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Row(
+    return AppSectionCard(
+      title: state.isEditing ? '기록 수정하기' : '오늘의 기록',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
           children: [
-            Expanded(
-              child: Text(
-                state.isEditing ? '기록 수정하기' : '오늘의 기록',
-                style: Theme.of(context).textTheme.titleLarge,
-              ),
-            ),
+            const Spacer(),
             if (state.isEditing)
               IconButton(
                 key: const ValueKey('diary-edit-cancel-button'),
@@ -495,7 +440,7 @@ class _DiaryForm extends StatelessWidget {
               ),
           ],
         ),
-        const SizedBox(height: 10),
+        const SizedBox(height: AppSpacing.sm),
         TextField(
           key: const ValueKey('diary-title-field'),
           controller: titleController,
@@ -505,7 +450,7 @@ class _DiaryForm extends StatelessWidget {
             border: OutlineInputBorder(),
           ),
         ),
-        const SizedBox(height: 10),
+        const SizedBox(height: AppSpacing.sm),
         TextField(
           key: const ValueKey('diary-content-field'),
           controller: contentController,
@@ -517,7 +462,7 @@ class _DiaryForm extends StatelessWidget {
             border: OutlineInputBorder(),
           ),
         ),
-        const SizedBox(height: 10),
+        const SizedBox(height: AppSpacing.sm),
         DropdownButtonFormField<DiaryCategory>(
           key: ValueKey('diary-category-${state.category.name}'),
           initialValue: state.category,
@@ -552,7 +497,7 @@ class _DiaryForm extends StatelessWidget {
           onPickImage: onPickImage,
           onClearImage: onClearImage,
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: AppSpacing.md),
         FilledButton(
           key: const ValueKey('diary-submit-button'),
           onPressed: state.isSubmitting ? null : onSubmit,
@@ -565,6 +510,7 @@ class _DiaryForm extends StatelessWidget {
           ),
         ),
       ],
+      ),
     );
   }
 }
@@ -600,11 +546,11 @@ class _ImagePreview extends StatelessWidget {
           label: const Text('이미지 선택'),
         ),
         if (isUploadingImage) ...[
-          const SizedBox(height: 8),
+          const SizedBox(height: AppSpacing.xs),
           LinearProgressIndicator(value: uploadProgress),
         ],
         if (image != null) ...[
-          const SizedBox(height: 8),
+          const SizedBox(height: AppSpacing.xs),
           ClipRRect(
             borderRadius: BorderRadius.circular(8),
             child: Image.memory(
@@ -627,7 +573,7 @@ class _ImagePreview extends StatelessWidget {
             label: const Text('이미지 제거'),
           ),
         ] else if (imageUrl != null) ...[
-          const SizedBox(height: 8),
+          const SizedBox(height: AppSpacing.xs),
           const _Notice(message: '기존 이미지가 유지됩니다.'),
           TextButton.icon(
             onPressed: onClearImage,
@@ -651,26 +597,9 @@ class _Notice extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: isError
-            ? colorScheme.errorContainer
-            : colorScheme.surfaceContainerHighest,
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(14),
-        child: Text(
-          message,
-          style: TextStyle(
-            color: isError
-                ? colorScheme.onErrorContainer
-                : colorScheme.onSurfaceVariant,
-          ),
-        ),
-      ),
+    return AppNotice(
+      message: message,
+      tone: isError ? AppNoticeTone.error : AppNoticeTone.neutral,
     );
   }
 }

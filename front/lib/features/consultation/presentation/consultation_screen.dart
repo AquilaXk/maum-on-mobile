@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../../../shared/ui/app_design_system.dart';
 import '../application/consultation_controller.dart';
 import '../domain/consultation_models.dart';
 
@@ -97,7 +98,10 @@ class _ConsultationScreenState extends State<ConsultationScreen>
                   onReconnect: widget.controller.reconnect,
                 ),
                 if (state.errorMessage != null)
-                  _InlineNotice(message: state.errorMessage!),
+                  AppNotice(
+                    message: state.errorMessage!,
+                    tone: AppNoticeTone.error,
+                  ),
                 Expanded(
                   child: ListView.builder(
                     key: const ValueKey('consultation-message-list'),
@@ -145,29 +149,17 @@ class _ConsultationHeader extends StatelessWidget {
     };
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
-      child: Row(
-        children: [
-          IconButton(
-            key: const ValueKey('consultation-back-button'),
-            tooltip: '홈으로',
-            onPressed: onBack,
-            icon: const Icon(Icons.arrow_back),
-          ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  '실시간 상담',
-                  style: Theme.of(context).textTheme.titleLarge,
-                ),
-                const SizedBox(height: 2),
-                Text(statusText),
-              ],
-            ),
-          ),
+      padding: const EdgeInsets.fromLTRB(
+        AppSpacing.md,
+        AppSpacing.xs,
+        AppSpacing.md,
+        AppSpacing.xs,
+      ),
+      child: AppScreenHeader(
+        title: '실시간 상담',
+        subtitle: statusText,
+        onBack: onBack,
+        actions: [
           if (connectionState == ConsultationConnectionState.error)
             IconButton.filledTonal(
               key: const ValueKey('consultation-reconnect-button'),
@@ -197,7 +189,7 @@ class _MessageBubble extends StatelessWidget {
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 320),
         child: Padding(
-          padding: const EdgeInsets.only(bottom: 10),
+          padding: const EdgeInsets.only(bottom: AppSpacing.sm),
           child: DecoratedBox(
             decoration: BoxDecoration(
               color: isUser
@@ -205,10 +197,13 @@ class _MessageBubble extends StatelessWidget {
                   : isSystem
                       ? colorScheme.errorContainer
                       : colorScheme.surfaceContainerHighest,
-              borderRadius: BorderRadius.circular(8),
+              borderRadius: AppRadii.card,
             ),
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              padding: const EdgeInsets.symmetric(
+                horizontal: AppSpacing.md,
+                vertical: AppSpacing.sm,
+              ),
               child: Text(
                 message.content.isEmpty ? '응답 작성 중입니다.' : message.content,
                 style: TextStyle(
@@ -252,7 +247,7 @@ class _Composer extends StatelessWidget {
         border: Border(top: BorderSide(color: Theme.of(context).dividerColor)),
       ),
       child: Padding(
-        padding: const EdgeInsets.all(12),
+        padding: const EdgeInsets.all(AppSpacing.md),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.end,
           children: [
@@ -272,7 +267,7 @@ class _Composer extends StatelessWidget {
                 onChanged: onChanged,
               ),
             ),
-            const SizedBox(width: 8),
+            const SizedBox(width: AppSpacing.xs),
             IconButton.filled(
               key: const ValueKey('consultation-send-button'),
               tooltip: '전송',
@@ -286,29 +281,6 @@ class _Composer extends StatelessWidget {
                   : const Icon(Icons.send),
             ),
           ],
-        ),
-      ),
-    );
-  }
-}
-
-class _InlineNotice extends StatelessWidget {
-  const _InlineNotice({required this.message});
-
-  final String message;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          color: Theme.of(context).colorScheme.errorContainer,
-          borderRadius: BorderRadius.circular(8),
-        ),
-        child: Padding(
-          padding: const EdgeInsets.all(12),
-          child: Text(message),
         ),
       ),
     );
