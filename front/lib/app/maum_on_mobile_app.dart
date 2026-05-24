@@ -41,6 +41,7 @@ import '../features/story/data/story_repository.dart';
 import '../features/story/domain/story_models.dart';
 import '../features/story/presentation/story_screen.dart';
 import '../theme/app_theme.dart';
+import 'authenticated_app_shell.dart';
 import 'app_routes.dart';
 
 class MaumOnMobileApp extends StatefulWidget {
@@ -126,7 +127,7 @@ class _MaumOnMobileAppState extends State<MaumOnMobileApp> {
   int? _letterMemberId;
   bool _openLetterComposer = false;
   ReportTarget? _pendingReportTarget;
-  _AuthenticatedDestination _destination = _AuthenticatedDestination.home;
+  AuthenticatedRoute _route = AuthenticatedRoute.home;
 
   @override
   void initState() {
@@ -162,9 +163,9 @@ class _MaumOnMobileAppState extends State<MaumOnMobileApp> {
       debugShowCheckedModeBanner: false,
       theme: buildAppTheme(),
       home: PopScope<void>(
-        canPop: _destination == _AuthenticatedDestination.home,
+        canPop: _route == AuthenticatedRoute.home,
         onPopInvokedWithResult: (didPop, _) {
-          if (didPop || _destination == _AuthenticatedDestination.home) {
+          if (didPop || _route == AuthenticatedRoute.home) {
             return;
           }
 
@@ -184,112 +185,21 @@ class _MaumOnMobileAppState extends State<MaumOnMobileApp> {
 
             if (!state.isAuthenticated || state.member == null) {
               _disposeAuthenticatedControllers();
-              _destination = _AuthenticatedDestination.home;
+              _route = AuthenticatedRoute.home;
               return AuthScreen(
                 controller: _authController,
                 externalLoginController: _externalLoginController,
               );
             }
 
-            if (_destination == _AuthenticatedDestination.diary) {
-              return DiaryScreen(
-                controller: _diaryControllerFor(state.member!.id),
-                imagePicker: widget.diaryImagePicker ??
-                    const FilePickerDiaryImagePicker(),
-                onBack: _returnHome,
-              );
-            }
-
-            if (_destination == _AuthenticatedDestination.consultation) {
-              return ConsultationScreen(
-                controller: _consultationControllerFor(state.member!.id),
-                onBack: _returnHome,
-              );
-            }
-
-            if (_destination == _AuthenticatedDestination.notifications) {
-              final reportController = _reportControllerFor(state.member!.id);
-              final pendingTarget = _pendingReportTarget;
-              if (pendingTarget != null) {
-                reportController.selectTarget(pendingTarget);
-                _pendingReportTarget = null;
-              }
-
-              return NotificationReportScreen(
-                notificationController:
-                    _notificationControllerFor(state.member!.id),
-                reportController: reportController,
-                onBack: _returnHome,
-              );
-            }
-
-            if (_destination == _AuthenticatedDestination.settings) {
-              return SettingsScreen(
-                controller: _settingsControllerFor(state.member!.id),
-                onBack: _returnHome,
-              );
-            }
-
-            if (_destination == _AuthenticatedDestination.letter) {
-              final letterController = _letterControllerFor(state.member!.id);
-              final startsInCompose = _openLetterComposer;
-              _openLetterComposer = false;
-
-              return LetterScreen(
-                controller: letterController,
-                initiallyCompose: startsInCompose,
-                onBack: _returnHome,
-              );
-            }
-
-            if (_destination == _AuthenticatedDestination.story) {
-              return StoryScreen(
-                controller: _storyControllerFor(state.member!.id),
-                onBack: _returnHome,
-              );
-            }
-
-            final homeController = _homeControllerFor(state.member!.id);
-            return HomeScreen(
-              routeTitle: initialRoute.title,
-              nickname: state.member!.nickname,
-              homeController: homeController,
-              onWriteDiary: () {
-                setState(() {
-                  _destination = _AuthenticatedDestination.diary;
-                });
-              },
-              onWriteLetter: () {
-                setState(() {
-                  _openLetterComposer = true;
-                  _destination = _AuthenticatedDestination.letter;
-                });
-              },
-              onViewStory: () {
-                setState(() {
-                  _destination = _AuthenticatedDestination.story;
-                });
-              },
-              onOpenConsultation: () {
-                setState(() {
-                  _destination = _AuthenticatedDestination.consultation;
-                });
-              },
-              onOpenNotifications: () {
-                setState(() {
-                  _destination = _AuthenticatedDestination.notifications;
-                });
-              },
-              onOpenSettings: () {
-                setState(() {
-                  _destination = _AuthenticatedDestination.settings;
-                });
-              },
-              onLogout: () {
-                _disposeAuthenticatedControllers();
-                _destination = _AuthenticatedDestination.home;
-                _authController.logout();
-              },
+            return AuthenticatedAppShell(
+              currentRoute: _route,
+              onRouteSelected: _selectPrimaryRoute,
+              child: _buildAuthenticatedRoute(
+                memberId: state.member!.id,
+                nickname: state.member!.nickname,
+                routeTitle: initialRoute.title,
+              ),
             );
           },
         ),
@@ -297,9 +207,104 @@ class _MaumOnMobileAppState extends State<MaumOnMobileApp> {
     );
   }
 
+  Widget _buildAuthenticatedRoute({
+    required int memberId,
+    required String nickname,
+    required String routeTitle,
+  }) {
+    return switch (_route) {
+      AuthenticatedRoute.diary => DiaryScreen(
+          controller: _diaryControllerFor(memberId),
+          imagePicker:
+              widget.diaryImagePicker ?? const FilePickerDiaryImagePicker(),
+          onBack: _returnHome,
+        ),
+      AuthenticatedRoute.consultation => ConsultationScreen(
+          controller: _consultationControllerFor(memberId),
+          onBack: _returnHome,
+        ),
+      AuthenticatedRoute.notifications => _buildNotificationRoute(memberId),
+      AuthenticatedRoute.settings => SettingsScreen(
+          controller: _settingsControllerFor(memberId),
+          onBack: _returnHome,
+        ),
+      AuthenticatedRoute.letter => _buildLetterRoute(memberId),
+      AuthenticatedRoute.story => StoryScreen(
+          controller: _storyControllerFor(memberId),
+          onBack: _returnHome,
+        ),
+      AuthenticatedRoute.home => HomeScreen(
+          routeTitle: routeTitle,
+          nickname: nickname,
+          homeController: _homeControllerFor(memberId),
+          onWriteDiary: () => _openRoute(AuthenticatedRoute.diary),
+          onWriteLetter: () {
+            setState(() {
+              _openLetterComposer = true;
+              _route = AuthenticatedRoute.letter;
+            });
+          },
+          onViewStory: () => _openRoute(AuthenticatedRoute.story),
+          onOpenConsultation: () => _openRoute(AuthenticatedRoute.consultation),
+          onOpenNotifications: () => _openRoute(
+            AuthenticatedRoute.notifications,
+          ),
+          onOpenSettings: () => _openRoute(AuthenticatedRoute.settings),
+          onLogout: () {
+            _disposeAuthenticatedControllers();
+            _route = AuthenticatedRoute.home;
+            _authController.logout();
+          },
+        ),
+    };
+  }
+
+  Widget _buildNotificationRoute(int memberId) {
+    final reportController = _reportControllerFor(memberId);
+    final pendingTarget = _pendingReportTarget;
+    if (pendingTarget != null) {
+      reportController.selectTarget(pendingTarget);
+      _pendingReportTarget = null;
+    }
+
+    return NotificationReportScreen(
+      notificationController: _notificationControllerFor(memberId),
+      reportController: reportController,
+      onBack: _returnHome,
+    );
+  }
+
+  Widget _buildLetterRoute(int memberId) {
+    final letterController = _letterControllerFor(memberId);
+    final startsInCompose = _openLetterComposer;
+    _openLetterComposer = false;
+
+    return LetterScreen(
+      controller: letterController,
+      initiallyCompose: startsInCompose,
+      onBack: _returnHome,
+    );
+  }
+
+  void _openRoute(AuthenticatedRoute route) {
+    setState(() {
+      _route = route;
+    });
+  }
+
+  void _selectPrimaryRoute(AuthenticatedRoute route) {
+    setState(() {
+      _openLetterComposer = false;
+      _pendingReportTarget = null;
+      _route = route;
+    });
+  }
+
   void _returnHome() {
     setState(() {
-      _destination = _AuthenticatedDestination.home;
+      _openLetterComposer = false;
+      _pendingReportTarget = null;
+      _route = AuthenticatedRoute.home;
     });
   }
 
@@ -730,19 +735,9 @@ class _MaumOnMobileAppState extends State<MaumOnMobileApp> {
   void _openReportTarget(ReportTarget target) {
     setState(() {
       _pendingReportTarget = target;
-      _destination = _AuthenticatedDestination.notifications;
+      _route = AuthenticatedRoute.notifications;
     });
   }
-}
-
-enum _AuthenticatedDestination {
-  home,
-  consultation,
-  notifications,
-  settings,
-  diary,
-  letter,
-  story,
 }
 
 class _SessionRestoreScreen extends StatelessWidget {
