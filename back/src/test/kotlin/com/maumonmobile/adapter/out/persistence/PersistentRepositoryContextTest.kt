@@ -1,6 +1,7 @@
 package com.maumonmobile.adapter.out.persistence
 
 import com.maumonmobile.application.port.out.AuthMemberRepository
+import com.maumonmobile.application.port.out.AuthOidcStateRepository
 import com.maumonmobile.application.port.out.ConsultationRepository
 import com.maumonmobile.application.port.out.DiaryRepository
 import com.maumonmobile.application.port.out.ImageAssetRepository
@@ -9,6 +10,7 @@ import com.maumonmobile.application.port.out.NotificationRepository
 import com.maumonmobile.application.port.out.ReportRepository
 import com.maumonmobile.application.port.out.StoryRepository
 import com.maumonmobile.domain.auth.AuthMember
+import com.maumonmobile.domain.auth.AuthOidcState
 import com.maumonmobile.domain.consultation.ConsultationMessageSender
 import com.maumonmobile.domain.story.StoryPostDraft
 import org.assertj.core.api.Assertions.assertThat
@@ -17,12 +19,14 @@ import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.test.context.ActiveProfiles
+import java.time.Instant
 
 @SpringBootTest
 @ActiveProfiles("test")
 class PersistentRepositoryContextTest @Autowired constructor(
     private val jdbcTemplate: JdbcTemplate,
     private val authMemberRepository: AuthMemberRepository,
+    private val authOidcStateRepository: AuthOidcStateRepository,
     private val consultationRepository: ConsultationRepository,
     private val diaryRepository: DiaryRepository,
     private val imageAssetRepository: ImageAssetRepository,
@@ -35,6 +39,7 @@ class PersistentRepositoryContextTest @Autowired constructor(
     @Test
     fun defaultRepositoriesUseFlywayBackedJdbcStorage() {
         assertNotInMemoryRepository(authMemberRepository)
+        assertNotInMemoryRepository(authOidcStateRepository)
         assertNotInMemoryRepository(consultationRepository)
         assertNotInMemoryRepository(diaryRepository)
         assertNotInMemoryRepository(imageAssetRepository)
@@ -45,6 +50,7 @@ class PersistentRepositoryContextTest @Autowired constructor(
 
         assertThat(tableExists("auth_members")).isTrue()
         assertThat(tableExists("diaries")).isTrue()
+        assertThat(tableExists("auth_oidc_states")).isTrue()
         assertThat(tableExists("image_assets")).isTrue()
         assertThat(tableExists("story_posts")).isTrue()
         assertThat(tableExists("story_comments")).isTrue()
@@ -74,6 +80,29 @@ class PersistentRepositoryContextTest @Autowired constructor(
         authMemberRepository.revokeRefreshToken("refresh-token-1")
 
         assertThat(authMemberRepository.findByRefreshToken("refresh-token-1")).isNull()
+    }
+
+    @Test
+    fun authOidcStateConsumptionReturnsSingleSuccess() {
+        val now = Instant.now()
+        val saved = authOidcStateRepository.save(
+            AuthOidcState(
+                id = 0,
+                provider = "kakao",
+                state = "persistent-state-${now.toEpochMilli()}",
+                nonce = "nonce",
+                codeVerifier = "verifier",
+                redirectUri = "maumon://auth/callback",
+                expiresAt = now.plusSeconds(600).toString(),
+                consumedAt = null,
+                createdAt = now.toString(),
+            ),
+        )
+
+        assertThat(authOidcStateRepository.markConsumed(saved.id, now.plusSeconds(1).toString()))
+            .isTrue()
+        assertThat(authOidcStateRepository.markConsumed(saved.id, now.plusSeconds(2).toString()))
+            .isFalse()
     }
 
     @Test

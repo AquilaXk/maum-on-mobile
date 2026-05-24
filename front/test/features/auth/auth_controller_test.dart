@@ -119,6 +119,9 @@ class _FakeAuthRepository implements AuthRepository {
   }
 
   @override
+  Future<void> saveSession(AuthSession session) async {}
+
+  @override
   Future<AuthMember> me() {
     throw UnimplementedError();
   }

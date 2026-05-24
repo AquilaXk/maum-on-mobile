@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../application/auth_controller.dart';
+import '../domain/auth_models.dart';
 
 class ExternalLoginConfig {
   const ExternalLoginConfig({
@@ -161,6 +162,21 @@ class ExternalLoginController extends ChangeNotifier {
     }
 
     if (status == 'success' || _hasCodeAndState(query)) {
+      final session = _sessionFromCallback(query);
+      if (session != null) {
+        try {
+          await _authController.completeExternalLogin(session);
+          _setState(const ExternalLoginState());
+        } on Object {
+          _setState(
+            const ExternalLoginState(
+              errorMessage: '로그인 세션을 저장하지 못했습니다. 다시 시도해 주세요.',
+            ),
+          );
+        }
+        return true;
+      }
+
       _setState(const ExternalLoginState());
       await _authController.restoreSession();
 
@@ -185,6 +201,49 @@ class ExternalLoginController extends ChangeNotifier {
     final state = query['state'];
 
     return code != null && code.isNotEmpty && state != null && state.isNotEmpty;
+  }
+
+  AuthSession? _sessionFromCallback(Map<String, String> query) {
+    final accessToken = query['access_token'] ?? query['accessToken'];
+    if (accessToken == null || accessToken.isEmpty) {
+      return null;
+    }
+
+    final memberId = int.tryParse(query['member_id'] ?? query['memberId'] ?? '');
+    final email = query['email'];
+    final nickname = query['nickname'];
+    if (memberId == null || email == null || email.isEmpty || nickname == null) {
+      return null;
+    }
+
+    return AuthSession(
+      accessToken: accessToken,
+      refreshToken: query['refresh_token'] ?? query['refreshToken'],
+      tokenType: query['token_type'] ?? query['tokenType'] ?? 'Bearer',
+      expiresInSeconds: int.tryParse(
+            query['expires_in'] ?? query['expiresInSeconds'] ?? '',
+          ) ??
+          0,
+      member: AuthMember(
+        id: memberId,
+        email: email,
+        nickname: nickname,
+        role: query['role'] ?? 'USER',
+        status: _memberStatusFromCallback(
+          query['member_status'] ?? query['memberStatus'],
+        ),
+      ),
+    );
+  }
+
+  String _memberStatusFromCallback(String? value) {
+    switch (value) {
+      case 'ACTIVE':
+      case 'WITHDRAWN':
+        return value!;
+      default:
+        return 'ACTIVE';
+    }
   }
 
   String _messageFromError(Map<String, String> query) {
