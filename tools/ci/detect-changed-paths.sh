@@ -4,6 +4,8 @@ set -euo pipefail
 changed_files_path="${1:?changed files path is required}"
 
 android=false
+backend=false
+frontend=false
 ios=false
 javascript=false
 repository=false
@@ -43,6 +45,18 @@ while IFS= read -r file; do
   esac
 
   case "${file}" in
+    back/**)
+      backend=true
+      ;;
+  esac
+
+  case "${file}" in
+    front/**)
+      frontend=true
+      ;;
+  esac
+
+  case "${file}" in
     android/**|gradle/**|build.gradle|build.gradle.kts|settings.gradle|settings.gradle.kts|gradle.properties|gradlew|gradlew.bat)
       android=true
       ;;
@@ -63,6 +77,8 @@ done < "${changed_files_path}"
 
 if [[ "${saw_file}" == "false" ]]; then
   android=true
+  backend=true
+  frontend=true
   ios=true
   javascript=true
   repository=true
@@ -71,6 +87,8 @@ fi
 
 if [[ "${ci}" == "true" ]]; then
   android=true
+  backend=true
+  frontend=true
   ios=true
   javascript=true
   repository=true
@@ -80,6 +98,8 @@ fi
 outputs_payload() {
   cat <<EOF
 android=${android}
+backend=${backend}
+frontend=${frontend}
 ios=${ios}
 javascript=${javascript}
 repository=${repository}
@@ -101,6 +121,8 @@ write_summary() {
     echo
     echo "### CI gates"
     echo "- android: ${android}"
+    echo "- backend: ${backend}"
+    echo "- frontend: ${frontend}"
     echo "- ios: ${ios}"
     echo "- javascript: ${javascript}"
     echo "- repository: ${repository}"

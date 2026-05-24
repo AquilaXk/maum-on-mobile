@@ -21,7 +21,7 @@ test("ci workflow detects changed paths before platform jobs", async () => {
   assert.match(changes, /git diff --name-only/);
   assert.match(changes, /bash tools\/ci\/detect-changed-paths\.sh changed-files\.txt/);
 
-  for (const output of ["android", "ios", "javascript", "repository", "docs_only", "ci"]) {
+  for (const output of ["android", "backend", "frontend", "ios", "javascript", "repository", "docs_only", "ci"]) {
     assert.match(changes, new RegExp(`${output}: \\$\\{\\{ steps\\.filter\\.outputs\\.${output} \\}\\}`));
   }
 });
@@ -30,6 +30,8 @@ test("ci jobs are gated by changed path outputs", async () => {
   const workflow = await readWorkflow();
 
   assertJobGate(workflow, "android", "android");
+  assertJobGate(workflow, "backend", "backend");
+  assertJobGate(workflow, "frontend", "frontend");
   assertJobGate(workflow, "ios", "ios");
   assertJobGate(workflow, "javascript", "javascript");
 
@@ -45,6 +47,8 @@ test("platform jobs skip cleanly before scaffolds exist", async () => {
   const workflow = await readWorkflow();
 
   assert.match(jobBlock(workflow, "android"), /Android scaffold not found; skipping Android checks\./);
+  assert.match(jobBlock(workflow, "backend"), /Backend scaffold not found; skipping backend checks\./);
+  assert.match(jobBlock(workflow, "frontend"), /Frontend scaffold not found; skipping frontend checks\./);
   assert.match(jobBlock(workflow, "ios"), /iOS scaffold not found; skipping iOS checks\./);
   assert.match(jobBlock(workflow, "javascript"), /JavaScript scaffold not found; skipping JavaScript checks\./);
 });
@@ -65,6 +69,8 @@ test("path classifier treats README and pull request template changes as docs-on
 
   assert.equal(outputs.docs_only, "true");
   assert.equal(outputs.android, "false");
+  assert.equal(outputs.backend, "false");
+  assert.equal(outputs.frontend, "false");
   assert.equal(outputs.ios, "false");
   assert.equal(outputs.javascript, "false");
   assert.equal(outputs.repository, "false");
@@ -77,6 +83,8 @@ test("path classifier enables repository checks for GitHub issue template change
   assert.equal(outputs.docs_only, "false");
   assert.equal(outputs.repository, "true");
   assert.equal(outputs.android, "false");
+  assert.equal(outputs.backend, "false");
+  assert.equal(outputs.frontend, "false");
   assert.equal(outputs.ios, "false");
   assert.equal(outputs.javascript, "false");
 });
@@ -86,6 +94,8 @@ test("path classifier enables Android checks for Android or Gradle changes", asy
 
   assert.equal(outputs.docs_only, "false");
   assert.equal(outputs.android, "true");
+  assert.equal(outputs.backend, "false");
+  assert.equal(outputs.frontend, "false");
   assert.equal(outputs.ios, "false");
   assert.equal(outputs.javascript, "false");
 });
@@ -95,6 +105,8 @@ test("path classifier enables iOS checks for iOS changes", async () => {
 
   assert.equal(outputs.docs_only, "false");
   assert.equal(outputs.android, "false");
+  assert.equal(outputs.backend, "false");
+  assert.equal(outputs.frontend, "false");
   assert.equal(outputs.ios, "true");
   assert.equal(outputs.javascript, "false");
 });
@@ -103,6 +115,55 @@ test("path classifier enables JavaScript checks for package or source changes", 
   const outputs = await classifyChangedFiles(["package.json", "src/app.ts"]);
 
   assert.equal(outputs.docs_only, "false");
+  assert.equal(outputs.android, "false");
+  assert.equal(outputs.backend, "false");
+  assert.equal(outputs.frontend, "false");
+  assert.equal(outputs.ios, "false");
+  assert.equal(outputs.javascript, "true");
+});
+
+test("path classifier enables backend checks for back changes", async () => {
+  const outputs = await classifyChangedFiles(["back/src/main/java/com/maumonmobile/App.java"]);
+
+  assert.equal(outputs.docs_only, "false");
+  assert.equal(outputs.backend, "true");
+  assert.equal(outputs.frontend, "false");
+  assert.equal(outputs.android, "false");
+  assert.equal(outputs.ios, "false");
+});
+
+test("path classifier enables frontend checks for front changes", async () => {
+  const outputs = await classifyChangedFiles(["front/src/screens/HomeScreen.tsx"]);
+
+  assert.equal(outputs.docs_only, "false");
+  assert.equal(outputs.backend, "false");
+  assert.equal(outputs.frontend, "true");
+  assert.equal(outputs.android, "false");
+  assert.equal(outputs.ios, "false");
+});
+
+test("path classifier keeps front package changes in frontend gate", async () => {
+  const outputs = await classifyChangedFiles(["front/package.json"]);
+
+  assert.equal(outputs.docs_only, "false");
+  assert.equal(outputs.frontend, "true");
+  assert.equal(outputs.javascript, "false");
+});
+
+test("path classifier keeps back Gradle changes in backend gate", async () => {
+  const outputs = await classifyChangedFiles(["back/build.gradle.kts", "back/gradlew"]);
+
+  assert.equal(outputs.docs_only, "false");
+  assert.equal(outputs.backend, "true");
+  assert.equal(outputs.android, "false");
+});
+
+test("path classifier enables root JavaScript checks for root package changes", async () => {
+  const outputs = await classifyChangedFiles(["package.json", "src/app.ts"]);
+
+  assert.equal(outputs.docs_only, "false");
+  assert.equal(outputs.backend, "false");
+  assert.equal(outputs.frontend, "false");
   assert.equal(outputs.android, "false");
   assert.equal(outputs.ios, "false");
   assert.equal(outputs.javascript, "true");
@@ -114,6 +175,8 @@ test("path classifier enables all checks for ci workflow changes", async () => {
   assert.equal(outputs.docs_only, "false");
   assert.equal(outputs.ci, "true");
   assert.equal(outputs.android, "true");
+  assert.equal(outputs.backend, "true");
+  assert.equal(outputs.frontend, "true");
   assert.equal(outputs.ios, "true");
   assert.equal(outputs.javascript, "true");
   assert.equal(outputs.repository, "true");
@@ -124,6 +187,8 @@ test("path classifier enables all checks when no changed files are available", a
 
   assert.equal(outputs.docs_only, "false");
   assert.equal(outputs.android, "true");
+  assert.equal(outputs.backend, "true");
+  assert.equal(outputs.frontend, "true");
   assert.equal(outputs.ios, "true");
   assert.equal(outputs.javascript, "true");
   assert.equal(outputs.repository, "true");
