@@ -31,4 +31,24 @@ class InMemoryNotificationRepository : NotificationRepository {
             .filter { notification -> notification.receiverId == receiverId }
             .sortedByDescending { notification -> notification.createdAt }
     }
+
+    override fun markRead(receiverId: Long, notificationId: Long, readAt: String): Notification? {
+        val notification = notificationsById[notificationId]
+            ?.takeIf { candidate -> candidate.receiverId == receiverId }
+            ?: return null
+        val updated = notification.copy(isRead = true, readAt = readAt)
+        notificationsById[notificationId] = updated
+        return updated
+    }
+
+    override fun markAllRead(receiverId: Long, readAt: String): Int {
+        var updatedCount = 0
+        notificationsById.values
+            .filter { notification -> notification.receiverId == receiverId && !notification.isRead }
+            .forEach { notification ->
+                notificationsById[notification.id] = notification.copy(isRead = true, readAt = readAt)
+                updatedCount += 1
+            }
+        return updatedCount
+    }
 }

@@ -6,8 +6,7 @@ import com.maumonmobile.application.port.`in`.ReportStatusUpdateCommand
 import com.maumonmobile.application.port.`in`.ReportUseCase
 import com.maumonmobile.application.port.out.AuthMemberRepository
 import com.maumonmobile.application.port.out.LetterRepository
-import com.maumonmobile.application.port.out.NotificationEventPublisher
-import com.maumonmobile.application.port.out.NotificationRepository
+import com.maumonmobile.application.port.out.NotificationDeliveryPort
 import com.maumonmobile.application.port.out.ReportRepository
 import com.maumonmobile.application.port.out.StoryRepository
 import com.maumonmobile.domain.moderation.ContentModerationTarget
@@ -17,7 +16,6 @@ import com.maumonmobile.domain.report.ReportTargetType
 import com.maumonmobile.global.security.AuthenticatedUser
 import com.maumonmobile.global.web.ApiException
 import com.maumonmobile.global.web.ErrorCode
-import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
 
 @Service
@@ -26,8 +24,7 @@ class ReportService(
     private val reportRepository: ReportRepository,
     private val storyRepository: StoryRepository,
     private val letterRepository: LetterRepository,
-    private val notificationRepository: NotificationRepository,
-    private val notificationEventPublisher: NotificationEventPublisher,
+    private val notificationDeliveryPort: NotificationDeliveryPort,
     private val contentModerationService: ContentModerationService,
 ) : ReportUseCase {
 
@@ -117,26 +114,15 @@ class ReportService(
         reportId: Long,
         status: String,
     ) {
-        notificationRepository.save(memberId, message)
-        runCatching {
-            notificationEventPublisher.publish(
-                memberId,
-                eventName,
-                reportPayload(message = message, reportId = reportId, status = status),
-            )
-        }.onFailure { exception ->
-            log.warn(
-                "Failed to publish report notification event. memberId={}, reportId={}, eventName={}",
-                memberId,
-                reportId,
-                eventName,
-                exception,
-            )
-        }
-    }
-
-    private companion object {
-        private val log = LoggerFactory.getLogger(ReportService::class.java)
+        notificationDeliveryPort.deliver(
+            memberId = memberId,
+            eventName = eventName,
+            message = message,
+            attributes = mapOf(
+                "reportId" to reportId,
+                "status" to status,
+            ),
+        )
     }
 }
 
@@ -156,25 +142,6 @@ private fun String?.toReportStatus(): String {
         throw ApiException(ErrorCode.INVALID_REQUEST, "신고 처리 상태를 확인해 주세요.")
     }
     return status
-}
-
-private fun reportPayload(message: String, reportId: Long, status: String): String {
-    return """{"message":"${message.escapeJson()}","reportId":$reportId,"status":"${status.escapeJson()}"}"""
-}
-
-private fun String.escapeJson(): String {
-    return buildString {
-        for (character in this@escapeJson) {
-            when (character) {
-                '\\' -> append("\\\\")
-                '"' -> append("\\\"")
-                '\n' -> append("\\n")
-                '\r' -> append("\\r")
-                '\t' -> append("\\t")
-                else -> append(character)
-            }
-        }
-    }
 }
 
 private const val REPORT_STATUS_EVENT = "report_status"

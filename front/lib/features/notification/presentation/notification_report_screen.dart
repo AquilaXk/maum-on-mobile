@@ -124,8 +124,17 @@ class _NotificationReportScreenState extends State<NotificationReportScreen>
                   _Header(
                     connectionState:
                         widget.notificationController.state.connectionState,
+                    pushNotificationState: widget
+                        .notificationController.state.pushNotificationState,
+                    unreadCount:
+                        widget.notificationController.state.unreadCount,
+                    lastReceivedAt:
+                        widget.notificationController.state.lastReceivedAt,
                     onBack: widget.onBack,
                     onReconnect: widget.notificationController.reconnect,
+                    onRequestPush:
+                        widget.notificationController.requestPushPermission,
+                    onMarkAllRead: widget.notificationController.markAllRead,
                   ),
                   const TabBar(
                     tabs: [
@@ -139,6 +148,8 @@ class _NotificationReportScreenState extends State<NotificationReportScreen>
                         _NotificationCenter(
                           state: widget.notificationController.state,
                           onRefresh: widget.notificationController.load,
+                          onMarkRead:
+                              widget.notificationController.markAsRead,
                         ),
                         _ReportForm(
                           state: widget.reportController.state,
@@ -175,13 +186,23 @@ class _NotificationReportScreenState extends State<NotificationReportScreen>
 class _Header extends StatelessWidget {
   const _Header({
     required this.connectionState,
+    required this.pushNotificationState,
+    required this.unreadCount,
+    required this.lastReceivedAt,
     required this.onBack,
     required this.onReconnect,
+    required this.onRequestPush,
+    required this.onMarkAllRead,
   });
 
   final NotificationConnectionState connectionState;
+  final PushNotificationState pushNotificationState;
+  final int unreadCount;
+  final String? lastReceivedAt;
   final VoidCallback onBack;
   final Future<void> Function() onReconnect;
+  final Future<void> Function() onRequestPush;
+  final Future<void> Function() onMarkAllRead;
 
   @override
   Widget build(BuildContext context) {
@@ -191,6 +212,16 @@ class _Header extends StatelessWidget {
       NotificationConnectionState.connected => '연결됨',
       NotificationConnectionState.error => '연결 불안정',
     };
+    final pushIcon = switch (pushNotificationState) {
+      PushNotificationState.registered => Icons.notifications_active,
+      PushNotificationState.requesting => Icons.hourglass_top,
+      PushNotificationState.denied => Icons.notifications_off_outlined,
+      PushNotificationState.error => Icons.notification_important_outlined,
+      PushNotificationState.idle => Icons.notifications_outlined,
+    };
+    final summary = lastReceivedAt == null
+        ? '$statusText · 읽지 않음 $unreadCount'
+        : '$statusText · 읽지 않음 $unreadCount · $lastReceivedAt';
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
@@ -212,9 +243,24 @@ class _Header extends StatelessWidget {
                   style: Theme.of(context).textTheme.titleLarge,
                 ),
                 const SizedBox(height: 2),
-                Text(statusText),
+                Text(summary),
               ],
             ),
+          ),
+          if (unreadCount > 0)
+            IconButton(
+              key: const ValueKey('notification-mark-all-read-button'),
+              tooltip: '모두 읽음',
+              onPressed: () => onMarkAllRead(),
+              icon: const Icon(Icons.done_all),
+            ),
+          IconButton(
+            key: const ValueKey('notification-push-button'),
+            tooltip: '푸시 알림',
+            onPressed: pushNotificationState == PushNotificationState.requesting
+                ? null
+                : () => onRequestPush(),
+            icon: Icon(pushIcon),
           ),
           if (connectionState == NotificationConnectionState.error)
             IconButton.filledTonal(
@@ -233,10 +279,12 @@ class _NotificationCenter extends StatelessWidget {
   const _NotificationCenter({
     required this.state,
     required this.onRefresh,
+    required this.onMarkRead,
   });
 
   final NotificationState state;
   final Future<void> Function({bool silent}) onRefresh;
+  final Future<void> Function(NotificationItem notification) onMarkRead;
 
   @override
   Widget build(BuildContext context) {
@@ -261,7 +309,10 @@ class _NotificationCenter extends StatelessWidget {
           if (state.isEmpty)
             const _InlineNotice(message: '아직 도착한 알림이 없습니다.'),
           for (final notification in state.notifications) ...[
-            _NotificationTile(notification: notification),
+            _NotificationTile(
+              notification: notification,
+              onMarkRead: onMarkRead,
+            ),
             const SizedBox(height: 10),
           ],
         ],
@@ -271,51 +322,57 @@ class _NotificationCenter extends StatelessWidget {
 }
 
 class _NotificationTile extends StatelessWidget {
-  const _NotificationTile({required this.notification});
+  const _NotificationTile({
+    required this.notification,
+    required this.onMarkRead,
+  });
 
   final NotificationItem notification;
+  final Future<void> Function(NotificationItem notification) onMarkRead;
 
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
 
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: notification.isRead
-            ? colorScheme.surfaceContainerHighest
-            : colorScheme.primaryContainer,
+    return Material(
+      color: notification.isRead
+          ? colorScheme.surfaceContainerHighest
+          : colorScheme.primaryContainer,
+      borderRadius: BorderRadius.circular(8),
+      child: InkWell(
         borderRadius: BorderRadius.circular(8),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(14),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Icon(
-              notification.isRead
-                  ? Icons.notifications_none
-                  : Icons.notifications_active_outlined,
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    notification.content,
-                    style: const TextStyle(fontWeight: FontWeight.w700),
-                  ),
-                  if (notification.createdAt.isNotEmpty) ...[
-                    const SizedBox(height: 4),
-                    Text(
-                      notification.createdAt,
-                      style: Theme.of(context).textTheme.bodySmall,
-                    ),
-                  ],
-                ],
+        onTap: notification.isRead ? null : () => onMarkRead(notification),
+        child: Padding(
+          padding: const EdgeInsets.all(14),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(
+                notification.isRead
+                    ? Icons.notifications_none
+                    : Icons.notifications_active_outlined,
               ),
-            ),
-          ],
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      notification.content,
+                      style: const TextStyle(fontWeight: FontWeight.w700),
+                    ),
+                    if (notification.createdAt.isNotEmpty) ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        notification.createdAt,
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

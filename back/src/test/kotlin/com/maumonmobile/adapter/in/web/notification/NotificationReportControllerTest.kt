@@ -3,8 +3,11 @@ package com.maumonmobile.adapter.`in`.web.notification
 import com.jayway.jsonpath.JsonPath
 import com.maumonmobile.application.port.out.AuthMemberRepository
 import com.maumonmobile.application.port.out.NotificationEventPublisher
+import com.maumonmobile.application.port.out.NotificationPushCommand
+import com.maumonmobile.application.port.out.NotificationPushSender
 import com.maumonmobile.domain.auth.AuthMember
 import com.maumonmobile.domain.auth.AuthMemberRole
+import com.maumonmobile.domain.notification.NotificationDevicePlatform
 import com.maumonmobile.global.security.JwtTokenProvider
 import org.assertj.core.api.Assertions.assertThat
 import org.hamcrest.Matchers.greaterThan
@@ -19,6 +22,7 @@ import org.springframework.http.MediaType
 import org.springframework.mock.web.MockHttpServletResponse
 import org.springframework.test.context.ActiveProfiles
 import org.springframework.test.web.servlet.MockMvc
+import org.springframework.test.web.servlet.delete
 import org.springframework.test.web.servlet.get
 import org.springframework.test.web.servlet.patch
 import org.springframework.test.web.servlet.post
@@ -31,6 +35,7 @@ class NotificationReportControllerTest @Autowired constructor(
     private val authMemberRepository: AuthMemberRepository,
     private val jwtTokenProvider: JwtTokenProvider,
     private val notificationEventPublisher: CapturingNotificationEventPublisher,
+    private val notificationPushSender: CapturingNotificationPushSender,
 ) {
 
     @Test
@@ -148,6 +153,7 @@ class NotificationReportControllerTest @Autowired constructor(
     @Test
     fun reportReceptionAndProcessingAreDeliveredAsNotifications() {
         notificationEventPublisher.clear()
+        notificationPushSender.clear()
         val owner = signupAndLogin("report-owner@example.com", "작성자")
         val reporter = signupAndLogin("reporter@example.com", "신고자")
         val adminToken = adminAccessToken()
@@ -208,6 +214,152 @@ class NotificationReportControllerTest @Autowired constructor(
     }
 
     @Test
+    fun deviceTokensAndReadStateAreManagedThroughNotificationApi() {
+        notificationEventPublisher.clear()
+        notificationPushSender.clear()
+        val owner = signupAndLogin("notification-device-owner@example.com", "기기작성자")
+        val reporter = signupAndLogin("notification-device-reporter@example.com", "기기신고자")
+
+        mockMvc.post("/api/v1/notifications/device-tokens") {
+            header("Authorization", "Bearer ${owner.accessToken}")
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"platform":"ANDROID","token":"android-token-123456"}"""
+        }
+            .andExpect {
+                status { isOk() }
+                jsonPath("$.data.platform") { value("ANDROID") }
+                jsonPath("$.data.enabled") { value(true) }
+            }
+
+        mockMvc.post("/api/v1/notifications/device-tokens") {
+            header("Authorization", "Bearer ${owner.accessToken}")
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"platform":"ANDROID","token":"short"}"""
+        }
+            .andExpect {
+                status { isBadRequest() }
+                jsonPath("$.error.code") { value("INVALID_REQUEST") }
+            }
+
+        val postId = createPost(owner.accessToken, "푸시 알림 신고 대상")
+        mockMvc.post("/api/v1/reports") {
+            header("Authorization", "Bearer ${reporter.accessToken}")
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"targetId":$postId,"targetType":"POST","reason":"SPAM","content":"반복 광고입니다."}"""
+        }
+            .andExpect {
+                status { isOk() }
+            }
+
+        assertThat(notificationPushSender.commands).hasSize(1)
+        val pushCommand = notificationPushSender.commands.single()
+        assertThat(pushCommand.memberId).isEqualTo(owner.memberId.toLong())
+        assertThat(pushCommand.platform).isEqualTo(NotificationDevicePlatform.ANDROID)
+        assertThat(pushCommand.body).isEqualTo("작성한 콘텐츠에 신고가 접수되었습니다.")
+        assertThat(pushCommand.data).containsKeys("notificationId", "reportId")
+
+        val notificationsResult = mockMvc.get("/api/v1/notifications") {
+            header("Authorization", "Bearer ${owner.accessToken}")
+        }
+            .andExpect {
+                status { isOk() }
+                jsonPath("$.data[0].read") { value(false) }
+                jsonPath("$.data[0].readAt") { doesNotExist() }
+            }
+            .andReturn()
+        val notificationId = notificationsResult.response.readJsonInt("$.data[0].id")
+
+        mockMvc.post("/api/v1/notifications/$notificationId/read") {
+            header("Authorization", "Bearer ${owner.accessToken}")
+        }
+            .andExpect {
+                status { isOk() }
+                jsonPath("$.data.read") { value(true) }
+                jsonPath("$.data.readAt") { isNotEmpty() }
+            }
+
+        mockMvc.post("/api/v1/notifications/read-all") {
+            header("Authorization", "Bearer ${owner.accessToken}")
+        }
+            .andExpect {
+                status { isOk() }
+                jsonPath("$.data.updatedCount") { value(0) }
+            }
+
+        mockMvc.delete("/api/v1/notifications/device-tokens") {
+            header("Authorization", "Bearer ${owner.accessToken}")
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"token":"android-token-123456"}"""
+        }
+            .andExpect {
+                status { isOk() }
+                jsonPath("$.data") { value(true) }
+            }
+    }
+
+    @Test
+    fun letterAndConsultationStateChangesCreateUserNotifications() {
+        notificationEventPublisher.clear()
+        notificationPushSender.clear()
+        val sender = signupAndLogin("letter-notify-sender@example.com", "편지보낸이")
+        val receiver = signupAndLogin("letter-notify-receiver@example.com", "편지받는이")
+
+        val letterResult = mockMvc.post("/api/v1/letters") {
+            header("Authorization", "Bearer ${sender.accessToken}")
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"title":"오늘의 마음","content":"잘 지내고 있나요?"}"""
+        }
+            .andExpect {
+                status { isOk() }
+            }
+            .andReturn()
+        val letterId = letterResult.response.readJsonInt("$.data")
+
+        assertNotificationsContain(receiver.accessToken, "새로운 랜덤 편지가 도착했습니다!")
+
+        mockMvc.post("/api/v1/letters/$letterId/accept") {
+            header("Authorization", "Bearer ${receiver.accessToken}")
+        }
+            .andExpect {
+                status { isOk() }
+            }
+
+        mockMvc.post("/api/v1/letters/$letterId/writing") {
+            header("Authorization", "Bearer ${receiver.accessToken}")
+        }
+            .andExpect {
+                status { isOk() }
+            }
+
+        mockMvc.post("/api/v1/letters/$letterId/reply") {
+            header("Authorization", "Bearer ${receiver.accessToken}")
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"replyContent":"답장을 보냅니다."}"""
+        }
+            .andExpect {
+                status { isOk() }
+            }
+
+        assertNotificationsContain(sender.accessToken, "상대방이 편지를 읽었습니다.")
+        assertNotificationsContain(sender.accessToken, "상대방이 답장을 작성 중입니다.")
+        assertNotificationsContain(sender.accessToken, "보낸 편지에 답장이 도착했습니다!")
+
+        mockMvc.post("/api/v1/consultations/chat") {
+            header("Authorization", "Bearer ${sender.accessToken}")
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"message":"마음이 복잡해요"}"""
+        }
+            .andExpect {
+                status { isOk() }
+                jsonPath("$.success") { value(true) }
+            }
+
+        assertNotificationsContain(sender.accessToken, "상담 답변이 도착했습니다.")
+        assertThat(notificationEventPublisher.events.map { event -> event.eventName })
+            .contains("new_letter", "letter_read", "writing_status", "reply_arrival", "consultation_reply")
+    }
+
+    @Test
     fun reportStatusUpdateSucceedsWhenRealtimePublishFails() {
         notificationEventPublisher.clear()
         val owner = signupAndLogin("report-publish-owner@example.com", "작성자")
@@ -247,6 +399,38 @@ class NotificationReportControllerTest @Autowired constructor(
         assertThat(notificationEventPublisher.events).isEmpty()
     }
 
+    @Test
+    fun notificationDeliveryContinuesWhenPushDispatchFails() {
+        notificationEventPublisher.clear()
+        notificationPushSender.clear()
+        val owner = signupAndLogin("report-push-owner@example.com", "작성자")
+        val reporter = signupAndLogin("report-push-reporter@example.com", "신고자")
+
+        mockMvc.post("/api/v1/notifications/device-tokens") {
+            header("Authorization", "Bearer ${owner.accessToken}")
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"platform":"IOS","token":"ios-token-1234567890"}"""
+        }
+            .andExpect {
+                status { isOk() }
+            }
+
+        val postId = createPost(owner.accessToken, "푸시 실패 신고 대상")
+        notificationPushSender.failNextSend = true
+
+        mockMvc.post("/api/v1/reports") {
+            header("Authorization", "Bearer ${reporter.accessToken}")
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"targetId":$postId,"targetType":"POST","reason":"SPAM","content":"반복 광고입니다."}"""
+        }
+            .andExpect {
+                status { isOk() }
+            }
+
+        assertNotificationsContain(owner.accessToken, "작성한 콘텐츠에 신고가 접수되었습니다.")
+        assertThat(notificationPushSender.commands).isEmpty()
+    }
+
     private fun createPost(accessToken: String, title: String): Int {
         val postResult = mockMvc.post("/api/v1/posts") {
             header("Authorization", "Bearer $accessToken")
@@ -258,6 +442,18 @@ class NotificationReportControllerTest @Autowired constructor(
             }
             .andReturn()
         return postResult.response.readJsonInt("$.data")
+    }
+
+    private fun assertNotificationsContain(accessToken: String, content: String) {
+        val result = mockMvc.get("/api/v1/notifications") {
+            header("Authorization", "Bearer $accessToken")
+        }
+            .andExpect {
+                status { isOk() }
+            }
+            .andReturn()
+        val contents = result.response.readJsonStringList("$.data[*].content")
+        assertThat(contents).contains(content)
     }
 
     private fun signupAndLogin(email: String, nickname: String): TestMember {
@@ -310,6 +506,12 @@ class NotificationReportControllerTest @Autowired constructor(
         fun notificationEventPublisher(): CapturingNotificationEventPublisher {
             return CapturingNotificationEventPublisher()
         }
+
+        @Bean
+        @Primary
+        fun notificationPushSender(): CapturingNotificationPushSender {
+            return CapturingNotificationPushSender()
+        }
     }
 }
 
@@ -342,10 +544,32 @@ data class PublishedNotificationEvent(
     val data: String,
 )
 
+class CapturingNotificationPushSender : NotificationPushSender {
+    val commands = mutableListOf<NotificationPushCommand>()
+    var failNextSend = false
+
+    override fun send(command: NotificationPushCommand) {
+        if (failNextSend) {
+            failNextSend = false
+            throw IllegalStateException("push failed")
+        }
+        commands += command
+    }
+
+    fun clear() {
+        commands.clear()
+        failNextSend = false
+    }
+}
+
 private fun MockHttpServletResponse.readJsonString(path: String): String {
     return JsonPath.read<String>(contentAsString, path)
 }
 
 private fun MockHttpServletResponse.readJsonInt(path: String): Int {
     return JsonPath.read<Int>(contentAsString, path)
+}
+
+private fun MockHttpServletResponse.readJsonStringList(path: String): List<String> {
+    return JsonPath.read<List<String>>(contentAsString, path)
 }

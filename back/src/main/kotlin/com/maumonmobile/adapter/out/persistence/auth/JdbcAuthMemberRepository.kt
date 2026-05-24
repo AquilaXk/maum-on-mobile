@@ -100,6 +100,19 @@ class JdbcAuthMemberRepository(
         ).singleOrNull()
     }
 
+    override fun findAllActive(): List<AuthMember> {
+        return jdbc.query(
+            """
+                select *
+                  from auth_members
+                 where status = :status
+                 order by id asc
+            """.trimIndent(),
+            params().withValue("status", AuthMemberStatus.ACTIVE.name),
+            rowMapper,
+        )
+    }
+
     override fun findByEmail(email: String): AuthMember? {
         return jdbc.query(
             "select * from auth_members where email = :email",

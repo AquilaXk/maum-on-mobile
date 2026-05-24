@@ -4,46 +4,68 @@ import 'package:flutter/widgets.dart';
 
 import '../../../core/network/api_error.dart';
 import '../data/notification_repository.dart';
+import '../data/push_notification_permission_client.dart';
 import '../domain/notification_models.dart';
+
+enum PushNotificationState {
+  idle,
+  requesting,
+  registered,
+  denied,
+  error,
+}
 
 class NotificationState {
   const NotificationState({
     required this.notifications,
     this.connectionState = NotificationConnectionState.idle,
+    this.pushNotificationState = PushNotificationState.idle,
     this.isLoading = false,
     this.hasLoaded = false,
     this.errorMessage,
     this.noticeMessage,
+    this.lastReceivedAt,
   });
 
   final List<NotificationItem> notifications;
   final NotificationConnectionState connectionState;
+  final PushNotificationState pushNotificationState;
   final bool isLoading;
   final bool hasLoaded;
   final String? errorMessage;
   final String? noticeMessage;
+  final String? lastReceivedAt;
 
   bool get isEmpty => hasLoaded && notifications.isEmpty;
+
+  int get unreadCount {
+    return notifications.where((notification) => !notification.isRead).length;
+  }
 
   NotificationState copyWith({
     List<NotificationItem>? notifications,
     NotificationConnectionState? connectionState,
+    PushNotificationState? pushNotificationState,
     bool? isLoading,
     bool? hasLoaded,
     String? errorMessage,
     String? noticeMessage,
+    String? lastReceivedAt,
     bool clearErrorMessage = false,
     bool clearNoticeMessage = false,
   }) {
     return NotificationState(
       notifications: notifications ?? this.notifications,
       connectionState: connectionState ?? this.connectionState,
+      pushNotificationState:
+          pushNotificationState ?? this.pushNotificationState,
       isLoading: isLoading ?? this.isLoading,
       hasLoaded: hasLoaded ?? this.hasLoaded,
       errorMessage:
           clearErrorMessage ? null : errorMessage ?? this.errorMessage,
       noticeMessage:
           clearNoticeMessage ? null : noticeMessage ?? this.noticeMessage,
+      lastReceivedAt: lastReceivedAt ?? this.lastReceivedAt,
     );
   }
 }
@@ -51,20 +73,32 @@ class NotificationState {
 class NotificationController extends ChangeNotifier {
   NotificationController({
     required NotificationRepository repository,
+    PushNotificationPermissionClient? pushPermissionClient,
+    Duration reconnectDelay = const Duration(seconds: 3),
+    int maxReconnectAttempts = 3,
     VoidCallback? onUnauthorized,
   })  : _repository = repository,
+        _pushPermissionClient = pushPermissionClient,
+        _reconnectDelay = reconnectDelay,
+        _maxReconnectAttempts = maxReconnectAttempts,
         _onUnauthorized = onUnauthorized,
         _state = const NotificationState(notifications: []);
 
   final NotificationRepository _repository;
+  final PushNotificationPermissionClient? _pushPermissionClient;
+  final Duration _reconnectDelay;
+  final int _maxReconnectAttempts;
   final VoidCallback? _onUnauthorized;
 
   NotificationState _state;
   StreamSubscription<NotificationStreamEvent>? _streamSubscription;
+  Timer? _reconnectTimer;
   bool _shouldRestoreConnection = false;
   bool _isConnecting = false;
   bool _isDisposed = false;
   int _localEventSequence = 0;
+  int _reconnectAttempts = 0;
+  final Set<String> _seenStreamEventKeys = <String>{};
 
   NotificationState get state => _state;
 
@@ -81,19 +115,14 @@ class NotificationController extends ChangeNotifier {
 
     try {
       final notifications = await _repository.fetchNotifications();
-      final nextNotifications = silent && notifications.isEmpty
-          ? _state.notifications
-          : silent
-              ? [
-                  ..._state.notifications.where(
-                    (notification) => notification.id < 0,
-                  ),
-                  ...notifications,
-                ]
-              : notifications;
+      for (final notification in notifications) {
+        _seenStreamEventKeys.add('notification:${notification.id}');
+      }
       _setState(
         _state.copyWith(
-          notifications: nextNotifications,
+          notifications: silent
+              ? _mergeNotifications(_state.notifications, notifications)
+              : notifications,
           isLoading: false,
           hasLoaded: true,
           clearErrorMessage: true,
@@ -111,6 +140,101 @@ class NotificationController extends ChangeNotifier {
     }
   }
 
+  Future<void> markAsRead(NotificationItem notification) async {
+    if (notification.isRead || notification.id <= 0) {
+      return;
+    }
+
+    try {
+      final updated = await _repository.markRead(notification.id);
+      _replaceNotification(updated);
+    } on Object catch (error) {
+      _handleError(error);
+      _setState(
+        _state.copyWith(errorMessage: _messageFromError(error)),
+      );
+    }
+  }
+
+  Future<void> markAllRead() async {
+    if (_state.unreadCount == 0) {
+      return;
+    }
+
+    try {
+      await _repository.markAllRead();
+      final now = DateTime.now().toIso8601String();
+      _setState(
+        _state.copyWith(
+          notifications: [
+            for (final notification in _state.notifications)
+              notification.copyWith(isRead: true, readAt: now),
+          ],
+          clearErrorMessage: true,
+        ),
+      );
+    } on Object catch (error) {
+      _handleError(error);
+      _setState(
+        _state.copyWith(errorMessage: _messageFromError(error)),
+      );
+    }
+  }
+
+  Future<void> requestPushPermission() async {
+    final client = _pushPermissionClient;
+    if (client == null) {
+      _setState(
+        _state.copyWith(
+          pushNotificationState: PushNotificationState.error,
+          errorMessage: '푸시 알림 권한을 요청할 수 없습니다.',
+        ),
+      );
+      return;
+    }
+
+    _setState(
+      _state.copyWith(
+        pushNotificationState: PushNotificationState.requesting,
+        clearErrorMessage: true,
+      ),
+    );
+
+    try {
+      final permission = await client.requestPermission();
+      final token = permission.token;
+      if (!permission.granted || token == null || token.isEmpty) {
+        _setState(
+          _state.copyWith(
+            pushNotificationState: PushNotificationState.denied,
+            errorMessage: permission.message ?? '푸시 알림 권한이 허용되지 않았습니다.',
+          ),
+        );
+        return;
+      }
+
+      await _repository.registerDeviceToken(
+        platform: permission.platform,
+        token: token,
+      );
+      _setState(
+        _state.copyWith(
+          pushNotificationState: PushNotificationState.registered,
+          noticeMessage: '푸시 알림이 켜졌습니다.',
+          clearErrorMessage: true,
+        ),
+      );
+    } on Object catch (error) {
+      _handleError(error);
+      _setState(
+        _state.copyWith(
+          pushNotificationState: PushNotificationState.error,
+          errorMessage: _messageFromError(error),
+        ),
+      );
+    }
+  }
+
   Future<void> connect() async {
     if (_streamSubscription != null || _isConnecting) {
       return;
@@ -118,6 +242,7 @@ class NotificationController extends ChangeNotifier {
 
     _shouldRestoreConnection = true;
     _isConnecting = true;
+    _reconnectTimer?.cancel();
     _setState(
       _state.copyWith(
         connectionState: NotificationConnectionState.connecting,
@@ -133,11 +258,11 @@ class NotificationController extends ChangeNotifier {
 
       _streamSubscription = _repository.connect(ticket.ticket).listen(
             _handleStreamEvent,
-            onError: _handleStreamError,
+            onError: (Object error) => _handleStreamError(error),
             onDone: _handleStreamDone,
           );
     } on Object catch (error) {
-      _handleStreamError(error);
+      _handleStreamError(error, canRestore: false);
     } finally {
       _isConnecting = false;
     }
@@ -145,12 +270,15 @@ class NotificationController extends ChangeNotifier {
 
   Future<void> reconnect() async {
     _shouldRestoreConnection = true;
+    _reconnectAttempts = 0;
+    _reconnectTimer?.cancel();
     await _cancelStream();
     await connect();
   }
 
   void close() {
     _shouldRestoreConnection = false;
+    _reconnectTimer?.cancel();
     _cancelStreamForLifecycle(
       connectionState: NotificationConnectionState.idle,
       clearErrorMessage: true,
@@ -159,6 +287,7 @@ class NotificationController extends ChangeNotifier {
 
   void handleLifecycleState(AppLifecycleState lifecycleState) {
     if (lifecycleState == AppLifecycleState.resumed) {
+      unawaited(load(silent: true));
       if (_shouldRestoreConnection &&
           _streamSubscription == null &&
           !_isConnecting) {
@@ -172,6 +301,7 @@ class NotificationController extends ChangeNotifier {
         lifecycleState == AppLifecycleState.detached) {
       if (_streamSubscription != null || _isConnecting) {
         _shouldRestoreConnection = true;
+        _reconnectTimer?.cancel();
         _cancelStreamForLifecycle(
           connectionState: NotificationConnectionState.idle,
           clearErrorMessage: true,
@@ -182,6 +312,7 @@ class NotificationController extends ChangeNotifier {
 
   void _handleStreamEvent(NotificationStreamEvent event) {
     if (event.type == NotificationStreamEventType.connect) {
+      _reconnectAttempts = 0;
       _setState(
         _state.copyWith(
           connectionState: NotificationConnectionState.connected,
@@ -192,31 +323,34 @@ class NotificationController extends ChangeNotifier {
       return;
     }
 
-    if (!event.shouldDisplay) {
+    if (!event.shouldDisplay || !_seenStreamEventKeys.add(event.dedupeKey)) {
       return;
     }
 
-    _localEventSequence -= 1;
+    final createdAt = event.createdAt ?? DateTime.now().toIso8601String();
     final notification = NotificationItem(
-      id: _localEventSequence,
+      id: event.notificationId ?? --_localEventSequence,
       content: event.message,
       isRead: false,
-      createdAt: DateTime.now().toIso8601String(),
+      createdAt: createdAt,
     );
     _setState(
       _state.copyWith(
         notifications: [
           notification,
-          ..._state.notifications,
+          ..._state.notifications.where(
+            (item) => item.id != notification.id,
+          ),
         ],
         noticeMessage: event.message,
+        lastReceivedAt: createdAt,
         clearErrorMessage: true,
       ),
     );
     unawaited(load(silent: true));
   }
 
-  void _handleStreamError(Object error) {
+  void _handleStreamError(Object error, {bool canRestore = true}) {
     final currentSubscription = _streamSubscription;
     _streamSubscription = null;
     _isConnecting = false;
@@ -231,19 +365,68 @@ class NotificationController extends ChangeNotifier {
         errorMessage: _messageFromError(error),
       ),
     );
+    if (canRestore) {
+      _scheduleReconnect();
+    }
   }
 
   void _handleStreamDone() {
     _streamSubscription = null;
     _isConnecting = false;
-    if (_state.connectionState == NotificationConnectionState.connected) {
-      _setState(
-        _state.copyWith(
-          connectionState: NotificationConnectionState.error,
-          errorMessage: '알림 연결이 종료되었습니다. 다시 연결해 주세요.',
-        ),
-      );
+    _setState(
+      _state.copyWith(
+        connectionState: NotificationConnectionState.error,
+        errorMessage: '알림 연결이 종료되었습니다. 다시 연결해 주세요.',
+      ),
+    );
+    _scheduleReconnect();
+  }
+
+  void _scheduleReconnect() {
+    if (!_shouldRestoreConnection ||
+        _isDisposed ||
+        _reconnectAttempts >= _maxReconnectAttempts ||
+        _reconnectTimer != null) {
+      return;
     }
+
+    _reconnectAttempts += 1;
+    _reconnectTimer = Timer(_reconnectDelay, () {
+      _reconnectTimer = null;
+      if (_isDisposed || !_shouldRestoreConnection) {
+        return;
+      }
+      unawaited(load(silent: true));
+      unawaited(connect());
+    });
+  }
+
+  void _replaceNotification(NotificationItem updated) {
+    _setState(
+      _state.copyWith(
+        notifications: [
+          for (final notification in _state.notifications)
+            notification.id == updated.id ? updated : notification,
+        ],
+        clearErrorMessage: true,
+      ),
+    );
+  }
+
+  List<NotificationItem> _mergeNotifications(
+    List<NotificationItem> current,
+    List<NotificationItem> fetched,
+  ) {
+    if (fetched.isEmpty) {
+      return current;
+    }
+
+    final localOnly = current.where((notification) => notification.id < 0);
+    final fetchedIds = fetched.map((notification) => notification.id).toSet();
+    final stillLocal = localOnly.where(
+      (notification) => !fetchedIds.contains(-notification.id),
+    );
+    return [...stillLocal, ...fetched];
   }
 
   void _handleError(Object error) {
@@ -300,6 +483,7 @@ class NotificationController extends ChangeNotifier {
   @override
   void dispose() {
     _isDisposed = true;
+    _reconnectTimer?.cancel();
     unawaited(_cancelStream());
     super.dispose();
   }

@@ -5,6 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:maum_on_mobile_front/core/network/api_error.dart';
 import 'package:maum_on_mobile_front/features/notification/application/notification_controller.dart';
 import 'package:maum_on_mobile_front/features/notification/data/notification_repository.dart';
+import 'package:maum_on_mobile_front/features/notification/data/push_notification_permission_client.dart';
 import 'package:maum_on_mobile_front/features/notification/domain/notification_models.dart';
 
 void main() {
@@ -70,6 +71,98 @@ void main() {
       expect(controller.state.noticeMessage, '신고 처리 결과가 등록되었습니다: RESOLVED');
     });
 
+    test('deduplicates streamed events by server notification id', () async {
+      final repository = _FakeNotificationRepository(
+        notificationsQueue: [
+          const [],
+          const [],
+          const [],
+        ],
+      );
+      final controller = NotificationController(repository: repository);
+
+      await controller.load();
+      await controller.connect();
+      repository.emit(
+        const NotificationStreamEvent.reportStatus(
+          '신고 처리 결과가 등록되었습니다: RESOLVED',
+          status: 'RESOLVED',
+          reportId: 9,
+          notificationId: 77,
+          createdAt: '2026-05-24T09:00:00',
+        ),
+      );
+      repository.emit(
+        const NotificationStreamEvent.reportStatus(
+          '신고 처리 결과가 등록되었습니다: RESOLVED',
+          status: 'RESOLVED',
+          reportId: 9,
+          notificationId: 77,
+          createdAt: '2026-05-24T09:00:00',
+        ),
+      );
+      await Future<void>.delayed(Duration.zero);
+
+      expect(controller.state.notifications, hasLength(1));
+      expect(controller.state.notifications.single.id, 77);
+      expect(controller.state.lastReceivedAt, '2026-05-24T09:00:00');
+    });
+
+    test('marks one notification and then marks all notifications as read',
+        () async {
+      final repository = _FakeNotificationRepository(
+        notificationsQueue: [
+          [
+            const NotificationItem(
+              id: 3,
+              content: '상대방이 편지를 읽었습니다.',
+              isRead: false,
+              createdAt: '2026-05-24T09:00:00',
+            ),
+            const NotificationItem(
+              id: 4,
+              content: '보낸 편지에 답장이 도착했습니다!',
+              isRead: false,
+              createdAt: '2026-05-24T09:01:00',
+            ),
+          ],
+        ],
+      );
+      final controller = NotificationController(repository: repository);
+
+      await controller.load();
+      await controller.markAsRead(controller.state.notifications.first);
+      await controller.markAllRead();
+
+      expect(repository.markReadIds, [3]);
+      expect(repository.markAllReadCount, 1);
+      expect(controller.state.notifications.every((item) => item.isRead), isTrue);
+    });
+
+    test('requests push permission and registers the device token', () async {
+      final repository = _FakeNotificationRepository();
+      final permissionClient = _FakePushNotificationPermissionClient(
+        const PushNotificationPermissionResult(
+          granted: true,
+          platform: NotificationDevicePlatform.ios,
+          token: 'ios-token-1234567890',
+        ),
+      );
+      final controller = NotificationController(
+        repository: repository,
+        pushPermissionClient: permissionClient,
+      );
+
+      await controller.requestPushPermission();
+
+      expect(permissionClient.requestCount, 1);
+      expect(repository.registeredTokens, ['IOS:ios-token-1234567890']);
+      expect(
+        controller.state.pushNotificationState,
+        PushNotificationState.registered,
+      );
+    });
+
     test('does not request duplicate tickets while connecting', () async {
       final ticketCompleter = Completer<NotificationSubscriptionTicket>();
       final repository = _FakeNotificationRepository(
@@ -114,7 +207,10 @@ void main() {
     test('closes and restores the stream around app lifecycle changes',
         () async {
       final repository = _FakeNotificationRepository();
-      final controller = NotificationController(repository: repository);
+      final controller = NotificationController(
+        repository: repository,
+        reconnectDelay: Duration.zero,
+      );
 
       await controller.connect();
       repository.emit(const NotificationStreamEvent.connect('연결되었습니다!'));
@@ -128,6 +224,33 @@ void main() {
       await Future<void>.delayed(Duration.zero);
 
       expect(repository.ticketRequestCount, 2);
+    });
+
+    test('refreshes and reconnects after an open stream fails', () async {
+      final repository = _FakeNotificationRepository(
+        notificationsQueue: [
+          const [],
+          const [],
+        ],
+      );
+      final controller = NotificationController(
+        repository: repository,
+        reconnectDelay: Duration.zero,
+      );
+
+      await controller.connect();
+      repository.emit(const NotificationStreamEvent.connect('연결되었습니다!'));
+      repository.emitError(const ApiClientException(
+        kind: ApiErrorKind.network,
+        message: '네트워크 연결을 확인해 주세요.',
+      ));
+      await Future<void>.delayed(Duration.zero);
+      await Future<void>.delayed(Duration.zero);
+
+      expect(repository.ticketRequestCount, 2);
+      expect(repository.fetchCount, 1);
+      expect(controller.state.connectionState,
+          NotificationConnectionState.connecting);
     });
   });
 }
@@ -147,17 +270,59 @@ class _FakeNotificationRepository implements NotificationRepository {
   final Completer<NotificationSubscriptionTicket>? _ticketCompleter;
   final Object? ticketError;
   final List<String> connectTickets = [];
+  final List<int> markReadIds = [];
+  final List<String> registeredTokens = [];
   int ticketRequestCount = 0;
+  int fetchCount = 0;
   int cancelCount = 0;
+  int markAllReadCount = 0;
   StreamController<NotificationStreamEvent>? _controller;
 
   @override
   Future<List<NotificationItem>> fetchNotifications() async {
+    fetchCount += 1;
     if (_notificationsQueue.isEmpty) {
       return const [];
     }
 
     return _notificationsQueue.removeAt(0);
+  }
+
+  @override
+  Future<NotificationItem> markRead(int notificationId) async {
+    markReadIds.add(notificationId);
+    return NotificationItem(
+      id: notificationId,
+      content: '상대방이 편지를 읽었습니다.',
+      isRead: true,
+      createdAt: '2026-05-24T09:00:00',
+      readAt: '2026-05-24T09:02:00',
+    );
+  }
+
+  @override
+  Future<NotificationBulkReadResult> markAllRead() async {
+    markAllReadCount += 1;
+    return const NotificationBulkReadResult(updatedCount: 1);
+  }
+
+  @override
+  Future<NotificationDeviceTokenResult> registerDeviceToken({
+    required NotificationDevicePlatform platform,
+    required String token,
+  }) async {
+    registeredTokens.add('${platform.apiValue}:$token');
+    return NotificationDeviceTokenResult(
+      platform: platform,
+      enabled: true,
+      updatedAt: '2026-05-24T09:03:00',
+    );
+  }
+
+  @override
+  Future<bool> unregisterDeviceToken(String token) async {
+    registeredTokens.removeWhere((registered) => registered.endsWith(':$token'));
+    return true;
   }
 
   @override
@@ -192,5 +357,23 @@ class _FakeNotificationRepository implements NotificationRepository {
 
   void emit(NotificationStreamEvent event) {
     _controller?.add(event);
+  }
+
+  void emitError(Object error) {
+    _controller?.addError(error);
+  }
+}
+
+class _FakePushNotificationPermissionClient
+    implements PushNotificationPermissionClient {
+  _FakePushNotificationPermissionClient(this.result);
+
+  final PushNotificationPermissionResult result;
+  int requestCount = 0;
+
+  @override
+  Future<PushNotificationPermissionResult> requestPermission() async {
+    requestCount += 1;
+    return result;
   }
 }

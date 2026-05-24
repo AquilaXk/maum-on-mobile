@@ -146,7 +146,7 @@ void main() {
     );
     await tester.pump();
     expect(find.text('알림/신고'), findsWidgets);
-    expect(find.text('연결됨'), findsOneWidget);
+    expect(find.textContaining('연결됨'), findsOneWidget);
     await _returnHome(tester);
 
     await _tapVisibleText(tester, '설정');
@@ -307,7 +307,7 @@ void main() {
     await tester.pump();
 
     expect(find.text('알림/신고'), findsWidgets);
-    expect(find.text('연결됨'), findsOneWidget);
+    expect(find.textContaining('연결됨'), findsOneWidget);
     expect(notificationRepository.ticketRequestCount, 1);
   });
 
@@ -576,6 +576,39 @@ class _FakeNotificationRepository implements NotificationRepository {
         createdAt: '2026-05-24T09:00:00',
       ),
     ];
+  }
+
+  @override
+  Future<NotificationItem> markRead(int notificationId) async {
+    return NotificationItem(
+      id: notificationId,
+      content: '상대방이 편지를 읽었습니다.',
+      isRead: true,
+      createdAt: '2026-05-24T09:00:00',
+      readAt: '2026-05-24T09:01:00',
+    );
+  }
+
+  @override
+  Future<NotificationBulkReadResult> markAllRead() async {
+    return const NotificationBulkReadResult(updatedCount: 1);
+  }
+
+  @override
+  Future<NotificationDeviceTokenResult> registerDeviceToken({
+    required NotificationDevicePlatform platform,
+    required String token,
+  }) async {
+    return NotificationDeviceTokenResult(
+      platform: platform,
+      enabled: true,
+      updatedAt: '2026-05-24T09:02:00',
+    );
+  }
+
+  @override
+  Future<bool> unregisterDeviceToken(String token) async {
+    return true;
   }
 
   @override
