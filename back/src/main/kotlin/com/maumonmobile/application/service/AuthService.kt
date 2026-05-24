@@ -12,7 +12,11 @@ import com.maumonmobile.application.port.`in`.OidcCallbackResult
 import com.maumonmobile.application.port.`in`.RefreshCommand
 import com.maumonmobile.application.port.`in`.SignupCommand
 import com.maumonmobile.application.port.out.AuthMemberRepository
+import com.maumonmobile.application.port.out.AuthOidcIdentity
+import com.maumonmobile.application.port.out.AuthOidcIdentityProvider
 import com.maumonmobile.application.port.out.AuthOidcStateRepository
+import com.maumonmobile.application.port.out.AuthOidcTokenCommand
+import com.maumonmobile.application.port.out.AuthOidcVerificationException
 import com.maumonmobile.domain.auth.AuthMember
 import com.maumonmobile.domain.auth.AuthMemberStatus
 import com.maumonmobile.domain.auth.AuthOidcState
@@ -35,6 +39,7 @@ import java.util.Locale
 class AuthService(
     private val authMemberRepository: AuthMemberRepository,
     private val authOidcStateRepository: AuthOidcStateRepository,
+    private val authOidcIdentityProvider: AuthOidcIdentityProvider,
     private val passwordEncoder: PasswordEncoder,
     private val jwtTokenProvider: JwtTokenProvider,
     @param:Value("\${app.auth.oidc.provider-authorization-base-url:https://login.maumon.local}")
@@ -145,7 +150,9 @@ class AuthService(
             return OidcCallbackResult(stateMismatchRedirect(defaultAppRedirectUri))
         }
 
-        authOidcStateRepository.markConsumed(savedState.id, Instant.now().toString())
+        if (!authOidcStateRepository.markConsumed(savedState.id, Instant.now().toString())) {
+            return OidcCallbackResult(stateMismatchRedirect(defaultAppRedirectUri))
+        }
 
         val error = command.error?.trim()?.takeIf(String::isNotEmpty)
         if (error != null) {
@@ -167,7 +174,26 @@ class AuthService(
                     mapOf("error" to "invalid_request"),
                 ),
             )
-        val session = issueSession(findOrCreateSocialMember(provider, code))
+        val identity = try {
+            authOidcIdentityProvider.verify(
+                AuthOidcTokenCommand(
+                    provider = provider,
+                    code = code,
+                    codeVerifier = savedState.codeVerifier,
+                    redirectUri = callbackUri(provider),
+                    clientId = oidcClientId,
+                    expectedNonce = savedState.nonce,
+                ),
+            )
+        } catch (_: AuthOidcVerificationException) {
+            return OidcCallbackResult(
+                appRedirect(
+                    savedState.redirectUri,
+                    mapOf("error" to "invalid_request"),
+                ),
+            )
+        }
+        val session = issueSession(findOrCreateSocialMember(provider, identity))
 
         return OidcCallbackResult(successRedirect(savedState.redirectUri, session))
     }
@@ -207,21 +233,28 @@ class AuthService(
         )
     }
 
-    private fun findOrCreateSocialMember(provider: String, code: String): AuthMember {
-        val subject = code.lowercase(Locale.ROOT)
+    private fun findOrCreateSocialMember(provider: String, identity: AuthOidcIdentity): AuthMember {
+        val subject = identity.subject.lowercase(Locale.ROOT)
             .replace(Regex("[^a-z0-9._-]"), "-")
             .trim('-')
             .take(80)
             .ifBlank { "user" }
-        val email = "$provider-$subject@social.maumon.local"
+        val email = identity.email
+            ?.trim()
+            ?.lowercase(Locale.ROOT)
+            ?.takeIf { candidate -> candidate.matches(Regex("[^@\\s]+@[^@\\s]+\\.[^@\\s]+")) }
+            ?: "$provider-$subject@social.maumon.local"
         authMemberRepository.findByEmail(email)?.let { member -> return member }
 
         return authMemberRepository.save(
             AuthMember(
                 id = 0,
                 email = email,
-                passwordHash = "OIDC:$provider:$subject",
-                nickname = "${provider.uppercase(Locale.ROOT)} 사용자",
+                passwordHash = "OIDC:${identity.issuer}:$subject",
+                nickname = identity.nickname
+                    ?.trim()
+                    ?.takeIf(String::isNotEmpty)
+                    ?: "${provider.uppercase(Locale.ROOT)} 사용자",
                 socialAccount = true,
             ),
         )

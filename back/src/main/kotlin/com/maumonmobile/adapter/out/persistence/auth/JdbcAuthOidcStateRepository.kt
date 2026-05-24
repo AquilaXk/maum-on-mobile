@@ -52,8 +52,8 @@ class JdbcAuthOidcStateRepository(
         ).singleOrNull()
     }
 
-    override fun markConsumed(id: Long, consumedAt: String) {
-        jdbc.update(
+    override fun markConsumed(id: Long, consumedAt: String): Boolean {
+        return jdbc.update(
             """
                 update auth_oidc_states
                    set consumed_at = :consumedAt
@@ -63,7 +63,7 @@ class JdbcAuthOidcStateRepository(
             params()
                 .withValue("id", id)
                 .withValue("consumedAt", consumedAt),
-        )
+        ) == 1
     }
 
     private fun AuthOidcState.toSqlParams() = params()

@@ -10,6 +10,7 @@ import com.maumonmobile.application.port.out.NotificationRepository
 import com.maumonmobile.application.port.out.ReportRepository
 import com.maumonmobile.application.port.out.StoryRepository
 import com.maumonmobile.domain.auth.AuthMember
+import com.maumonmobile.domain.auth.AuthOidcState
 import com.maumonmobile.domain.consultation.ConsultationMessageSender
 import com.maumonmobile.domain.story.StoryPostDraft
 import org.assertj.core.api.Assertions.assertThat
@@ -18,6 +19,7 @@ import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.test.context.ActiveProfiles
+import java.time.Instant
 
 @SpringBootTest
 @ActiveProfiles("test")
@@ -78,6 +80,29 @@ class PersistentRepositoryContextTest @Autowired constructor(
         authMemberRepository.revokeRefreshToken("refresh-token-1")
 
         assertThat(authMemberRepository.findByRefreshToken("refresh-token-1")).isNull()
+    }
+
+    @Test
+    fun authOidcStateConsumptionReturnsSingleSuccess() {
+        val now = Instant.now()
+        val saved = authOidcStateRepository.save(
+            AuthOidcState(
+                id = 0,
+                provider = "kakao",
+                state = "persistent-state-${now.toEpochMilli()}",
+                nonce = "nonce",
+                codeVerifier = "verifier",
+                redirectUri = "maumon://auth/callback",
+                expiresAt = now.plusSeconds(600).toString(),
+                consumedAt = null,
+                createdAt = now.toString(),
+            ),
+        )
+
+        assertThat(authOidcStateRepository.markConsumed(saved.id, now.plusSeconds(1).toString()))
+            .isTrue()
+        assertThat(authOidcStateRepository.markConsumed(saved.id, now.plusSeconds(2).toString()))
+            .isFalse()
     }
 
     @Test

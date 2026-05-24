@@ -84,6 +84,44 @@ void main() {
       expect(controller.state.errorMessage, isNull);
     });
 
+    test('success callback without member status defaults to active', () async {
+      final repository = _FakeAuthRepository(restoredSession: _session());
+      final authController = AuthController(
+        authRepository: repository,
+      );
+      final controller = ExternalLoginController(
+        authController: authController,
+        launcher: _RecordingExternalLoginLauncher(),
+        config: ExternalLoginConfig(
+          apiBaseUrl: Uri.parse('https://api.example.test'),
+        ),
+      );
+
+      final handled = await controller.handleIncomingUri(
+        Uri.parse(
+          'maumon://auth/callback?status=success'
+          '&access_token=external-access'
+          '&refresh_token=external-refresh'
+          '&member_id=7'
+          '&email=me%40example.com'
+          '&nickname=%EB%A7%88%EC%9D%8C%EC%9D%B4',
+        ),
+      );
+
+      expect(handled, isTrue);
+      expect(authController.state.isAuthenticated, isTrue);
+      expect(
+        repository.savedExternalSessions.single.accessToken,
+        'external-access',
+      );
+      expect(
+        repository.savedExternalSessions.single.refreshToken,
+        'external-refresh',
+      );
+      expect(repository.savedExternalSessions.single.member.status, 'ACTIVE');
+      expect(controller.state.errorMessage, isNull);
+    });
+
     test('success callback without tokens falls back to session restore',
         () async {
       final authController = AuthController(

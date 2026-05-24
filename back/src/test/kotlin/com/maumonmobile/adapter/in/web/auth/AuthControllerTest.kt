@@ -1,6 +1,10 @@
 package com.maumonmobile.adapter.`in`.web.auth
 
 import com.jayway.jsonpath.JsonPath
+import com.maumonmobile.application.port.out.AuthOidcIdentity
+import com.maumonmobile.application.port.out.AuthOidcIdentityProvider
+import com.maumonmobile.application.port.out.AuthOidcTokenCommand
+import com.maumonmobile.application.port.out.AuthOidcVerificationException
 import org.assertj.core.api.Assertions.assertThat
 import org.hamcrest.Matchers.blankOrNullString
 import org.hamcrest.Matchers.greaterThan
@@ -8,7 +12,10 @@ import org.hamcrest.Matchers.not
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
+import org.springframework.boot.test.context.TestConfiguration
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc
+import org.springframework.context.annotation.Bean
+import org.springframework.context.annotation.Primary
 import org.springframework.http.MediaType
 import org.springframework.mock.web.MockHttpServletResponse
 import org.springframework.test.context.ActiveProfiles
@@ -182,7 +189,7 @@ class AuthControllerTest @Autowired constructor(
         assertThat(callbackQuery["status"]).isEqualTo("success")
         assertThat(callbackQuery["access_token"]).isNotBlank()
         assertThat(callbackQuery["refresh_token"]).isNotBlank()
-        assertThat(callbackQuery["email"]).isEqualTo("kakao-social-code@social.maumon.local")
+        assertThat(callbackQuery["email"]).isEqualTo("kakao-verified-social-code@social.maumon.local")
 
         val accessToken = callbackQuery.getValue("access_token")
         mockMvc.get("/api/v1/auth/me") {
@@ -190,7 +197,7 @@ class AuthControllerTest @Autowired constructor(
         }
             .andExpect {
                 status { isOk() }
-                jsonPath("$.data.email") { value("kakao-social-code@social.maumon.local") }
+                jsonPath("$.data.email") { value("kakao-verified-social-code@social.maumon.local") }
             }
 
         val reused = mockMvc.get("/api/v1/auth/oidc/callback/kakao") {
@@ -204,6 +211,31 @@ class AuthControllerTest @Autowired constructor(
 
         assertThat(URI(reused.response.getHeader("Location")!!).queryParameters()["error"])
             .isEqualTo("state_mismatch")
+    }
+
+    @Test
+    fun oidcCallbackRejectsCodesThatProviderCannotVerify() {
+        val authorizeLocation = mockMvc.get("/api/v1/auth/oidc/authorize/kakao") {
+            param("redirect_uri", "maumon://auth/callback")
+        }
+            .andReturn()
+            .response
+            .getHeader("Location")!!
+        val state = URI(authorizeLocation).queryParameters().getValue("state")
+
+        val callbackResult = mockMvc.get("/api/v1/auth/oidc/callback/kakao") {
+            param("code", "invalid-code")
+            param("state", state)
+        }
+            .andExpect {
+                status { is3xxRedirection() }
+            }
+            .andReturn()
+
+        val callbackQuery = URI(callbackResult.response.getHeader("Location")!!).queryParameters()
+
+        assertThat(callbackQuery["error"]).isEqualTo("invalid_request")
+        assertThat(callbackQuery["access_token"]).isNull()
     }
 
     @Test
@@ -230,6 +262,27 @@ class AuthControllerTest @Autowired constructor(
 
         assertThat(callbackQuery["error"]).isEqualTo("access_denied")
         assertThat(callbackQuery["error_description"]).isEqualTo("Provider denied")
+    }
+
+    @TestConfiguration(proxyBeanMethods = false)
+    class OidcProviderTestConfig {
+        @Bean
+        @Primary
+        fun authOidcIdentityProvider(): AuthOidcIdentityProvider = object : AuthOidcIdentityProvider {
+            override fun verify(command: AuthOidcTokenCommand): AuthOidcIdentity {
+                if (command.code == "invalid-code") {
+                    throw AuthOidcVerificationException("provider rejected code")
+                }
+                assertThat(command.expectedNonce).isNotBlank()
+                assertThat(command.codeVerifier).isNotBlank()
+                return AuthOidcIdentity(
+                    issuer = "https://login.maumon.local/${command.provider}",
+                    subject = "verified-${command.code}",
+                    email = "${command.provider}-verified-${command.code}@social.maumon.local",
+                    nickname = "${command.provider.uppercase()} 사용자",
+                )
+            }
+        }
     }
 }
 

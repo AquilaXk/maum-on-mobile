@@ -229,9 +229,21 @@ class ExternalLoginController extends ChangeNotifier {
         email: email,
         nickname: nickname,
         role: query['role'] ?? 'USER',
-        status: query['member_status'] ?? query['status'] ?? 'ACTIVE',
+        status: _memberStatusFromCallback(
+          query['member_status'] ?? query['memberStatus'],
+        ),
       ),
     );
+  }
+
+  String _memberStatusFromCallback(String? value) {
+    switch (value) {
+      case 'ACTIVE':
+      case 'WITHDRAWN':
+        return value!;
+      default:
+        return 'ACTIVE';
+    }
   }
 
   String _messageFromError(Map<String, String> query) {

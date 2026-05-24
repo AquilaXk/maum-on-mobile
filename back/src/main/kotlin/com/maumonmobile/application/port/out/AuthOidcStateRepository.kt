@@ -7,5 +7,5 @@ interface AuthOidcStateRepository {
 
     fun findByState(state: String): AuthOidcState?
 
-    fun markConsumed(id: Long, consumedAt: String)
+    fun markConsumed(id: Long, consumedAt: String): Boolean
 }
