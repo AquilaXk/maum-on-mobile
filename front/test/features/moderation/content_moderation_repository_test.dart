@@ -1,6 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:maum_on_mobile_front/core/network/api_client.dart';
-import 'package:maum_on_mobile_front/core/network/api_response.dart';
 import 'package:maum_on_mobile_front/core/network/api_transport.dart';
 import 'package:maum_on_mobile_front/core/network/auth_token_store.dart';
 import 'package:maum_on_mobile_front/features/moderation/data/content_moderation_repository.dart';

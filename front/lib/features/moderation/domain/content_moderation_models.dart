@@ -73,6 +73,11 @@ class ContentModerationResult {
     required this.categories,
   });
 
+  final bool allowed;
+  final ContentModerationRiskLevel riskLevel;
+  final String message;
+  final List<ContentModerationCategory> categories;
+
   factory ContentModerationResult.fromJson(Object? json) {
     if (json is! Map) {
       throw const FormatException('Expected content moderation result object.');
