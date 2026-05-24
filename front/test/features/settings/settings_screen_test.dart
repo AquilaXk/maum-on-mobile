@@ -37,6 +37,10 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('settings-save-email')));
     await tester.pump();
 
+    await tester.ensureVisible(
+      find.byKey(const ValueKey('settings-random-toggle')),
+    );
+    await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey('settings-random-toggle')));
     await tester.pump();
 
