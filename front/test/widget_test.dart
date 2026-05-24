@@ -52,6 +52,11 @@ class _UnauthenticatedRepository implements AuthRepository {
   }
 
   @override
+  Future<void> saveSession(AuthSession session) {
+    throw UnimplementedError();
+  }
+
+  @override
   Future<AuthMember> me() {
     throw UnimplementedError();
   }

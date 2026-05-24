@@ -1,6 +1,7 @@
 package com.maumonmobile.adapter.`in`.web.auth
 
 import com.jayway.jsonpath.JsonPath
+import org.assertj.core.api.Assertions.assertThat
 import org.hamcrest.Matchers.blankOrNullString
 import org.hamcrest.Matchers.greaterThan
 import org.hamcrest.Matchers.not
@@ -14,6 +15,7 @@ import org.springframework.test.context.ActiveProfiles
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.get
 import org.springframework.test.web.servlet.post
+import java.net.URI
 
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -80,6 +82,15 @@ class AuthControllerTest @Autowired constructor(
         val refreshedAccessToken = refreshed.response.readJsonString("$.data.accessToken")
         val refreshedRefreshToken = refreshed.response.readJsonString("$.data.refreshToken")
 
+        mockMvc.post("/api/v1/auth/refresh") {
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"refreshToken":"$refreshToken"}"""
+        }
+            .andExpect {
+                status { isUnauthorized() }
+                jsonPath("$.error.code") { value("UNAUTHORIZED") }
+            }
+
         mockMvc.get("/api/v1/auth/me") {
             header("Authorization", "Bearer $refreshedAccessToken")
         }
@@ -108,8 +119,133 @@ class AuthControllerTest @Autowired constructor(
                 jsonPath("$.error.code") { value("UNAUTHORIZED") }
             }
     }
+
+    @Test
+    fun oidcAuthorizeStoresStateAndRedirectsToProvider() {
+        val result = mockMvc.get("/api/v1/auth/oidc/authorize/kakao") {
+            param("redirect_uri", "maumon://auth/callback")
+        }
+            .andExpect {
+                status { is3xxRedirection() }
+            }
+            .andReturn()
+
+        val location = URI(result.response.getHeader("Location")!!)
+        val query = location.queryParameters()
+
+        assertThat(location.host).isEqualTo("login.maumon.local")
+        assertThat(location.path).isEqualTo("/kakao/authorize")
+        assertThat(query["response_type"]).isEqualTo("code")
+        assertThat(query["client_id"]).isEqualTo("maum-on-mobile")
+        assertThat(query["redirect_uri"]).isEqualTo("http://localhost/api/v1/auth/oidc/callback/kakao")
+        assertThat(query["state"]).hasSizeGreaterThanOrEqualTo(24)
+        assertThat(query["nonce"]).hasSizeGreaterThanOrEqualTo(24)
+        assertThat(query["code_challenge"]).hasSizeGreaterThanOrEqualTo(24)
+    }
+
+    @Test
+    fun oidcAuthorizeRejectsInvalidMobileRedirectUri() {
+        mockMvc.get("/api/v1/auth/oidc/authorize/kakao") {
+            param("redirect_uri", "https://evil.example/callback")
+        }
+            .andExpect {
+                status { isBadRequest() }
+                jsonPath("$.error.code") { value("INVALID_REQUEST") }
+            }
+    }
+
+    @Test
+    fun oidcCallbackIssuesSessionDeeplinkAndRejectsStateReuse() {
+        val authorizeLocation = mockMvc.get("/api/v1/auth/oidc/authorize/kakao") {
+            param("redirect_uri", "maumon://auth/callback")
+        }
+            .andReturn()
+            .response
+            .getHeader("Location")!!
+        val state = URI(authorizeLocation).queryParameters().getValue("state")
+
+        val callbackResult = mockMvc.get("/api/v1/auth/oidc/callback/kakao") {
+            param("code", "social-code")
+            param("state", state)
+        }
+            .andExpect {
+                status { is3xxRedirection() }
+            }
+            .andReturn()
+
+        val appCallback = URI(callbackResult.response.getHeader("Location")!!)
+        val callbackQuery = appCallback.queryParameters()
+
+        assertThat(appCallback.scheme).isEqualTo("maumon")
+        assertThat(appCallback.host).isEqualTo("auth")
+        assertThat(appCallback.path).isEqualTo("/callback")
+        assertThat(callbackQuery["status"]).isEqualTo("success")
+        assertThat(callbackQuery["access_token"]).isNotBlank()
+        assertThat(callbackQuery["refresh_token"]).isNotBlank()
+        assertThat(callbackQuery["email"]).isEqualTo("kakao-social-code@social.maumon.local")
+
+        val accessToken = callbackQuery.getValue("access_token")
+        mockMvc.get("/api/v1/auth/me") {
+            header("Authorization", "Bearer $accessToken")
+        }
+            .andExpect {
+                status { isOk() }
+                jsonPath("$.data.email") { value("kakao-social-code@social.maumon.local") }
+            }
+
+        val reused = mockMvc.get("/api/v1/auth/oidc/callback/kakao") {
+            param("code", "social-code")
+            param("state", state)
+        }
+            .andExpect {
+                status { is3xxRedirection() }
+            }
+            .andReturn()
+
+        assertThat(URI(reused.response.getHeader("Location")!!).queryParameters()["error"])
+            .isEqualTo("state_mismatch")
+    }
+
+    @Test
+    fun oidcCallbackReturnsProviderErrorsToAppDeeplink() {
+        val authorizeLocation = mockMvc.get("/api/v1/auth/oidc/authorize/google") {
+            param("redirect_uri", "maumon://auth/callback")
+        }
+            .andReturn()
+            .response
+            .getHeader("Location")!!
+        val state = URI(authorizeLocation).queryParameters().getValue("state")
+
+        val callbackResult = mockMvc.get("/api/v1/auth/oidc/callback/google") {
+            param("state", state)
+            param("error", "access_denied")
+            param("error_description", "Provider denied")
+        }
+            .andExpect {
+                status { is3xxRedirection() }
+            }
+            .andReturn()
+
+        val callbackQuery = URI(callbackResult.response.getHeader("Location")!!).queryParameters()
+
+        assertThat(callbackQuery["error"]).isEqualTo("access_denied")
+        assertThat(callbackQuery["error_description"]).isEqualTo("Provider denied")
+    }
 }
 
 private fun MockHttpServletResponse.readJsonString(path: String): String {
     return JsonPath.read<String>(contentAsString, path)
+}
+
+private fun URI.queryParameters(): Map<String, String> {
+    return rawQuery
+        ?.split("&")
+        ?.filter(String::isNotBlank)
+        ?.associate { pair ->
+            val key = pair.substringBefore("=")
+            val value = pair.substringAfter("=", "")
+            java.net.URLDecoder.decode(key, Charsets.UTF_8) to
+                java.net.URLDecoder.decode(value, Charsets.UTF_8)
+        }
+        .orEmpty()
 }

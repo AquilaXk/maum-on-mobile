@@ -10,6 +10,7 @@ import java.nio.charset.StandardCharsets
 import java.time.Duration
 import java.time.Instant
 import java.util.Base64
+import java.util.UUID
 import javax.crypto.Mac
 import javax.crypto.spec.SecretKeySpec
 
@@ -75,6 +76,7 @@ class JwtTokenProvider(
             "typ" to tokenType,
             "iat" to now.epochSecond,
             "exp" to now.plus(ttl).epochSecond,
+            "jti" to UUID.randomUUID().toString(),
         )
 
         val headerPart = encodeJson(header)

@@ -11,6 +11,10 @@ interface AuthUseCase {
 
     fun refresh(command: RefreshCommand): AuthSessionResult
 
+    fun authorizeOidc(command: OidcAuthorizeCommand): OidcAuthorizeResult
+
+    fun completeOidcCallback(command: OidcCallbackCommand): OidcCallbackResult
+
     fun me(user: AuthenticatedUser): AuthMemberResult
 
     fun logout(command: LogoutCommand)
@@ -33,6 +37,27 @@ data class RefreshCommand(
 
 data class LogoutCommand(
     val refreshToken: String?,
+)
+
+data class OidcAuthorizeCommand(
+    val provider: String,
+    val redirectUri: String,
+)
+
+data class OidcAuthorizeResult(
+    val authorizationUri: String,
+)
+
+data class OidcCallbackCommand(
+    val provider: String,
+    val state: String?,
+    val code: String?,
+    val error: String?,
+    val errorDescription: String?,
+)
+
+data class OidcCallbackResult(
+    val redirectUri: String,
 )
 
 data class AuthSessionResult(

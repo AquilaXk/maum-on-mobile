@@ -29,7 +29,63 @@ void main() {
       expect(controller.state.errorMessage, isNull);
     });
 
-    test('success callback restores the app session', () async {
+    test('shows a retry message when provider launch fails', () async {
+      final launcher = _RecordingExternalLoginLauncher(launchResult: false);
+      final controller = ExternalLoginController(
+        authController: AuthController(
+          authRepository: _FakeAuthRepository(restoredSession: _session()),
+        ),
+        launcher: launcher,
+        config: ExternalLoginConfig(
+          apiBaseUrl: Uri.parse('https://api.example.test'),
+        ),
+      );
+
+      await controller.start(provider: 'kakao');
+
+      expect(launcher.launchedUris, hasLength(1));
+      expect(controller.state.isStarting, isFalse);
+      expect(controller.state.errorMessage, '외부 로그인을 시작할 수 없습니다.');
+    });
+
+    test('success callback stores returned tokens and authenticates the app',
+        () async {
+      final repository = _FakeAuthRepository(restoredSession: _session());
+      final authController = AuthController(
+        authRepository: repository,
+      );
+      final controller = ExternalLoginController(
+        authController: authController,
+        launcher: _RecordingExternalLoginLauncher(),
+        config: ExternalLoginConfig(
+          apiBaseUrl: Uri.parse('https://api.example.test'),
+        ),
+      );
+
+      final handled = await controller.handleIncomingUri(
+        Uri.parse(
+          'maumon://auth/callback?status=success'
+          '&access_token=external-access'
+          '&refresh_token=external-refresh'
+          '&token_type=Bearer'
+          '&expires_in=3600'
+          '&member_id=7'
+          '&email=me%40example.com'
+          '&nickname=%EB%A7%88%EC%9D%8C%EC%9D%B4'
+          '&role=USER'
+          '&member_status=ACTIVE',
+        ),
+      );
+
+      expect(handled, isTrue);
+      expect(authController.state.isAuthenticated, isTrue);
+      expect(repository.savedExternalSessions.single.accessToken, 'external-access');
+      expect(repository.savedExternalSessions.single.refreshToken, 'external-refresh');
+      expect(controller.state.errorMessage, isNull);
+    });
+
+    test('success callback without tokens falls back to session restore',
+        () async {
       final authController = AuthController(
         authRepository: _FakeAuthRepository(restoredSession: _session()),
       );
@@ -129,12 +185,15 @@ AuthSession _session() {
 }
 
 class _RecordingExternalLoginLauncher implements ExternalLoginLauncher {
+  _RecordingExternalLoginLauncher({this.launchResult = true});
+
+  final bool launchResult;
   final List<Uri> launchedUris = [];
 
   @override
   Future<bool> launch(Uri uri) async {
     launchedUris.add(uri);
-    return true;
+    return launchResult;
   }
 }
 
@@ -144,6 +203,7 @@ class _FakeAuthRepository implements AuthRepository {
   });
 
   final AuthSession restoredSession;
+  final List<AuthSession> savedExternalSessions = [];
 
   @override
   Future<AuthMember> signup(SignupRequest request) {
@@ -161,6 +221,11 @@ class _FakeAuthRepository implements AuthRepository {
   @override
   Future<AuthSession> refreshSession() {
     throw UnimplementedError();
+  }
+
+  @override
+  Future<void> saveSession(AuthSession session) async {
+    savedExternalSessions.add(session);
   }
 
   @override

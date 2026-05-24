@@ -1,6 +1,7 @@
 package com.maumonmobile.adapter.out.persistence
 
 import com.maumonmobile.application.port.out.AuthMemberRepository
+import com.maumonmobile.application.port.out.AuthOidcStateRepository
 import com.maumonmobile.application.port.out.ConsultationRepository
 import com.maumonmobile.application.port.out.DiaryRepository
 import com.maumonmobile.application.port.out.ImageAssetRepository
@@ -23,6 +24,7 @@ import org.springframework.test.context.ActiveProfiles
 class PersistentRepositoryContextTest @Autowired constructor(
     private val jdbcTemplate: JdbcTemplate,
     private val authMemberRepository: AuthMemberRepository,
+    private val authOidcStateRepository: AuthOidcStateRepository,
     private val consultationRepository: ConsultationRepository,
     private val diaryRepository: DiaryRepository,
     private val imageAssetRepository: ImageAssetRepository,
@@ -35,6 +37,7 @@ class PersistentRepositoryContextTest @Autowired constructor(
     @Test
     fun defaultRepositoriesUseFlywayBackedJdbcStorage() {
         assertNotInMemoryRepository(authMemberRepository)
+        assertNotInMemoryRepository(authOidcStateRepository)
         assertNotInMemoryRepository(consultationRepository)
         assertNotInMemoryRepository(diaryRepository)
         assertNotInMemoryRepository(imageAssetRepository)
@@ -45,6 +48,7 @@ class PersistentRepositoryContextTest @Autowired constructor(
 
         assertThat(tableExists("auth_members")).isTrue()
         assertThat(tableExists("diaries")).isTrue()
+        assertThat(tableExists("auth_oidc_states")).isTrue()
         assertThat(tableExists("image_assets")).isTrue()
         assertThat(tableExists("story_posts")).isTrue()
         assertThat(tableExists("story_comments")).isTrue()

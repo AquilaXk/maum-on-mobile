@@ -5,6 +5,8 @@ import com.maumonmobile.application.port.`in`.AuthSessionResult
 import com.maumonmobile.application.port.`in`.AuthUseCase
 import com.maumonmobile.application.port.`in`.LoginCommand
 import com.maumonmobile.application.port.`in`.LogoutCommand
+import com.maumonmobile.application.port.`in`.OidcAuthorizeCommand
+import com.maumonmobile.application.port.`in`.OidcCallbackCommand
 import com.maumonmobile.application.port.`in`.RefreshCommand
 import com.maumonmobile.application.port.`in`.SignupCommand
 import com.maumonmobile.global.security.AuthenticatedUser
@@ -14,11 +16,17 @@ import jakarta.validation.constraints.Email
 import jakarta.validation.constraints.NotBlank
 import jakarta.validation.constraints.Size
 import org.springframework.security.core.Authentication
+import org.springframework.http.HttpHeaders
+import org.springframework.http.HttpStatus
+import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.GetMapping
+import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestMapping
+import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.bind.annotation.RestController
+import java.net.URI
 
 @RestController
 @RequestMapping("/api/v1/auth")
@@ -67,6 +75,42 @@ class AuthController(
         return ApiResponse.success(authUseCase.refresh(RefreshCommand(request.refreshToken)))
     }
 
+    @GetMapping("/oidc/authorize/{provider}")
+    fun authorizeOidc(
+        @PathVariable provider: String,
+        @RequestParam("redirect_uri") redirectUri: String,
+    ): ResponseEntity<Void> {
+        val result = authUseCase.authorizeOidc(
+            OidcAuthorizeCommand(
+                provider = provider,
+                redirectUri = redirectUri,
+            ),
+        )
+
+        return redirect(result.authorizationUri)
+    }
+
+    @GetMapping("/oidc/callback/{provider}")
+    fun completeOidcCallback(
+        @PathVariable provider: String,
+        @RequestParam(required = false) state: String?,
+        @RequestParam(required = false) code: String?,
+        @RequestParam(required = false) error: String?,
+        @RequestParam("error_description", required = false) errorDescription: String?,
+    ): ResponseEntity<Void> {
+        val result = authUseCase.completeOidcCallback(
+            OidcCallbackCommand(
+                provider = provider,
+                state = state,
+                code = code,
+                error = error,
+                errorDescription = errorDescription,
+            ),
+        )
+
+        return redirect(result.redirectUri)
+    }
+
     @PostMapping("/logout")
     fun logout(
         @RequestBody(required = false) request: LogoutRequest?,
@@ -79,6 +123,12 @@ class AuthController(
     fun me(authentication: Authentication): ApiResponse<AuthMemberResult> {
         return ApiResponse.success(authUseCase.me(authentication.authenticatedUser()))
     }
+}
+
+private fun redirect(location: String): ResponseEntity<Void> {
+    return ResponseEntity.status(HttpStatus.FOUND)
+        .header(HttpHeaders.LOCATION, URI.create(location).toString())
+        .build()
 }
 
 data class SignupRequest(

@@ -186,6 +186,11 @@ class AuthController extends ChangeNotifier {
     );
   }
 
+  Future<void> completeExternalLogin(AuthSession session) async {
+    await _authRepository.saveSession(session);
+    _setAuthenticated(session.member, hasRestored: true);
+  }
+
   Future<void> clearSession() async {
     try {
       await _authRepository.logout();
