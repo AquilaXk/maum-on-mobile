@@ -4,6 +4,7 @@ import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 
 const root = process.cwd();
+const iosDeploymentTarget = "15.0";
 
 function read(relativePath) {
   return readFileSync(path.join(root, relativePath), "utf8");
@@ -64,6 +65,10 @@ test("front uses a Flutter Android/iOS app scaffold", () => {
   );
   assert.match(read("front/ios/Runner/Info.plist"), /Maum On/, "iOS display name must be configured");
   assert.match(read("front/ios/Runner.xcodeproj/project.pbxproj"), /com\.aquilaxk\.maumonmobile/, "iOS bundle id must be configured");
-  assert.match(read("front/ios/Runner.xcodeproj/project.pbxproj"), /IPHONEOS_DEPLOYMENT_TARGET = 15\.0;/, "iOS deployment target must be configured");
+  assert.match(
+    read("front/ios/Runner.xcodeproj/project.pbxproj"),
+    new RegExp(`IPHONEOS_DEPLOYMENT_TARGET = ${iosDeploymentTarget.replace(".", "\\.")};`),
+    "iOS deployment target must be configured"
+  );
   assert.ok(!existsSync(path.join(root, "front/package.json")), "React Native package.json must not remain");
 });
