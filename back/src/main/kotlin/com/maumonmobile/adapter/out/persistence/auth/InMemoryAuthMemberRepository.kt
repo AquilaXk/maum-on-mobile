@@ -20,6 +20,9 @@ class InMemoryAuthMemberRepository : AuthMemberRepository {
             member
         }
 
+        membersById[persistedMember.id]
+            ?.takeIf { existingMember -> existingMember.email != persistedMember.email }
+            ?.let { existingMember -> memberIdsByEmail.remove(existingMember.email) }
         membersById[persistedMember.id] = persistedMember
         memberIdsByEmail[persistedMember.email] = persistedMember.id
         return persistedMember
