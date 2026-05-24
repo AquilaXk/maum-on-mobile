@@ -78,7 +78,10 @@ test("ci pins GitHub Action references to immutable commits", async () => {
 
 test("checkout steps do not persist GitHub credentials", async () => {
   const workflow = await readWorkflow();
-  const checkoutSteps = workflow.match(/      - name: Checkout\n[\s\S]*?(?=\n      - name:|\n\n  [a-z-]+:|\n$)/g) ?? [];
+  const stepBlocks = workflow
+    .split(/\n(?=      - (?:name|uses): )/)
+    .filter((block) => block.startsWith("      - "));
+  const checkoutSteps = stepBlocks.filter((step) => /uses: actions\/checkout@[a-f0-9]{40}/.test(step));
 
   assert.ok(checkoutSteps.length > 0);
   for (const step of checkoutSteps) {
