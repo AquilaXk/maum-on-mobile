@@ -35,6 +35,7 @@ class SecurityConfig(
                         "/api/v1/posts",
                         "/api/v1/posts/*",
                         "/api/v1/posts/*/comments",
+                        "/api/v1/letters/*/status",
                     )
                     .permitAll()
                     .requestMatchers(
