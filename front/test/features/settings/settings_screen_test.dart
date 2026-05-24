@@ -65,17 +65,24 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    await tester.drag(
-      find.byKey(const ValueKey('settings-scroll')),
-      const Offset(0, -900),
+    await tester.ensureVisible(
+      find.byKey(const ValueKey('settings-request-withdraw')),
     );
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey('settings-request-withdraw')));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(
+      find.byKey(const ValueKey('settings-withdraw-password')),
+    );
     await tester.pumpAndSettle();
     await tester.enterText(
       find.byKey(const ValueKey('settings-withdraw-password')),
       'old-password',
     );
+    await tester.ensureVisible(
+      find.byKey(const ValueKey('settings-confirm-withdraw')),
+    );
+    await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey('settings-confirm-withdraw')));
     await tester.pump();
 

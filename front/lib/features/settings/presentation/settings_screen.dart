@@ -447,12 +447,15 @@ class _RandomReceiveSection extends StatelessWidget {
     return _SettingsSection(
       title: '랜덤 편지',
       children: [
-        SwitchListTile(
-          key: const ValueKey('settings-random-toggle'),
-          contentPadding: EdgeInsets.zero,
-          value: value,
-          onChanged: isSubmitting ? null : onChanged,
-          title: const Text('랜덤 편지 수신'),
+        Row(
+          children: [
+            const Expanded(child: Text('랜덤 편지 수신')),
+            Switch(
+              key: const ValueKey('settings-random-toggle'),
+              value: value,
+              onChanged: isSubmitting ? null : onChanged,
+            ),
+          ],
         ),
       ],
     );
