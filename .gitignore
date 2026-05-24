@@ -73,6 +73,7 @@ ios/DerivedData/
 .flutter-plugins-dependencies
 .packages
 pubspec.lock
+!front/pubspec.lock
 
 # React Native / Expo, if selected later
 .expo/

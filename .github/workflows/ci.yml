@@ -255,13 +255,19 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          if [[ -f android/gradlew ]]; then
+          if [[ -f front/pubspec.yaml && -d front/android ]]; then
+            echo "present=true" >> "${GITHUB_OUTPUT}"
+            echo "stack=flutter" >> "${GITHUB_OUTPUT}"
+            echo "working_directory=front" >> "${GITHUB_OUTPUT}"
+          elif [[ -f android/gradlew ]]; then
             chmod +x android/gradlew
             echo "present=true" >> "${GITHUB_OUTPUT}"
+            echo "stack=gradle" >> "${GITHUB_OUTPUT}"
             echo "working_directory=android" >> "${GITHUB_OUTPUT}"
           elif [[ -f gradlew ]]; then
             chmod +x gradlew
             echo "present=true" >> "${GITHUB_OUTPUT}"
+            echo "stack=gradle" >> "${GITHUB_OUTPUT}"
             echo "working_directory=." >> "${GITHUB_OUTPUT}"
           else
             echo "present=false" >> "${GITHUB_OUTPUT}"
@@ -276,8 +282,24 @@ jobs:
           java-version: "21"
           cache: gradle
 
+      - name: Set up Flutter
+        if: ${{ steps.scaffold.outputs.present == 'true' && steps.scaffold.outputs.stack == 'flutter' }}
+        uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Build Flutter Android debug app
+        if: ${{ steps.scaffold.outputs.present == 'true' && steps.scaffold.outputs.stack == 'flutter' }}
+        working-directory: front
+        shell: bash
+        run: |
+          set -euo pipefail
+          flutter pub get
+          flutter build apk --debug
+
       - name: Run Android checks
-        if: ${{ steps.scaffold.outputs.present == 'true' }}
+        if: ${{ steps.scaffold.outputs.present == 'true' && steps.scaffold.outputs.stack == 'gradle' }}
         working-directory: ${{ steps.scaffold.outputs.working_directory }}
         run: ./gradlew check --no-daemon
 
@@ -293,15 +315,43 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Validate iOS project metadata
+      - name: Detect iOS scaffold
+        id: scaffold
         shell: bash
         run: |
           set -euo pipefail
-          if [[ ! -d ios ]]; then
+          if [[ -f front/pubspec.yaml && -d front/ios ]]; then
+            echo "present=true" >> "${GITHUB_OUTPUT}"
+            echo "stack=flutter" >> "${GITHUB_OUTPUT}"
+          elif [[ -d ios ]]; then
+            echo "present=true" >> "${GITHUB_OUTPUT}"
+            echo "stack=xcode" >> "${GITHUB_OUTPUT}"
+          else
+            echo "present=false" >> "${GITHUB_OUTPUT}"
             echo "iOS scaffold not found; skipping iOS checks."
-            exit 0
           fi
 
+      - name: Set up Flutter
+        if: ${{ steps.scaffold.outputs.present == 'true' && steps.scaffold.outputs.stack == 'flutter' }}
+        uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Build Flutter iOS app
+        if: ${{ steps.scaffold.outputs.present == 'true' && steps.scaffold.outputs.stack == 'flutter' }}
+        working-directory: front
+        shell: bash
+        run: |
+          set -euo pipefail
+          flutter pub get
+          flutter build ios --simulator --no-codesign
+
+      - name: Validate iOS project metadata
+        if: ${{ steps.scaffold.outputs.present == 'true' && steps.scaffold.outputs.stack == 'xcode' }}
+        shell: bash
+        run: |
+          set -euo pipefail
           workspace="$(find ios -maxdepth 4 -name '*.xcworkspace' -print -quit)"
           project="$(find ios -maxdepth 4 -name '*.xcodeproj' -print -quit)"
 

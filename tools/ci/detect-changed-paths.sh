@@ -57,12 +57,18 @@ while IFS= read -r file; do
   esac
 
   case "${file}" in
+    front/android/**)
+      android=true
+      ;;
     android/**|gradle/**|build.gradle|build.gradle.kts|settings.gradle|settings.gradle.kts|gradle.properties|gradlew|gradlew.bat)
       android=true
       ;;
   esac
 
   case "${file}" in
+    front/ios/**)
+      ios=true
+      ;;
     ios/**|Podfile|Podfile.lock|Package.swift|*.xcodeproj/**|*.xcworkspace/**)
       ios=true
       ;;
