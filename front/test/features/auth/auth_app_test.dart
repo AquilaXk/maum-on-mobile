@@ -20,6 +20,8 @@ import 'package:maum_on_mobile_front/features/notification/data/notification_rep
 import 'package:maum_on_mobile_front/features/notification/domain/notification_models.dart';
 import 'package:maum_on_mobile_front/features/report/data/report_repository.dart';
 import 'package:maum_on_mobile_front/features/report/domain/report_models.dart';
+import 'package:maum_on_mobile_front/features/settings/data/settings_repository.dart';
+import 'package:maum_on_mobile_front/features/settings/domain/settings_models.dart';
 import 'package:maum_on_mobile_front/features/story/data/story_repository.dart';
 import 'package:maum_on_mobile_front/features/story/domain/story_models.dart';
 
@@ -170,6 +172,57 @@ void main() {
     expect(find.text('알림/신고'), findsWidgets);
     expect(find.text('연결됨'), findsOneWidget);
     expect(notificationRepository.ticketRequestCount, 1);
+  });
+
+  testWidgets('navigates authenticated users to settings and clears session',
+      (tester) async {
+    final authRepository = _FakeAuthRepository(restoredSession: _session());
+    final settingsRepository = _FakeSettingsRepository();
+    await tester.pumpWidget(
+      MaumOnMobileApp(
+        authRepository: authRepository,
+        homeRepository: const _FakeHomeRepository(),
+        settingsRepository: settingsRepository,
+        diaryRepository: _FakeDiaryRepository(),
+        diaryImagePicker: const _FakeDiaryImagePicker(),
+        storyRepository: _FakeStoryRepository(),
+        letterRepository: _FakeLetterRepository(),
+        listenForDeepLinks: false,
+      ),
+    );
+
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('설정'));
+    await tester.tap(find.text('설정'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('계정 설정'), findsOneWidget);
+    expect(find.text('me@example.com'), findsOneWidget);
+
+    await tester.ensureVisible(
+      find.byKey(const ValueKey('settings-request-withdraw')),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('settings-request-withdraw')));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(
+      find.byKey(const ValueKey('settings-withdraw-password')),
+    );
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byKey(const ValueKey('settings-withdraw-password')),
+      'old-password',
+    );
+    await tester.ensureVisible(
+      find.byKey(const ValueKey('settings-confirm-withdraw')),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('settings-confirm-withdraw')));
+    await tester.pumpAndSettle();
+
+    expect(settingsRepository.withdrawPasswords, ['old-password']);
+    expect(authRepository.logoutCount, 1);
+    expect(find.byKey(const ValueKey('login-email-field')), findsOneWidget);
   });
 
   testWidgets('navigates authenticated users from home to story list',
@@ -381,6 +434,50 @@ class _FakeReportRepository implements ReportRepository {
   Future<int> createReport(ReportDraft draft) async {
     drafts.add(draft);
     return drafts.length;
+  }
+}
+
+class _FakeSettingsRepository implements SettingsRepository {
+  final List<String?> withdrawPasswords = [];
+  MemberSettings settings = const MemberSettings(
+    id: 7,
+    email: 'me@example.com',
+    nickname: '마음이',
+    randomReceiveAllowed: true,
+    socialAccount: false,
+  );
+
+  @override
+  Future<MemberSettings> fetchSettings() async => settings;
+
+  @override
+  Future<MemberSettings> updateNickname(String nickname) async {
+    settings = settings.copyWith(nickname: nickname);
+    return settings;
+  }
+
+  @override
+  Future<MemberSettings> updateEmail(String email) async {
+    settings = settings.copyWith(email: email);
+    return settings;
+  }
+
+  @override
+  Future<MemberSettings> updatePassword(PasswordChangeDraft draft) async {
+    return settings;
+  }
+
+  @override
+  Future<MemberSettings> toggleRandomSetting() async {
+    settings = settings.copyWith(
+      randomReceiveAllowed: !settings.randomReceiveAllowed,
+    );
+    return settings;
+  }
+
+  @override
+  Future<void> withdraw({String? currentPassword}) async {
+    withdrawPasswords.add(currentPassword);
   }
 }
 
@@ -612,6 +709,7 @@ class _FakeAuthRepository implements AuthRepository {
   final AuthSession? restoredSession;
   final Object? restoreError;
   final Object? loginError;
+  int logoutCount = 0;
 
   @override
   Future<AuthMember> signup(SignupRequest request) {
@@ -647,5 +745,7 @@ class _FakeAuthRepository implements AuthRepository {
   }
 
   @override
-  Future<void> logout() async {}
+  Future<void> logout() async {
+    logoutCount += 1;
+  }
 }

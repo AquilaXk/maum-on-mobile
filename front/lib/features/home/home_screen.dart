@@ -14,6 +14,7 @@ class HomeScreen extends StatefulWidget {
     required this.onViewStory,
     required this.onOpenConsultation,
     required this.onOpenNotifications,
+    required this.onOpenSettings,
     required this.onLogout,
     super.key,
   });
@@ -26,6 +27,7 @@ class HomeScreen extends StatefulWidget {
   final VoidCallback onViewStory;
   final VoidCallback onOpenConsultation;
   final VoidCallback onOpenNotifications;
+  final VoidCallback onOpenSettings;
   final VoidCallback onLogout;
 
   @override
@@ -85,6 +87,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         onViewStory: widget.onViewStory,
                         onOpenConsultation: widget.onOpenConsultation,
                         onOpenNotifications: widget.onOpenNotifications,
+                        onOpenSettings: widget.onOpenSettings,
                         onLogout: widget.onLogout,
                       ),
                       const SizedBox(height: 20),
@@ -277,6 +280,7 @@ class _ActionGrid extends StatelessWidget {
     required this.onViewStory,
     required this.onOpenConsultation,
     required this.onOpenNotifications,
+    required this.onOpenSettings,
     required this.onLogout,
   });
 
@@ -285,6 +289,7 @@ class _ActionGrid extends StatelessWidget {
   final VoidCallback onViewStory;
   final VoidCallback onOpenConsultation;
   final VoidCallback onOpenNotifications;
+  final VoidCallback onOpenSettings;
   final VoidCallback onLogout;
 
   @override
@@ -314,6 +319,11 @@ class _ActionGrid extends StatelessWidget {
           onPressed: onOpenNotifications,
           icon: const Icon(Icons.notifications_none),
           label: const Text('알림/신고'),
+        ),
+        OutlinedButton.icon(
+          onPressed: onOpenSettings,
+          icon: const Icon(Icons.settings_outlined),
+          label: const Text('설정'),
         ),
         OutlinedButton(
           onPressed: onLogout,

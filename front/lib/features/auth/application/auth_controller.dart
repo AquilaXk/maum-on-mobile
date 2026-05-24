@@ -186,6 +186,22 @@ class AuthController extends ChangeNotifier {
     );
   }
 
+  Future<void> clearSession() async {
+    try {
+      await _authRepository.logout();
+    } on Object {
+      // 회원 탈퇴 후에는 서버 로그아웃 실패와 관계없이 로컬 세션을 정리한다.
+    }
+
+    _setState(
+      AuthState(
+        status: AuthStatus.unauthenticated,
+        hasRestored: true,
+        sessionRevision: _state.sessionRevision + 1,
+      ),
+    );
+  }
+
   void _setAuthenticated(AuthMember member, {required bool hasRestored}) {
     _setState(
       AuthState(
