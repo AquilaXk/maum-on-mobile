@@ -47,6 +47,114 @@ void main() {
     expect(find.text('로그아웃'), findsOneWidget);
   });
 
+  testWidgets('runs the authenticated mobile smoke flow without network',
+      (tester) async {
+    final consultationRepository = _FakeConsultationRepository();
+    final notificationRepository = _FakeNotificationRepository();
+
+    await tester.pumpWidget(
+      MaumOnMobileApp(
+        authRepository: _FakeAuthRepository(restoredSession: _session()),
+        homeRepository: const _FakeHomeRepository(),
+        consultationRepository: consultationRepository,
+        notificationRepository: notificationRepository,
+        reportRepository: _FakeReportRepository(),
+        settingsRepository: _FakeSettingsRepository(),
+        diaryRepository: _FakeDiaryRepository(),
+        diaryImagePicker: const _FakeDiaryImagePicker(),
+        storyRepository: _FakeStoryRepository(
+          storyPages: const [
+            PageResponse(
+              items: [
+                StorySummary(
+                  id: 1,
+                  title: '오늘의 스토리',
+                  summary: '마음 나눔',
+                  authorNickname: '친구',
+                  category: StoryCategory.daily,
+                  resolutionStatus: StoryResolutionStatus.ongoing,
+                  viewCount: 1,
+                  createDate: '2026-05-24T09:00:00',
+                  modifyDate: '2026-05-24T09:00:00',
+                ),
+              ],
+              page: 0,
+              size: 20,
+              totalElements: 1,
+              totalPages: 1,
+              last: true,
+            ),
+          ],
+        ),
+        letterRepository: _FakeLetterRepository(
+          statsQueue: const [LetterStats(receivedCount: 1)],
+          receivedPages: const [
+            LetterListPage(
+              items: [
+                LetterSummary(
+                  id: 1,
+                  title: '도착한 편지',
+                  content: '요약',
+                  createdDate: '2026-05-24T08:00:00',
+                  status: LetterStatus.sent,
+                ),
+              ],
+              totalPages: 1,
+              totalElements: 1,
+              currentPage: 0,
+              isFirst: true,
+              isLast: true,
+            ),
+          ],
+        ),
+        listenForDeepLinks: false,
+      ),
+    );
+
+    await tester.pumpAndSettle();
+    expect(find.text('홈'), findsOneWidget);
+    expect(find.text('마음이님, 오늘의 마음을 이어가세요.'), findsOneWidget);
+
+    await _tapVisibleText(tester, '다이어리 쓰기');
+    expect(find.text('나의 기록'), findsOneWidget);
+    await _returnHome(tester);
+
+    await _tapVisibleText(tester, '스토리 보기');
+    expect(find.text('스토리'), findsOneWidget);
+    expect(find.text('오늘의 스토리'), findsOneWidget);
+    await _returnHome(tester);
+
+    await _tapVisibleText(tester, '편지 쓰기');
+    expect(find.text('편지함'), findsOneWidget);
+    expect(find.byKey(const ValueKey('letter-title-field')), findsOneWidget);
+    await _returnHome(tester);
+
+    await _tapVisibleText(tester, '상담하기');
+    await tester.pump();
+    consultationRepository.emit(
+      const ConsultationStreamEvent.connect('connected'),
+    );
+    await tester.pump();
+    expect(find.text('실시간 상담'), findsOneWidget);
+    expect(find.text('연결됨'), findsOneWidget);
+    await _returnHome(tester);
+
+    await _tapVisibleText(tester, '알림/신고');
+    await tester.pump();
+    notificationRepository.emit(
+      const NotificationStreamEvent.connect('connected'),
+    );
+    await tester.pump();
+    expect(find.text('알림/신고'), findsWidgets);
+    expect(find.text('연결됨'), findsOneWidget);
+    await _returnHome(tester);
+
+    await _tapVisibleText(tester, '설정');
+    expect(find.text('계정 설정'), findsOneWidget);
+    expect(find.text('me@example.com'), findsOneWidget);
+    await _returnHome(tester);
+  });
+
   testWidgets('navigates authenticated users from home to diary',
       (tester) async {
     await tester.pumpWidget(
@@ -339,6 +447,22 @@ void main() {
     expect(find.text('이메일 또는 비밀번호가 맞지 않아요.'), findsOneWidget);
     expect(find.text('로그인'), findsWidgets);
   });
+}
+
+Future<void> _tapVisibleText(WidgetTester tester, String text) async {
+  final finder = find.text(text);
+  await tester.ensureVisible(finder);
+  await tester.pumpAndSettle();
+  await tester.tap(finder);
+  await tester.pumpAndSettle();
+}
+
+Future<void> _returnHome(WidgetTester tester) async {
+  final handled = await tester.binding.handlePopRoute();
+  await tester.pumpAndSettle();
+
+  expect(handled, isTrue);
+  expect(find.text('홈'), findsOneWidget);
 }
 
 class _FakeHomeRepository implements HomeRepository {
