@@ -212,14 +212,26 @@ class DiaryController extends ChangeNotifier {
   }
 
   Future<void> submit() async {
-    if (!_state.canSubmit) {
+    if (_state.isSubmitting) {
+      return;
+    }
+
+    final title = _state.title.trim();
+    final content = _state.content.trim();
+    if (title.isEmpty || content.isEmpty) {
+      _setState(
+        _state.copyWith(
+          errorMessage: '제목과 본문을 입력해 주세요.',
+          clearNoticeMessage: true,
+        ),
+      );
       return;
     }
 
     final editingId = _state.editingDiaryId;
     final draft = DiaryDraft(
-      title: _state.title.trim(),
-      content: _state.content.trim(),
+      title: title,
+      content: content,
       category: _state.category,
       isPrivate: _state.isPrivate,
       imageUrl: _state.imageUrl,
@@ -251,7 +263,13 @@ class DiaryController extends ChangeNotifier {
         ),
       );
     } on Object catch (error) {
-      _handleError(error);
+      _handleError(
+        error,
+        clearSelectedImage: draft.image != null,
+        nextAction: draft.image == null
+            ? '잠시 후 다시 저장해 주세요.'
+            : '이미지를 다시 선택한 뒤 저장해 주세요.',
+      );
       _setState(_state.copyWith(isSubmitting: false));
     }
   }
@@ -311,16 +329,35 @@ class DiaryController extends ChangeNotifier {
     );
   }
 
-  void _handleError(Object error) {
+  void _handleError(
+    Object error, {
+    bool clearSelectedImage = false,
+    String? nextAction,
+  }) {
     if (error is ApiClientException) {
       if (error.kind == ApiErrorKind.unauthorized) {
         _onUnauthorized?.call();
       }
-      _setState(_state.copyWith(errorMessage: error.message));
+      _setState(
+        _state.copyWith(
+          errorMessage: _errorMessageWithAction(error.message, nextAction),
+          clearSelectedImage: clearSelectedImage,
+          clearNoticeMessage: true,
+        ),
+      );
       return;
     }
 
-    _setState(_state.copyWith(errorMessage: '요청을 처리하지 못했습니다.'));
+    _setState(
+      _state.copyWith(
+        errorMessage: _errorMessageWithAction(
+          '요청을 처리하지 못했습니다.',
+          nextAction,
+        ),
+        clearSelectedImage: clearSelectedImage,
+        clearNoticeMessage: true,
+      ),
+    );
   }
 
   void _setState(DiaryState nextState) {
@@ -337,4 +374,16 @@ class DiaryController extends ChangeNotifier {
     _isDisposed = true;
     super.dispose();
   }
+}
+
+String _errorMessageWithAction(String message, String? nextAction) {
+  final trimmedMessage = message.trim();
+  final trimmedAction = nextAction?.trim() ?? '';
+  if (trimmedAction.isEmpty) {
+    return trimmedMessage.isEmpty ? '요청을 처리하지 못했습니다.' : trimmedMessage;
+  }
+
+  final base =
+      trimmedMessage.isEmpty ? '요청을 처리하지 못했습니다.' : trimmedMessage;
+  return '$base $trimmedAction';
 }

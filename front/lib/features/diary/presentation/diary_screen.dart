@@ -71,6 +71,34 @@ class _DiaryScreenState extends State<DiaryScreen> {
     }
   }
 
+  Future<void> _confirmDelete(DiaryEntry entry) async {
+    final shouldDelete = await showDialog<bool>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('기록을 삭제할까요?'),
+          content: const Text('삭제한 기록은 되돌릴 수 없습니다.'),
+          actions: [
+            TextButton(
+              key: const ValueKey('diary-delete-cancel-button'),
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('취소'),
+            ),
+            FilledButton(
+              key: const ValueKey('diary-delete-confirm-button'),
+              onPressed: () => Navigator.of(context).pop(true),
+              child: const Text('삭제'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (shouldDelete == true) {
+      await widget.controller.deleteDiary(entry);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return AnimatedBuilder(
@@ -112,7 +140,7 @@ class _DiaryScreenState extends State<DiaryScreen> {
                         entries: state.selectedDateEntries,
                         selectedDateLabel: _formatDateLabel(state.selectedDate),
                         onEdit: widget.controller.startEditing,
-                        onDelete: widget.controller.deleteDiary,
+                        onDelete: _confirmDelete,
                       ),
                       const SizedBox(height: 20),
                       _DiaryForm(
@@ -400,6 +428,7 @@ class _DiaryForm extends StatelessWidget {
             ),
             if (state.isEditing)
               IconButton(
+                key: const ValueKey('diary-edit-cancel-button'),
                 tooltip: '수정 취소',
                 onPressed: onReset,
                 icon: const Icon(Icons.close),
@@ -464,7 +493,7 @@ class _DiaryForm extends StatelessWidget {
         const SizedBox(height: 12),
         FilledButton(
           key: const ValueKey('diary-submit-button'),
-          onPressed: state.canSubmit ? onSubmit : null,
+          onPressed: state.isSubmitting ? null : onSubmit,
           child: Text(state.isSubmitting ? '저장 중' : '저장'),
         ),
       ],
