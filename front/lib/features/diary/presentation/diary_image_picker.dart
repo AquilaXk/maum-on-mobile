@@ -11,7 +11,7 @@ class FilePickerDiaryImagePicker implements DiaryImagePicker {
 
   @override
   Future<DiaryImageAttachment?> pickImage() async {
-    final result = await FilePicker.platform.pickFiles(
+    final result = await FilePicker.pickFiles(
       type: FileType.custom,
       allowedExtensions: const ['jpg', 'jpeg', 'png', 'webp'],
       allowMultiple: false,
