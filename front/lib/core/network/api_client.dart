@@ -74,16 +74,56 @@ class ApiClient {
     );
   }
 
+  Future<void> putVoid(
+    String path, {
+    Object? body,
+    Map<String, Object?> queryParameters = const {},
+    bool requiresAuth = true,
+    bool retryOnUnauthorized = true,
+  }) {
+    return _sendVoid(
+      ApiRequest(
+        method: ApiMethod.put,
+        path: path,
+        body: body,
+        queryParameters: queryParameters,
+        requiresAuth: requiresAuth,
+        retryOnUnauthorized: retryOnUnauthorized,
+      ),
+    );
+  }
+
+  Future<void> patchVoid(
+    String path, {
+    Object? body,
+    Map<String, Object?> queryParameters = const {},
+    bool requiresAuth = true,
+    bool retryOnUnauthorized = true,
+  }) {
+    return _sendVoid(
+      ApiRequest(
+        method: ApiMethod.patch,
+        path: path,
+        body: body,
+        queryParameters: queryParameters,
+        requiresAuth: requiresAuth,
+        retryOnUnauthorized: retryOnUnauthorized,
+      ),
+    );
+  }
+
   Future<PageResponse<T>> getPage<T>(
     String path, {
     required T Function(Object? json) itemParser,
     Map<String, Object?> queryParameters = const {},
     bool requiresAuth = true,
+    bool retryOnUnauthorized = true,
   }) {
     return get<PageResponse<T>>(
       path,
       queryParameters: queryParameters,
       requiresAuth: requiresAuth,
+      retryOnUnauthorized: retryOnUnauthorized,
       parser: (json) => PageResponse.fromJson(json, itemParser),
     );
   }

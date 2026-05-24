@@ -17,6 +17,10 @@ import '../features/diary/presentation/diary_screen.dart';
 import '../features/home/application/home_controller.dart';
 import '../features/home/data/home_repository.dart';
 import '../features/home/home_screen.dart';
+import '../features/story/application/story_controller.dart';
+import '../features/story/data/story_repository.dart';
+import '../features/story/domain/story_models.dart';
+import '../features/story/presentation/story_screen.dart';
 import '../theme/app_theme.dart';
 import 'app_routes.dart';
 
@@ -29,6 +33,8 @@ class MaumOnMobileApp extends StatefulWidget {
     this.homeRepository,
     this.diaryRepository,
     this.diaryImagePicker,
+    this.storyRepository,
+    this.onStoryReportTarget,
     this.listenForDeepLinks = true,
     super.key,
   });
@@ -40,6 +46,8 @@ class MaumOnMobileApp extends StatefulWidget {
   final HomeRepository? homeRepository;
   final DiaryRepository? diaryRepository;
   final DiaryImagePicker? diaryImagePicker;
+  final StoryRepository? storyRepository;
+  final ValueChanged<StoryReportTarget>? onStoryReportTarget;
   final bool listenForDeepLinks;
 
   @override
@@ -67,6 +75,8 @@ class _MaumOnMobileAppState extends State<MaumOnMobileApp> {
   int? _homeMemberId;
   DiaryController? _diaryController;
   int? _diaryMemberId;
+  StoryController? _storyController;
+  int? _storyMemberId;
   _AuthenticatedDestination _destination = _AuthenticatedDestination.home;
 
   @override
@@ -85,6 +95,7 @@ class _MaumOnMobileAppState extends State<MaumOnMobileApp> {
     _authController.dispose();
     _disposeHomeController();
     _disposeDiaryController();
+    _disposeStoryController();
     super.dispose();
   }
 
@@ -111,6 +122,7 @@ class _MaumOnMobileAppState extends State<MaumOnMobileApp> {
           if (!state.isAuthenticated || state.member == null) {
             _disposeHomeController();
             _disposeDiaryController();
+            _disposeStoryController();
             _destination = _AuthenticatedDestination.home;
             return AuthScreen(
               controller: _authController,
@@ -123,6 +135,17 @@ class _MaumOnMobileAppState extends State<MaumOnMobileApp> {
               controller: _diaryControllerFor(state.member!.id),
               imagePicker:
                   widget.diaryImagePicker ?? const FilePickerDiaryImagePicker(),
+              onBack: () {
+                setState(() {
+                  _destination = _AuthenticatedDestination.home;
+                });
+              },
+            );
+          }
+
+          if (_destination == _AuthenticatedDestination.story) {
+            return StoryScreen(
+              controller: _storyControllerFor(state.member!.id),
               onBack: () {
                 setState(() {
                   _destination = _AuthenticatedDestination.home;
@@ -145,13 +168,15 @@ class _MaumOnMobileAppState extends State<MaumOnMobileApp> {
               context,
               '편지 화면을 준비 중입니다.',
             ),
-            onViewStory: () => _showHomeActionMessage(
-              context,
-              '스토리 화면을 준비 중입니다.',
-            ),
+            onViewStory: () {
+              setState(() {
+                _destination = _AuthenticatedDestination.story;
+              });
+            },
             onLogout: () {
               _disposeHomeController();
               _disposeDiaryController();
+              _disposeStoryController();
               _destination = _AuthenticatedDestination.home;
               _authController.logout();
             },
@@ -200,6 +225,30 @@ class _MaumOnMobileAppState extends State<MaumOnMobileApp> {
     _diaryController?.dispose();
     _diaryController = null;
     _diaryMemberId = null;
+  }
+
+  StoryController _storyControllerFor(int memberId) {
+    final currentController = _storyController;
+    if (currentController != null && _storyMemberId == memberId) {
+      return currentController;
+    }
+
+    currentController?.dispose();
+    _storyMemberId = memberId;
+    return _storyController = StoryController(
+      storyRepository: widget.storyRepository ?? _buildDefaultStoryRepository(),
+      currentMemberId: memberId,
+      onUnauthorized: () {
+        _authController.logout();
+      },
+      onReportTargetSelected: widget.onStoryReportTarget,
+    );
+  }
+
+  void _disposeStoryController() {
+    _storyController?.dispose();
+    _storyController = null;
+    _storyMemberId = null;
   }
 
   void _showHomeActionMessage(BuildContext context, String message) {
@@ -252,6 +301,23 @@ class _MaumOnMobileAppState extends State<MaumOnMobileApp> {
     );
   }
 
+  StoryRepository _buildDefaultStoryRepository() {
+    final refreshRepository = ApiAuthRepository(
+      apiClient: ApiClient(transport: _apiTransport, tokenStore: _tokenStore),
+      tokenStore: _tokenStore,
+    );
+
+    return ApiStoryRepository(
+      apiClient: ApiClient(
+        transport: _apiTransport,
+        tokenStore: _tokenStore,
+        tokenRefresher: AuthSessionTokenRefresher(
+          authRepository: refreshRepository,
+        ),
+      ),
+    );
+  }
+
   Future<void> _bindDeepLinks() async {
     final source =
         widget.deepLinkSource ?? AppLinksExternalLoginDeepLinkSource();
@@ -269,6 +335,7 @@ class _MaumOnMobileAppState extends State<MaumOnMobileApp> {
 enum _AuthenticatedDestination {
   home,
   diary,
+  story,
 }
 
 class _SessionRestoreScreen extends StatelessWidget {
