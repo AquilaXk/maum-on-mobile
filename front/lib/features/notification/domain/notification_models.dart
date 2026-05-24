@@ -13,6 +13,7 @@ enum NotificationStreamEventType {
   letterRead,
   writingStatus,
   replyArrival,
+  reportStatus,
   unknown,
 }
 
@@ -77,6 +78,7 @@ class NotificationStreamEvent {
     required this.data,
     required this.message,
     this.letterId,
+    this.reportId,
     this.status,
   });
 
@@ -113,6 +115,18 @@ class NotificationStreamEvent {
           type: NotificationStreamEventType.replyArrival,
           data: message,
           message: message,
+        );
+
+  const NotificationStreamEvent.reportStatus(
+    String message, {
+    int? reportId,
+    String? status,
+  }) : this._(
+          type: NotificationStreamEventType.reportStatus,
+          data: message,
+          message: message,
+          reportId: reportId,
+          status: status,
         );
 
   const NotificationStreamEvent.unknown(String data)
@@ -159,6 +173,13 @@ class NotificationStreamEvent {
           letterId: payload.letterId,
           status: payload.status,
         ),
+      'report_status' => NotificationStreamEvent._(
+          type: NotificationStreamEventType.reportStatus,
+          data: data,
+          message: message.isEmpty ? '신고 처리 결과가 등록되었습니다.' : message,
+          reportId: payload.reportId,
+          status: payload.status,
+        ),
       _ => NotificationStreamEvent.unknown(message),
     };
   }
@@ -167,13 +188,15 @@ class NotificationStreamEvent {
   final String data;
   final String message;
   final int? letterId;
+  final int? reportId;
   final String? status;
 
   bool get shouldDisplay {
     return type == NotificationStreamEventType.newLetter ||
         type == NotificationStreamEventType.letterRead ||
         type == NotificationStreamEventType.writingStatus ||
-        type == NotificationStreamEventType.replyArrival;
+        type == NotificationStreamEventType.replyArrival ||
+        type == NotificationStreamEventType.reportStatus;
   }
 }
 
@@ -181,11 +204,13 @@ class _NotificationPayload {
   const _NotificationPayload({
     required this.message,
     this.letterId,
+    this.reportId,
     this.status,
   });
 
   final String message;
   final int? letterId;
+  final int? reportId;
   final String? status;
 }
 
@@ -197,6 +222,7 @@ _NotificationPayload _decodePayload(String data) {
       return _NotificationPayload(
         message: (map['message'] ?? map['content'] ?? data).toString(),
         letterId: _readOptionalInt(map, 'letterId'),
+        reportId: _readOptionalInt(map, 'reportId'),
         status: _readNullableString(map['status']),
       );
     }

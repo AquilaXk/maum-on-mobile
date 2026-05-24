@@ -141,6 +141,51 @@ class LetterControllerTest @Autowired constructor(
             }
     }
 
+    @Test
+    fun rejectsHighRiskLettersAndRepliesBeforePersistence() {
+        val sender = signupAndLogin("moderated-letter-sender@example.com", "보낸이")
+        val receiver = signupAndLogin("moderated-letter-receiver@example.com", "받는이")
+
+        mockMvc.post("/api/v1/letters") {
+            header("Authorization", "Bearer ${sender.accessToken}")
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"title":"비밀 편지","content":"너 죽어 버려"}"""
+        }
+            .andExpect {
+                status { isBadRequest() }
+                jsonPath("$.error.code") { value("INVALID_REQUEST") }
+                jsonPath("$.error.message") { value("위험도가 높은 표현이 포함되어 수정이 필요합니다.") }
+            }
+
+        val createResult = mockMvc.post("/api/v1/letters") {
+            header("Authorization", "Bearer ${sender.accessToken}")
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"title":"안전한 편지","content":"오늘 마음을 나누고 싶어요."}"""
+        }
+            .andExpect {
+                status { isOk() }
+            }
+            .andReturn()
+        val letterId = createResult.response.readJsonInt("$.data")
+
+        mockMvc.post("/api/v1/letters/$letterId/accept") {
+            header("Authorization", "Bearer ${receiver.accessToken}")
+        }
+            .andExpect {
+                status { isOk() }
+            }
+
+        mockMvc.post("/api/v1/letters/$letterId/reply") {
+            header("Authorization", "Bearer ${receiver.accessToken}")
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"replyContent":"010-1234-5678로 연락해 주세요."}"""
+        }
+            .andExpect {
+                status { isBadRequest() }
+                jsonPath("$.error.code") { value("INVALID_REQUEST") }
+            }
+    }
+
     private fun signupAndLogin(email: String, nickname: String): TestMember {
         mockMvc.post("/api/v1/auth/signup") {
             contentType = MediaType.APPLICATION_JSON

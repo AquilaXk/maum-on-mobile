@@ -5,6 +5,8 @@ import 'package:maum_on_mobile_front/features/diary/application/diary_controller
 import 'package:maum_on_mobile_front/features/diary/data/diary_image_repository.dart';
 import 'package:maum_on_mobile_front/features/diary/data/diary_repository.dart';
 import 'package:maum_on_mobile_front/features/diary/domain/diary_models.dart';
+import 'package:maum_on_mobile_front/features/moderation/data/content_moderation_repository.dart';
+import 'package:maum_on_mobile_front/features/moderation/domain/content_moderation_models.dart';
 
 void main() {
   group('DiaryController', () {
@@ -134,6 +136,39 @@ void main() {
 
       expect(repository.createdDrafts, isEmpty);
       expect(controller.state.errorMessage, '제목과 본문을 입력해 주세요.');
+    });
+
+    test('blocks high-risk diary text before upload and save', () async {
+      final repository = _FakeDiaryRepository(pages: [_page([])]);
+      final imageRepository = _FakeDiaryImageRepository();
+      final moderationRepository = _FakeContentModerationRepository(
+        result: const ContentModerationResult(
+          allowed: false,
+          riskLevel: ContentModerationRiskLevel.high,
+          message: '위험도가 높은 표현이 포함되어 수정이 필요합니다.',
+          categories: [ContentModerationCategory.personalInfo],
+        ),
+      );
+      final controller = DiaryController(
+        diaryRepository: repository,
+        imageRepository: imageRepository,
+        moderationRepository: moderationRepository,
+        now: DateTime(2026, 5, 20),
+      );
+
+      await controller.load();
+      controller.updateTitle('연락처 기록');
+      controller.updateContent('010-1234-5678');
+      controller.attachImage(
+        const DiaryImageAttachment(filename: 'mind.png', bytes: [9]),
+      );
+      await controller.submit();
+
+      expect(repository.createdDrafts, isEmpty);
+      expect(imageRepository.uploadedImages, isEmpty);
+      expect(moderationRepository.requests.single.targetType,
+          ContentModerationTarget.diary);
+      expect(controller.state.errorMessage, '위험도가 높은 표현이 포함되어 수정이 필요합니다.');
     });
 
     test('updates the editing diary and refreshes the calendar', () async {
@@ -439,5 +474,21 @@ class _FakeDiaryRepository implements DiaryRepository {
   @override
   Future<void> deleteDiary(int id) async {
     deletedIds.add(id);
+  }
+}
+
+class _FakeContentModerationRepository implements ContentModerationRepository {
+  _FakeContentModerationRepository({required this.result});
+
+  final ContentModerationResult result;
+  final List<ContentModerationRequest> requests = [];
+
+  @override
+  Future<ContentModerationResult> reviewText({
+    required ContentModerationTarget targetType,
+    required String text,
+  }) async {
+    requests.add(ContentModerationRequest(targetType: targetType, text: text));
+    return result;
   }
 }

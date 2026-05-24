@@ -2,6 +2,8 @@ import 'dart:async';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:maum_on_mobile_front/core/network/api_error.dart';
+import 'package:maum_on_mobile_front/features/moderation/data/content_moderation_repository.dart';
+import 'package:maum_on_mobile_front/features/moderation/domain/content_moderation_models.dart';
 import 'package:maum_on_mobile_front/features/letter/application/letter_controller.dart';
 import 'package:maum_on_mobile_front/features/letter/data/letter_repository.dart';
 import 'package:maum_on_mobile_front/features/letter/domain/letter_models.dart';
@@ -181,6 +183,35 @@ void main() {
       expect(unauthorizedCount, 1);
       expect(controller.state.errorMessage, '다시 로그인해 주세요.');
     });
+
+    test('clears moderation notice when letter submission fails', () async {
+      final repository = _FakeLetterRepository(
+        createError: const ApiClientException(
+          kind: ApiErrorKind.server,
+          message: '전송하지 못했습니다.',
+        ),
+      );
+      final moderationRepository = _FakeContentModerationRepository(
+        result: const ContentModerationResult(
+          allowed: true,
+          riskLevel: ContentModerationRiskLevel.high,
+          message: '표현을 순화해 주세요.',
+          categories: [ContentModerationCategory.profanity],
+        ),
+      );
+      final controller = LetterController(
+        letterRepository: repository,
+        moderationRepository: moderationRepository,
+      );
+
+      controller.startCompose();
+      controller.updateTitle('새 편지');
+      controller.updateContent('조금 거친 본문');
+      await controller.submitLetter();
+
+      expect(controller.state.errorMessage, '전송하지 못했습니다.');
+      expect(controller.state.noticeMessage, isNull);
+    });
   });
 }
 
@@ -243,6 +274,7 @@ class _FakeLetterRepository implements LetterRepository {
     this.markWritingErrors = const [],
     this.createdId = 1,
     this.fetchError,
+    this.createError,
   });
 
   final List<LetterStats> statsQueue;
@@ -253,6 +285,7 @@ class _FakeLetterRepository implements LetterRepository {
   final List<Object> markWritingErrors;
   final int createdId;
   final Object? fetchError;
+  final Object? createError;
   final List<LetterDraft> createdDrafts = [];
   final List<int> acceptedIds = [];
   final List<int> rejectedIds = [];
@@ -263,6 +296,10 @@ class _FakeLetterRepository implements LetterRepository {
   @override
   Future<int> createLetter(LetterDraft draft) async {
     createdDrafts.add(draft);
+    final error = createError;
+    if (error != null) {
+      throw error;
+    }
     return createdId;
   }
 
@@ -380,4 +417,20 @@ class _DeferredLoadRepository implements LetterRepository {
 
   @override
   Future<void> replyLetter(int id, String replyContent) async {}
+}
+
+class _FakeContentModerationRepository implements ContentModerationRepository {
+  _FakeContentModerationRepository({required this.result});
+
+  final ContentModerationResult result;
+  final List<ContentModerationRequest> requests = [];
+
+  @override
+  Future<ContentModerationResult> reviewText({
+    required ContentModerationTarget targetType,
+    required String text,
+  }) async {
+    requests.add(ContentModerationRequest(targetType: targetType, text: text));
+    return result;
+  }
 }

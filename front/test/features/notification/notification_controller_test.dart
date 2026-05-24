@@ -44,6 +44,32 @@ void main() {
       expect(controller.state.notifications.last.content, '상대방이 편지를 읽었습니다.');
     });
 
+    test('prepends report processing events from the notification stream',
+        () async {
+      final repository = _FakeNotificationRepository(
+        notificationsQueue: [
+          const [],
+          const [],
+        ],
+      );
+      final controller = NotificationController(repository: repository);
+
+      await controller.load();
+      await controller.connect();
+      repository.emit(
+        const NotificationStreamEvent.reportStatus(
+          '신고 처리 결과가 등록되었습니다: RESOLVED',
+          status: 'RESOLVED',
+          reportId: 9,
+        ),
+      );
+      await Future<void>.delayed(Duration.zero);
+
+      expect(controller.state.notifications.first.content,
+          '신고 처리 결과가 등록되었습니다: RESOLVED');
+      expect(controller.state.noticeMessage, '신고 처리 결과가 등록되었습니다: RESOLVED');
+    });
+
     test('does not request duplicate tickets while connecting', () async {
       final ticketCompleter = Completer<NotificationSubscriptionTicket>();
       final repository = _FakeNotificationRepository(

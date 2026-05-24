@@ -53,6 +53,28 @@ class JdbcReportRepository(
         return findById(id) ?: error("저장된 신고를 확인하지 못했습니다.")
     }
 
+    override fun findById(id: Long): Report? {
+        return jdbc.query(
+            "select * from reports where id = :id",
+            params().withValue("id", id),
+            rowMapper,
+        ).singleOrNull()
+    }
+
+    override fun updateStatus(id: Long, status: String): Report? {
+        jdbc.update(
+            """
+                update reports
+                   set status = :status
+                 where id = :id
+            """.trimIndent(),
+            params()
+                .withValue("id", id)
+                .withValue("status", status),
+        )
+        return findById(id)
+    }
+
     override fun existsByReporterAndTarget(
         reporterId: Long,
         targetId: Long,
@@ -73,14 +95,6 @@ class JdbcReportRepository(
             Long::class.java,
         )
         return (count ?: 0) > 0
-    }
-
-    private fun findById(id: Long): Report? {
-        return jdbc.query(
-            "select * from reports where id = :id",
-            params().withValue("id", id),
-            rowMapper,
-        ).singleOrNull()
     }
 
     private companion object {

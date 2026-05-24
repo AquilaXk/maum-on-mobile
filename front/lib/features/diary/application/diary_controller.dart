@@ -1,6 +1,8 @@
 import 'package:flutter/foundation.dart';
 
 import '../../../core/network/api_error.dart';
+import '../../moderation/data/content_moderation_repository.dart';
+import '../../moderation/domain/content_moderation_models.dart';
 import '../data/diary_image_repository.dart';
 import '../data/diary_repository.dart';
 import '../domain/diary_models.dart';
@@ -148,10 +150,12 @@ class DiaryController extends ChangeNotifier {
   DiaryController({
     required DiaryRepository diaryRepository,
     required DiaryImageRepository imageRepository,
+    ContentModerationRepository? moderationRepository,
     DateTime? now,
     VoidCallback? onUnauthorized,
   })  : _diaryRepository = diaryRepository,
         _imageRepository = imageRepository,
+        _moderationRepository = moderationRepository,
         _onUnauthorized = onUnauthorized,
         _state = DiaryState(
           visibleMonth: firstDayOfMonth(now ?? DateTime.now()),
@@ -160,6 +164,7 @@ class DiaryController extends ChangeNotifier {
 
   final DiaryRepository _diaryRepository;
   final DiaryImageRepository _imageRepository;
+  final ContentModerationRepository? _moderationRepository;
   final VoidCallback? _onUnauthorized;
 
   DiaryState _state;
@@ -290,6 +295,10 @@ class DiaryController extends ChangeNotifier {
     );
 
     try {
+      if (!await _ensureModerationAllowed('$title\n$content')) {
+        return;
+      }
+
       final uploadedImageUrl = await _uploadSelectedImageIfNeeded();
       final draft = DiaryDraft(
         title: title,
@@ -358,6 +367,35 @@ class DiaryController extends ChangeNotifier {
       ),
     );
     return uploadedImage.imageUrl;
+  }
+
+  Future<bool> _ensureModerationAllowed(String text) async {
+    final repository = _moderationRepository;
+    if (repository == null) {
+      return true;
+    }
+
+    final result = await repository.reviewText(
+      targetType: ContentModerationTarget.diary,
+      text: text,
+    );
+    if (result.allowed) {
+      if (result.riskLevel != ContentModerationRiskLevel.low) {
+        _setState(_state.copyWith(noticeMessage: result.message));
+      }
+      return true;
+    }
+
+    _setState(
+      _state.copyWith(
+        isSubmitting: false,
+        isUploadingImage: false,
+        clearImageUploadProgress: true,
+        errorMessage: result.message,
+        clearNoticeMessage: true,
+      ),
+    );
+    return false;
   }
 
   Future<void> deleteDiary(DiaryEntry entry) async {

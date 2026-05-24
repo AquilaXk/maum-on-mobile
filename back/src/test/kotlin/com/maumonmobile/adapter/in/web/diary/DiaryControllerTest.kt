@@ -182,6 +182,25 @@ class DiaryControllerTest @Autowired constructor(
     }
 
     @Test
+    fun rejectsHighRiskDiaryTextBeforePersistence() {
+        val accessToken = signupAndLogin("moderated-diary@example.com")
+
+        mockMvc.perform(
+            multipart("/api/v1/diaries")
+                .file(
+                    jsonPart(
+                        "data",
+                        """{"title":"연락처 기록","content":"010-1234-5678로 연락해 주세요.","categoryName":"일상","isPrivate":true}""",
+                    ),
+                )
+                .header("Authorization", "Bearer $accessToken"),
+        )
+            .andExpect(status().isBadRequest)
+            .andExpect(jsonPath("$.error.code").value("INVALID_REQUEST"))
+            .andExpect(jsonPath("$.error.message").value("위험도가 높은 표현이 포함되어 수정이 필요합니다."))
+    }
+
+    @Test
     fun updatesDiaryImageUrlAndReleasesPreviousUpload() {
         val accessToken = signupAndLogin("replace-diary-image@example.com")
         val firstImageUrl = uploadImage(accessToken)

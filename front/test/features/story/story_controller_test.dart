@@ -1,6 +1,8 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:maum_on_mobile_front/core/network/api_error.dart';
 import 'package:maum_on_mobile_front/core/network/api_response.dart';
+import 'package:maum_on_mobile_front/features/moderation/data/content_moderation_repository.dart';
+import 'package:maum_on_mobile_front/features/moderation/domain/content_moderation_models.dart';
 import 'package:maum_on_mobile_front/features/story/application/story_controller.dart';
 import 'package:maum_on_mobile_front/features/story/data/story_repository.dart';
 import 'package:maum_on_mobile_front/features/story/domain/story_models.dart';
@@ -52,6 +54,98 @@ void main() {
       expect(controller.state.mode, StoryViewMode.detail);
       expect(controller.state.selectedStory?.id, 12);
       expect(controller.state.noticeMessage, '스토리가 등록되었습니다.');
+    });
+
+    test('blocks high-risk story text before creating a story', () async {
+      final repository = _FakeStoryRepository();
+      final moderationRepository = _FakeContentModerationRepository(
+        result: const ContentModerationResult(
+          allowed: false,
+          riskLevel: ContentModerationRiskLevel.high,
+          message: '위험도가 높은 표현이 포함되어 수정이 필요합니다.',
+          categories: [ContentModerationCategory.profanity],
+        ),
+      );
+      final controller = StoryController(
+        storyRepository: repository,
+        currentMemberId: 7,
+        moderationRepository: moderationRepository,
+      );
+
+      controller.startCreate();
+      controller.updateStoryTitle('새 글');
+      controller.updateStoryContent('너 죽어 버려');
+      await controller.submitStory();
+
+      expect(repository.createdDrafts, isEmpty);
+      expect(moderationRepository.requests.single.targetType,
+          ContentModerationTarget.story);
+      expect(moderationRepository.requests.single.text, contains('너 죽어 버려'));
+      expect(controller.state.errorMessage, '위험도가 높은 표현이 포함되어 수정이 필요합니다.');
+      expect(controller.state.isSubmitting, isFalse);
+    });
+
+    test('blocks high-risk comments before creating a comment', () async {
+      final repository = _FakeStoryRepository(
+        details: [_detail(id: 8, title: '댓글 글', authorId: 7)],
+        commentPages: [_commentPage([])],
+      );
+      final moderationRepository = _FakeContentModerationRepository(
+        result: const ContentModerationResult(
+          allowed: false,
+          riskLevel: ContentModerationRiskLevel.high,
+          message: '위험도가 높은 표현이 포함되어 수정이 필요합니다.',
+          categories: [ContentModerationCategory.personalInfo],
+        ),
+      );
+      final controller = StoryController(
+        storyRepository: repository,
+        currentMemberId: 7,
+        moderationRepository: moderationRepository,
+      );
+
+      await controller.openStoryById(8);
+      controller.updateCommentDraft('010-1234-5678');
+      await controller.submitComment();
+
+      expect(repository.createdComments, isEmpty);
+      expect(moderationRepository.requests.single.targetType,
+          ContentModerationTarget.comment);
+      expect(
+        moderationRepository.requests.single.text,
+        contains('010-1234-5678'),
+      );
+      expect(controller.state.errorMessage, '위험도가 높은 표현이 포함되어 수정이 필요합니다.');
+    });
+
+    test('clears moderation notice when story submission fails', () async {
+      final repository = _FakeStoryRepository(
+        createError: const ApiClientException(
+          kind: ApiErrorKind.server,
+          message: '등록하지 못했습니다.',
+        ),
+      );
+      final moderationRepository = _FakeContentModerationRepository(
+        result: const ContentModerationResult(
+          allowed: true,
+          riskLevel: ContentModerationRiskLevel.high,
+          message: '표현을 순화해 주세요.',
+          categories: [ContentModerationCategory.profanity],
+        ),
+      );
+      final controller = StoryController(
+        storyRepository: repository,
+        currentMemberId: 7,
+        moderationRepository: moderationRepository,
+      );
+
+      controller.startCreate();
+      controller.updateStoryTitle('새 글');
+      controller.updateStoryContent('조금 거친 본문');
+      await controller.submitStory();
+
+      expect(controller.state.errorMessage, '등록하지 못했습니다.');
+      expect(controller.state.noticeMessage, isNull);
     });
 
     test(
@@ -257,6 +351,7 @@ class _FakeStoryRepository implements StoryRepository {
     this.commentPages = const [],
     this.createdStoryId = 1,
     this.fetchError,
+    this.createError,
   });
 
   final List<PageResponse<StorySummary>> storyPages;
@@ -264,6 +359,7 @@ class _FakeStoryRepository implements StoryRepository {
   final List<PageResponse<StoryComment>> commentPages;
   final int createdStoryId;
   final Object? fetchError;
+  final Object? createError;
   final List<({String? title, StoryCategory category})> fetchStoryRequests = [];
   final List<StoryDraft> createdDrafts = [];
   final List<({int id, StoryDraft draft})> updatedDrafts = [];
@@ -296,6 +392,10 @@ class _FakeStoryRepository implements StoryRepository {
   @override
   Future<int> createStory(StoryDraft draft) async {
     createdDrafts.add(draft);
+    final error = createError;
+    if (error != null) {
+      throw error;
+    }
     return createdStoryId;
   }
 
@@ -348,5 +448,21 @@ class _FakeStoryRepository implements StoryRepository {
   @override
   Future<void> deleteComment(int commentId) async {
     deletedCommentIds.add(commentId);
+  }
+}
+
+class _FakeContentModerationRepository implements ContentModerationRepository {
+  _FakeContentModerationRepository({required this.result});
+
+  final ContentModerationResult result;
+  final List<ContentModerationRequest> requests = [];
+
+  @override
+  Future<ContentModerationResult> reviewText({
+    required ContentModerationTarget targetType,
+    required String text,
+  }) async {
+    requests.add(ContentModerationRequest(targetType: targetType, text: text));
+    return result;
   }
 }

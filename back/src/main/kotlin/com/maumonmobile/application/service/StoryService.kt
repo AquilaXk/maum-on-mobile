@@ -11,6 +11,7 @@ import com.maumonmobile.application.port.`in`.StoryUseCase
 import com.maumonmobile.application.port.out.AuthMemberRepository
 import com.maumonmobile.application.port.out.StoryRepository
 import com.maumonmobile.domain.auth.AuthMember
+import com.maumonmobile.domain.moderation.ContentModerationTarget
 import com.maumonmobile.domain.story.StoryComment
 import com.maumonmobile.domain.story.StoryPost
 import com.maumonmobile.domain.story.StoryPostDraft
@@ -24,6 +25,7 @@ import kotlin.math.ceil
 class StoryService(
     private val storyRepository: StoryRepository,
     private val authMemberRepository: AuthMemberRepository,
+    private val contentModerationService: ContentModerationService,
 ) : StoryUseCase {
 
     override fun list(title: String?, category: String?, page: Int, size: Int): StoryPageResult {
@@ -57,6 +59,7 @@ class StoryService(
 
     override fun create(user: AuthenticatedUser, command: StorySaveCommand): Long {
         val member = findMember(user)
+        contentModerationService.ensureAllowed(ContentModerationTarget.STORY, command.title, command.content)
         return storyRepository.savePost(
             authorId = member.id,
             authorNickname = member.nickname,
@@ -66,6 +69,7 @@ class StoryService(
 
     override fun update(user: AuthenticatedUser, postId: Long, command: StorySaveCommand) {
         val post = findOwnedPost(user, postId)
+        contentModerationService.ensureAllowed(ContentModerationTarget.STORY, command.title, command.content)
         storyRepository.updatePost(post, command.toDraft())
     }
 
@@ -129,6 +133,7 @@ class StoryService(
             }
         }
 
+        contentModerationService.ensureAllowed(ContentModerationTarget.COMMENT, command.content)
         return storyRepository.saveComment(
             postId = postId,
             authorId = member.id,
@@ -141,6 +146,7 @@ class StoryService(
 
     override fun updateComment(user: AuthenticatedUser, commentId: Long, content: String) {
         val comment = findOwnedComment(user, commentId)
+        contentModerationService.ensureAllowed(ContentModerationTarget.COMMENT, content)
         storyRepository.updateComment(comment, content.trim())
     }
 

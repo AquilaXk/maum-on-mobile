@@ -10,6 +10,7 @@ import com.maumonmobile.application.port.out.AuthMemberRepository
 import com.maumonmobile.application.port.out.LetterRepository
 import com.maumonmobile.domain.letter.Letter
 import com.maumonmobile.domain.letter.LetterDraft
+import com.maumonmobile.domain.moderation.ContentModerationTarget
 import com.maumonmobile.global.security.AuthenticatedUser
 import com.maumonmobile.global.web.ApiException
 import com.maumonmobile.global.web.ErrorCode
@@ -21,12 +22,14 @@ import kotlin.math.ceil
 class LetterService(
     private val letterRepository: LetterRepository,
     private val authMemberRepository: AuthMemberRepository,
+    private val contentModerationService: ContentModerationService,
 ) : LetterUseCase {
 
     override fun create(user: AuthenticatedUser, command: LetterSaveCommand): Long {
         val memberId = user.memberId()
         val member = authMemberRepository.findById(memberId)
             ?: throw ApiException(ErrorCode.UNAUTHORIZED, "다시 로그인해 주세요.")
+        contentModerationService.ensureAllowed(ContentModerationTarget.LETTER, command.title, command.content)
 
         return letterRepository.save(
             senderId = member.id,
@@ -91,6 +94,7 @@ class LetterService(
 
     override fun reply(user: AuthenticatedUser, letterId: Long, replyContent: String) {
         val letter = findReceivedLetter(user.memberId(), letterId)
+        contentModerationService.ensureAllowed(ContentModerationTarget.LETTER, replyContent)
         letterRepository.update(
             letter.copy(
                 status = "REPLIED",

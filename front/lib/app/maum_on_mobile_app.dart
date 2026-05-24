@@ -25,6 +25,7 @@ import '../features/letter/application/letter_controller.dart';
 import '../features/letter/data/letter_repository.dart';
 import '../features/letter/domain/letter_models.dart';
 import '../features/letter/presentation/letter_screen.dart';
+import '../features/moderation/data/content_moderation_repository.dart';
 import '../features/notification/application/notification_controller.dart';
 import '../features/notification/data/notification_repository.dart';
 import '../features/notification/presentation/notification_report_screen.dart';
@@ -55,6 +56,7 @@ class MaumOnMobileApp extends StatefulWidget {
     this.diaryRepository,
     this.diaryImageRepository,
     this.diaryImagePicker,
+    this.contentModerationRepository,
     this.storyRepository,
     this.onStoryReportTarget,
     this.letterRepository,
@@ -75,6 +77,7 @@ class MaumOnMobileApp extends StatefulWidget {
   final DiaryRepository? diaryRepository;
   final DiaryImageRepository? diaryImageRepository;
   final DiaryImagePicker? diaryImagePicker;
+  final ContentModerationRepository? contentModerationRepository;
   final StoryRepository? storyRepository;
   final ValueChanged<StoryReportTarget>? onStoryReportTarget;
   final LetterRepository? letterRepository;
@@ -383,6 +386,8 @@ class _MaumOnMobileAppState extends State<MaumOnMobileApp> {
     _reportMemberId = memberId;
     return _reportController = ReportController(
       repository: widget.reportRepository ?? _buildDefaultReportRepository(),
+      moderationRepository: widget.contentModerationRepository ??
+          _buildDefaultContentModerationRepository(),
       onUnauthorized: () {
         _authController.logout();
       },
@@ -431,6 +436,8 @@ class _MaumOnMobileAppState extends State<MaumOnMobileApp> {
       diaryRepository: widget.diaryRepository ?? _buildDefaultDiaryRepository(),
       imageRepository:
           widget.diaryImageRepository ?? _buildDefaultDiaryImageRepository(),
+      moderationRepository: widget.contentModerationRepository ??
+          _buildDefaultContentModerationRepository(),
       onUnauthorized: () {
         _authController.logout();
       },
@@ -454,6 +461,8 @@ class _MaumOnMobileAppState extends State<MaumOnMobileApp> {
     return _storyController = StoryController(
       storyRepository: widget.storyRepository ?? _buildDefaultStoryRepository(),
       currentMemberId: memberId,
+      moderationRepository: widget.contentModerationRepository ??
+          _buildDefaultContentModerationRepository(),
       onUnauthorized: () {
         _authController.logout();
       },
@@ -478,6 +487,8 @@ class _MaumOnMobileAppState extends State<MaumOnMobileApp> {
     return _letterController = LetterController(
       letterRepository:
           widget.letterRepository ?? _buildDefaultLetterRepository(),
+      moderationRepository: widget.contentModerationRepository ??
+          _buildDefaultContentModerationRepository(),
       onUnauthorized: () {
         _authController.logout();
       },
@@ -615,6 +626,23 @@ class _MaumOnMobileAppState extends State<MaumOnMobileApp> {
     );
 
     return ApiReportRepository(
+      apiClient: ApiClient(
+        transport: _apiTransport,
+        tokenStore: _tokenStore,
+        tokenRefresher: AuthSessionTokenRefresher(
+          authRepository: refreshRepository,
+        ),
+      ),
+    );
+  }
+
+  ContentModerationRepository _buildDefaultContentModerationRepository() {
+    final refreshRepository = ApiAuthRepository(
+      apiClient: ApiClient(transport: _apiTransport, tokenStore: _tokenStore),
+      tokenStore: _tokenStore,
+    );
+
+    return ApiContentModerationRepository(
       apiClient: ApiClient(
         transport: _apiTransport,
         tokenStore: _tokenStore,

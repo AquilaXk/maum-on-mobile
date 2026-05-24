@@ -1,6 +1,8 @@
 import 'package:flutter/widgets.dart';
 
 import '../../../core/network/api_error.dart';
+import '../../moderation/data/content_moderation_repository.dart';
+import '../../moderation/domain/content_moderation_models.dart';
 import '../data/report_repository.dart';
 import '../domain/report_models.dart';
 
@@ -88,11 +90,14 @@ class ReportState {
 class ReportController extends ChangeNotifier {
   ReportController({
     required ReportRepository repository,
+    ContentModerationRepository? moderationRepository,
     VoidCallback? onUnauthorized,
   })  : _repository = repository,
+        _moderationRepository = moderationRepository,
         _onUnauthorized = onUnauthorized;
 
   final ReportRepository _repository;
+  final ContentModerationRepository? _moderationRepository;
   final VoidCallback? _onUnauthorized;
 
   ReportState _state = const ReportState();
@@ -176,6 +181,10 @@ class ReportController extends ChangeNotifier {
     );
 
     try {
+      if (!await _ensureModerationAllowed(_state.content.trim())) {
+        return;
+      }
+
       final reportId = await _repository.createReport(
         ReportDraft(
           target: target,
@@ -211,6 +220,36 @@ class ReportController extends ChangeNotifier {
     }
 
     return '신고를 접수하지 못했습니다.';
+  }
+
+  Future<bool> _ensureModerationAllowed(String text) async {
+    if (text.isEmpty) {
+      return true;
+    }
+    final repository = _moderationRepository;
+    if (repository == null) {
+      return true;
+    }
+
+    final result = await repository.reviewText(
+      targetType: ContentModerationTarget.report,
+      text: text,
+    );
+    if (result.allowed) {
+      if (result.riskLevel != ContentModerationRiskLevel.low) {
+        _setState(_state.copyWith(noticeMessage: result.message));
+      }
+      return true;
+    }
+
+    _setState(
+      _state.copyWith(
+        isSubmitting: false,
+        errorMessage: result.message,
+        clearNoticeMessage: true,
+      ),
+    );
+    return false;
   }
 
   void _setState(ReportState state) {

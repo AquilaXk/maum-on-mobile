@@ -9,6 +9,7 @@ import com.maumonmobile.application.port.out.DiaryRepository
 import com.maumonmobile.application.port.out.ImageLifecyclePort
 import com.maumonmobile.domain.diary.Diary
 import com.maumonmobile.domain.diary.DiaryDraft
+import com.maumonmobile.domain.moderation.ContentModerationTarget
 import com.maumonmobile.global.security.AuthenticatedUser
 import com.maumonmobile.global.web.ApiException
 import com.maumonmobile.global.web.ErrorCode
@@ -21,6 +22,7 @@ class DiaryService(
     private val diaryRepository: DiaryRepository,
     private val authMemberRepository: AuthMemberRepository,
     private val imageLifecyclePort: ImageLifecyclePort,
+    private val contentModerationService: ContentModerationService,
 ) : DiaryUseCase {
 
     @Transactional
@@ -28,6 +30,7 @@ class DiaryService(
         val member = authMemberRepository.findById(user.memberId())
             ?: throw ApiException(ErrorCode.UNAUTHORIZED, "다시 로그인해 주세요.")
         val draft = command.toDraft()
+        contentModerationService.ensureAllowed(ContentModerationTarget.DIARY, draft.title, draft.content)
         imageLifecyclePort.validateDiaryImage(member.id, draft.imageUrl)
 
         val diary = diaryRepository.save(
@@ -81,6 +84,7 @@ class DiaryService(
     override fun update(user: AuthenticatedUser, diaryId: Long, command: DiarySaveCommand) {
         val diary = findOwnedDiary(user, diaryId)
         val draft = command.toDraft()
+        contentModerationService.ensureAllowed(ContentModerationTarget.DIARY, draft.title, draft.content)
         imageLifecyclePort.validateDiaryImage(diary.memberId, draft.imageUrl)
 
         val updatedDiary = diaryRepository.update(diary, draft)
