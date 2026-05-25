@@ -66,6 +66,75 @@ void main() {
     expect(controller.state.metricsErrorMessage, '운영 지표 권한이 없습니다.');
     expect(controller.state.isMetricsPermissionError, isTrue);
   });
+
+  test('refreshes system status without changing the current view', () async {
+    final environment = _systemEnvironment();
+    final repository = _MetricsOperationsRepository(
+      systemStatus: OperationsSystemStatus.connected(environment),
+    );
+    final controller = OperationsController(
+      reportRepository: _NoopReportRepository(),
+      operationsRepository: repository,
+      systemEnvironment: environment,
+    );
+    addTearDown(controller.dispose);
+
+    await controller.refreshSystemStatus();
+
+    expect(repository.systemStatusCalls, 1);
+    expect(controller.state.view, OperationsView.dashboard);
+    expect(controller.state.hasSystemStatusLoaded, isTrue);
+    expect(controller.state.systemStatus?.kind,
+        OperationsSystemStatusKind.connected);
+    expect(controller.state.systemStatusErrorMessage, isNull);
+    expect(controller.state.errorMessage, isNull);
+  });
+
+  test('keeps system permission errors separate from global operation errors',
+      () async {
+    final environment = _systemEnvironment();
+    final controller = OperationsController(
+      reportRepository: _NoopReportRepository(),
+      operationsRepository: _MetricsOperationsRepository(
+        systemStatus: OperationsSystemStatus.permissionDenied(
+          environment,
+          message: '운영 시스템 권한이 없습니다.',
+        ),
+      ),
+      systemEnvironment: environment,
+    );
+    addTearDown(controller.dispose);
+
+    await controller.refreshSystemStatus();
+
+    expect(controller.state.hasSystemStatusLoaded, isTrue);
+    expect(controller.state.errorMessage, isNull);
+    expect(controller.state.systemStatusErrorMessage, '운영 시스템 권한이 없습니다.');
+    expect(controller.state.isSystemStatusPermissionError, isTrue);
+  });
+
+  test('keeps system status failures separate from global operation errors',
+      () async {
+    final environment = _systemEnvironment();
+    final controller = OperationsController(
+      reportRepository: _NoopReportRepository(),
+      operationsRepository: _MetricsOperationsRepository(
+        systemError: const ApiClientException(
+          kind: ApiErrorKind.network,
+          message: '네트워크 연결을 확인해 주세요.',
+        ),
+      ),
+      systemEnvironment: environment,
+    );
+    addTearDown(controller.dispose);
+
+    await controller.refreshSystemStatus();
+
+    expect(controller.state.hasSystemStatusLoaded, isTrue);
+    expect(controller.state.errorMessage, isNull);
+    expect(controller.state.systemStatusErrorMessage, '네트워크 연결을 확인해 주세요.');
+    expect(controller.state.isSystemStatusPermissionError, isFalse);
+  });
 }
 
 MobileApiMetricsSnapshot _metrics() {
@@ -96,11 +165,19 @@ MobileApiMetricsSnapshot _metrics() {
 }
 
 class _MetricsOperationsRepository implements OperationsRepository {
-  _MetricsOperationsRepository({this.metrics, this.error});
+  _MetricsOperationsRepository({
+    this.metrics,
+    this.error,
+    this.systemStatus,
+    this.systemError,
+  });
 
   final MobileApiMetricsSnapshot? metrics;
   final Object? error;
+  final OperationsSystemStatus? systemStatus;
+  final Object? systemError;
   int metricsCalls = 0;
+  int systemStatusCalls = 0;
 
   @override
   Future<MobileApiMetricsSnapshot> fetchApiMetrics() async {
@@ -110,6 +187,18 @@ class _MetricsOperationsRepository implements OperationsRepository {
       throw error;
     }
     return metrics!;
+  }
+
+  @override
+  Future<OperationsSystemStatus> fetchSystemStatus(
+    OperationsSystemEnvironment environment,
+  ) async {
+    systemStatusCalls += 1;
+    final error = systemError;
+    if (error != null) {
+      throw error;
+    }
+    return systemStatus ?? OperationsSystemStatus.connected(environment);
   }
 
   @override
@@ -200,6 +289,16 @@ class _MetricsOperationsRepository implements OperationsRepository {
   }) {
     throw UnimplementedError();
   }
+}
+
+OperationsSystemEnvironment _systemEnvironment() {
+  return const OperationsSystemEnvironment(
+    apiEndpoint: 'https://api.maum-on.test',
+    appVersion: '0.1.0',
+    buildNumber: '1',
+    platform: 'Android',
+    observabilityToolUrl: 'https://observe.maum-on.test/mobile',
+  );
 }
 
 class _NoopReportRepository implements ReportRepository {

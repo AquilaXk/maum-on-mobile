@@ -1,10 +1,15 @@
 import '../../../core/network/api_client.dart';
+import '../../../core/network/api_error.dart';
 import '../domain/operations_models.dart';
 
 abstract interface class OperationsRepository {
   Future<OperationsDashboard> fetchDashboard();
 
   Future<MobileApiMetricsSnapshot> fetchApiMetrics();
+
+  Future<OperationsSystemStatus> fetchSystemStatus(
+    OperationsSystemEnvironment environment,
+  );
 
   Future<AdminMemberPage> fetchMembers({
     String? query,
@@ -82,6 +87,36 @@ class ApiOperationsRepository implements OperationsRepository {
       '/api/v1/observability/api-metrics',
       parser: MobileApiMetricsSnapshot.fromJson,
     );
+  }
+
+  @override
+  Future<OperationsSystemStatus> fetchSystemStatus(
+    OperationsSystemEnvironment environment,
+  ) async {
+    if (!environment.isObservabilityToolConfigured) {
+      return OperationsSystemStatus.unconfigured(environment);
+    }
+
+    try {
+      await fetchApiMetrics();
+      return OperationsSystemStatus.connected(environment);
+    } on ApiClientException catch (error) {
+      if (_isPermissionError(error)) {
+        return OperationsSystemStatus.permissionDenied(
+          environment,
+          message: error.message,
+        );
+      }
+      return OperationsSystemStatus.failure(
+        environment,
+        message: error.message,
+      );
+    } on Object {
+      return OperationsSystemStatus.failure(
+        environment,
+        message: '관측 도구 상태를 확인하지 못했습니다.',
+      );
+    }
   }
 
   @override
@@ -217,4 +252,10 @@ class ApiOperationsRepository implements OperationsRepository {
       parser: AdminLetterActionResult.fromJson,
     );
   }
+}
+
+bool _isPermissionError(ApiClientException error) {
+  return error.kind == ApiErrorKind.unauthorized ||
+      error.kind == ApiErrorKind.forbidden ||
+      error.kind == ApiErrorKind.permissionChanged;
 }

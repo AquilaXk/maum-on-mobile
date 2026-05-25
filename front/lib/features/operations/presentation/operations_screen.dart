@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../../shared/ui/app_design_system.dart';
 import '../domain/operations_models.dart';
@@ -9,11 +10,25 @@ class OperationsScreen extends StatefulWidget {
   const OperationsScreen({
     required this.controller,
     required this.onBack,
+    this.adminProfile = const OperationsAdminProfile(
+      id: 0,
+      email: '',
+      nickname: '운영자',
+      role: 'ADMIN',
+      status: 'ACTIVE',
+    ),
+    this.onOpenSettings,
+    this.onLogout,
+    this.onOpenExternalUri,
     super.key,
   });
 
   final OperationsController controller;
   final VoidCallback onBack;
+  final OperationsAdminProfile adminProfile;
+  final VoidCallback? onOpenSettings;
+  final VoidCallback? onLogout;
+  final Future<bool> Function(Uri uri)? onOpenExternalUri;
 
   @override
   State<OperationsScreen> createState() => _OperationsScreenState();
@@ -163,6 +178,15 @@ class _OperationsScreenState extends State<OperationsScreen> {
                   state: state,
                   onRefresh: widget.controller.refreshObservability,
                 ),
+              OperationsView.system => _SystemToolsView(
+                  state: state,
+                  adminProfile: widget.adminProfile,
+                  onRefresh: widget.controller.refreshSystemStatus,
+                  onOpenSettings: widget.onOpenSettings,
+                  onLogout: widget.onLogout,
+                  onOpenExternalUri:
+                      widget.onOpenExternalUri ?? _launchExternalUri,
+                ),
               OperationsView.members => _MembersView(
                   state: state,
                   reasonController: _memberReasonController,
@@ -229,6 +253,12 @@ class _OperationsViewSelector extends StatelessWidget {
           label: '관측',
           selected: selected == OperationsView.observability,
           onSelected: () => onSelected(OperationsView.observability),
+        ),
+        _ViewChip(
+          key: const ValueKey('operations-view-system'),
+          label: '시스템',
+          selected: selected == OperationsView.system,
+          onSelected: () => onSelected(OperationsView.system),
         ),
         _ViewChip(
           key: const ValueKey('operations-view-letters'),
@@ -369,6 +399,246 @@ class _DashboardView extends StatelessWidget {
           ],
         ),
       ],
+    );
+  }
+}
+
+class _SystemToolsView extends StatelessWidget {
+  const _SystemToolsView({
+    required this.state,
+    required this.adminProfile,
+    required this.onRefresh,
+    required this.onOpenExternalUri,
+    this.onOpenSettings,
+    this.onLogout,
+  });
+
+  final OperationsState state;
+  final OperationsAdminProfile adminProfile;
+  final Future<void> Function() onRefresh;
+  final VoidCallback? onOpenSettings;
+  final VoidCallback? onLogout;
+  final Future<bool> Function(Uri uri) onOpenExternalUri;
+
+  @override
+  Widget build(BuildContext context) {
+    if (!adminProfile.isAdmin) {
+      return const AppStateView.permission(
+        title: '시스템 도구 권한이 없습니다.',
+        message: '관리자 계정으로 다시 로그인해 주세요.',
+        semanticLabel: '운영 시스템 도구 권한 없음',
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text('시스템 도구', style: Theme.of(context).textTheme.titleMedium),
+        const SizedBox(height: AppSpacing.xs),
+        _AdminAccountCard(profile: adminProfile),
+        const SizedBox(height: AppSpacing.md),
+        _SystemConnectionCard(
+          state: state,
+          onRefresh: onRefresh,
+        ),
+        const SizedBox(height: AppSpacing.md),
+        _SystemActionPanel(
+          state: state,
+          onRefresh: onRefresh,
+          onOpenSettings: onOpenSettings,
+          onLogout: onLogout,
+          onOpenObservabilityTool: () => _openObservabilityTool(context),
+        ),
+      ],
+    );
+  }
+
+  Future<void> _openObservabilityTool(BuildContext context) async {
+    final uri = state.systemStatus?.environment.observabilityToolUri;
+    if (uri == null) {
+      return;
+    }
+
+    final opened = await onOpenExternalUri(uri);
+    if (!opened && context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('관측 도구를 열지 못했습니다.')),
+      );
+    }
+  }
+}
+
+class _AdminAccountCard extends StatelessWidget {
+  const _AdminAccountCard({required this.profile});
+
+  final OperationsAdminProfile profile;
+
+  @override
+  Widget build(BuildContext context) {
+    return AppSectionCard(
+      title: '관리자 계정',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Wrap(
+            spacing: AppSpacing.xs,
+            runSpacing: AppSpacing.xs,
+            children: [
+              AppStatusPill(
+                label: _memberStatusLabel(profile.status),
+                tone: _memberStatusTone(profile.status),
+              ),
+              AppStatusPill(label: _memberRoleLabel(profile.role)),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.md),
+          AppDetailRow(label: '닉네임', value: profile.nickname),
+          AppDetailRow(label: '이메일', value: profile.email),
+          AppDetailRow(label: '역할', value: _memberRoleLabel(profile.role)),
+          AppDetailRow(label: '계정 상태', value: _memberStatusLabel(profile.status)),
+        ],
+      ),
+    );
+  }
+}
+
+class _SystemConnectionCard extends StatelessWidget {
+  const _SystemConnectionCard({
+    required this.state,
+    required this.onRefresh,
+  });
+
+  final OperationsState state;
+  final Future<void> Function() onRefresh;
+
+  @override
+  Widget build(BuildContext context) {
+    final status = state.systemStatus;
+
+    if (state.isSystemStatusLoading && status == null) {
+      return const AppStateView.loading(
+        title: '시스템 상태를 확인하는 중입니다.',
+        semanticLabel: '운영 시스템 상태 확인 중',
+      );
+    }
+
+    if (status == null) {
+      return AppStateView.empty(
+        title: '시스템 상태 확인이 필요합니다.',
+        message: '상태를 새로고침하면 연결 정보가 표시됩니다.',
+        actionLabel: '새로고침',
+        onAction: () {
+          onRefresh();
+        },
+        semanticLabel: '운영 시스템 상태 확인 필요',
+      );
+    }
+
+    return AppSectionCard(
+      title: '시스템 연결',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Wrap(
+            spacing: AppSpacing.xs,
+            runSpacing: AppSpacing.xs,
+            children: [
+              AppStatusPill(
+                label: _systemStatusLabel(status.kind),
+                tone: _systemStatusTone(status.kind),
+              ),
+              if (state.isSystemStatusLoading)
+                const AppStatusPill(label: '확인 중'),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.md),
+          AppDetailRow(
+            label: 'API endpoint',
+            value: status.environment.apiEndpoint,
+          ),
+          AppDetailRow(label: '앱 버전', value: status.environment.appVersion),
+          AppDetailRow(label: '빌드 번호', value: status.environment.buildNumber),
+          AppDetailRow(label: '플랫폼', value: status.environment.platform),
+          AppDetailRow(
+            label: '관측 도구',
+            value: _systemStatusLabel(status.kind),
+          ),
+          if (state.systemStatusErrorMessage != null ||
+              status.kind == OperationsSystemStatusKind.unconfigured) ...[
+            const SizedBox(height: AppSpacing.sm),
+            AppNotice(
+              message: state.systemStatusErrorMessage ?? status.message,
+              tone: state.isSystemStatusPermissionError
+                  ? AppNoticeTone.warning
+                  : status.kind == OperationsSystemStatusKind.unconfigured
+                      ? AppNoticeTone.warning
+                      : AppNoticeTone.error,
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _SystemActionPanel extends StatelessWidget {
+  const _SystemActionPanel({
+    required this.state,
+    required this.onRefresh,
+    required this.onOpenObservabilityTool,
+    this.onOpenSettings,
+    this.onLogout,
+  });
+
+  final OperationsState state;
+  final Future<void> Function() onRefresh;
+  final VoidCallback onOpenObservabilityTool;
+  final VoidCallback? onOpenSettings;
+  final VoidCallback? onLogout;
+
+  @override
+  Widget build(BuildContext context) {
+    final status = state.systemStatus;
+
+    return AppSectionCard(
+      title: '시스템 작업',
+      child: Wrap(
+        spacing: AppSpacing.xs,
+        runSpacing: AppSpacing.xs,
+        children: [
+          if (status?.canOpenObservabilityTool ?? false)
+            FilledButton.icon(
+              key: const ValueKey(
+                'operations-system-open-observability-button',
+              ),
+              onPressed: onOpenObservabilityTool,
+              icon: const Icon(Icons.open_in_new),
+              label: const Text('관측 도구 열기'),
+            ),
+          OutlinedButton.icon(
+            key: const ValueKey('operations-system-refresh-button'),
+            onPressed: state.isSystemStatusLoading
+                ? null
+                : () {
+                    onRefresh();
+                  },
+            icon: const Icon(Icons.refresh),
+            label: Text(state.isSystemStatusLoading ? '새로고침 중' : '새로고침'),
+          ),
+          OutlinedButton.icon(
+            key: const ValueKey('operations-system-settings-button'),
+            onPressed: onOpenSettings,
+            icon: const Icon(Icons.settings_outlined),
+            label: const Text('내 설정'),
+          ),
+          OutlinedButton.icon(
+            key: const ValueKey('operations-system-logout-button'),
+            onPressed: onLogout,
+            icon: const Icon(Icons.logout),
+            label: const Text('로그아웃'),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -1791,6 +2061,28 @@ String _adminMemberLabel(AdminReportMember? member) {
     return '미배정';
   }
   return '${member.nickname} · ${member.email} · ${member.status}';
+}
+
+Future<bool> _launchExternalUri(Uri uri) {
+  return launchUrl(uri, mode: LaunchMode.externalApplication);
+}
+
+String _systemStatusLabel(OperationsSystemStatusKind kind) {
+  return switch (kind) {
+    OperationsSystemStatusKind.connected => '관측 도구 연결됨',
+    OperationsSystemStatusKind.unconfigured => '관측 도구 미구성',
+    OperationsSystemStatusKind.permissionDenied => '관측 도구 권한 없음',
+    OperationsSystemStatusKind.failure => '관측 도구 확인 실패',
+  };
+}
+
+AppStatusTone _systemStatusTone(OperationsSystemStatusKind kind) {
+  return switch (kind) {
+    OperationsSystemStatusKind.connected => AppStatusTone.success,
+    OperationsSystemStatusKind.unconfigured => AppStatusTone.warning,
+    OperationsSystemStatusKind.permissionDenied => AppStatusTone.warning,
+    OperationsSystemStatusKind.failure => AppStatusTone.danger,
+  };
 }
 
 String _endpointRiskLabel(MobileApiEndpointMetrics endpoint) {

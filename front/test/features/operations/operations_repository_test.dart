@@ -3,6 +3,7 @@ import 'package:maum_on_mobile_front/core/network/api_client.dart';
 import 'package:maum_on_mobile_front/core/network/api_transport.dart';
 import 'package:maum_on_mobile_front/core/network/auth_token_store.dart';
 import 'package:maum_on_mobile_front/features/operations/data/operations_repository.dart';
+import 'package:maum_on_mobile_front/features/operations/domain/operations_models.dart';
 
 void main() {
   test('loads dashboard, members, member detail, and member actions', () async {
@@ -221,6 +222,75 @@ void main() {
     expect(metrics.client.p95DurationMs['APP_START'], 420);
     expect(metrics.writeRecovery.duplicatePreventions['diary'], 1);
   });
+
+  test('checks system status through observability metrics when configured',
+      () async {
+    final transport = _FakeApiTransport([
+      ApiTransportResponse.ok({
+        'resultCode': '200-1',
+        'data': _metricsJson(),
+      }),
+    ]);
+    final repository = ApiOperationsRepository(
+      apiClient: ApiClient(
+        transport: transport,
+        tokenStore: MemoryAuthTokenStore(),
+      ),
+    );
+
+    final status = await repository.fetchSystemStatus(_systemEnvironment());
+
+    expect(transport.requests.single.path, '/api/v1/observability/api-metrics');
+    expect(status.kind, OperationsSystemStatusKind.connected);
+    expect(status.environment.apiEndpoint, 'https://api.maum-on.test');
+    expect(status.environment.observabilityToolUrl,
+        'https://observe.maum-on.test/mobile');
+  });
+
+  test('returns unconfigured system status without a network request',
+      () async {
+    final transport = _FakeApiTransport([]);
+    final repository = ApiOperationsRepository(
+      apiClient: ApiClient(
+        transport: transport,
+        tokenStore: MemoryAuthTokenStore(),
+      ),
+    );
+
+    final status = await repository.fetchSystemStatus(
+      _systemEnvironment(observabilityToolUrl: ''),
+    );
+
+    expect(transport.requests, isEmpty);
+    expect(status.kind, OperationsSystemStatusKind.unconfigured);
+    expect(status.message, '관측 도구 주소가 설정되지 않았습니다.');
+  });
+
+  test('returns permission system status when the metrics probe is forbidden',
+      () async {
+    final transport = _FakeApiTransport([
+      const ApiTransportResponse(
+        statusCode: 403,
+        body: {
+          'error': {
+            'message': '운영 시스템 권한이 없습니다.',
+          },
+        },
+      ),
+    ]);
+    final repository = ApiOperationsRepository(
+      apiClient: ApiClient(
+        transport: transport,
+        tokenStore: MemoryAuthTokenStore(),
+      ),
+    );
+
+    final status = await repository.fetchSystemStatus(_systemEnvironment());
+
+    expect(transport.requests.single.path, '/api/v1/observability/api-metrics');
+    expect(status.kind, OperationsSystemStatusKind.permissionDenied);
+    expect(status.message, '운영 시스템 권한이 없습니다.');
+  });
 }
 
 Map<String, Object?> _metricsJson() {
@@ -262,6 +332,18 @@ Map<String, Object?> _metricsJson() {
       'dropped': {'sampled_out': 1},
     },
   };
+}
+
+OperationsSystemEnvironment _systemEnvironment({
+  String observabilityToolUrl = 'https://observe.maum-on.test/mobile',
+}) {
+  return OperationsSystemEnvironment(
+    apiEndpoint: 'https://api.maum-on.test',
+    appVersion: '0.1.0',
+    buildNumber: '1',
+    platform: 'Android',
+    observabilityToolUrl: observabilityToolUrl,
+  );
 }
 
 Map<String, Object?> _memberJson({String status = 'ACTIVE'}) {

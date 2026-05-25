@@ -8,13 +8,14 @@ import '../domain/operations_models.dart';
 import '../../report/data/report_repository.dart';
 import '../../report/domain/report_models.dart';
 
-enum OperationsView { dashboard, observability, members, letters, reports }
+enum OperationsView { dashboard, observability, system, members, letters, reports }
 
 class OperationsState {
   const OperationsState({
     this.view = OperationsView.dashboard,
     this.dashboard,
     this.apiMetrics,
+    this.systemStatus,
     this.reports = const [],
     this.selectedReport,
     this.members = const [],
@@ -47,18 +48,23 @@ class OperationsState {
     this.isLetterReceiverLoading = false,
     this.isDetailLoading = false,
     this.isMetricsLoading = false,
+    this.isSystemStatusLoading = false,
     this.isSubmitting = false,
     this.hasLoaded = false,
     this.hasMetricsLoaded = false,
+    this.hasSystemStatusLoaded = false,
     this.isMetricsPermissionError = false,
+    this.isSystemStatusPermissionError = false,
     this.errorMessage,
     this.metricsErrorMessage,
+    this.systemStatusErrorMessage,
     this.noticeMessage,
   });
 
   final OperationsView view;
   final OperationsDashboard? dashboard;
   final MobileApiMetricsSnapshot? apiMetrics;
+  final OperationsSystemStatus? systemStatus;
   final List<AdminReportSummary> reports;
   final AdminReportDetail? selectedReport;
   final List<AdminMemberSummary> members;
@@ -91,12 +97,16 @@ class OperationsState {
   final bool isLetterReceiverLoading;
   final bool isDetailLoading;
   final bool isMetricsLoading;
+  final bool isSystemStatusLoading;
   final bool isSubmitting;
   final bool hasLoaded;
   final bool hasMetricsLoaded;
+  final bool hasSystemStatusLoaded;
   final bool isMetricsPermissionError;
+  final bool isSystemStatusPermissionError;
   final String? errorMessage;
   final String? metricsErrorMessage;
+  final String? systemStatusErrorMessage;
   final String? noticeMessage;
 
   bool get isEmpty => hasLoaded && reports.isEmpty && errorMessage == null;
@@ -158,6 +168,7 @@ class OperationsState {
     OperationsView? view,
     OperationsDashboard? dashboard,
     MobileApiMetricsSnapshot? apiMetrics,
+    OperationsSystemStatus? systemStatus,
     List<AdminReportSummary>? reports,
     AdminReportDetail? selectedReport,
     bool clearSelectedReport = false,
@@ -198,14 +209,19 @@ class OperationsState {
     bool? isLetterReceiverLoading,
     bool? isDetailLoading,
     bool? isMetricsLoading,
+    bool? isSystemStatusLoading,
     bool? isSubmitting,
     bool? hasLoaded,
     bool? hasMetricsLoaded,
+    bool? hasSystemStatusLoaded,
     bool? isMetricsPermissionError,
+    bool? isSystemStatusPermissionError,
     String? errorMessage,
     bool clearErrorMessage = false,
     String? metricsErrorMessage,
     bool clearMetricsErrorMessage = false,
+    String? systemStatusErrorMessage,
+    bool clearSystemStatusErrorMessage = false,
     String? noticeMessage,
     bool clearNoticeMessage = false,
   }) {
@@ -213,6 +229,7 @@ class OperationsState {
       view: view ?? this.view,
       dashboard: dashboard ?? this.dashboard,
       apiMetrics: apiMetrics ?? this.apiMetrics,
+      systemStatus: systemStatus ?? this.systemStatus,
       reports: reports ?? this.reports,
       selectedReport:
           clearSelectedReport ? null : selectedReport ?? this.selectedReport,
@@ -263,16 +280,25 @@ class OperationsState {
           isLetterReceiverLoading ?? this.isLetterReceiverLoading,
       isDetailLoading: isDetailLoading ?? this.isDetailLoading,
       isMetricsLoading: isMetricsLoading ?? this.isMetricsLoading,
+      isSystemStatusLoading:
+          isSystemStatusLoading ?? this.isSystemStatusLoading,
       isSubmitting: isSubmitting ?? this.isSubmitting,
       hasLoaded: hasLoaded ?? this.hasLoaded,
       hasMetricsLoaded: hasMetricsLoaded ?? this.hasMetricsLoaded,
+      hasSystemStatusLoaded:
+          hasSystemStatusLoaded ?? this.hasSystemStatusLoaded,
       isMetricsPermissionError:
           isMetricsPermissionError ?? this.isMetricsPermissionError,
+      isSystemStatusPermissionError:
+          isSystemStatusPermissionError ?? this.isSystemStatusPermissionError,
       errorMessage:
           clearErrorMessage ? null : errorMessage ?? this.errorMessage,
       metricsErrorMessage: clearMetricsErrorMessage
           ? null
           : metricsErrorMessage ?? this.metricsErrorMessage,
+      systemStatusErrorMessage: clearSystemStatusErrorMessage
+          ? null
+          : systemStatusErrorMessage ?? this.systemStatusErrorMessage,
       noticeMessage:
           clearNoticeMessage ? null : noticeMessage ?? this.noticeMessage,
     );
@@ -283,13 +309,17 @@ class OperationsController extends ChangeNotifier {
   OperationsController({
     required ReportRepository reportRepository,
     required OperationsRepository operationsRepository,
+    OperationsSystemEnvironment systemEnvironment =
+        const OperationsSystemEnvironment(),
     ValueChanged<String>? onUnauthorized,
   })  : _reportRepository = reportRepository,
         _operationsRepository = operationsRepository,
+        _systemEnvironment = systemEnvironment,
         _onUnauthorized = onUnauthorized;
 
   final ReportRepository _reportRepository;
   final OperationsRepository _operationsRepository;
+  final OperationsSystemEnvironment _systemEnvironment;
   final ValueChanged<String>? _onUnauthorized;
 
   OperationsState _state = const OperationsState();
@@ -349,10 +379,19 @@ class OperationsController extends ChangeNotifier {
         !_state.isMetricsLoading) {
       unawaited(refreshObservability());
     }
+    if (view == OperationsView.system &&
+        !_state.hasSystemStatusLoaded &&
+        !_state.isSystemStatusLoading) {
+      unawaited(refreshSystemStatus());
+    }
   }
 
   Future<void> refreshObservability() {
     return _loadObservability(showLoading: true);
+  }
+
+  Future<void> refreshSystemStatus() {
+    return _loadSystemStatus(showLoading: true);
   }
 
   Future<void> _loadObservability({required bool showLoading}) async {
@@ -386,6 +425,50 @@ class OperationsController extends ChangeNotifier {
         _state.copyWith(
           isMetricsLoading: false,
           hasMetricsLoaded: true,
+        ),
+      );
+    }
+  }
+
+  Future<void> _loadSystemStatus({required bool showLoading}) async {
+    if (_state.isSystemStatusLoading) {
+      return;
+    }
+
+    _setState(
+      _state.copyWith(
+        isSystemStatusLoading: showLoading,
+        isSystemStatusPermissionError: false,
+        clearSystemStatusErrorMessage: true,
+        clearNoticeMessage: true,
+      ),
+    );
+
+    try {
+      final status = await _operationsRepository.fetchSystemStatus(
+        _systemEnvironment,
+      );
+      _setState(
+        _state.copyWith(
+          systemStatus: status,
+          isSystemStatusLoading: false,
+          hasSystemStatusLoaded: true,
+          isSystemStatusPermissionError:
+              status.kind == OperationsSystemStatusKind.permissionDenied,
+          systemStatusErrorMessage:
+              status.kind == OperationsSystemStatusKind.connected
+                  ? null
+                  : status.message,
+          clearSystemStatusErrorMessage:
+              status.kind == OperationsSystemStatusKind.connected,
+        ),
+      );
+    } on Object catch (error) {
+      _handleSystemStatusError(error);
+      _setState(
+        _state.copyWith(
+          isSystemStatusLoading: false,
+          hasSystemStatusLoaded: true,
         ),
       );
     }
@@ -1133,6 +1216,26 @@ class OperationsController extends ChangeNotifier {
             ? error.message
             : '관측 지표를 불러오지 못했습니다.',
         isMetricsPermissionError: isPermissionError,
+        clearNoticeMessage: true,
+      ),
+    );
+  }
+
+  void _handleSystemStatusError(Object error) {
+    final isPermissionError = error is ApiClientException &&
+        (error.kind == ApiErrorKind.unauthorized ||
+            error.kind == ApiErrorKind.forbidden ||
+            error.kind == ApiErrorKind.permissionChanged);
+    if (error is ApiClientException && error.sessionInvalidated) {
+      _onUnauthorized?.call(error.message);
+    }
+
+    _setState(
+      _state.copyWith(
+        systemStatusErrorMessage: error is ApiClientException
+            ? error.message
+            : '관측 도구 상태를 확인하지 못했습니다.',
+        isSystemStatusPermissionError: isPermissionError,
         clearNoticeMessage: true,
       ),
     );

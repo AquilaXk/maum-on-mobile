@@ -30,6 +30,123 @@ class OperationsDashboard {
   final int receivableMemberCount;
 }
 
+class OperationsAdminProfile {
+  const OperationsAdminProfile({
+    required this.id,
+    required this.email,
+    required this.nickname,
+    required this.role,
+    required this.status,
+  });
+
+  final int id;
+  final String email;
+  final String nickname;
+  final String role;
+  final String status;
+
+  bool get isAdmin => role == 'ADMIN';
+}
+
+class OperationsSystemEnvironment {
+  const OperationsSystemEnvironment({
+    this.apiEndpoint = '',
+    this.appVersion = '0.1.0',
+    this.buildNumber = '1',
+    this.platform = 'unknown',
+    this.observabilityToolUrl = '',
+  });
+
+  final String apiEndpoint;
+  final String appVersion;
+  final String buildNumber;
+  final String platform;
+  final String observabilityToolUrl;
+
+  bool get isObservabilityToolConfigured {
+    return observabilityToolUrl.trim().isNotEmpty;
+  }
+
+  Uri? get observabilityToolUri {
+    final url = observabilityToolUrl.trim();
+    if (url.isEmpty) {
+      return null;
+    }
+
+    final uri = Uri.tryParse(url);
+    if (uri == null || !uri.hasScheme || uri.host.isEmpty) {
+      return null;
+    }
+    return uri;
+  }
+}
+
+enum OperationsSystemStatusKind {
+  connected,
+  unconfigured,
+  permissionDenied,
+  failure,
+}
+
+class OperationsSystemStatus {
+  const OperationsSystemStatus({
+    required this.environment,
+    required this.kind,
+    required this.message,
+  });
+
+  factory OperationsSystemStatus.connected(
+    OperationsSystemEnvironment environment,
+  ) {
+    return OperationsSystemStatus(
+      environment: environment,
+      kind: OperationsSystemStatusKind.connected,
+      message: '관측 도구 연결됨',
+    );
+  }
+
+  factory OperationsSystemStatus.unconfigured(
+    OperationsSystemEnvironment environment,
+  ) {
+    return OperationsSystemStatus(
+      environment: environment,
+      kind: OperationsSystemStatusKind.unconfigured,
+      message: '관측 도구 주소가 설정되지 않았습니다.',
+    );
+  }
+
+  factory OperationsSystemStatus.permissionDenied(
+    OperationsSystemEnvironment environment, {
+    required String message,
+  }) {
+    return OperationsSystemStatus(
+      environment: environment,
+      kind: OperationsSystemStatusKind.permissionDenied,
+      message: message,
+    );
+  }
+
+  factory OperationsSystemStatus.failure(
+    OperationsSystemEnvironment environment, {
+    required String message,
+  }) {
+    return OperationsSystemStatus(
+      environment: environment,
+      kind: OperationsSystemStatusKind.failure,
+      message: message,
+    );
+  }
+
+  final OperationsSystemEnvironment environment;
+  final OperationsSystemStatusKind kind;
+  final String message;
+
+  bool get canOpenObservabilityTool {
+    return kind != OperationsSystemStatusKind.unconfigured &&
+        environment.observabilityToolUri != null;
+  }
+}
+
 class MobileApiMetricsSnapshot {
   const MobileApiMetricsSnapshot({
     required this.sampleCount,

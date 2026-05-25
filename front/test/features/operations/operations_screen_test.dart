@@ -281,6 +281,158 @@ void main() {
     expect(find.text('운영 대시보드 정보가 없습니다.'), findsNothing);
   });
 
+  testWidgets('shows admin system tools and routes system actions',
+      (tester) async {
+    var settingsTaps = 0;
+    var logoutTaps = 0;
+    final openedUris = <Uri>[];
+    final environment = _systemEnvironment();
+    final operationsRepository = _FakeOperationsRepository(
+      systemStatus: OperationsSystemStatus.connected(environment),
+    );
+    final controller = OperationsController(
+      reportRepository: _FakeReportRepository(),
+      operationsRepository: operationsRepository,
+      systemEnvironment: environment,
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: OperationsScreen(
+          controller: controller,
+          onBack: () {},
+          adminProfile: _adminProfile(),
+          onOpenSettings: () => settingsTaps += 1,
+          onLogout: () => logoutTaps += 1,
+          onOpenExternalUri: (uri) async {
+            openedUris.add(uri);
+            return true;
+          },
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const ValueKey('operations-view-system')));
+    await tester.pumpAndSettle();
+
+    expect(operationsRepository.systemStatusFetchCount, 1);
+    expect(find.text('시스템 도구'), findsOneWidget);
+    expect(find.text('관리자 계정'), findsOneWidget);
+    expect(find.bySemanticsLabel('이메일, admin@example.com'), findsOneWidget);
+    expect(find.text('운영자'), findsOneWidget);
+    expect(find.text('API endpoint'), findsOneWidget);
+    expect(
+      find.bySemanticsLabel('API endpoint, https://api.maum-on.test'),
+      findsOneWidget,
+    );
+    expect(find.bySemanticsLabel('앱 버전, 0.1.0'), findsOneWidget);
+    expect(find.bySemanticsLabel('플랫폼, Android'), findsOneWidget);
+    expect(find.text('관측 도구 연결됨'), findsWidgets);
+
+    final openButton = find.byKey(
+      const ValueKey('operations-system-open-observability-button'),
+    );
+    await tester.ensureVisible(openButton);
+    await tester.tap(openButton);
+    await tester.pumpAndSettle();
+    final settingsButton =
+        find.byKey(const ValueKey('operations-system-settings-button'));
+    await tester.ensureVisible(settingsButton);
+    await tester.tap(settingsButton);
+    final logoutButton =
+        find.byKey(const ValueKey('operations-system-logout-button'));
+    await tester.ensureVisible(logoutButton);
+    await tester.tap(logoutButton);
+
+    expect(openedUris.single.toString(), 'https://observe.maum-on.test/mobile');
+    expect(settingsTaps, 1);
+    expect(logoutTaps, 1);
+  });
+
+  testWidgets('shows unconfigured system status without external action',
+      (tester) async {
+    tester.view.physicalSize = const Size(320, 780);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    final environment = _systemEnvironment(observabilityToolUrl: '');
+    final controller = OperationsController(
+      reportRepository: _FakeReportRepository(),
+      operationsRepository: _FakeOperationsRepository(
+        systemStatus: OperationsSystemStatus.unconfigured(environment),
+      ),
+      systemEnvironment: environment,
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        builder: (context, child) {
+          return MediaQuery(
+            data: MediaQuery.of(context).copyWith(
+              textScaler: const TextScaler.linear(1.35),
+            ),
+            child: child!,
+          );
+        },
+        home: OperationsScreen(
+          controller: controller,
+          onBack: () {},
+          adminProfile: _adminProfile(),
+          onOpenSettings: () {},
+          onLogout: () {},
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const ValueKey('operations-view-system')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('관측 도구 미구성'), findsWidgets);
+    expect(find.text('관측 도구 주소가 설정되지 않았습니다.'), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('operations-system-open-observability-button')),
+      findsNothing,
+    );
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('shows system permission errors separately', (tester) async {
+    final environment = _systemEnvironment();
+    final controller = OperationsController(
+      reportRepository: _FakeReportRepository(),
+      operationsRepository: _FakeOperationsRepository(
+        systemStatus: OperationsSystemStatus.permissionDenied(
+          environment,
+          message: '운영 시스템 권한이 없습니다.',
+        ),
+      ),
+      systemEnvironment: environment,
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: OperationsScreen(
+          controller: controller,
+          onBack: () {},
+          adminProfile: _adminProfile(),
+          onOpenSettings: () {},
+          onLogout: () {},
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const ValueKey('operations-view-system')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('관측 도구 권한 없음'), findsWidgets);
+    expect(find.text('운영 시스템 권한이 없습니다.'), findsOneWidget);
+    expect(find.text('운영 대시보드 정보가 없습니다.'), findsNothing);
+  });
+
   testWidgets('shows letter review and confirms reassign and block actions',
       (tester) async {
     final operationsRepository = _FakeOperationsRepository();
@@ -510,6 +662,7 @@ class _FakeOperationsRepository implements OperationsRepository {
   _FakeOperationsRepository({
     MobileApiMetricsSnapshot? metrics,
     this.metricsError,
+    this.systemStatus,
   }) : metrics = metrics ?? _metrics();
 
   final List<String?> memberQueries = [];
@@ -520,8 +673,10 @@ class _FakeOperationsRepository implements OperationsRepository {
   final List<int> blockedLetterIds = [];
   final MobileApiMetricsSnapshot metrics;
   final Object? metricsError;
+  final OperationsSystemStatus? systemStatus;
   int currentReceiverId = 7;
   int metricsFetchCount = 0;
+  int systemStatusFetchCount = 0;
 
   @override
   Future<OperationsDashboard> fetchDashboard() async {
@@ -543,6 +698,14 @@ class _FakeOperationsRepository implements OperationsRepository {
       throw error;
     }
     return metrics;
+  }
+
+  @override
+  Future<OperationsSystemStatus> fetchSystemStatus(
+    OperationsSystemEnvironment environment,
+  ) async {
+    systemStatusFetchCount += 1;
+    return systemStatus ?? OperationsSystemStatus.connected(environment);
   }
 
   @override
@@ -829,6 +992,28 @@ class _FakeOperationsRepository implements OperationsRepository {
       createdAt: '2026-05-25T09:30:00',
     );
   }
+}
+
+OperationsAdminProfile _adminProfile() {
+  return const OperationsAdminProfile(
+    id: 1,
+    email: 'admin@example.com',
+    nickname: '운영자',
+    role: 'ADMIN',
+    status: 'ACTIVE',
+  );
+}
+
+OperationsSystemEnvironment _systemEnvironment({
+  String observabilityToolUrl = 'https://observe.maum-on.test/mobile',
+}) {
+  return OperationsSystemEnvironment(
+    apiEndpoint: 'https://api.maum-on.test',
+    appVersion: '0.1.0',
+    buildNumber: '1',
+    platform: 'Android',
+    observabilityToolUrl: observabilityToolUrl,
+  );
 }
 
 MobileApiMetricsSnapshot _metrics() {
