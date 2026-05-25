@@ -375,8 +375,12 @@ class _CommentComposerState extends State<_CommentComposer> {
   @override
   void didUpdateWidget(covariant _CommentComposer oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (widget.state.commentDraft.isEmpty && _textController.text.isNotEmpty) {
-      _textController.clear();
+    final draft = widget.state.commentDraft;
+    if (_textController.text != draft) {
+      _textController.value = TextEditingValue(
+        text: draft,
+        selection: TextSelection.collapsed(offset: draft.length),
+      );
     }
   }
 

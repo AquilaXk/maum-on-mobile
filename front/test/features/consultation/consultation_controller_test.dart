@@ -3,6 +3,8 @@ import 'dart:async';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:maum_on_mobile_front/core/network/api_error.dart';
+import 'package:maum_on_mobile_front/features/draft_recovery/data/draft_recovery_repository.dart';
+import 'package:maum_on_mobile_front/features/draft_recovery/domain/draft_recovery_models.dart';
 import 'package:maum_on_mobile_front/features/consultation/application/consultation_controller.dart';
 import 'package:maum_on_mobile_front/features/consultation/data/consultation_repository.dart';
 import 'package:maum_on_mobile_front/features/consultation/domain/consultation_models.dart';
@@ -132,6 +134,57 @@ void main() {
       expect(repository.deleteSensitiveCount, 1);
       expect(controller.state.safetyNotice, isNull);
       expect(controller.state.messages.single.id, 'remote-safe');
+    });
+
+    test('restores normal draft but clears blocked sensitive draft', () async {
+      final draftRepository = StorageDraftRecoveryRepository(
+        storage: MemoryDraftRecoveryStorage(),
+      );
+      final controller = ConsultationController(
+        repository: _FakeConsultationRepository(),
+        currentMemberId: 7,
+        draftRepository: draftRepository,
+      );
+
+      controller.updateDraft('내일 상담에서 이어 말할 내용');
+      await Future<void>.delayed(Duration.zero);
+
+      final restoredController = ConsultationController(
+        repository: _FakeConsultationRepository(),
+        currentMemberId: 7,
+        draftRepository: draftRepository,
+      );
+      await restoredController.restoreDraft();
+
+      expect(restoredController.state.draft, '내일 상담에서 이어 말할 내용');
+
+      final blockedRepository = _FakeConsultationRepository(
+        sendResult: const ConsultationSendResult(
+          accepted: false,
+          safety: ConsultationSafetyResult(
+            category: ConsultationRiskCategory.selfHarm,
+            severity: ConsultationRiskSeverity.critical,
+            actionPolicy: ConsultationActionPolicy.blockAndEscalate,
+            message: '긴급 도움을 요청해 주세요.',
+          ),
+        ),
+      );
+      final blockedController = ConsultationController(
+        repository: blockedRepository,
+        currentMemberId: 7,
+        draftRepository: draftRepository,
+      );
+      await blockedController.connect();
+      blockedRepository.emit(const ConsultationStreamEvent.connect('connected'));
+      blockedController.updateDraft('죽고 싶어요');
+      await blockedController.submitMessage();
+
+      expect(
+        await draftRepository.read(
+          const DraftKey(memberId: 7, surface: DraftSurface.consultation),
+        ),
+        isNull,
+      );
     });
 
     test('does not create duplicate stream connections', () async {

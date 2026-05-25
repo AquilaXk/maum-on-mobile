@@ -1,6 +1,10 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 
 import '../../../core/network/api_error.dart';
+import '../../draft_recovery/data/draft_recovery_repository.dart';
+import '../../draft_recovery/domain/draft_recovery_models.dart';
 import '../../moderation/data/content_moderation_repository.dart';
 import '../../moderation/domain/content_moderation_models.dart';
 import '../data/letter_repository.dart';
@@ -167,15 +171,21 @@ class LetterController extends ChangeNotifier {
   LetterController({
     required LetterRepository letterRepository,
     ContentModerationRepository? moderationRepository,
+    int currentMemberId = 0,
+    DraftRecoveryRepository? draftRepository,
     VoidCallback? onUnauthorized,
     ValueChanged<LetterReportTarget>? onReportTargetSelected,
   })  : _letterRepository = letterRepository,
         _moderationRepository = moderationRepository,
+        _currentMemberId = currentMemberId,
+        _draftRepository = draftRepository,
         _onUnauthorized = onUnauthorized,
         _onReportTargetSelected = onReportTargetSelected;
 
   final LetterRepository _letterRepository;
   final ContentModerationRepository? _moderationRepository;
+  final int _currentMemberId;
+  final DraftRecoveryRepository? _draftRepository;
   final VoidCallback? _onUnauthorized;
   final ValueChanged<LetterReportTarget>? _onReportTargetSelected;
 
@@ -185,6 +195,34 @@ class LetterController extends ChangeNotifier {
   int _loadRequestId = 0;
 
   LetterState get state => _state;
+
+  DraftKey get _composeDraftKey => DraftKey(
+        memberId: _currentMemberId,
+        surface: DraftSurface.letter,
+      );
+
+  DraftKey _replyDraftKey(int letterId) => DraftKey(
+        memberId: _currentMemberId,
+        surface: DraftSurface.letterReply,
+        scopeId: letterId.toString(),
+      );
+
+  Future<void> restoreDraft() async {
+    final entry = await _draftRepository?.read(_composeDraftKey);
+    if (entry == null || entry.fields.isEmpty) {
+      return;
+    }
+
+    _setState(
+      _state.copyWith(
+        mode: LetterViewMode.compose,
+        title: entry.fields['title'] ?? '',
+        content: entry.fields['content'] ?? '',
+        noticeMessage: '임시 저장된 편지를 복원했습니다.',
+        clearErrorMessage: true,
+      ),
+    );
+  }
 
   Future<void> load() async {
     final requestId = ++_loadRequestId;
@@ -265,11 +303,13 @@ class LetterController extends ChangeNotifier {
   }
 
   void startCompose() {
+    final hasDraft =
+        _state.title.trim().isNotEmpty || _state.content.trim().isNotEmpty;
     _setState(
       _state.copyWith(
         mode: LetterViewMode.compose,
-        title: '',
-        content: '',
+        title: hasDraft ? _state.title : '',
+        content: hasDraft ? _state.content : '',
         clearSelectedLetter: true,
         clearErrorMessage: true,
         clearNoticeMessage: true,
@@ -279,10 +319,12 @@ class LetterController extends ChangeNotifier {
 
   void updateTitle(String title) {
     _setState(_state.copyWith(title: title, clearErrorMessage: true));
+    _saveComposeDraft();
   }
 
   void updateContent(String content) {
     _setState(_state.copyWith(content: content, clearErrorMessage: true));
+    _saveComposeDraft();
   }
 
   Future<void> submitLetter() async {
@@ -308,6 +350,7 @@ class LetterController extends ChangeNotifier {
       }
 
       await _letterRepository.createLetter(draft);
+      await _draftRepository?.delete(_composeDraftKey);
       _setState(
         _state.copyWith(
           activeTab: LetterMailboxTab.sent,
@@ -320,6 +363,7 @@ class LetterController extends ChangeNotifier {
       await load();
       _setState(_state.copyWith(noticeMessage: '편지가 전송되었습니다.'));
     } on Object catch (error) {
+      await _markComposeDraftFailed(error);
       _handleError(error);
       _setState(_state.copyWith(isSubmitting: false));
     }
@@ -342,11 +386,14 @@ class LetterController extends ChangeNotifier {
 
     try {
       final detail = await _letterRepository.fetchLetter(id);
+      final replyDraft = await _draftRepository?.read(_replyDraftKey(id));
       _writingNotifiedLetterId = null;
       _setState(
         _state.copyWith(
           selectedLetter: detail,
-          replyContent: detail.replyContent ?? '',
+          replyContent: replyDraft?.fields['content'] ??
+              detail.replyContent ??
+              '',
           isLoading: false,
           clearErrorMessage: true,
         ),
@@ -378,6 +425,7 @@ class LetterController extends ChangeNotifier {
         clearErrorMessage: true,
       ),
     );
+    unawaited(_draftRepository?.delete(_composeDraftKey));
   }
 
   Future<void> acceptSelectedLetter() async {
@@ -432,6 +480,7 @@ class LetterController extends ChangeNotifier {
 
   void updateReplyContent(String content) {
     _setState(_state.copyWith(replyContent: content, clearErrorMessage: true));
+    _saveReplyDraft();
 
     final letter = _state.selectedLetter;
     if (letter == null ||
@@ -477,6 +526,7 @@ class LetterController extends ChangeNotifier {
 
       await _letterRepository.replyLetter(
           letter.id, _state.replyContent.trim());
+      await _draftRepository?.delete(_replyDraftKey(letter.id));
       await _reloadSelectedLetter(letter.id);
       _setState(
         _state.copyWith(
@@ -486,6 +536,7 @@ class LetterController extends ChangeNotifier {
       );
       await _refreshMailboxSilently();
     } on Object catch (error) {
+      await _markReplyDraftFailed(error);
       _handleError(error);
       _setState(_state.copyWith(isSubmitting: false));
     }
@@ -583,6 +634,64 @@ class LetterController extends ChangeNotifier {
     );
   }
 
+  void _saveComposeDraft() {
+    final repository = _draftRepository;
+    if (repository == null) {
+      return;
+    }
+    unawaited(
+      repository.saveEditing(
+        _composeDraftKey,
+        fields: {
+          'title': _state.title,
+          'content': _state.content,
+        },
+      ),
+    );
+  }
+
+  void _saveReplyDraft() {
+    final repository = _draftRepository;
+    final letter = _state.selectedLetter;
+    if (repository == null || letter == null) {
+      return;
+    }
+    unawaited(
+      repository.saveEditing(
+        _replyDraftKey(letter.id),
+        fields: {'content': _state.replyContent},
+      ),
+    );
+  }
+
+  Future<void> _markComposeDraftFailed(Object error) async {
+    final repository = _draftRepository;
+    if (repository == null) {
+      return;
+    }
+    await repository.markFailed(
+      _composeDraftKey,
+      fields: {
+        'title': _state.title,
+        'content': _state.content,
+      },
+      failureMessage: _messageFromError(error),
+    );
+  }
+
+  Future<void> _markReplyDraftFailed(Object error) async {
+    final repository = _draftRepository;
+    final letter = _state.selectedLetter;
+    if (repository == null || letter == null) {
+      return;
+    }
+    await repository.markFailed(
+      _replyDraftKey(letter.id),
+      fields: {'content': _state.replyContent},
+      failureMessage: _messageFromError(error),
+    );
+  }
+
   Future<void> _refreshMailboxSilently() async {
     final stats = await _letterRepository.fetchStats();
     final page = await _fetchPage(_state.activeTab, page: 0);
@@ -636,6 +745,13 @@ class LetterController extends ChangeNotifier {
         clearNoticeMessage: true,
       ),
     );
+  }
+
+  String _messageFromError(Object error) {
+    if (error is ApiClientException) {
+      return error.message;
+    }
+    return '요청을 처리하지 못했습니다.';
   }
 
   void _setState(LetterState nextState) {

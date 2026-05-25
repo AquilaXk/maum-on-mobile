@@ -1,6 +1,10 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 
 import '../../../core/network/api_error.dart';
+import '../../draft_recovery/data/draft_recovery_repository.dart';
+import '../../draft_recovery/domain/draft_recovery_models.dart';
 import '../../moderation/data/content_moderation_repository.dart';
 import '../../moderation/domain/content_moderation_models.dart';
 import '../data/story_repository.dart';
@@ -163,17 +167,20 @@ class StoryController extends ChangeNotifier {
     required StoryRepository storyRepository,
     required int currentMemberId,
     ContentModerationRepository? moderationRepository,
+    DraftRecoveryRepository? draftRepository,
     VoidCallback? onUnauthorized,
     ValueChanged<StoryReportTarget>? onReportTargetSelected,
   })  : _storyRepository = storyRepository,
         _currentMemberId = currentMemberId,
         _moderationRepository = moderationRepository,
+        _draftRepository = draftRepository,
         _onUnauthorized = onUnauthorized,
         _onReportTargetSelected = onReportTargetSelected;
 
   final StoryRepository _storyRepository;
   final int _currentMemberId;
   final ContentModerationRepository? _moderationRepository;
+  final DraftRecoveryRepository? _draftRepository;
   final VoidCallback? _onUnauthorized;
   final ValueChanged<StoryReportTarget>? _onReportTargetSelected;
 
@@ -183,6 +190,36 @@ class StoryController extends ChangeNotifier {
   StoryState get state => _state;
 
   int get currentMemberId => _currentMemberId;
+
+  DraftKey get _storyDraftKey => DraftKey(
+        memberId: _currentMemberId,
+        surface: DraftSurface.story,
+      );
+
+  DraftKey _commentDraftKey(int storyId) => DraftKey(
+        memberId: _currentMemberId,
+        surface: DraftSurface.storyComment,
+        scopeId: storyId.toString(),
+      );
+
+  Future<void> restoreDraft() async {
+    final entry = await _draftRepository?.read(_storyDraftKey);
+    if (entry == null || entry.fields.isEmpty) {
+      return;
+    }
+
+    _setState(
+      _state.copyWith(
+        mode: StoryViewMode.editor,
+        clearEditingStoryId: true,
+        storyTitle: entry.fields['title'] ?? '',
+        storyContent: entry.fields['content'] ?? '',
+        storyCategory: _storyCategoryFromDraft(entry.fields['category']),
+        noticeMessage: '임시 저장된 스토리를 복원했습니다.',
+        clearErrorMessage: true,
+      ),
+    );
+  }
 
   Future<void> loadStories() async {
     await _loadStoriesPage(pageIndex: 0, append: false);
@@ -273,12 +310,13 @@ class StoryController extends ChangeNotifier {
     try {
       final detail = await _storyRepository.fetchStory(storyId);
       final commentsPage = await _storyRepository.fetchComments(storyId);
+      final commentDraft = await _readCommentDraft(storyId);
       _setState(
         _state.copyWith(
           selectedStory: detail,
           comments: commentsPage.items,
           isDetailLoading: false,
-          commentDraft: '',
+          commentDraft: commentDraft,
           clearEditingCommentId: true,
           editingCommentContent: '',
           clearErrorMessage: true,
@@ -350,14 +388,17 @@ class StoryController extends ChangeNotifier {
         clearErrorMessage: true,
       ),
     );
+    unawaited(_draftRepository?.delete(_storyDraftKey));
   }
 
   void updateStoryTitle(String title) {
     _setState(_state.copyWith(storyTitle: title, clearErrorMessage: true));
+    _saveStoryDraft();
   }
 
   void updateStoryContent(String content) {
     _setState(_state.copyWith(storyContent: content, clearErrorMessage: true));
+    _saveStoryDraft();
   }
 
   void updateStoryCategory(StoryCategory category) {
@@ -366,6 +407,7 @@ class StoryController extends ChangeNotifier {
     }
 
     _setState(_state.copyWith(storyCategory: category));
+    _saveStoryDraft();
   }
 
   Future<void> submitStory() async {
@@ -404,6 +446,7 @@ class StoryController extends ChangeNotifier {
         storyId = editingId;
       }
 
+      await _draftRepository?.delete(_storyDraftKey);
       _resetEditorSilently();
       await loadStories();
       await openStoryById(storyId);
@@ -414,6 +457,7 @@ class StoryController extends ChangeNotifier {
         ),
       );
     } on Object catch (error) {
+      await _markStoryDraftFailed(error);
       _handleError(error);
       _setState(_state.copyWith(isSubmitting: false));
     }
@@ -479,6 +523,7 @@ class StoryController extends ChangeNotifier {
 
   void updateCommentDraft(String content) {
     _setState(_state.copyWith(commentDraft: content, clearErrorMessage: true));
+    _saveCommentDraft();
   }
 
   Future<void> submitComment({int? parentCommentId}) async {
@@ -503,6 +548,7 @@ class StoryController extends ChangeNotifier {
         content: _state.commentDraft.trim(),
         parentCommentId: parentCommentId,
       );
+      await _draftRepository?.delete(_commentDraftKey(story.id));
       final commentsPage = await _storyRepository.fetchComments(story.id);
       _setState(
         _state.copyWith(
@@ -513,6 +559,7 @@ class StoryController extends ChangeNotifier {
         ),
       );
     } on Object catch (error) {
+      await _markCommentDraftFailed(error);
       _handleError(error);
       _setState(_state.copyWith(isSubmitting: false));
     }
@@ -549,6 +596,78 @@ class StoryController extends ChangeNotifier {
         editingCommentContent: '',
         clearErrorMessage: true,
       ),
+    );
+  }
+
+  Future<String> _readCommentDraft(int storyId) async {
+    final entry = await _draftRepository?.read(_commentDraftKey(storyId));
+    return entry?.fields['content'] ?? '';
+  }
+
+  void _saveStoryDraft() {
+    final repository = _draftRepository;
+    if (repository == null) {
+      return;
+    }
+    unawaited(
+      repository.saveEditing(
+        _storyDraftKey,
+        fields: {
+          'title': _state.storyTitle,
+          'content': _state.storyContent,
+          'category': _state.storyCategory.name,
+        },
+      ),
+    );
+  }
+
+  void _saveCommentDraft() {
+    final repository = _draftRepository;
+    final story = _state.selectedStory;
+    if (repository == null || story == null) {
+      return;
+    }
+    unawaited(
+      repository.saveEditing(
+        _commentDraftKey(story.id),
+        fields: {'content': _state.commentDraft},
+      ),
+    );
+  }
+
+  Future<void> _markStoryDraftFailed(Object error) async {
+    final repository = _draftRepository;
+    if (repository == null) {
+      return;
+    }
+    await repository.markFailed(
+      _storyDraftKey,
+      fields: {
+        'title': _state.storyTitle,
+        'content': _state.storyContent,
+        'category': _state.storyCategory.name,
+      },
+      failureMessage: _messageFromError(error),
+    );
+  }
+
+  Future<void> _markCommentDraftFailed(Object error) async {
+    final repository = _draftRepository;
+    final story = _state.selectedStory;
+    if (repository == null || story == null) {
+      return;
+    }
+    await repository.markFailed(
+      _commentDraftKey(story.id),
+      fields: {'content': _state.commentDraft},
+      failureMessage: _messageFromError(error),
+    );
+  }
+
+  StoryCategory _storyCategoryFromDraft(String? value) {
+    return StoryCategory.values.firstWhere(
+      (category) => category.name == value && category != StoryCategory.all,
+      orElse: () => StoryCategory.worry,
     );
   }
 
