@@ -7,8 +7,6 @@ import 'package:maum_on_mobile_front/features/report/domain/report_models.dart';
 
 void main() {
   testWidgets('confirms a report action before storing it', (tester) async {
-    final semantics = tester.ensureSemantics();
-    addTearDown(semantics.dispose);
     final repository = _FakeReportRepository();
     final controller = OperationsController(repository: repository);
 
@@ -59,8 +57,6 @@ void main() {
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
-    final semantics = tester.ensureSemantics();
-    addTearDown(semantics.dispose);
 
     final repository = _FakeReportRepository(
       reporterEmail: 'very.long.reporter.email.address@example-service.test',
@@ -93,7 +89,7 @@ void main() {
     );
     expect(
       find.bySemanticsLabel(
-        RegExp('신고자, 신고자, very.long.reporter.email.address'),
+        RegExp('신고자, 신고자 · very.long.reporter.email.address'),
       ),
       findsOneWidget,
     );
