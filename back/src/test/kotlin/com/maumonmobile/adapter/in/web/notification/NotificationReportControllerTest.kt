@@ -510,6 +510,7 @@ class NotificationReportControllerTest @Autowired constructor(
             }
 
         assertNotificationsContain(owner.accessToken, "작성한 콘텐츠에 신고가 접수되었습니다.")
+        assertThat(notificationPushSender.attemptedCommands).hasSize(2)
         assertThat(notificationPushSender.commands).isEmpty()
     }
 
@@ -627,11 +628,13 @@ data class PublishedNotificationEvent(
 )
 
 class CapturingNotificationPushSender : NotificationPushSender {
+    val attemptedCommands = mutableListOf<NotificationPushCommand>()
     val commands = mutableListOf<NotificationPushCommand>()
     var failNextSend = false
     var alwaysFail = false
 
     override fun send(command: NotificationPushCommand): NotificationPushSendResult {
+        attemptedCommands += command
         if (alwaysFail || failNextSend) {
             failNextSend = false
             throw IllegalStateException("push failed")
@@ -641,6 +644,7 @@ class CapturingNotificationPushSender : NotificationPushSender {
     }
 
     fun clear() {
+        attemptedCommands.clear()
         commands.clear()
         failNextSend = false
         alwaysFail = false

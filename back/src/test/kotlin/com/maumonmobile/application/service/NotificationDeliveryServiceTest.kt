@@ -2,14 +2,17 @@ package com.maumonmobile.application.service
 
 import com.maumonmobile.adapter.out.persistence.notification.InMemoryNotificationDeviceTokenRepository
 import com.maumonmobile.adapter.out.persistence.notification.InMemoryNotificationRepository
+import com.maumonmobile.application.port.out.NotificationDeviceTokenRepository
 import com.maumonmobile.application.port.out.NotificationEventPublisher
 import com.maumonmobile.application.port.out.NotificationPushCommand
 import com.maumonmobile.application.port.out.NotificationPushSendResult
 import com.maumonmobile.application.port.out.NotificationPushSender
 import com.maumonmobile.domain.notification.NotificationDevicePlatform
+import com.maumonmobile.domain.notification.NotificationDeviceToken
 import com.maumonmobile.global.observability.MobileApiMetricsRegistry
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
+import java.time.Instant
 
 class NotificationDeliveryServiceTest {
 
@@ -94,9 +97,39 @@ class NotificationDeliveryServiceTest {
 
         assertThat(notification.content).isEqualTo("상담 답변이 도착했습니다.")
         assertThat(eventPublisher.events).hasSize(1)
+        assertThat(sender.commands).hasSize(2)
         assertThat(fixture.tokenRepository.findEnabledByMemberId(3L)).hasSize(1)
         assertThat(fixture.metrics.snapshot().notifications.pushDelivery)
             .containsEntry("ANDROID.temporary_failure", 1)
+    }
+
+    @Test
+    fun continuesPushDispatchWhenOneTokenCleanupFails() {
+        val sender = ScriptedNotificationPushSender(
+            NotificationPushSendResult.permanentFailure(providerStatusCode = 410),
+            NotificationPushSendResult.success(providerStatusCode = 200),
+        )
+        val tokenRepository = ThrowingDisableNotificationDeviceTokenRepository("ios-token-bad")
+        tokenRepository.save(4L, NotificationDevicePlatform.IOS, "ios-token-bad")
+        tokenRepository.save(4L, NotificationDevicePlatform.ANDROID, "android-token-good")
+        val service = NotificationDeliveryService(
+            notificationRepository = InMemoryNotificationRepository(),
+            notificationEventPublisher = CapturingEventPublisher(),
+            notificationDeviceTokenRepository = tokenRepository,
+            notificationPushSender = sender,
+            pushRetryProperties = NotificationPushRetryProperties(),
+            metricsRegistry = MobileApiMetricsRegistry(),
+        )
+
+        service.deliver(
+            memberId = 4L,
+            eventName = "multi_device",
+            message = "여러 기기 알림입니다.",
+            attributes = mapOf("notificationId" to 11L),
+        )
+
+        assertThat(sender.commands.map { command -> command.token })
+            .containsExactly("ios-token-bad", "android-token-good")
     }
 
     private fun deliveryFixture(
@@ -150,5 +183,57 @@ private class ScriptedNotificationPushSender(
         commands += command
         return results.removeFirstOrNull()
             ?: NotificationPushSendResult.temporaryFailure(providerMessage = "no scripted result")
+    }
+}
+
+private class ThrowingDisableNotificationDeviceTokenRepository(
+    private val throwingToken: String,
+) : NotificationDeviceTokenRepository {
+    private val tokens = mutableListOf<NotificationDeviceToken>()
+
+    override fun save(
+        memberId: Long,
+        platform: NotificationDevicePlatform,
+        token: String,
+    ): NotificationDeviceToken {
+        val deviceToken = NotificationDeviceToken(
+            memberId = memberId,
+            platform = platform,
+            token = token,
+            enabled = true,
+            updatedAt = Instant.now().toString(),
+        )
+        tokens.removeAll { existing -> existing.memberId == memberId && existing.token == token }
+        tokens += deviceToken
+        return deviceToken
+    }
+
+    override fun disable(memberId: Long, token: String): Boolean {
+        if (token == throwingToken) {
+            throw IllegalStateException("disable failed")
+        }
+        val index = tokens.indexOfFirst { existing -> existing.memberId == memberId && existing.token == token }
+        if (index < 0) {
+            return false
+        }
+        tokens[index] = tokens[index].copy(enabled = false, updatedAt = Instant.now().toString())
+        return true
+    }
+
+    override fun disableAll(memberId: Long): Int {
+        var disabledCount = 0
+        tokens.replaceAll { token ->
+            if (token.memberId == memberId && token.enabled) {
+                disabledCount += 1
+                token.copy(enabled = false, updatedAt = Instant.now().toString())
+            } else {
+                token
+            }
+        }
+        return disabledCount
+    }
+
+    override fun findEnabledByMemberId(memberId: Long): List<NotificationDeviceToken> {
+        return tokens.filter { token -> token.memberId == memberId && token.enabled }
     }
 }

@@ -1,6 +1,5 @@
 package com.maumonmobile.adapter.out.push
 
-import com.fasterxml.jackson.databind.ObjectMapper
 import com.maumonmobile.application.port.out.NotificationPushCommand
 import com.maumonmobile.application.port.out.NotificationPushSendStatus
 import com.maumonmobile.domain.notification.NotificationDevicePlatform
@@ -8,6 +7,7 @@ import com.sun.net.httpserver.HttpServer
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.Test
+import tools.jackson.databind.ObjectMapper
 import java.net.InetSocketAddress
 
 class RemoteNotificationPushSenderTest {
@@ -36,6 +36,7 @@ class RemoteNotificationPushSenderTest {
                     memberId = 1L,
                     platform = NotificationDevicePlatform.ANDROID,
                     token = "android-token-123456",
+                    idempotencyKey = "2bf0e582-5987-33bd-a859-c44ea1779a59",
                     title = "Maum On",
                     body = "새 알림",
                     data = mapOf("notificationId" to "7"),
@@ -48,6 +49,7 @@ class RemoteNotificationPushSenderTest {
             assertThat(server.requests.single().authorization)
                 .isEqualTo("Bearer fcm-access-token")
             assertThat(server.requests.single().body).contains("android-token-123456")
+            assertThat(server.requests.single().body).contains("2bf0e582-5987-33bd-a859-c44ea1779a59")
         }
     }
 
@@ -64,6 +66,7 @@ class RemoteNotificationPushSenderTest {
                     memberId = 2L,
                     platform = NotificationDevicePlatform.IOS,
                     token = "ios-token-1234567890",
+                    idempotencyKey = "40e54842-d454-36e8-bba5-e4cd4d19085b",
                     title = "Maum On",
                     body = "새 알림",
                     data = mapOf("notificationId" to "8"),
@@ -74,6 +77,57 @@ class RemoteNotificationPushSenderTest {
             assertThat(result.providerStatusCode).isEqualTo(400)
             assertThat(server.requests.single().path).isEqualTo("/3/device/ios-token-1234567890")
             assertThat(server.requests.single().apnsTopic).isEqualTo("com.maumon.mobile")
+            assertThat(server.requests.single().apnsId).isEqualTo("40e54842-d454-36e8-bba5-e4cd4d19085b")
+        }
+    }
+
+    @Test
+    fun keepsGenericFcmInvalidArgumentAsTemporaryFailure() {
+        val responseBody = """{"error":{"status":"INVALID_ARGUMENT","message":"payload invalid"}}"""
+        TestPushServer(statusCode = 400, responseBody = responseBody).use { server ->
+            val sender = RemoteNotificationPushSender(
+                properties = pushProperties(server.baseUrl),
+                objectMapper = ObjectMapper(),
+            )
+
+            val result = sender.send(
+                NotificationPushCommand(
+                    memberId = 3L,
+                    platform = NotificationDevicePlatform.ANDROID,
+                    token = "android-token-abcdef",
+                    idempotencyKey = "6b4721b0-6cf0-3dc8-9682-c7e7a70bc2bd",
+                    title = "Maum On",
+                    body = "새 알림",
+                    data = mapOf("notificationId" to "9"),
+                ),
+            )
+
+            assertThat(result.status).isEqualTo(NotificationPushSendStatus.TEMPORARY_FAILURE)
+        }
+    }
+
+    @Test
+    fun classifiesFcmUnregisteredTokenAsPermanentFailure() {
+        val responseBody = """{"error":{"details":[{"errorCode":"UNREGISTERED"}]}}"""
+        TestPushServer(statusCode = 404, responseBody = responseBody).use { server ->
+            val sender = RemoteNotificationPushSender(
+                properties = pushProperties(server.baseUrl),
+                objectMapper = ObjectMapper(),
+            )
+
+            val result = sender.send(
+                NotificationPushCommand(
+                    memberId = 4L,
+                    platform = NotificationDevicePlatform.ANDROID,
+                    token = "android-token-unregistered",
+                    idempotencyKey = "393fc1f0-874f-3313-9a85-0bf30c3fbc5c",
+                    title = "Maum On",
+                    body = "새 알림",
+                    data = mapOf("notificationId" to "10"),
+                ),
+            )
+
+            assertThat(result.status).isEqualTo(NotificationPushSendStatus.PERMANENT_FAILURE)
         }
     }
 
@@ -93,6 +147,7 @@ private data class RecordedPushRequest(
     val path: String,
     val authorization: String?,
     val apnsTopic: String?,
+    val apnsId: String?,
     val body: String,
 )
 
@@ -111,6 +166,7 @@ private class TestPushServer(
                 path = exchange.requestURI.path,
                 authorization = exchange.requestHeaders.getFirst("Authorization"),
                 apnsTopic = exchange.requestHeaders.getFirst("apns-topic"),
+                apnsId = exchange.requestHeaders.getFirst("apns-id"),
                 body = exchange.requestBody.readBytes().toString(Charsets.UTF_8),
             )
             val responseBytes = responseBody.toByteArray(Charsets.UTF_8)

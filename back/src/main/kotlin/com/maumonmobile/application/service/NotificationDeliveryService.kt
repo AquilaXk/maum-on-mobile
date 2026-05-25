@@ -13,6 +13,8 @@ import com.maumonmobile.domain.notification.NotificationDeviceToken
 import com.maumonmobile.global.observability.MobileApiMetricsRegistry
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
+import java.nio.charset.StandardCharsets
+import java.util.UUID
 
 @Service
 class NotificationDeliveryService(
@@ -57,7 +59,16 @@ class NotificationDeliveryService(
 
     private fun dispatchPush(memberId: Long, message: String, payload: Map<String, Any?>) {
         notificationDeviceTokenRepository.findEnabledByMemberId(memberId).forEach { deviceToken ->
-            dispatchPushToToken(memberId, deviceToken, message, payload)
+            runCatching {
+                dispatchPushToToken(memberId, deviceToken, message, payload)
+            }.onFailure { exception ->
+                log.warn(
+                    "Unexpected push dispatch failure. memberId={}, platform={}",
+                    memberId,
+                    deviceToken.platform,
+                    exception,
+                )
+            }
         }
     }
 
@@ -67,13 +78,16 @@ class NotificationDeliveryService(
         message: String,
         payload: Map<String, Any?>,
     ) {
+        val idempotencyKey = pushIdempotencyKey(payload["notificationId"], deviceToken.token)
         val command = NotificationPushCommand(
             memberId = memberId,
             platform = deviceToken.platform,
             token = deviceToken.token,
+            idempotencyKey = idempotencyKey,
             title = PUSH_TITLE,
             body = message,
-            data = payload.mapValues { (_, value) -> value?.toString() ?: "" },
+            data = payload.mapValues { (_, value) -> value?.toString() ?: "" } +
+                mapOf("idempotencyKey" to idempotencyKey),
         )
         val result = sendWithRetry(command)
         when (result.status) {
@@ -131,6 +145,11 @@ class NotificationDeliveryService(
             }
         }
         return lastResult
+    }
+
+    private fun pushIdempotencyKey(notificationId: Any?, token: String): String {
+        val source = "${notificationId ?: "unknown"}:$token"
+        return UUID.nameUUIDFromBytes(source.toByteArray(StandardCharsets.UTF_8)).toString()
     }
 
     private companion object {
