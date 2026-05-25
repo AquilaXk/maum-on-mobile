@@ -1,11 +1,14 @@
 package com.maumonmobile.adapter.`in`.web.report
 
+import com.maumonmobile.application.port.`in`.AdminReportDetail
+import com.maumonmobile.application.port.`in`.AdminReportSummary
 import com.maumonmobile.application.port.`in`.ReportStatusResult
 import com.maumonmobile.application.port.`in`.ReportStatusUpdateCommand
 import com.maumonmobile.application.port.`in`.ReportUseCase
 import com.maumonmobile.global.security.AuthenticatedUser
 import com.maumonmobile.global.web.ApiResponse
 import org.springframework.security.core.Authentication
+import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PatchMapping
 import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.RequestBody
@@ -17,6 +20,23 @@ import org.springframework.web.bind.annotation.RestController
 class AdminReportController(
     private val reportUseCase: ReportUseCase,
 ) {
+
+    @GetMapping
+    fun list(authentication: Authentication): ApiResponse<List<AdminReportSummary>> {
+        return ApiResponse.success(
+            reportUseCase.listForAdmin(authentication.authenticatedUser()),
+        )
+    }
+
+    @GetMapping("/{id}")
+    fun get(
+        authentication: Authentication,
+        @PathVariable id: Long,
+    ): ApiResponse<AdminReportDetail> {
+        return ApiResponse.success(
+            reportUseCase.getForAdmin(authentication.authenticatedUser(), id),
+        )
+    }
 
     @PatchMapping("/{id}/status")
     fun updateStatus(
@@ -36,10 +56,11 @@ class AdminReportController(
 
 data class ReportStatusUpdateRequest(
     val status: String? = null,
+    val reason: String? = null,
 )
 
 private fun ReportStatusUpdateRequest.toCommand(): ReportStatusUpdateCommand {
-    return ReportStatusUpdateCommand(status = status)
+    return ReportStatusUpdateCommand(status = status, reason = reason)
 }
 
 private fun Authentication.authenticatedUser(): AuthenticatedUser {

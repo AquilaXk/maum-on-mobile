@@ -12,6 +12,7 @@ void main() {
         'letter',
         'consultation',
         'notifications',
+        'operations',
         'settings',
       ],
     );
@@ -24,6 +25,7 @@ void main() {
         '/letters',
         '/consultation',
         '/notifications',
+        '/operations',
         '/settings',
       ],
     );

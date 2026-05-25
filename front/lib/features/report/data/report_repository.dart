@@ -3,6 +3,15 @@ import '../domain/report_models.dart';
 
 abstract interface class ReportRepository {
   Future<int> createReport(ReportDraft draft);
+
+  Future<List<AdminReportSummary>> fetchAdminReports();
+
+  Future<AdminReportDetail> fetchAdminReport(int id);
+
+  Future<AdminReportActionResult> updateAdminReportStatus(
+    int id,
+    AdminReportActionDraft draft,
+  );
 }
 
 class ApiReportRepository implements ReportRepository {
@@ -18,6 +27,40 @@ class ApiReportRepository implements ReportRepository {
       '/api/v1/reports',
       body: draft.toJson(),
       parser: _parseReportId,
+    );
+  }
+
+  @override
+  Future<List<AdminReportSummary>> fetchAdminReports() {
+    return _apiClient.get<List<AdminReportSummary>>(
+      '/api/v1/admin/reports',
+      parser: (json) {
+        if (json is! List) {
+          throw const FormatException('Expected admin report list.');
+        }
+
+        return json.map(AdminReportSummary.fromJson).toList(growable: false);
+      },
+    );
+  }
+
+  @override
+  Future<AdminReportDetail> fetchAdminReport(int id) {
+    return _apiClient.get<AdminReportDetail>(
+      '/api/v1/admin/reports/$id',
+      parser: AdminReportDetail.fromJson,
+    );
+  }
+
+  @override
+  Future<AdminReportActionResult> updateAdminReportStatus(
+    int id,
+    AdminReportActionDraft draft,
+  ) {
+    return _apiClient.patch<AdminReportActionResult>(
+      '/api/v1/admin/reports/$id/status',
+      body: draft.toJson(),
+      parser: AdminReportActionResult.fromJson,
     );
   }
 }

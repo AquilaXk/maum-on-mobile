@@ -151,6 +151,87 @@ class NotificationReportControllerTest @Autowired constructor(
     }
 
     @Test
+    fun adminReviewsReportDetailAndStoresActionAuditTrail() {
+        val owner = signupAndLogin("admin-report-owner@example.com", "운영대상")
+        val reporter = signupAndLogin("admin-report-reporter@example.com", "신고담당")
+        val adminToken = adminAccessToken()
+        val postId = createPost(owner.accessToken, "운영 검수 대상")
+        val reportResult = mockMvc.post("/api/v1/reports") {
+            header("Authorization", "Bearer ${reporter.accessToken}")
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"targetId":$postId,"targetType":"POST","reason":"PERSONAL_INFO","content":"전화번호가 노출되어 있습니다."}"""
+        }
+            .andExpect {
+                status { isOk() }
+            }
+            .andReturn()
+        val reportId = reportResult.response.readJsonInt("$.data")
+
+        mockMvc.get("/api/v1/admin/reports") {
+            header("Authorization", "Bearer ${reporter.accessToken}")
+        }
+            .andExpect {
+                status { isForbidden() }
+            }
+
+        mockMvc.get("/api/v1/admin/reports") {
+            header("Authorization", "Bearer $adminToken")
+        }
+            .andExpect {
+                status { isOk() }
+                jsonPath("$.data[0].id") { value(reportId) }
+                jsonPath("$.data[0].targetTitle") { value("운영 검수 대상") }
+                jsonPath("$.data[0].reporter.nickname") { value("신고담당") }
+                jsonPath("$.data[0].targetOwner.nickname") { value("운영대상") }
+            }
+
+        mockMvc.get("/api/v1/admin/reports/$reportId") {
+            header("Authorization", "Bearer $adminToken")
+        }
+            .andExpect {
+                status { isOk() }
+                jsonPath("$.data.id") { value(reportId) }
+                jsonPath("$.data.target.title") { value("운영 검수 대상") }
+                jsonPath("$.data.target.preview") { value("확인이 필요한 글입니다.") }
+                jsonPath("$.data.targetOwner.email") { value("admin-report-owner@example.com") }
+            }
+
+        mockMvc.patch("/api/v1/admin/reports/$reportId/status") {
+            header("Authorization", "Bearer $adminToken")
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"status":"HIDDEN","reason":"  "}"""
+        }
+            .andExpect {
+                status { isBadRequest() }
+                jsonPath("$.error.code") { value("INVALID_REQUEST") }
+            }
+
+        mockMvc.patch("/api/v1/admin/reports/$reportId/status") {
+            header("Authorization", "Bearer $adminToken")
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"status":"HIDDEN","reason":"개인정보 노출로 숨김 처리"}"""
+        }
+            .andExpect {
+                status { isOk() }
+                jsonPath("$.data.status") { value("HIDDEN") }
+                jsonPath("$.data.actionReason") { value("개인정보 노출로 숨김 처리") }
+                jsonPath("$.data.handledBy") { isNotEmpty() }
+                jsonPath("$.data.handledAt") { isNotEmpty() }
+            }
+
+        mockMvc.get("/api/v1/admin/reports/$reportId") {
+            header("Authorization", "Bearer $adminToken")
+        }
+            .andExpect {
+                status { isOk() }
+                jsonPath("$.data.status") { value("HIDDEN") }
+                jsonPath("$.data.actionReason") { value("개인정보 노출로 숨김 처리") }
+                jsonPath("$.data.handledBy.nickname") { value("관리자") }
+                jsonPath("$.data.handledAt") { isNotEmpty() }
+            }
+    }
+
+    @Test
     fun reportReceptionAndProcessingAreDeliveredAsNotifications() {
         notificationEventPublisher.clear()
         notificationPushSender.clear()
@@ -192,7 +273,7 @@ class NotificationReportControllerTest @Autowired constructor(
         mockMvc.patch("/api/v1/admin/reports/$reportId/status") {
             header("Authorization", "Bearer $adminToken")
             contentType = MediaType.APPLICATION_JSON
-            content = """{"status":"RESOLVED"}"""
+            content = """{"status":"RESOLVED","reason":"신고 검수 완료"}"""
         }
             .andExpect {
                 status { isOk() }
@@ -382,7 +463,7 @@ class NotificationReportControllerTest @Autowired constructor(
         mockMvc.patch("/api/v1/admin/reports/$reportId/status") {
             header("Authorization", "Bearer $adminToken")
             contentType = MediaType.APPLICATION_JSON
-            content = """{"status":"RESOLVED"}"""
+            content = """{"status":"RESOLVED","reason":"알림 발행 실패 검증"}"""
         }
             .andExpect {
                 status { isOk() }

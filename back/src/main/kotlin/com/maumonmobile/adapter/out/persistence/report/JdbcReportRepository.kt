@@ -61,16 +61,35 @@ class JdbcReportRepository(
         ).singleOrNull()
     }
 
-    override fun updateStatus(id: Long, status: String): Report? {
+    override fun findAll(): List<Report> {
+        return jdbc.query(
+            "select * from reports order by created_at desc, id desc",
+            rowMapper,
+        )
+    }
+
+    override fun updateStatus(
+        id: Long,
+        status: String,
+        actionReason: String?,
+        handledBy: Long,
+        handledAt: String,
+    ): Report? {
         jdbc.update(
             """
                 update reports
-                   set status = :status
+                   set status = :status,
+                       action_reason = :actionReason,
+                       handled_by = :handledBy,
+                       handled_at = :handledAt
                  where id = :id
             """.trimIndent(),
             params()
                 .withValue("id", id)
-                .withValue("status", status),
+                .withValue("status", status)
+                .withValue("actionReason", actionReason)
+                .withValue("handledBy", handledBy)
+                .withValue("handledAt", handledAt),
         )
         return findById(id)
     }
@@ -108,6 +127,9 @@ class JdbcReportRepository(
                 content = rs.getString("content"),
                 status = rs.getString("status"),
                 createdAt = rs.getString("created_at"),
+                actionReason = rs.getString("action_reason"),
+                handledBy = rs.getLong("handled_by").takeUnless { rs.wasNull() },
+                handledAt = rs.getString("handled_at"),
             )
         }
     }

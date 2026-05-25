@@ -9,6 +9,9 @@ data class Report(
     val content: String?,
     val status: String,
     val createdAt: String,
+    val actionReason: String? = null,
+    val handledBy: Long? = null,
+    val handledAt: String? = null,
 )
 
 enum class ReportTargetType {

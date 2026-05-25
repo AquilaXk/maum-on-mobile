@@ -9,7 +9,15 @@ interface ReportRepository {
 
     fun findById(id: Long): Report?
 
-    fun updateStatus(id: Long, status: String): Report?
+    fun findAll(): List<Report>
+
+    fun updateStatus(
+        id: Long,
+        status: String,
+        actionReason: String?,
+        handledBy: Long,
+        handledAt: String,
+    ): Report?
 
     fun existsByReporterAndTarget(
         reporterId: Long,

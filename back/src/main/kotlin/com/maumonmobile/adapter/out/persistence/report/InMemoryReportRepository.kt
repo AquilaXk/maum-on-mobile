@@ -35,9 +35,24 @@ class InMemoryReportRepository : ReportRepository {
         return reportsById[id]
     }
 
-    override fun updateStatus(id: Long, status: String): Report? {
+    override fun findAll(): List<Report> {
+        return reportsById.values.sortedByDescending { report -> report.createdAt }
+    }
+
+    override fun updateStatus(
+        id: Long,
+        status: String,
+        actionReason: String?,
+        handledBy: Long,
+        handledAt: String,
+    ): Report? {
         return reportsById.computeIfPresent(id) { _, report ->
-            report.copy(status = status)
+            report.copy(
+                status = status,
+                actionReason = actionReason,
+                handledBy = handledBy,
+                handledAt = handledAt,
+            )
         }
     }
 
