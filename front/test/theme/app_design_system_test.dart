@@ -123,4 +123,55 @@ void main() {
 
     expect(refreshCount, 1);
   });
+
+  testWidgets('list and detail rows expose stable mobile accessibility',
+      (tester) async {
+    tester.view.physicalSize = const Size(320, 720);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final semantics = tester.ensureSemantics();
+    addTearDown(semantics.dispose);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: buildAppTheme(),
+        home: Scaffold(
+          body: ListView(
+            children: [
+              AppListRow(
+                rowKey: const ValueKey('design-list-row'),
+                title: '작은 화면에서 두 줄까지 보이는 긴 운영 대상 제목',
+                subtitle: '신고자 · very.long.email.address@example-service.test',
+                statusLabel: '접수',
+                statusTone: AppStatusTone.warning,
+                leadingIcon: Icons.inbox_outlined,
+                semanticLabel: '운영 목록 행, 게시글, 접수 상태',
+                onTap: () {},
+              ),
+              const AppDetailRow(
+                label: '신고자',
+                value: '신고자 · very.long.email.address@example-service.test',
+                semanticLabel:
+                    '신고자, 신고자, very.long.email.address@example-service.test',
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+
+    expect(find.bySemanticsLabel('운영 목록 행, 게시글, 접수 상태'), findsOneWidget);
+    expect(
+      find.bySemanticsLabel(
+        '신고자, 신고자, very.long.email.address@example-service.test',
+      ),
+      findsOneWidget,
+    );
+    expect(
+      tester.getSize(find.byKey(const ValueKey('design-list-row'))).height,
+      greaterThanOrEqualTo(64),
+    );
+    expect(tester.takeException(), isNull);
+  });
 }
