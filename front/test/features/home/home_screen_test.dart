@@ -86,6 +86,61 @@ void main() {
     expect(notificationTaps, 1);
     expect(settingsTaps, 1);
   });
+
+  testWidgets('shows operations entry only to admins', (tester) async {
+    final userController = HomeController(
+      homeRepository: const _FakeHomeRepository(),
+    );
+    await userController.load();
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: HomeScreen(
+          routeTitle: '홈',
+          nickname: '마음이',
+          homeController: userController,
+          onWriteDiary: () {},
+          onWriteLetter: () {},
+          onViewStory: () {},
+          onOpenConsultation: () {},
+          onOpenNotifications: () {},
+          onOpenSettings: () {},
+          onLogout: () {},
+        ),
+      ),
+    );
+
+    expect(find.byKey(const ValueKey('home-operations-button')), findsNothing);
+
+    final adminController = HomeController(
+      homeRepository: const _FakeHomeRepository(),
+    );
+    await adminController.load();
+    var operationsTaps = 0;
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: HomeScreen(
+          routeTitle: '홈',
+          nickname: '관리자',
+          homeController: adminController,
+          isAdmin: true,
+          onOpenOperations: () => operationsTaps += 1,
+          onWriteDiary: () {},
+          onWriteLetter: () {},
+          onViewStory: () {},
+          onOpenConsultation: () {},
+          onOpenNotifications: () {},
+          onOpenSettings: () {},
+          onLogout: () {},
+        ),
+      ),
+    );
+
+    await tester.tap(find.byKey(const ValueKey('home-operations-button')));
+
+    expect(operationsTaps, 1);
+  });
 }
 
 class _FakeHomeRepository implements HomeRepository {

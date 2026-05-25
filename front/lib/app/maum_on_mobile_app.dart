@@ -30,6 +30,8 @@ import '../features/notification/application/notification_controller.dart';
 import '../features/notification/data/notification_repository.dart';
 import '../features/notification/data/push_notification_permission_client.dart';
 import '../features/notification/presentation/notification_report_screen.dart';
+import '../features/operations/application/operations_controller.dart';
+import '../features/operations/presentation/operations_screen.dart';
 import '../features/report/application/report_controller.dart';
 import '../features/report/data/report_repository.dart';
 import '../features/report/domain/report_models.dart';
@@ -117,6 +119,8 @@ class _MaumOnMobileAppState extends State<MaumOnMobileApp> {
   int? _notificationMemberId;
   ReportController? _reportController;
   int? _reportMemberId;
+  OperationsController? _operationsController;
+  int? _operationsMemberId;
   SettingsController? _settingsController;
   int? _settingsMemberId;
   DiaryController? _diaryController;
@@ -147,6 +151,7 @@ class _MaumOnMobileAppState extends State<MaumOnMobileApp> {
     _disposeConsultationController();
     _disposeNotificationController();
     _disposeReportController();
+    _disposeOperationsController();
     _disposeSettingsController();
     _disposeDiaryController();
     _disposeStoryController();
@@ -198,6 +203,7 @@ class _MaumOnMobileAppState extends State<MaumOnMobileApp> {
               child: _buildAuthenticatedRoute(
                 memberId: state.member!.id,
                 nickname: state.member!.nickname,
+                role: state.member!.role,
                 routeTitle: initialRoute.title,
               ),
             );
@@ -210,6 +216,7 @@ class _MaumOnMobileAppState extends State<MaumOnMobileApp> {
   Widget _buildAuthenticatedRoute({
     required int memberId,
     required String nickname,
+    required String role,
     required String routeTitle,
   }) {
     return switch (_route) {
@@ -224,6 +231,35 @@ class _MaumOnMobileAppState extends State<MaumOnMobileApp> {
           onBack: _returnHome,
         ),
       AuthenticatedRoute.notifications => _buildNotificationRoute(memberId),
+      AuthenticatedRoute.operations => role == 'ADMIN'
+          ? OperationsScreen(
+              controller: _operationsControllerFor(memberId),
+              onBack: _returnHome,
+            )
+          : HomeScreen(
+              routeTitle: routeTitle,
+              nickname: nickname,
+              homeController: _homeControllerFor(memberId),
+              onWriteDiary: () => _openRoute(AuthenticatedRoute.diary),
+              onWriteLetter: () {
+                setState(() {
+                  _openLetterComposer = true;
+                  _route = AuthenticatedRoute.letter;
+                });
+              },
+              onViewStory: () => _openRoute(AuthenticatedRoute.story),
+              onOpenConsultation: () =>
+                  _openRoute(AuthenticatedRoute.consultation),
+              onOpenNotifications: () => _openRoute(
+                AuthenticatedRoute.notifications,
+              ),
+              onOpenSettings: () => _openRoute(AuthenticatedRoute.settings),
+              onLogout: () {
+                _disposeAuthenticatedControllers();
+                _route = AuthenticatedRoute.home;
+                _authController.logout();
+              },
+            ),
       AuthenticatedRoute.settings => SettingsScreen(
           controller: _settingsControllerFor(memberId),
           onBack: _returnHome,
@@ -250,6 +286,10 @@ class _MaumOnMobileAppState extends State<MaumOnMobileApp> {
             AuthenticatedRoute.notifications,
           ),
           onOpenSettings: () => _openRoute(AuthenticatedRoute.settings),
+          isAdmin: role == 'ADMIN',
+          onOpenOperations: role == 'ADMIN'
+              ? () => _openRoute(AuthenticatedRoute.operations)
+              : null,
           onLogout: () {
             _disposeAuthenticatedControllers();
             _route = AuthenticatedRoute.home;
@@ -313,6 +353,7 @@ class _MaumOnMobileAppState extends State<MaumOnMobileApp> {
     _disposeConsultationController();
     _disposeNotificationController();
     _disposeReportController();
+    _disposeOperationsController();
     _disposeSettingsController();
     _disposeDiaryController();
     _disposeStoryController();
@@ -408,6 +449,28 @@ class _MaumOnMobileAppState extends State<MaumOnMobileApp> {
     _reportController?.dispose();
     _reportController = null;
     _reportMemberId = null;
+  }
+
+  OperationsController _operationsControllerFor(int memberId) {
+    final currentController = _operationsController;
+    if (currentController != null && _operationsMemberId == memberId) {
+      return currentController;
+    }
+
+    currentController?.dispose();
+    _operationsMemberId = memberId;
+    return _operationsController = OperationsController(
+      repository: widget.reportRepository ?? _buildDefaultReportRepository(),
+      onUnauthorized: () {
+        _authController.logout();
+      },
+    );
+  }
+
+  void _disposeOperationsController() {
+    _operationsController?.dispose();
+    _operationsController = null;
+    _operationsMemberId = null;
   }
 
   SettingsController _settingsControllerFor(int memberId) {

@@ -17,6 +17,8 @@ class HomeScreen extends StatefulWidget {
     required this.onOpenNotifications,
     required this.onOpenSettings,
     required this.onLogout,
+    this.isAdmin = false,
+    this.onOpenOperations,
     super.key,
   });
 
@@ -30,6 +32,8 @@ class HomeScreen extends StatefulWidget {
   final VoidCallback onOpenNotifications;
   final VoidCallback onOpenSettings;
   final VoidCallback onLogout;
+  final bool isAdmin;
+  final VoidCallback? onOpenOperations;
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
@@ -81,6 +85,8 @@ class _HomeScreenState extends State<HomeScreen> {
               onOpenNotifications: widget.onOpenNotifications,
               onOpenSettings: widget.onOpenSettings,
               onLogout: widget.onLogout,
+              isAdmin: widget.isAdmin,
+              onOpenOperations: widget.onOpenOperations,
             ),
             const SizedBox(height: AppSpacing.xl),
             _CategoryFilter(
@@ -177,6 +183,8 @@ class _ActionGrid extends StatelessWidget {
     required this.onOpenNotifications,
     required this.onOpenSettings,
     required this.onLogout,
+    required this.isAdmin,
+    this.onOpenOperations,
   });
 
   final VoidCallback onWriteDiary;
@@ -186,6 +194,8 @@ class _ActionGrid extends StatelessWidget {
   final VoidCallback onOpenNotifications;
   final VoidCallback onOpenSettings;
   final VoidCallback onLogout;
+  final bool isAdmin;
+  final VoidCallback? onOpenOperations;
 
   @override
   Widget build(BuildContext context) {
@@ -220,6 +230,13 @@ class _ActionGrid extends StatelessWidget {
           icon: const Icon(Icons.settings_outlined),
           label: const Text('설정'),
         ),
+        if (isAdmin && onOpenOperations != null)
+          OutlinedButton.icon(
+            key: const ValueKey('home-operations-button'),
+            onPressed: onOpenOperations,
+            icon: const Icon(Icons.admin_panel_settings_outlined),
+            label: const Text('운영 검수'),
+          ),
         OutlinedButton(
           onPressed: onLogout,
           child: const Text('로그아웃'),

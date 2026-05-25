@@ -1,5 +1,9 @@
 package com.maumonmobile.application.service
 
+import com.maumonmobile.application.port.`in`.AdminReportDetail
+import com.maumonmobile.application.port.`in`.AdminReportMember
+import com.maumonmobile.application.port.`in`.AdminReportSummary
+import com.maumonmobile.application.port.`in`.AdminReportTarget
 import com.maumonmobile.application.port.`in`.ReportCreateCommand
 import com.maumonmobile.application.port.`in`.ReportStatusResult
 import com.maumonmobile.application.port.`in`.ReportStatusUpdateCommand
@@ -9,7 +13,9 @@ import com.maumonmobile.application.port.out.LetterRepository
 import com.maumonmobile.application.port.out.NotificationDeliveryPort
 import com.maumonmobile.application.port.out.ReportRepository
 import com.maumonmobile.application.port.out.StoryRepository
+import com.maumonmobile.domain.auth.AuthMember
 import com.maumonmobile.domain.moderation.ContentModerationTarget
+import com.maumonmobile.domain.report.Report
 import com.maumonmobile.domain.report.ReportDraft
 import com.maumonmobile.domain.report.ReportReason
 import com.maumonmobile.domain.report.ReportTargetType
@@ -17,6 +23,7 @@ import com.maumonmobile.global.security.AuthenticatedUser
 import com.maumonmobile.global.web.ApiException
 import com.maumonmobile.global.web.ErrorCode
 import org.springframework.stereotype.Service
+import java.time.Instant
 
 @Service
 class ReportService(
@@ -73,17 +80,41 @@ class ReportService(
         return report.id
     }
 
+    override fun listForAdmin(user: AuthenticatedUser): List<AdminReportSummary> {
+        ensureAdmin(user)
+        return reportRepository.findAll().map { report -> report.toSummary() }
+    }
+
+    override fun getForAdmin(user: AuthenticatedUser, reportId: Long): AdminReportDetail {
+        ensureAdmin(user)
+        val report = reportRepository.findById(reportId)
+            ?: throw ApiException(ErrorCode.NOT_FOUND, "신고 내역을 찾을 수 없습니다.")
+        return report.toDetail()
+    }
+
     override fun updateStatus(
         user: AuthenticatedUser,
         reportId: Long,
         command: ReportStatusUpdateCommand,
     ): ReportStatusResult {
-        if ("ADMIN" !in user.roles) {
-            throw ApiException(ErrorCode.FORBIDDEN)
-        }
+        val admin = ensureAdmin(user)
 
         val status = command.status.toReportStatus()
-        val report = reportRepository.updateStatus(reportId, status)
+        val actionReason = command.reason?.trim()
+        if (actionReason == null || actionReason.length < ACTION_REASON_MIN_LENGTH) {
+            throw ApiException(
+                ErrorCode.INVALID_REQUEST,
+                "신고 처리 사유를 ${ACTION_REASON_MIN_LENGTH}자 이상 입력해 주세요.",
+            )
+        }
+        val handledAt = Instant.now().toString()
+        val report = reportRepository.updateStatus(
+            id = reportId,
+            status = status,
+            actionReason = actionReason,
+            handledBy = admin.id,
+            handledAt = handledAt,
+        )
             ?: throw ApiException(ErrorCode.NOT_FOUND, "신고 내역을 찾을 수 없습니다.")
         notifyMember(
             memberId = report.reporterId,
@@ -96,6 +127,105 @@ class ReportService(
         return ReportStatusResult(
             id = report.id,
             status = report.status,
+            actionReason = report.actionReason,
+            handledBy = report.handledBy?.let(::memberSummary),
+            handledAt = report.handledAt,
+        )
+    }
+
+    private fun ensureAdmin(user: AuthenticatedUser): AuthMember {
+        if ("ADMIN" !in user.roles) {
+            throw ApiException(ErrorCode.FORBIDDEN)
+        }
+
+        val adminId = user.id.toLongOrNull()
+            ?: throw ApiException(ErrorCode.UNAUTHORIZED, "다시 로그인해 주세요.")
+        return authMemberRepository.findById(adminId)
+            ?: throw ApiException(ErrorCode.UNAUTHORIZED, "다시 로그인해 주세요.")
+    }
+
+    private fun Report.toSummary(): AdminReportSummary {
+        val target = resolveTarget(targetType, targetId)
+        return AdminReportSummary(
+            id = id,
+            targetId = targetId,
+            targetType = targetType.name,
+            reason = reason.name,
+            content = content,
+            status = status,
+            createdAt = createdAt,
+            targetTitle = target.title,
+            targetPreview = target.preview,
+            reporter = memberSummary(reporterId),
+            targetOwner = target.ownerId?.let(::memberSummary),
+            actionReason = actionReason,
+            handledBy = handledBy?.let(::memberSummary),
+            handledAt = handledAt,
+        )
+    }
+
+    private fun Report.toDetail(): AdminReportDetail {
+        val target = resolveTarget(targetType, targetId)
+        return AdminReportDetail(
+            id = id,
+            targetId = targetId,
+            targetType = targetType.name,
+            reason = reason.name,
+            content = content,
+            status = status,
+            createdAt = createdAt,
+            target = target,
+            reporter = memberSummary(reporterId),
+            targetOwner = target.ownerId?.let(::memberSummary),
+            actionReason = actionReason,
+            handledBy = handledBy?.let(::memberSummary),
+            handledAt = handledAt,
+        )
+    }
+
+    private fun resolveTarget(targetType: ReportTargetType, targetId: Long): AdminReportTarget {
+        return when (targetType) {
+            ReportTargetType.POST -> {
+                val post = storyRepository.findPostById(targetId)
+                AdminReportTarget(
+                    id = targetId,
+                    type = targetType.name,
+                    title = post?.title ?: "삭제된 게시글 #$targetId",
+                    preview = post?.content ?: "",
+                    ownerId = post?.authorId,
+                )
+            }
+            ReportTargetType.COMMENT -> {
+                val comment = storyRepository.findCommentById(targetId)
+                AdminReportTarget(
+                    id = targetId,
+                    type = targetType.name,
+                    title = "댓글 #$targetId",
+                    preview = comment?.content ?: "",
+                    ownerId = comment?.authorId,
+                )
+            }
+            ReportTargetType.LETTER -> {
+                val letter = letterRepository.findById(targetId)
+                AdminReportTarget(
+                    id = targetId,
+                    type = targetType.name,
+                    title = letter?.title ?: "삭제된 편지 #$targetId",
+                    preview = letter?.content ?: "",
+                    ownerId = letter?.senderId,
+                )
+            }
+        }
+    }
+
+    private fun memberSummary(memberId: Long): AdminReportMember {
+        val member = authMemberRepository.findById(memberId)
+        return AdminReportMember(
+            id = memberId,
+            email = member?.email ?: "",
+            nickname = member?.nickname ?: "탈퇴한 회원",
+            role = member?.role?.name ?: "USER",
+            status = member?.status?.name ?: "WITHDRAWN",
         )
     }
 
@@ -145,4 +275,5 @@ private fun String?.toReportStatus(): String {
 }
 
 private const val REPORT_STATUS_EVENT = "report_status"
-private val REPORT_STATUSES = setOf("RESOLVED", "REJECTED")
+private const val ACTION_REASON_MIN_LENGTH = 4
+private val REPORT_STATUSES = setOf("RESOLVED", "REJECTED", "HIDDEN", "DELETED", "RESTRICTED")

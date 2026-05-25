@@ -144,4 +144,22 @@ class _FakeReportRepository implements ReportRepository {
     drafts.add(draft);
     return drafts.length;
   }
+
+  @override
+  Future<List<AdminReportSummary>> fetchAdminReports() {
+    throw UnimplementedError();
+  }
+
+  @override
+  Future<AdminReportDetail> fetchAdminReport(int id) {
+    throw UnimplementedError();
+  }
+
+  @override
+  Future<AdminReportActionResult> updateAdminReportStatus(
+    int id,
+    AdminReportActionDraft draft,
+  ) {
+    throw UnimplementedError();
+  }
 }
