@@ -394,12 +394,13 @@ void main() {
     );
 
     await tester.pumpAndSettle();
+    await pushClient.waitForTapListener();
     pushClient.emitTap(
       const NotificationTapPayload(
         destination: NotificationTapDestination.consultation,
       ),
     );
-    await tester.pump();
+    await tester.pumpAndSettle();
 
     expect(find.text('실시간 상담'), findsOneWidget);
   });
@@ -787,6 +788,7 @@ class _FakePushNotificationPermissionClient
 
   final NotificationTapPayload? initialPayload;
   final PushNotificationPermissionResult permissionResult;
+  final Completer<void> _tapListenerReady = Completer<void>();
   final StreamController<NotificationTapPayload> _tapController =
       StreamController<NotificationTapPayload>.broadcast();
   bool initialPayloadConsumed = false;
@@ -818,7 +820,16 @@ class _FakePushNotificationPermissionClient
   }
 
   @override
-  Stream<NotificationTapPayload> get notificationTaps => _tapController.stream;
+  Stream<NotificationTapPayload> get notificationTaps {
+    if (!_tapListenerReady.isCompleted) {
+      _tapListenerReady.complete();
+    }
+    return _tapController.stream;
+  }
+
+  Future<void> waitForTapListener() {
+    return _tapListenerReady.future;
+  }
 
   void emitTap(NotificationTapPayload payload) {
     _tapController.add(payload);
