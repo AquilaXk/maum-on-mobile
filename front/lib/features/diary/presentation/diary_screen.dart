@@ -129,11 +129,14 @@ class _DiaryScreenState extends State<DiaryScreen> {
           ],
           children: [
             if (state.errorMessage != null) ...[
-              _Notice(message: state.errorMessage!, isError: true),
+              AppNotice(
+                message: state.errorMessage!,
+                tone: AppNoticeTone.error,
+              ),
               const SizedBox(height: AppSpacing.sm),
             ],
             if (state.noticeMessage != null) ...[
-              _Notice(message: state.noticeMessage!),
+              AppNotice(message: state.noticeMessage!),
               const SizedBox(height: AppSpacing.sm),
             ],
             AppSectionCard(
@@ -299,7 +302,11 @@ class _SelectedEntriesSection extends StatelessWidget {
         Text(selectedDateLabel, style: Theme.of(context).textTheme.titleMedium),
         const SizedBox(height: AppSpacing.xs),
         if (entries.isEmpty)
-          const _Notice(message: '선택한 날짜에 작성한 기록이 없습니다.')
+          const AppStateView.empty(
+            title: '선택한 날짜에 작성한 기록이 없습니다.',
+            message: '아래 입력 영역에서 오늘의 마음을 기록할 수 있습니다.',
+            semanticLabel: '선택한 날짜 기록 비어 있음',
+          )
         else
           for (final entry in entries) ...[
             Card(
@@ -362,14 +369,25 @@ class _PublicEntriesSection extends StatelessWidget {
         Text('공개 기록', style: theme.textTheme.titleMedium),
         const SizedBox(height: AppSpacing.xs),
         if (state.isPublicLoading)
-          const _Notice(message: '공개 기록을 불러오는 중입니다.')
+          const AppStateView.loading(
+            title: '공개 기록을 불러오는 중입니다.',
+            semanticLabel: '공개 기록 목록을 불러오는 중',
+          )
         else ...[
           if (state.publicErrorMessage != null) ...[
-            _Notice(message: state.publicErrorMessage!, isError: true),
+            AppStateView.error(
+              title: '공개 기록을 불러오지 못했습니다.',
+              message: state.publicErrorMessage!,
+              semanticLabel: '공개 기록 목록 오류',
+            ),
             const SizedBox(height: AppSpacing.xs),
           ],
           if (state.isPublicEmpty)
-            const _Notice(message: '아직 공개된 기록이 없습니다.'),
+            const AppStateView.empty(
+              title: '아직 공개된 기록이 없습니다.',
+              message: '공개 기록이 생기면 이곳에 표시됩니다.',
+              semanticLabel: '공개 기록 목록 비어 있음',
+            ),
           for (final entry in state.publicEntries) ...[
             Card(
               child: Padding(
@@ -406,7 +424,7 @@ class _PublicEntriesSection extends StatelessWidget {
         if (!state.isPublicLoading && state.publicEntries.isNotEmpty) ...[
           const SizedBox(height: AppSpacing.xs),
           if (state.isLastPublicPage)
-            const _Notice(message: '마지막 공개 기록입니다.')
+            const AppNotice(message: '마지막 공개 기록입니다.')
           else
             OutlinedButton.icon(
               key: const ValueKey('diary-public-load-more-button'),
@@ -463,87 +481,87 @@ class _DiaryForm extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Row(
-          children: [
-            const Spacer(),
-            if (state.isEditing)
-              IconButton(
-                key: const ValueKey('diary-edit-cancel-button'),
-                tooltip: '수정 취소',
-                onPressed: onReset,
-                icon: const Icon(Icons.close),
-              ),
-          ],
-        ),
-        const SizedBox(height: AppSpacing.sm),
-        TextField(
-          key: const ValueKey('diary-title-field'),
-          controller: titleController,
-          onChanged: onTitleChanged,
-          decoration: const InputDecoration(
-            labelText: '제목',
-            border: OutlineInputBorder(),
+            children: [
+              const Spacer(),
+              if (state.isEditing)
+                IconButton(
+                  key: const ValueKey('diary-edit-cancel-button'),
+                  tooltip: '수정 취소',
+                  onPressed: onReset,
+                  icon: const Icon(Icons.close),
+                ),
+            ],
           ),
-        ),
-        const SizedBox(height: AppSpacing.sm),
-        TextField(
-          key: const ValueKey('diary-content-field'),
-          controller: contentController,
-          onChanged: onContentChanged,
-          minLines: 5,
-          maxLines: 8,
-          decoration: const InputDecoration(
-            labelText: '본문',
-            border: OutlineInputBorder(),
+          const SizedBox(height: AppSpacing.sm),
+          TextField(
+            key: const ValueKey('diary-title-field'),
+            controller: titleController,
+            onChanged: onTitleChanged,
+            decoration: const InputDecoration(
+              labelText: '제목',
+              border: OutlineInputBorder(),
+            ),
           ),
-        ),
-        const SizedBox(height: AppSpacing.sm),
-        DropdownButtonFormField<DiaryCategory>(
-          key: ValueKey('diary-category-${state.category.name}'),
-          initialValue: state.category,
-          decoration: const InputDecoration(
-            labelText: '카테고리',
-            border: OutlineInputBorder(),
+          const SizedBox(height: AppSpacing.sm),
+          TextField(
+            key: const ValueKey('diary-content-field'),
+            controller: contentController,
+            onChanged: onContentChanged,
+            minLines: 5,
+            maxLines: 8,
+            decoration: const InputDecoration(
+              labelText: '본문',
+              border: OutlineInputBorder(),
+            ),
           ),
-          items: [
-            for (final category in DiaryCategory.values)
-              DropdownMenuItem(
-                value: category,
-                child: Text(category.label),
-              ),
-          ],
-          onChanged: (category) {
-            if (category != null) {
-              onCategoryChanged(category);
-            }
-          },
-        ),
-        SwitchListTile(
-          contentPadding: EdgeInsets.zero,
-          title: const Text('나만 보기'),
-          value: state.isPrivate,
-          onChanged: onPrivacyChanged,
-        ),
-        _ImagePreview(
-          selectedImage: state.selectedImage,
-          imageUrl: state.imageUrl,
-          isUploadingImage: state.isUploadingImage,
-          uploadProgress: state.imageUploadProgress,
-          onPickImage: onPickImage,
-          onClearImage: onClearImage,
-        ),
-        const SizedBox(height: AppSpacing.md),
-        FilledButton(
-          key: const ValueKey('diary-submit-button'),
-          onPressed: state.isSubmitting ? null : onSubmit,
-          child: Text(
-            state.isUploadingImage
-                ? '이미지 업로드 중'
-                : state.isSubmitting
-                    ? '저장 중'
-                    : '저장',
+          const SizedBox(height: AppSpacing.sm),
+          DropdownButtonFormField<DiaryCategory>(
+            key: ValueKey('diary-category-${state.category.name}'),
+            initialValue: state.category,
+            decoration: const InputDecoration(
+              labelText: '카테고리',
+              border: OutlineInputBorder(),
+            ),
+            items: [
+              for (final category in DiaryCategory.values)
+                DropdownMenuItem(
+                  value: category,
+                  child: Text(category.label),
+                ),
+            ],
+            onChanged: (category) {
+              if (category != null) {
+                onCategoryChanged(category);
+              }
+            },
           ),
-        ),
-      ],
+          SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            title: const Text('나만 보기'),
+            value: state.isPrivate,
+            onChanged: onPrivacyChanged,
+          ),
+          _ImagePreview(
+            selectedImage: state.selectedImage,
+            imageUrl: state.imageUrl,
+            isUploadingImage: state.isUploadingImage,
+            uploadProgress: state.imageUploadProgress,
+            onPickImage: onPickImage,
+            onClearImage: onClearImage,
+          ),
+          const SizedBox(height: AppSpacing.md),
+          FilledButton(
+            key: const ValueKey('diary-submit-button'),
+            onPressed: state.isSubmitting ? null : onSubmit,
+            child: Text(
+              state.isUploadingImage
+                  ? '이미지 업로드 중'
+                  : state.isSubmitting
+                      ? '저장 중'
+                      : '저장',
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -608,7 +626,7 @@ class _ImagePreview extends StatelessWidget {
           ),
         ] else if (imageUrl != null) ...[
           const SizedBox(height: AppSpacing.xs),
-          const _Notice(message: '기존 이미지가 유지됩니다.'),
+          const AppNotice(message: '기존 이미지가 유지됩니다.'),
           TextButton.icon(
             onPressed: onClearImage,
             icon: const Icon(Icons.close),
@@ -616,24 +634,6 @@ class _ImagePreview extends StatelessWidget {
           ),
         ],
       ],
-    );
-  }
-}
-
-class _Notice extends StatelessWidget {
-  const _Notice({
-    required this.message,
-    this.isError = false,
-  });
-
-  final String message;
-  final bool isError;
-
-  @override
-  Widget build(BuildContext context) {
-    return AppNotice(
-      message: message,
-      tone: isError ? AppNoticeTone.error : AppNoticeTone.neutral,
     );
   }
 }

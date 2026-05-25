@@ -130,9 +130,16 @@ class _StoryListView extends StatelessWidget {
         ),
         const SizedBox(height: AppSpacing.lg),
         if (state.isListLoading)
-          const AppNotice(message: '스토리를 불러오는 중입니다.')
+          const AppStateView.loading(
+            title: '스토리를 불러오는 중입니다.',
+            semanticLabel: '스토리 목록을 불러오는 중',
+          )
         else if (state.isEmpty)
-          const AppNotice(message: '조건에 맞는 스토리가 없습니다.')
+          const AppStateView.empty(
+            title: '조건에 맞는 스토리가 없습니다.',
+            message: '검색어 또는 카테고리를 바꿔 다시 확인해 주세요.',
+            semanticLabel: '스토리 목록 비어 있음',
+          )
         else
           for (final story in state.stories) ...[
             _StoryListCard(
@@ -262,11 +269,18 @@ class _StoryDetailView extends StatelessWidget {
     final story = state.selectedStory;
 
     if (state.isDetailLoading) {
-      return const AppNotice(message: '스토리를 불러오는 중입니다.');
+      return const AppStateView.loading(
+        title: '스토리를 불러오는 중입니다.',
+        semanticLabel: '스토리 상세를 불러오는 중',
+      );
     }
 
     if (story == null) {
-      return const AppNotice(message: '스토리를 선택해 주세요.');
+      return const AppStateView.empty(
+        title: '스토리를 선택해 주세요.',
+        message: '목록에서 읽을 스토리를 선택하면 상세 내용을 볼 수 있습니다.',
+        semanticLabel: '스토리 상세 선택 필요',
+      );
     }
 
     final canEdit = story.canEdit(controller.currentMemberId);
@@ -437,7 +451,11 @@ class _CommentList extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (state.comments.isEmpty) {
-      return const AppNotice(message: '아직 댓글이 없습니다.');
+      return const AppStateView.empty(
+        title: '아직 댓글이 없습니다.',
+        message: '첫 댓글로 마음을 전할 수 있습니다.',
+        semanticLabel: '스토리 댓글 비어 있음',
+      );
     }
 
     return Column(

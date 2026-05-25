@@ -27,6 +27,8 @@ abstract final class AppRadii {
 
 enum AppNoticeTone { neutral, success, warning, error }
 
+enum AppStateKind { loading, empty, error, permission, risk, success, neutral }
+
 enum AppStatusTone { neutral, success, warning, danger }
 
 class AppScreen extends StatelessWidget {
@@ -202,6 +204,153 @@ class AppNotice extends StatelessWidget {
                     ),
               ),
             ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class AppStateView extends StatelessWidget {
+  const AppStateView({
+    required this.title,
+    this.message,
+    this.kind = AppStateKind.neutral,
+    this.actionLabel,
+    this.onAction,
+    this.semanticLabel,
+    this.padding = const EdgeInsets.all(AppSpacing.md),
+    super.key,
+  });
+
+  const AppStateView.loading({
+    this.title = '불러오는 중입니다.',
+    this.message,
+    this.actionLabel,
+    this.onAction,
+    this.semanticLabel,
+    this.padding = const EdgeInsets.all(AppSpacing.md),
+    super.key,
+  }) : kind = AppStateKind.loading;
+
+  const AppStateView.empty({
+    required this.title,
+    this.message,
+    this.actionLabel,
+    this.onAction,
+    this.semanticLabel,
+    this.padding = const EdgeInsets.all(AppSpacing.md),
+    super.key,
+  }) : kind = AppStateKind.empty;
+
+  const AppStateView.error({
+    required this.title,
+    this.message,
+    this.actionLabel,
+    this.onAction,
+    this.semanticLabel,
+    this.padding = const EdgeInsets.all(AppSpacing.md),
+    super.key,
+  }) : kind = AppStateKind.error;
+
+  const AppStateView.permission({
+    required this.title,
+    this.message,
+    this.actionLabel,
+    this.onAction,
+    this.semanticLabel,
+    this.padding = const EdgeInsets.all(AppSpacing.md),
+    super.key,
+  }) : kind = AppStateKind.permission;
+
+  const AppStateView.risk({
+    required this.title,
+    this.message,
+    this.actionLabel,
+    this.onAction,
+    this.semanticLabel,
+    this.padding = const EdgeInsets.all(AppSpacing.md),
+    super.key,
+  }) : kind = AppStateKind.risk;
+
+  final String title;
+  final String? message;
+  final AppStateKind kind;
+  final String? actionLabel;
+  final VoidCallback? onAction;
+  final String? semanticLabel;
+  final EdgeInsetsGeometry padding;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colors = _stateColors(theme.colorScheme, kind);
+    final stateDescription = Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _StateLead(kind: kind, colors: colors),
+        const SizedBox(width: AppSpacing.sm),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                style: theme.textTheme.titleSmall?.copyWith(
+                  color: colors.foreground,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              if (message != null) ...[
+                const SizedBox(height: AppSpacing.xxs),
+                Text(
+                  message!,
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: colors.foreground,
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ],
+    );
+
+    final describedState = semanticLabel == null
+        ? stateDescription
+        : Semantics(
+            container: true,
+            liveRegion: _stateLiveRegion(kind),
+            label: semanticLabel,
+            child: ExcludeSemantics(child: stateDescription),
+          );
+
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: colors.background,
+        borderRadius: AppRadii.card,
+        border: Border.all(color: colors.border),
+      ),
+      child: Padding(
+        padding: padding,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            describedState,
+            if (actionLabel != null) ...[
+              const SizedBox(height: AppSpacing.md),
+              Align(
+                alignment: AlignmentDirectional.centerStart,
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(minHeight: 48),
+                  child: FilledButton.tonal(
+                    onPressed: onAction,
+                    child: Text(actionLabel!),
+                  ),
+                ),
+              ),
+            ],
           ],
         ),
       ),
@@ -664,6 +813,84 @@ _ToneColors _statusColors(ColorScheme colorScheme, AppStatusTone tone) {
         icon: Icons.error_outline,
       ),
   };
+}
+
+_ToneColors _stateColors(ColorScheme colorScheme, AppStateKind kind) {
+  return switch (kind) {
+    AppStateKind.loading => _ToneColors(
+        background: colorScheme.surfaceContainerHighest,
+        foreground: colorScheme.onSurfaceVariant,
+        border: colorScheme.outlineVariant,
+        icon: Icons.hourglass_empty,
+      ),
+    AppStateKind.empty => _ToneColors(
+        background: colorScheme.surfaceContainerHighest,
+        foreground: colorScheme.onSurfaceVariant,
+        border: colorScheme.outlineVariant,
+        icon: Icons.inbox_outlined,
+      ),
+    AppStateKind.error => _ToneColors(
+        background: colorScheme.errorContainer,
+        foreground: colorScheme.onErrorContainer,
+        border: colorScheme.error.withValues(alpha: 0.28),
+        icon: Icons.error_outline,
+      ),
+    AppStateKind.permission => _ToneColors(
+        background: colorScheme.tertiaryContainer,
+        foreground: colorScheme.onTertiaryContainer,
+        border: colorScheme.tertiary.withValues(alpha: 0.28),
+        icon: Icons.lock_outline,
+      ),
+    AppStateKind.risk => _ToneColors(
+        background: colorScheme.errorContainer,
+        foreground: colorScheme.onErrorContainer,
+        border: colorScheme.error.withValues(alpha: 0.28),
+        icon: Icons.health_and_safety_outlined,
+      ),
+    AppStateKind.success => _ToneColors(
+        background: colorScheme.secondaryContainer,
+        foreground: colorScheme.onSecondaryContainer,
+        border: colorScheme.secondary.withValues(alpha: 0.28),
+        icon: Icons.check_circle_outline,
+      ),
+    AppStateKind.neutral => _ToneColors(
+        background: colorScheme.surfaceContainerHighest,
+        foreground: colorScheme.onSurfaceVariant,
+        border: colorScheme.outlineVariant,
+        icon: Icons.info_outline,
+      ),
+  };
+}
+
+bool _stateLiveRegion(AppStateKind kind) {
+  return kind == AppStateKind.loading ||
+      kind == AppStateKind.error ||
+      kind == AppStateKind.permission;
+}
+
+class _StateLead extends StatelessWidget {
+  const _StateLead({
+    required this.kind,
+    required this.colors,
+  });
+
+  final AppStateKind kind;
+  final _ToneColors colors;
+
+  @override
+  Widget build(BuildContext context) {
+    if (kind == AppStateKind.loading) {
+      return SizedBox.square(
+        dimension: 22,
+        child: CircularProgressIndicator(
+          strokeWidth: 2.5,
+          color: colors.foreground,
+        ),
+      );
+    }
+
+    return Icon(colors.icon, color: colors.foreground, size: 22);
+  }
 }
 
 class _ToneColors {
