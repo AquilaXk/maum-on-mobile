@@ -69,7 +69,8 @@ void main() {
         home: DiaryScreen(
           controller: controller,
           imagePicker: _FakeDiaryImagePicker(
-            attachment: DiaryImageAttachment(filename: 'mind.png', bytes: [1]),
+            attachment:
+                const DiaryImageAttachment(filename: 'mind.png', bytes: [1]),
           ),
           onBack: () {},
         ),
