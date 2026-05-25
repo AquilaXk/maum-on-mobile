@@ -316,6 +316,90 @@ void main() {
       expect(controller.state.imageUrl, isNull);
     });
 
+    test('deletes temporary uploaded image when user resets after save failure',
+        () async {
+      final repository = _FakeDiaryRepository(
+        pages: [_page([])],
+        createError: const ApiClientException(
+          kind: ApiErrorKind.server,
+          message: '저장 실패',
+        ),
+      );
+      final imageRepository = _FakeDiaryImageRepository(
+        uploadedUrl: '/images/uploads/reset-temp.png',
+      );
+      final controller = DiaryController(
+        diaryRepository: repository,
+        imageRepository: imageRepository,
+        now: DateTime(2026, 5, 20),
+      );
+
+      await controller.load();
+      controller.updateTitle('이미지 기록');
+      controller.updateContent('첨부 포함');
+      controller.attachImage(
+        const DiaryImageAttachment(filename: 'mind.png', bytes: [9]),
+      );
+      await controller.submit();
+      controller.resetForm();
+
+      expect(imageRepository.deletedUrls, ['/images/uploads/reset-temp.png']);
+      expect(controller.state.imageUrl, isNull);
+      expect(controller.state.selectedImage, isNull);
+    });
+
+    test('deletes prior temporary uploaded image when replacing attachment',
+        () async {
+      final repository = _FakeDiaryRepository(
+        pages: [_page([])],
+        createError: const ApiClientException(
+          kind: ApiErrorKind.server,
+          message: '저장 실패',
+        ),
+      );
+      final imageRepository = _FakeDiaryImageRepository(
+        uploadedUrl: '/images/uploads/replace-temp.png',
+      );
+      final controller = DiaryController(
+        diaryRepository: repository,
+        imageRepository: imageRepository,
+        now: DateTime(2026, 5, 20),
+      );
+
+      await controller.load();
+      controller.updateTitle('이미지 기록');
+      controller.updateContent('첨부 포함');
+      controller.attachImage(
+        const DiaryImageAttachment(filename: 'first.png', bytes: [9]),
+      );
+      await controller.submit();
+      controller.attachImage(
+        const DiaryImageAttachment(filename: 'second.png', bytes: [7]),
+      );
+
+      expect(imageRepository.deletedUrls, ['/images/uploads/replace-temp.png']);
+      expect(controller.state.imageUrl, isNull);
+      expect(controller.state.selectedImage?.filename, 'second.png');
+    });
+
+    test('shows image attachment failure without clearing the draft', () async {
+      final controller = DiaryController(
+        diaryRepository: _FakeDiaryRepository(pages: [_page([])]),
+        imageRepository: _FakeDiaryImageRepository(),
+        now: DateTime(2026, 5, 20),
+      );
+
+      await controller.load();
+      controller.updateTitle('초안');
+      controller.updateContent('작성 중인 내용');
+      controller.showImageAttachmentFailure('사진 권한이 허용되지 않았습니다.');
+
+      expect(controller.state.title, '초안');
+      expect(controller.state.content, '작성 중인 내용');
+      expect(controller.state.errorMessage, '사진 권한이 허용되지 않았습니다.');
+      expect(controller.state.selectedImage, isNull);
+    });
+
     test('restores member-scoped draft and marks failed diary for retry',
         () async {
       final draftRepository = StorageDraftRecoveryRepository(

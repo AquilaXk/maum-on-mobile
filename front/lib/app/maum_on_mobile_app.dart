@@ -245,7 +245,7 @@ class _MaumOnMobileAppState extends State<MaumOnMobileApp> {
       AuthenticatedRoute.diary => DiaryScreen(
           controller: _diaryControllerFor(memberId),
           imagePicker:
-              widget.diaryImagePicker ?? const FilePickerDiaryImagePicker(),
+              widget.diaryImagePicker ?? const PlatformDiaryImagePicker(),
           onBack: _returnHome,
         ),
       AuthenticatedRoute.consultation => ConsultationScreen(

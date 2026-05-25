@@ -23,14 +23,39 @@ enum DiaryCategory {
   }
 }
 
+enum DiaryImageSource {
+  camera(label: '카메라'),
+  gallery(label: '앨범');
+
+  const DiaryImageSource({required this.label});
+
+  final String label;
+}
+
 class DiaryImageAttachment {
   const DiaryImageAttachment({
     required this.filename,
     required this.bytes,
-  });
+    this.source = DiaryImageSource.gallery,
+    this.contentType = 'image/jpeg',
+    int? originalByteSize,
+    this.width,
+    this.height,
+    this.wasCompressed = false,
+  }) : _originalByteSize = originalByteSize;
 
   final String filename;
   final List<int> bytes;
+  final DiaryImageSource source;
+  final String contentType;
+  final int? _originalByteSize;
+  final int? width;
+  final int? height;
+  final bool wasCompressed;
+
+  int get originalByteSize => _originalByteSize ?? bytes.length;
+
+  int get byteSize => bytes.length;
 }
 
 class DiaryDraft {

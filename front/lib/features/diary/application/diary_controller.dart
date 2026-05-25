@@ -312,21 +312,34 @@ class DiaryController extends ChangeNotifier {
   }
 
   void attachImage(DiaryImageAttachment image) {
+    final temporaryUrl = _takeTemporaryUploadedImageUrlIfCurrent();
     _setState(
       _state.copyWith(
         selectedImage: image,
         clearImageUrl: true,
         clearErrorMessage: true,
+        noticeMessage: image.wasCompressed
+            ? '이미지 용량을 줄여 첨부했습니다.'
+            : '이미지를 첨부했습니다.',
       ),
     );
     _saveDraft();
+    if (temporaryUrl != null) {
+      unawaited(_deleteTemporaryImage(temporaryUrl));
+    }
+  }
+
+  void showImageAttachmentFailure(String message) {
+    _setState(
+      _state.copyWith(
+        errorMessage: message,
+        clearNoticeMessage: true,
+      ),
+    );
   }
 
   Future<void> clearImage() async {
-    final temporaryUrl = _state.imageUrl == _temporaryUploadedImageUrl
-        ? _temporaryUploadedImageUrl
-        : null;
-    _temporaryUploadedImageUrl = null;
+    final temporaryUrl = _takeTemporaryUploadedImageUrlIfCurrent();
     _setState(_state.copyWith(clearSelectedImage: true, clearImageUrl: true));
     _saveDraft();
     if (temporaryUrl != null) {
@@ -335,7 +348,7 @@ class DiaryController extends ChangeNotifier {
   }
 
   void startEditing(DiaryEntry entry) {
-    _temporaryUploadedImageUrl = null;
+    final temporaryUrl = _takeTemporaryUploadedImageUrlIfCurrent();
     _setState(
       _state.copyWith(
         editingDiaryId: entry.id,
@@ -349,10 +362,13 @@ class DiaryController extends ChangeNotifier {
         clearErrorMessage: true,
       ),
     );
+    if (temporaryUrl != null) {
+      unawaited(_deleteTemporaryImage(temporaryUrl));
+    }
   }
 
   void resetForm() {
-    _temporaryUploadedImageUrl = null;
+    final temporaryUrl = _takeTemporaryUploadedImageUrlIfCurrent();
     _setState(
       _state.copyWith(
         clearEditingDiaryId: true,
@@ -367,6 +383,9 @@ class DiaryController extends ChangeNotifier {
       ),
     );
     unawaited(_draftRepository?.delete(_draftKey));
+    if (temporaryUrl != null) {
+      unawaited(_deleteTemporaryImage(temporaryUrl));
+    }
   }
 
   Future<void> submit() async {
@@ -628,6 +647,8 @@ class DiaryController extends ChangeNotifier {
       'imageUrl': _state.imageUrl ?? '',
       'imageFilename': selectedImage?.filename ?? '',
       'imageByteLength': selectedImage?.bytes.length.toString() ?? '',
+      'imageSource': selectedImage?.source.name ?? '',
+      'imageContentType': selectedImage?.contentType ?? '',
     };
   }
 
@@ -644,6 +665,14 @@ class DiaryController extends ChangeNotifier {
     } on Object {
       // 사용자가 화면을 계속 조작할 수 있도록 임시 파일 정리 실패는 저장 흐름과 분리한다.
     }
+  }
+
+  String? _takeTemporaryUploadedImageUrlIfCurrent() {
+    final temporaryUrl = _state.imageUrl == _temporaryUploadedImageUrl
+        ? _temporaryUploadedImageUrl
+        : null;
+    _temporaryUploadedImageUrl = null;
+    return temporaryUrl;
   }
 
   void _handleError(

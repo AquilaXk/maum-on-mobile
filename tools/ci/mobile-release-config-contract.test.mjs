@@ -34,8 +34,10 @@ test("Android store-facing metadata stays release ready", () => {
   assert.match(read("front/android/app/build.gradle.kts"), /applicationId\s*=\s*"com\.aquilaxk\.maumonmobile"/);
   assert.match(manifest, /android:label="Maum On"/);
   assert.match(manifest, /android:icon="@mipmap\/ic_launcher"/);
+  assert.match(manifest, /<uses-permission[^>]*android:name="android\.permission\.CAMERA"[^>]*\/?>/);
   assert.match(manifest, /android\.permission\.POST_NOTIFICATIONS/);
   assert.match(manifest, /android\.permission\.READ_MEDIA_IMAGES/);
+  assert.match(manifest, /<provider[\s\S]*android:name="androidx\.core\.content\.FileProvider"[\s\S]*android:authorities="\$\{applicationId\}\.diaryimageprovider"[\s\S]*@xml\/diary_image_paths/);
   assert.doesNotMatch(manifest, /android:usesCleartextTraffic="true"/);
   assert.match(manifest, /android:scheme="maumon"/);
   assert.match(manifest, /android:host="auth"/);
@@ -50,6 +52,7 @@ test("Android store-facing metadata stays release ready", () => {
 
   assert.ok(existsSync(path.join(root, "front/android/app/src/main/res/drawable/launch_background.xml")));
   assert.ok(existsSync(path.join(root, "front/android/app/src/main/res/drawable-v21/launch_background.xml")));
+  assert.match(read("front/android/app/src/main/res/xml/diary_image_paths.xml"), /<cache-path[\s\S]*path="diary_images\/"/);
 });
 
 test("iOS release profile declares signing, entitlement, and version contracts", () => {
@@ -78,6 +81,7 @@ test("iOS store-facing metadata and privacy strings stay release ready", () => {
   assert.match(plist, /<key>NSAllowsLocalNetworking<\/key>\s*<true\/>/);
   assert.doesNotMatch(plist, /<key>NSAllowsArbitraryLoads<\/key>\s*<true\/>/);
   assert.match(plist, /<key>NSPhotoLibraryUsageDescription<\/key>\s*<string>.+<\/string>/);
+  assert.match(plist, /<key>NSCameraUsageDescription<\/key>\s*<string>\s*[^<\s][^<]*<\/string>/);
   assert.match(plist, /<key>UILaunchStoryboardName<\/key>\s*<string>LaunchScreen<\/string>/);
 
   assert.ok(existsSync(path.join(root, "front/ios/Runner/Assets.xcassets/AppIcon.appiconset/Icon-App-1024x1024@1x.png")));

@@ -102,5 +102,6 @@ flutter {
 }
 
 dependencies {
+    implementation("androidx.core:core:1.17.0")
     implementation("com.google.firebase:firebase-messaging:25.0.2")
 }

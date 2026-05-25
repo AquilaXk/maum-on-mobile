@@ -5,6 +5,7 @@ import UserNotifications
 @main
 @objc class AppDelegate: FlutterAppDelegate, FlutterImplicitEngineDelegate {
   private var pushNotificationChannel: FlutterMethodChannel?
+  private var diaryImagePickerChannel: DiaryImagePickerChannel?
   private var pendingPushResult: FlutterResult?
   private var latestDeviceToken: String?
   private var initialNotificationPayload: [String: Any]?
@@ -32,6 +33,9 @@ import UserNotifications
       binaryMessenger: registrar.messenger()
     )
     pushNotificationChannel?.setMethodCallHandler(handlePushNotificationCall)
+    diaryImagePickerChannel = DiaryImagePickerChannel(
+      binaryMessenger: registrar.messenger()
+    )
   }
 
   override func application(

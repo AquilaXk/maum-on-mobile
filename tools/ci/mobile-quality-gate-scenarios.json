@@ -85,7 +85,8 @@
         {
           "path": "front/test/features/diary/diary_screen_test.dart",
           "patterns": [
-            "picks an image and submits a diary"
+            "picks a gallery image and submits a diary",
+            "camera action requests the camera source"
           ]
         },
         {

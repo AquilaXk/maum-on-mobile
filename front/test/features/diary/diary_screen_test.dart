@@ -38,7 +38,7 @@ void main() {
       MaterialApp(
         home: DiaryScreen(
           controller: controller,
-          imagePicker: const _FakeDiaryImagePicker(),
+          imagePicker: _FakeDiaryImagePicker(),
           onBack: () {},
         ),
       ),
@@ -52,7 +52,7 @@ void main() {
     expect(find.byKey(const ValueKey('diary-submit-button')), findsOneWidget);
   });
 
-  testWidgets('picks an image and submits a diary', (tester) async {
+  testWidgets('picks a gallery image and submits a diary', (tester) async {
     final repository = _FakeDiaryRepository(
       pages: [_page([]), _page([])],
       createdId: 10,
@@ -68,8 +68,9 @@ void main() {
       MaterialApp(
         home: DiaryScreen(
           controller: controller,
-          imagePicker: const _FakeDiaryImagePicker(
-            attachment: DiaryImageAttachment(filename: 'mind.png', bytes: [1]),
+          imagePicker: _FakeDiaryImagePicker(
+            attachment:
+                const DiaryImageAttachment(filename: 'mind.png', bytes: [1]),
           ),
           onBack: () {},
         ),
@@ -85,8 +86,8 @@ void main() {
       '사진이 있는 기록',
     );
     await tester
-        .ensureVisible(find.byKey(const ValueKey('diary-image-pick-button')));
-    await tester.tap(find.byKey(const ValueKey('diary-image-pick-button')));
+        .ensureVisible(find.byKey(const ValueKey('diary-image-gallery-button')));
+    await tester.tap(find.byKey(const ValueKey('diary-image-gallery-button')));
     await tester.pump();
     await tester
         .ensureVisible(find.byKey(const ValueKey('diary-submit-button')));
@@ -96,6 +97,76 @@ void main() {
     expect(find.text('mind.png'), findsNothing);
     expect(repository.createdDrafts.single.image, isNull);
     expect(repository.createdDrafts.single.imageUrl, '/images/uploads/mind.png');
+  });
+
+  testWidgets('camera action requests the camera source', (tester) async {
+    final picker = _FakeDiaryImagePicker(
+      attachment: const DiaryImageAttachment(filename: 'camera.jpg', bytes: [1]),
+    );
+    final controller = DiaryController(
+      diaryRepository: _FakeDiaryRepository(pages: [_page([])]),
+      imageRepository: _FakeDiaryImageRepository(),
+      now: DateTime(2026, 5, 20),
+    );
+    await controller.load();
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: DiaryScreen(
+          controller: controller,
+          imagePicker: picker,
+          onBack: () {},
+        ),
+      ),
+    );
+
+    await tester
+        .ensureVisible(find.byKey(const ValueKey('diary-image-camera-button')));
+    await tester.tap(find.byKey(const ValueKey('diary-image-camera-button')));
+    await tester.pump();
+
+    expect(picker.requestedSources, [DiaryImageSource.camera]);
+    expect(controller.state.selectedImage?.filename, 'camera.jpg');
+  });
+
+  testWidgets('shows permission settings action when image access is denied',
+      (tester) async {
+    final picker = _FakeDiaryImagePicker(
+      result: const DiaryImagePickResult.permissionDenied(
+        message: '사진 권한이 허용되지 않았습니다.',
+        canOpenSettings: true,
+      ),
+    );
+    final controller = DiaryController(
+      diaryRepository: _FakeDiaryRepository(pages: [_page([])]),
+      imageRepository: _FakeDiaryImageRepository(),
+      now: DateTime(2026, 5, 20),
+    );
+    await controller.load();
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: DiaryScreen(
+          controller: controller,
+          imagePicker: picker,
+          onBack: () {},
+        ),
+      ),
+    );
+
+    await tester
+        .ensureVisible(find.byKey(const ValueKey('diary-image-gallery-button')));
+    await tester.tap(find.byKey(const ValueKey('diary-image-gallery-button')));
+    await tester.pump();
+
+    expect(find.text('사진 권한이 허용되지 않았습니다.'), findsOneWidget);
+    expect(find.byKey(const ValueKey('diary-image-settings-button')),
+        findsOneWidget);
+
+    await tester.tap(find.byKey(const ValueKey('diary-image-settings-button')));
+    await tester.pump();
+
+    expect(picker.openSettingsCount, 1);
   });
 
   testWidgets('shows validation feedback for an empty diary', (tester) async {
@@ -110,7 +181,7 @@ void main() {
       MaterialApp(
         home: DiaryScreen(
           controller: controller,
-          imagePicker: const _FakeDiaryImagePicker(),
+          imagePicker: _FakeDiaryImagePicker(),
           onBack: () {},
         ),
       ),
@@ -165,7 +236,7 @@ void main() {
       MaterialApp(
         home: DiaryScreen(
           controller: controller,
-          imagePicker: const _FakeDiaryImagePicker(),
+          imagePicker: _FakeDiaryImagePicker(),
           onBack: () {},
         ),
       ),
@@ -204,7 +275,7 @@ void main() {
       MaterialApp(
         home: DiaryScreen(
           controller: controller,
-          imagePicker: const _FakeDiaryImagePicker(),
+          imagePicker: _FakeDiaryImagePicker(),
           onBack: () {},
         ),
       ),
@@ -245,7 +316,7 @@ void main() {
       MaterialApp(
         home: DiaryScreen(
           controller: controller,
-          imagePicker: const _FakeDiaryImagePicker(),
+          imagePicker: _FakeDiaryImagePicker(),
           onBack: () {},
         ),
       ),
@@ -382,12 +453,26 @@ class _FakeDiaryRepository implements DiaryRepository {
 }
 
 class _FakeDiaryImagePicker implements DiaryImagePicker {
-  const _FakeDiaryImagePicker({this.attachment});
+  _FakeDiaryImagePicker({this.attachment, DiaryImagePickResult? result})
+      : result = result ??
+            (attachment == null
+                ? const DiaryImagePickResult.cancelled()
+                : DiaryImagePickResult.picked(attachment));
 
   final DiaryImageAttachment? attachment;
+  final DiaryImagePickResult result;
+  final List<DiaryImageSource> requestedSources = [];
+  int openSettingsCount = 0;
 
   @override
-  Future<DiaryImageAttachment?> pickImage() async {
-    return attachment;
+  Future<DiaryImagePickResult> pickImage(DiaryImageSource source) async {
+    requestedSources.add(source);
+    return result;
+  }
+
+  @override
+  Future<bool> openSettings() async {
+    openSettingsCount += 1;
+    return true;
   }
 }

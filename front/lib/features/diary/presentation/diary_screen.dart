@@ -27,6 +27,7 @@ class DiaryScreen extends StatefulWidget {
 class _DiaryScreenState extends State<DiaryScreen> {
   late final TextEditingController _titleController;
   late final TextEditingController _contentController;
+  bool _canOpenImageSettings = false;
 
   @override
   void initState() {
@@ -66,10 +67,49 @@ class _DiaryScreenState extends State<DiaryScreen> {
     );
   }
 
-  Future<void> _pickImage() async {
-    final image = await widget.imagePicker.pickImage();
-    if (image != null) {
-      widget.controller.attachImage(image);
+  Future<void> _pickImage(DiaryImageSource source) async {
+    setState(() {
+      _canOpenImageSettings = false;
+    });
+    final result = await widget.imagePicker.pickImage(source);
+    if (!mounted) {
+      return;
+    }
+
+    switch (result.status) {
+      case DiaryImagePickStatus.picked:
+        final attachment = result.attachment;
+        if (attachment == null) {
+          widget.controller.showImageAttachmentFailure('이미지를 읽지 못했습니다.');
+          return;
+        }
+        widget.controller.attachImage(attachment);
+        return;
+      case DiaryImagePickStatus.cancelled:
+        return;
+      case DiaryImagePickStatus.permissionDenied:
+        setState(() {
+          _canOpenImageSettings = result.canOpenSettings;
+        });
+        widget.controller.showImageAttachmentFailure(
+          result.message ?? '${source.label} 권한이 허용되지 않았습니다.',
+        );
+        return;
+      case DiaryImagePickStatus.tooLarge:
+      case DiaryImagePickStatus.unsupportedFormat:
+      case DiaryImagePickStatus.unavailable:
+      case DiaryImagePickStatus.error:
+        widget.controller.showImageAttachmentFailure(
+          result.message ?? '이미지를 첨부하지 못했습니다.',
+        );
+        return;
+    }
+  }
+
+  Future<void> _openImageSettings() async {
+    final opened = await widget.imagePicker.openSettings();
+    if (!opened) {
+      widget.controller.showImageAttachmentFailure('설정 화면을 열지 못했습니다.');
     }
   }
 
@@ -168,7 +208,12 @@ class _DiaryScreenState extends State<DiaryScreen> {
               onCategoryChanged: widget.controller.updateCategory,
               onPrivacyChanged: widget.controller.updatePrivacy,
               onPickImage: _pickImage,
+              canOpenImageSettings: _canOpenImageSettings,
+              onOpenImageSettings: _openImageSettings,
               onClearImage: () {
+                setState(() {
+                  _canOpenImageSettings = false;
+                });
                 unawaited(widget.controller.clearImage());
               },
               onReset: widget.controller.resetForm,
@@ -456,6 +501,8 @@ class _DiaryForm extends StatelessWidget {
     required this.onCategoryChanged,
     required this.onPrivacyChanged,
     required this.onPickImage,
+    required this.canOpenImageSettings,
+    required this.onOpenImageSettings,
     required this.onClearImage,
     required this.onReset,
     required this.onSubmit,
@@ -468,7 +515,9 @@ class _DiaryForm extends StatelessWidget {
   final ValueChanged<String> onContentChanged;
   final ValueChanged<DiaryCategory> onCategoryChanged;
   final ValueChanged<bool> onPrivacyChanged;
-  final VoidCallback onPickImage;
+  final ValueChanged<DiaryImageSource> onPickImage;
+  final bool canOpenImageSettings;
+  final Future<void> Function() onOpenImageSettings;
   final VoidCallback onClearImage;
   final VoidCallback onReset;
   final Future<void> Function() onSubmit;
@@ -547,6 +596,8 @@ class _DiaryForm extends StatelessWidget {
             isUploadingImage: state.isUploadingImage,
             uploadProgress: state.imageUploadProgress,
             onPickImage: onPickImage,
+            canOpenImageSettings: canOpenImageSettings,
+            onOpenImageSettings: onOpenImageSettings,
             onClearImage: onClearImage,
           ),
           const SizedBox(height: AppSpacing.md),
@@ -574,6 +625,8 @@ class _ImagePreview extends StatelessWidget {
     required this.isUploadingImage,
     required this.uploadProgress,
     required this.onPickImage,
+    required this.canOpenImageSettings,
+    required this.onOpenImageSettings,
     required this.onClearImage,
   });
 
@@ -581,7 +634,9 @@ class _ImagePreview extends StatelessWidget {
   final String? imageUrl;
   final bool isUploadingImage;
   final double? uploadProgress;
-  final VoidCallback onPickImage;
+  final ValueChanged<DiaryImageSource> onPickImage;
+  final bool canOpenImageSettings;
+  final Future<void> Function() onOpenImageSettings;
   final VoidCallback onClearImage;
 
   @override
@@ -591,12 +646,52 @@ class _ImagePreview extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        OutlinedButton.icon(
-          key: const ValueKey('diary-image-pick-button'),
-          onPressed: isUploadingImage ? null : onPickImage,
-          icon: const Icon(Icons.image_outlined),
-          label: const Text('이미지 선택'),
+        Wrap(
+          spacing: AppSpacing.xs,
+          runSpacing: AppSpacing.xs,
+          children: [
+            OutlinedButton.icon(
+              key: const ValueKey('diary-image-camera-button'),
+              onPressed: isUploadingImage
+                  ? null
+                  : () => onPickImage(DiaryImageSource.camera),
+              icon: const Icon(Icons.photo_camera_outlined),
+              label: const Text('촬영'),
+            ),
+            OutlinedButton.icon(
+              key: const ValueKey('diary-image-gallery-button'),
+              onPressed: isUploadingImage
+                  ? null
+                  : () => onPickImage(DiaryImageSource.gallery),
+              icon: const Icon(Icons.photo_library_outlined),
+              label: const Text('앨범'),
+            ),
+          ],
         ),
+        if (canOpenImageSettings) ...[
+          const SizedBox(height: AppSpacing.xs),
+          Align(
+            alignment: AlignmentDirectional.centerStart,
+            child: TextButton.icon(
+              key: const ValueKey('diary-image-settings-button'),
+              onPressed: onOpenImageSettings,
+              icon: const Icon(Icons.settings_outlined),
+              label: const Text('권한 설정 열기'),
+            ),
+          ),
+        ],
+        if (image != null) ...[
+          const SizedBox(height: AppSpacing.xs),
+          Wrap(
+            spacing: AppSpacing.xs,
+            runSpacing: AppSpacing.xs,
+            children: [
+              Chip(label: Text(image.source.label)),
+              Chip(label: Text(_formatByteSize(image.byteSize))),
+              if (image.wasCompressed) const Chip(label: Text('압축됨')),
+            ],
+          ),
+        ],
         if (isUploadingImage) ...[
           const SizedBox(height: AppSpacing.xs),
           LinearProgressIndicator(value: uploadProgress),
@@ -644,4 +739,11 @@ String _formatMonthLabel(DateTime date) {
 
 String _formatDateLabel(DateTime date) {
   return '${date.year}년 ${date.month}월 ${date.day}일';
+}
+
+String _formatByteSize(int bytes) {
+  if (bytes < 1024 * 1024) {
+    return '${(bytes / 1024).ceil()}KB';
+  }
+  return '${(bytes / (1024 * 1024)).toStringAsFixed(1)}MB';
 }
