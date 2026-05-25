@@ -312,6 +312,10 @@ jobs:
         if: ${{ steps.scaffold.outputs.present == 'true' && steps.scaffold.outputs.stack == 'flutter' }}
         run: node --test tools/ci/mobile-release-config-contract.test.mjs
 
+      - name: Run mobile quality gate
+        if: ${{ steps.scaffold.outputs.present == 'true' && steps.scaffold.outputs.stack == 'flutter' }}
+        run: node tools/ci/run-mobile-quality-gate.mjs --platform android --report-dir build/reports/mobile-quality
+
       - name: Build Flutter Android release appbundle
         if: ${{ github.event_name == 'workflow_dispatch' && steps.scaffold.outputs.present == 'true' && steps.scaffold.outputs.stack == 'flutter' }}
         env:
@@ -400,6 +404,10 @@ jobs:
       - name: Validate mobile release contracts
         if: ${{ steps.scaffold.outputs.present == 'true' && steps.scaffold.outputs.stack == 'flutter' }}
         run: node --test tools/ci/mobile-release-config-contract.test.mjs
+
+      - name: Run mobile quality gate
+        if: ${{ steps.scaffold.outputs.present == 'true' && steps.scaffold.outputs.stack == 'flutter' }}
+        run: node tools/ci/run-mobile-quality-gate.mjs --platform ios --report-dir build/reports/mobile-quality
 
       - name: Build Flutter iOS release without code signing
         if: ${{ github.event_name == 'workflow_dispatch' && steps.scaffold.outputs.present == 'true' && steps.scaffold.outputs.stack == 'flutter' }}

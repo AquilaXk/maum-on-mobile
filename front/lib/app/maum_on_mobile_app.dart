@@ -178,6 +178,8 @@ class _MaumOnMobileAppState extends State<MaumOnMobileApp> {
       title: 'Maum On',
       debugShowCheckedModeBanner: false,
       theme: buildAppTheme(),
+      darkTheme: buildDarkAppTheme(),
+      themeMode: ThemeMode.system,
       home: PopScope<void>(
         canPop: _route == AuthenticatedRoute.home,
         onPopInvokedWithResult: (didPop, _) {

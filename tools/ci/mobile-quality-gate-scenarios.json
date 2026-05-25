@@ -1,0 +1,216 @@
+{
+  "version": 1,
+  "platforms": {
+    "android": {
+      "buildArtifacts": [
+        "front/build/app/outputs/flutter-apk/app-debug.apk"
+      ]
+    },
+    "ios": {
+      "buildArtifacts": [
+        "front/build/ios/iphonesimulator/Runner.app"
+      ]
+    }
+  },
+  "report": {
+    "requiredFields": [
+      "platform",
+      "scenario",
+      "status",
+      "area",
+      "failureStep",
+      "evidence"
+    ]
+  },
+  "scenarios": [
+    {
+      "id": "auth.login",
+      "name": "로그인",
+      "area": "frontend",
+      "failureStep": "로그인 화면 입력과 제출",
+      "evidence": [
+        {
+          "path": "front/test/features/auth/auth_app_test.dart",
+          "patterns": [
+            "login-email-field",
+            "login-submit-button",
+            "shows a login failure message"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "auth.external-callback",
+      "name": "외부 로그인 콜백",
+      "area": "frontend",
+      "failureStep": "플랫폼 딥링크 콜백 수신",
+      "evidence": [
+        {
+          "path": "front/test/features/auth/deeplink/platform_deeplink_config_test.dart",
+          "patterns": [
+            "android:scheme=\"maumon\"",
+            "android:path=\"/callback\"",
+            "CFBundleURLSchemes",
+            "<string>maumon</string>"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "navigation.tabs",
+      "name": "탭 이동",
+      "area": "frontend",
+      "failureStep": "인증 후 주요 탭 경로 이동",
+      "evidence": [
+        {
+          "path": "front/test/app/authenticated_routes_test.dart",
+          "patterns": [
+            "AuthenticatedRoute.values",
+            "/diary",
+            "/stories",
+            "/letters",
+            "/consultation",
+            "/notifications",
+            "/settings"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "write.flows",
+      "name": "작성",
+      "area": "frontend",
+      "failureStep": "기록, 이야기, 편지, 상담 작성",
+      "evidence": [
+        {
+          "path": "front/test/features/diary/diary_screen_test.dart",
+          "patterns": [
+            "picks an image and submits a diary"
+          ]
+        },
+        {
+          "path": "front/test/features/story/story_screen_test.dart",
+          "patterns": [
+            "submits a new story from the editor"
+          ]
+        },
+        {
+          "path": "front/test/features/letter/letter_screen_test.dart",
+          "patterns": [
+            "submits a new letter and moves to sent mailbox"
+          ]
+        },
+        {
+          "path": "front/test/features/consultation/consultation_screen_test.dart",
+          "patterns": [
+            "renders chat stream and sends a message"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "push.registration",
+      "name": "푸시 등록",
+      "area": "frontend",
+      "failureStep": "권한 요청과 디바이스 토큰 등록",
+      "evidence": [
+        {
+          "path": "front/test/features/notification/notification_controller_test.dart",
+          "patterns": [
+            "registerDeviceToken",
+            "PushNotificationState.registered"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "realtime.lifecycle",
+      "name": "실시간 연결과 생명주기",
+      "area": "frontend",
+      "failureStep": "백그라운드 전환 후 재연결",
+      "evidence": [
+        {
+          "path": "front/test/features/notification/notification_controller_test.dart",
+          "patterns": [
+            "handleLifecycleState(AppLifecycleState.paused)",
+            "handleLifecycleState(AppLifecycleState.resumed)"
+          ]
+        },
+        {
+          "path": "front/lib/features/notification/application/notification_controller.dart",
+          "patterns": [
+            "_seenStreamEventKeys",
+            "event.dedupeKey"
+          ]
+        },
+        {
+          "path": "front/test/features/consultation/consultation_controller_test.dart",
+          "patterns": [
+            "handleLifecycleState(AppLifecycleState.paused)",
+            "handleLifecycleState(AppLifecycleState.resumed)"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "auth.logout",
+      "name": "로그아웃",
+      "area": "frontend",
+      "failureStep": "세션 정리와 로그인 화면 복귀",
+      "evidence": [
+        {
+          "path": "front/test/features/auth/auth_app_test.dart",
+          "patterns": [
+            "logoutCount",
+            "login-email-field"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "layout.accessibility",
+      "name": "접근성, 작은 화면, 큰 글자, 다크 모드, 회전",
+      "area": "design",
+      "failureStep": "반응형 레이아웃과 터치 영역",
+      "evidence": [
+        {
+          "path": "front/test/quality/mobile_quality_gate_test.dart",
+          "patterns": [
+            "small-screen-large-text",
+            "dark-mode",
+            "rotated-landscape",
+            "greaterThanOrEqualTo(48)",
+            "품질 게이트 작성 버튼"
+          ]
+        },
+        {
+          "path": "front/test/theme/app_design_system_test.dart",
+          "patterns": [
+            "greaterThanOrEqualTo(64)",
+            "find.bySemanticsLabel"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "api.performance",
+      "name": "핵심 API 성능 스모크",
+      "area": "backend",
+      "failureStep": "API 성능 예산",
+      "evidence": [
+        {
+          "path": "tools/ci/run-mobile-performance-smoke.sh",
+          "patterns": [
+            "MobileApiPerformanceSmokeTest"
+          ]
+        },
+        {
+          "path": ".github/workflows/ci.yml",
+          "patterns": [
+            "Run mobile API performance smoke"
+          ]
+        }
+      ]
+    }
+  ]
+}
