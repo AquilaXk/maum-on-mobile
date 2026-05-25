@@ -36,6 +36,7 @@ class AppScreen extends StatelessWidget {
     this.eyebrow,
     this.subtitle,
     this.onBack,
+    this.onRefresh,
     this.actions = const [],
     this.maxWidth = AppBreakpoints.contentMaxWidth,
     this.padding = const EdgeInsets.all(AppSpacing.xl),
@@ -46,6 +47,7 @@ class AppScreen extends StatelessWidget {
   final String? eyebrow;
   final String? subtitle;
   final VoidCallback? onBack;
+  final RefreshCallback? onRefresh;
   final List<Widget> actions;
   final List<Widget> children;
   final double maxWidth;
@@ -53,30 +55,40 @@ class AppScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: SafeArea(
-        child: SingleChildScrollView(
-          padding: padding,
-          child: Center(
-            child: ConstrainedBox(
-              constraints: BoxConstraints(maxWidth: maxWidth),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  AppScreenHeader(
-                    title: title,
-                    eyebrow: eyebrow,
-                    subtitle: subtitle,
-                    onBack: onBack,
-                    actions: actions,
-                  ),
-                  const SizedBox(height: AppSpacing.xl),
-                  ...children,
-                ],
+    final scrollView = SingleChildScrollView(
+      physics: onRefresh == null
+          ? null
+          : const AlwaysScrollableScrollPhysics(),
+      padding: padding,
+      child: Center(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxWidth: maxWidth),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              AppScreenHeader(
+                title: title,
+                eyebrow: eyebrow,
+                subtitle: subtitle,
+                onBack: onBack,
+                actions: actions,
               ),
-            ),
+              const SizedBox(height: AppSpacing.xl),
+              ...children,
+            ],
           ),
         ),
+      ),
+    );
+
+    return Scaffold(
+      body: SafeArea(
+        child: onRefresh == null
+            ? scrollView
+            : RefreshIndicator(
+                onRefresh: onRefresh!,
+                child: scrollView,
+              ),
       ),
     );
   }

@@ -112,6 +112,7 @@ class _DiaryScreenState extends State<DiaryScreen> {
           title: '나의 기록',
           subtitle: _formatMonthLabel(state.visibleMonth),
           onBack: widget.onBack,
+          onRefresh: widget.controller.load,
           actions: [
             IconButton(
               key: const ValueKey('diary-prev-month-button'),
@@ -150,7 +151,10 @@ class _DiaryScreenState extends State<DiaryScreen> {
               onDelete: _confirmDelete,
             ),
             const SizedBox(height: AppSpacing.lg),
-            _PublicEntriesSection(state: state),
+            _PublicEntriesSection(
+              state: state,
+              onLoadMore: widget.controller.loadMorePublicEntries,
+            ),
             const SizedBox(height: AppSpacing.xl),
             _DiaryForm(
               state: state,
@@ -340,9 +344,13 @@ class _SelectedEntriesSection extends StatelessWidget {
 }
 
 class _PublicEntriesSection extends StatelessWidget {
-  const _PublicEntriesSection({required this.state});
+  const _PublicEntriesSection({
+    required this.state,
+    required this.onLoadMore,
+  });
 
   final DiaryState state;
+  final Future<void> Function() onLoadMore;
 
   @override
   Widget build(BuildContext context) {
@@ -355,11 +363,13 @@ class _PublicEntriesSection extends StatelessWidget {
         const SizedBox(height: AppSpacing.xs),
         if (state.isPublicLoading)
           const _Notice(message: '공개 기록을 불러오는 중입니다.')
-        else if (state.publicErrorMessage != null)
-          _Notice(message: state.publicErrorMessage!, isError: true)
-        else if (state.isPublicEmpty)
-          const _Notice(message: '아직 공개된 기록이 없습니다.')
-        else
+        else ...[
+          if (state.publicErrorMessage != null) ...[
+            _Notice(message: state.publicErrorMessage!, isError: true),
+            const SizedBox(height: AppSpacing.xs),
+          ],
+          if (state.isPublicEmpty)
+            const _Notice(message: '아직 공개된 기록이 없습니다.'),
           for (final entry in state.publicEntries) ...[
             Card(
               child: Padding(
@@ -372,7 +382,10 @@ class _PublicEntriesSection extends StatelessWidget {
                       crossAxisAlignment: WrapCrossAlignment.center,
                       children: [
                         Chip(label: Text(entry.category.label)),
-                        Text(entry.nickname, style: theme.textTheme.bodySmall),
+                        Text(
+                          entry.nickname,
+                          style: theme.textTheme.bodySmall,
+                        ),
                       ],
                     ),
                     const SizedBox(height: AppSpacing.xs),
@@ -389,6 +402,27 @@ class _PublicEntriesSection extends StatelessWidget {
             ),
             const SizedBox(height: AppSpacing.xs),
           ],
+        ],
+        if (!state.isPublicLoading && state.publicEntries.isNotEmpty) ...[
+          const SizedBox(height: AppSpacing.xs),
+          if (state.isLastPublicPage)
+            const _Notice(message: '마지막 공개 기록입니다.')
+          else
+            OutlinedButton.icon(
+              key: const ValueKey('diary-public-load-more-button'),
+              onPressed: state.isPublicLoadingMore ||
+                      state.publicErrorMessage != null
+                  ? null
+                  : onLoadMore,
+              icon: state.isPublicLoadingMore
+                  ? const SizedBox.square(
+                      dimension: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.expand_more),
+              label: Text(state.isPublicLoadingMore ? '불러오는 중' : '더 보기'),
+            ),
+        ],
       ],
     );
   }

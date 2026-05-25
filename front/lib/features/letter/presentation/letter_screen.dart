@@ -60,6 +60,9 @@ class _LetterScreenState extends State<LetterScreen> {
           title: '편지함',
           subtitle: '받은 편지와 보낸 마음을 확인합니다.',
           onBack: widget.onBack,
+          onRefresh: state.mode == LetterViewMode.mailbox
+              ? widget.controller.load
+              : null,
           actions: [
             FilledButton.icon(
               key: const ValueKey('letter-compose-button'),
@@ -143,6 +146,25 @@ class _MailboxView extends StatelessWidget {
             ),
             const SizedBox(height: AppSpacing.sm),
           ],
+        if (!state.isLoading && state.visibleLetters.isNotEmpty) ...[
+          const SizedBox(height: AppSpacing.xs),
+          if (state.isVisibleLastPage)
+            const AppNotice(message: '마지막 편지입니다.')
+          else
+            OutlinedButton.icon(
+              key: const ValueKey('letter-load-more-button'),
+              onPressed: state.isLoadingMore || state.errorMessage != null
+                  ? null
+                  : controller.loadMore,
+              icon: state.isLoadingMore
+                  ? const SizedBox.square(
+                      dimension: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.expand_more),
+              label: Text(state.isLoadingMore ? '불러오는 중' : '더 보기'),
+            ),
+        ],
       ],
     );
   }

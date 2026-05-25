@@ -93,4 +93,34 @@ void main() {
     expect(find.byIcon(Icons.check_circle_outline), findsOneWidget);
     expect(find.byIcon(Icons.error_outline), findsOneWidget);
   });
+
+  testWidgets('screen exposes pull refresh when a reload callback is provided',
+      (tester) async {
+    var refreshCount = 0;
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: buildAppTheme(),
+        home: AppScreen(
+          title: '목록',
+          onRefresh: () async {
+            refreshCount += 1;
+          },
+          children: const [
+            SizedBox(height: 1200, child: Text('스크롤 목록')),
+          ],
+        ),
+      ),
+    );
+
+    expect(find.byType(RefreshIndicator), findsOneWidget);
+
+    final indicator = tester.widget<RefreshIndicator>(
+      find.byType(RefreshIndicator),
+    );
+    await indicator.onRefresh();
+    await tester.pump();
+
+    expect(refreshCount, 1);
+  });
 }

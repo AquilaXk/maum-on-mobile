@@ -15,6 +15,9 @@ class DiaryState {
     this.publicEntries = const [],
     this.isLoading = false,
     this.isPublicLoading = false,
+    this.isPublicLoadingMore = false,
+    this.publicPage = 0,
+    this.isLastPublicPage = true,
     this.isSubmitting = false,
     this.isUploadingImage = false,
     this.imageUploadProgress,
@@ -37,6 +40,9 @@ class DiaryState {
   final List<DiaryEntry> publicEntries;
   final bool isLoading;
   final bool isPublicLoading;
+  final bool isPublicLoadingMore;
+  final int publicPage;
+  final bool isLastPublicPage;
   final bool isSubmitting;
   final bool isUploadingImage;
   final double? imageUploadProgress;
@@ -55,8 +61,18 @@ class DiaryState {
   bool get isPublicEmpty =>
       hasLoaded &&
       !isPublicLoading &&
+      !isPublicLoadingMore &&
       publicErrorMessage == null &&
       publicEntries.isEmpty;
+
+  bool get canLoadMorePublicEntries {
+    return hasLoaded &&
+        publicEntries.isNotEmpty &&
+        !isPublicLoading &&
+        !isPublicLoadingMore &&
+        !isLastPublicPage &&
+        publicErrorMessage == null;
+  }
 
   String get visibleMonthKey => monthKeyFromDate(visibleMonth);
 
@@ -91,6 +107,9 @@ class DiaryState {
     List<DiaryEntry>? publicEntries,
     bool? isLoading,
     bool? isPublicLoading,
+    bool? isPublicLoadingMore,
+    int? publicPage,
+    bool? isLastPublicPage,
     bool? isSubmitting,
     bool? isUploadingImage,
     double? imageUploadProgress,
@@ -120,6 +139,9 @@ class DiaryState {
       publicEntries: publicEntries ?? this.publicEntries,
       isLoading: isLoading ?? this.isLoading,
       isPublicLoading: isPublicLoading ?? this.isPublicLoading,
+      isPublicLoadingMore: isPublicLoadingMore ?? this.isPublicLoadingMore,
+      publicPage: publicPage ?? this.publicPage,
+      isLastPublicPage: isLastPublicPage ?? this.isLastPublicPage,
       isSubmitting: isSubmitting ?? this.isSubmitting,
       isUploadingImage: isUploadingImage ?? this.isUploadingImage,
       imageUploadProgress: clearImageUploadProgress
@@ -175,6 +197,45 @@ class DiaryController extends ChangeNotifier {
 
   Future<void> load() async {
     await _loadMonth(_state.visibleMonth);
+  }
+
+  Future<void> loadMorePublicEntries() async {
+    if (!_state.canLoadMorePublicEntries) {
+      return;
+    }
+
+    _setState(
+      _state.copyWith(
+        isPublicLoadingMore: true,
+        clearPublicErrorMessage: true,
+      ),
+    );
+
+    try {
+      final page = await _diaryRepository.fetchPublicDiaries(
+        page: _state.publicPage + 1,
+        size: 20,
+      );
+      _setState(
+        _state.copyWith(
+          publicEntries: _mergePublicEntries(_state.publicEntries, page.items),
+          publicPage: page.page,
+          isLastPublicPage: page.last,
+          isPublicLoadingMore: false,
+          clearPublicErrorMessage: true,
+        ),
+      );
+    } on Object catch (error) {
+      _setState(
+        _state.copyWith(
+          isPublicLoadingMore: false,
+          publicErrorMessage: _messageFromError(
+            error,
+            '공개 기록을 더 불러오지 못했습니다.',
+          ),
+        ),
+      );
+    }
   }
 
   Future<void> moveMonth(int delta) async {
@@ -414,6 +475,7 @@ class DiaryController extends ChangeNotifier {
         _state.copyWith(
           isLoading: true,
           isPublicLoading: true,
+          isPublicLoadingMore: false,
           clearErrorMessage: true,
           clearPublicErrorMessage: true,
           clearNoticeMessage: true,
@@ -459,13 +521,14 @@ class DiaryController extends ChangeNotifier {
       _setState(
         _state.copyWith(
           publicEntries: page.items,
+          publicPage: page.page,
+          isLastPublicPage: page.last,
           clearPublicErrorMessage: true,
         ),
       );
     } on Object catch (error) {
       _setState(
         _state.copyWith(
-          publicEntries: const [],
           publicErrorMessage: _messageFromError(
             error,
             '공개 기록을 불러오지 못했습니다.',
@@ -544,6 +607,18 @@ class DiaryController extends ChangeNotifier {
 
     _state = nextState;
     notifyListeners();
+  }
+
+  List<DiaryEntry> _mergePublicEntries(
+    List<DiaryEntry> current,
+    List<DiaryEntry> next,
+  ) {
+    final seenIds = current.map((entry) => entry.id).toSet();
+    return [
+      ...current,
+      for (final entry in next)
+        if (seenIds.add(entry.id)) entry,
+    ];
   }
 
   @override
