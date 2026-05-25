@@ -22,6 +22,9 @@ class OperationsScreen extends StatefulWidget {
 class _OperationsScreenState extends State<OperationsScreen> {
   late final TextEditingController _reasonController;
   late final TextEditingController _memberReasonController;
+  late final TextEditingController _letterReasonController;
+  late final TextEditingController _letterNoteController;
+  late final TextEditingController _letterReceiverSearchController;
 
   @override
   void initState() {
@@ -31,6 +34,15 @@ class _OperationsScreenState extends State<OperationsScreen> {
     );
     _memberReasonController = TextEditingController(
       text: widget.controller.state.memberActionReason,
+    );
+    _letterReasonController = TextEditingController(
+      text: widget.controller.state.letterActionReason,
+    );
+    _letterNoteController = TextEditingController(
+      text: widget.controller.state.letterNote,
+    );
+    _letterReceiverSearchController = TextEditingController(
+      text: widget.controller.state.letterReceiverQuery,
     );
     widget.controller.addListener(_syncReason);
     _loadIfNeeded();
@@ -51,6 +63,9 @@ class _OperationsScreenState extends State<OperationsScreen> {
     widget.controller.removeListener(_syncReason);
     _reasonController.dispose();
     _memberReasonController.dispose();
+    _letterReasonController.dispose();
+    _letterNoteController.dispose();
+    _letterReceiverSearchController.dispose();
     super.dispose();
   }
 
@@ -76,6 +91,30 @@ class _OperationsScreenState extends State<OperationsScreen> {
         selection: TextSelection.collapsed(offset: memberReason.length),
       );
     }
+
+    final letterReason = widget.controller.state.letterActionReason;
+    if (_letterReasonController.text != letterReason) {
+      _letterReasonController.value = TextEditingValue(
+        text: letterReason,
+        selection: TextSelection.collapsed(offset: letterReason.length),
+      );
+    }
+
+    final letterNote = widget.controller.state.letterNote;
+    if (_letterNoteController.text != letterNote) {
+      _letterNoteController.value = TextEditingValue(
+        text: letterNote,
+        selection: TextSelection.collapsed(offset: letterNote.length),
+      );
+    }
+
+    final letterReceiverQuery = widget.controller.state.letterReceiverQuery;
+    if (_letterReceiverSearchController.text != letterReceiverQuery) {
+      _letterReceiverSearchController.value = TextEditingValue(
+        text: letterReceiverQuery,
+        selection: TextSelection.collapsed(offset: letterReceiverQuery.length),
+      );
+    }
   }
 
   @override
@@ -87,7 +126,7 @@ class _OperationsScreenState extends State<OperationsScreen> {
 
         return AppScreen(
           title: '운영 검수',
-          subtitle: '서비스 지표와 회원, 신고 조치를 확인합니다.',
+          subtitle: '서비스 지표와 회원, 편지, 신고 조치를 확인합니다.',
           onBack: widget.onBack,
           onRefresh: widget.controller.load,
           children: [
@@ -112,12 +151,21 @@ class _OperationsScreenState extends State<OperationsScreen> {
                   state: state,
                   onOpenMembers: () =>
                       widget.controller.selectView(OperationsView.members),
+                  onOpenLetters: () =>
+                      widget.controller.selectView(OperationsView.letters),
                   onOpenReports: () =>
                       widget.controller.selectView(OperationsView.reports),
                 ),
               OperationsView.members => _MembersView(
                   state: state,
                   reasonController: _memberReasonController,
+                  controller: widget.controller,
+                ),
+              OperationsView.letters => _LettersView(
+                  state: state,
+                  reasonController: _letterReasonController,
+                  noteController: _letterNoteController,
+                  receiverSearchController: _letterReceiverSearchController,
                   controller: widget.controller,
                 ),
               OperationsView.reports => Column(
@@ -170,6 +218,12 @@ class _OperationsViewSelector extends StatelessWidget {
           onSelected: () => onSelected(OperationsView.members),
         ),
         _ViewChip(
+          key: const ValueKey('operations-view-letters'),
+          label: '편지',
+          selected: selected == OperationsView.letters,
+          onSelected: () => onSelected(OperationsView.letters),
+        ),
+        _ViewChip(
           key: const ValueKey('operations-view-reports'),
           label: '신고',
           selected: selected == OperationsView.reports,
@@ -206,11 +260,13 @@ class _DashboardView extends StatelessWidget {
   const _DashboardView({
     required this.state,
     required this.onOpenMembers,
+    required this.onOpenLetters,
     required this.onOpenReports,
   });
 
   final OperationsState state;
   final VoidCallback onOpenMembers;
+  final VoidCallback onOpenLetters;
   final VoidCallback onOpenReports;
 
   @override
@@ -274,6 +330,11 @@ class _DashboardView extends StatelessWidget {
               label: const Text('회원 관리'),
             ),
             OutlinedButton.icon(
+              onPressed: onOpenLetters,
+              icon: const Icon(Icons.mail_outline),
+              label: const Text('편지 검수'),
+            ),
+            OutlinedButton.icon(
               onPressed: onOpenReports,
               icon: const Icon(Icons.report_gmailerrorred_outlined),
               label: const Text('신고 검수'),
@@ -325,6 +386,372 @@ class _MembersView extends StatelessWidget {
           controller: controller,
         ),
       ],
+    );
+  }
+}
+
+class _LettersView extends StatelessWidget {
+  const _LettersView({
+    required this.state,
+    required this.reasonController,
+    required this.noteController,
+    required this.receiverSearchController,
+    required this.controller,
+  });
+
+  final OperationsState state;
+  final TextEditingController reasonController;
+  final TextEditingController noteController;
+  final TextEditingController receiverSearchController;
+  final OperationsController controller;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text('편지 검수', style: Theme.of(context).textTheme.titleMedium),
+        const SizedBox(height: AppSpacing.xs),
+        TextField(
+          key: const ValueKey('operations-letter-search-field'),
+          decoration: const InputDecoration(
+            labelText: '편지 검색',
+            border: OutlineInputBorder(),
+            prefixIcon: Icon(Icons.search),
+          ),
+          onChanged: (query) {
+            controller.updateLetterQuery(query);
+          },
+        ),
+        const SizedBox(height: AppSpacing.xs),
+        _LetterFilters(state: state, controller: controller),
+        const SizedBox(height: AppSpacing.md),
+        _LetterList(state: state, controller: controller),
+        const SizedBox(height: AppSpacing.lg),
+        _LetterDetail(
+          state: state,
+          reasonController: reasonController,
+          noteController: noteController,
+          receiverSearchController: receiverSearchController,
+          controller: controller,
+        ),
+      ],
+    );
+  }
+}
+
+class _LetterFilters extends StatelessWidget {
+  const _LetterFilters({
+    required this.state,
+    required this.controller,
+  });
+
+  final OperationsState state;
+  final OperationsController controller;
+
+  @override
+  Widget build(BuildContext context) {
+    return DropdownButton<String?>(
+      value: state.letterStatusFilter,
+      hint: const Text('편지 상태'),
+      items: const <DropdownMenuItem<String?>>[
+        DropdownMenuItem(value: null, child: Text('전체 상태')),
+        DropdownMenuItem(value: 'UNASSIGNED', child: Text('미배정')),
+        DropdownMenuItem(value: 'SENT', child: Text('발송')),
+        DropdownMenuItem(value: 'ACCEPTED', child: Text('수락')),
+        DropdownMenuItem(value: 'WRITING', child: Text('작성 중')),
+        DropdownMenuItem(value: 'REPLIED', child: Text('답장 완료')),
+      ],
+      onChanged: (status) {
+        controller.selectLetterStatusFilter(status);
+      },
+    );
+  }
+}
+
+class _LetterList extends StatelessWidget {
+  const _LetterList({
+    required this.state,
+    required this.controller,
+  });
+
+  final OperationsState state;
+  final OperationsController controller;
+
+  @override
+  Widget build(BuildContext context) {
+    if (state.isLetterLoading && state.letters.isEmpty) {
+      return const AppNotice(message: '편지 목록을 불러오는 중입니다.');
+    }
+
+    if (state.isLetterEmpty) {
+      return const AppNotice(message: '조건에 맞는 편지가 없습니다.');
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        for (final letter in state.letters) ...[
+          AppListRow(
+            rowKey: ValueKey('operations-letter-${letter.id}'),
+            title: letter.title.isEmpty ? '제목 없는 편지' : letter.title,
+            subtitle:
+                '발신 ${_adminMemberLabel(letter.sender)} · '
+                '수신 ${_adminMemberLabel(letter.receiver)} · '
+                '조치 ${letter.actionCount} · ${letter.createdAt}',
+            statusLabel: _letterStatusLabel(letter.status),
+            statusTone: _letterStatusTone(letter.status),
+            leadingIcon: Icons.mail_outline,
+            selected: state.selectedLetter?.id == letter.id,
+            onTap: () {
+              controller.openLetter(letter);
+            },
+            semanticLabel:
+                '편지 항목: ${letter.title}, 발신 ${letter.sender.nickname}, 상태 ${_letterStatusLabel(letter.status)}',
+          ),
+          const SizedBox(height: AppSpacing.xs),
+        ],
+        if (state.canLoadMoreLetters)
+          OutlinedButton.icon(
+            onPressed: () => controller.loadLetters(),
+            icon: const Icon(Icons.expand_more),
+            label: const Text('더 불러오기'),
+          ),
+      ],
+    );
+  }
+}
+
+class _LetterDetail extends StatelessWidget {
+  const _LetterDetail({
+    required this.state,
+    required this.reasonController,
+    required this.noteController,
+    required this.receiverSearchController,
+    required this.controller,
+  });
+
+  final OperationsState state;
+  final TextEditingController reasonController;
+  final TextEditingController noteController;
+  final TextEditingController receiverSearchController;
+  final OperationsController controller;
+
+  @override
+  Widget build(BuildContext context) {
+    if (state.isLetterDetailLoading) {
+      return const AppNotice(message: '편지 상세를 불러오는 중입니다.');
+    }
+
+    final detail = state.selectedLetter;
+    if (detail == null) {
+      return const AppNotice(message: '검수할 편지를 선택해 주세요.');
+    }
+
+    return AppSectionCard(
+      title: '편지 상세',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Wrap(
+            spacing: AppSpacing.xs,
+            runSpacing: AppSpacing.xs,
+            children: [
+              AppStatusPill(
+                label: _letterStatusLabel(detail.status),
+                tone: _letterStatusTone(detail.status),
+              ),
+              AppStatusPill(label: '후보 ${detail.receivers.length}명'),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.md),
+          AppDetailRow(label: '발신자', value: _adminMemberLabel(detail.sender)),
+          AppDetailRow(label: '수신자', value: _adminMemberLabel(detail.receiver)),
+          AppDetailRow(label: '작성일', value: detail.createdAt),
+          if (detail.replyCreatedAt != null)
+            AppDetailRow(label: '답장일', value: detail.replyCreatedAt!),
+          _SummaryBlock(label: '원문 요약', value: detail.originalSummary),
+          _SummaryBlock(label: '답장 요약', value: detail.replySummary ?? '-'),
+          const SizedBox(height: AppSpacing.md),
+          TextField(
+            key: const ValueKey('operations-letter-action-reason-field'),
+            controller: reasonController,
+            minLines: 2,
+            maxLines: 4,
+            onChanged: controller.updateLetterActionReason,
+            decoration: const InputDecoration(
+              labelText: '편지 조치 사유',
+              border: OutlineInputBorder(),
+            ),
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          TextField(
+            key: const ValueKey('operations-letter-note-field'),
+            controller: noteController,
+            minLines: 2,
+            maxLines: 4,
+            onChanged: controller.updateLetterNote,
+            decoration: const InputDecoration(
+              labelText: '운영 메모',
+              border: OutlineInputBorder(),
+            ),
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          TextField(
+            key: const ValueKey('operations-letter-receiver-search-field'),
+            controller: receiverSearchController,
+            decoration: const InputDecoration(
+              labelText: '재배정 수신자 검색',
+              border: OutlineInputBorder(),
+              prefixIcon: Icon(Icons.search),
+            ),
+            onChanged: (query) {
+              controller.searchLetterReceivers(query);
+            },
+          ),
+          const SizedBox(height: AppSpacing.xs),
+          _LetterReceiverCandidates(state: state, controller: controller),
+          const SizedBox(height: AppSpacing.md),
+          Wrap(
+            spacing: AppSpacing.xs,
+            runSpacing: AppSpacing.xs,
+            children: [
+              AppConfirmActionButton(
+                buttonKey: const ValueKey('operations-letter-note-button'),
+                confirmButtonKey:
+                    const ValueKey('operations-confirm-letter-note-button'),
+                enabled: state.canSubmitLetterNote,
+                icon: const Icon(Icons.note_add_outlined),
+                label: state.isLetterActionSubmitting ? '저장 중' : '메모 저장',
+                confirmTitle: '편지 메모 저장 확인',
+                confirmMessage: '운영 메모와 사유가 조치 이력에 남습니다.',
+                confirmButtonLabel: '저장',
+                onConfirmed: controller.addSelectedLetterNote,
+              ),
+              AppConfirmActionButton(
+                buttonKey: const ValueKey('operations-letter-reassign-button'),
+                confirmButtonKey:
+                    const ValueKey('operations-confirm-letter-reassign-button'),
+                enabled: state.canSubmitLetterReassign,
+                icon: const Icon(Icons.swap_horiz),
+                label: state.isLetterActionSubmitting ? '변경 중' : '수신자 재배정',
+                confirmTitle: '편지 재배정 확인',
+                confirmMessage: '선택한 수신자로 편지를 재배정하고 조치 이력을 남깁니다.',
+                confirmButtonLabel: '재배정',
+                onConfirmed: controller.reassignSelectedLetter,
+              ),
+              AppConfirmActionButton(
+                buttonKey:
+                    const ValueKey('operations-letter-block-sender-button'),
+                confirmButtonKey:
+                    const ValueKey('operations-confirm-letter-block-button'),
+                enabled: state.canSubmitLetterAction,
+                icon: const Icon(Icons.block),
+                label: state.isLetterActionSubmitting ? '차단 중' : '발신자 차단',
+                confirmTitle: '발신자 차단 확인',
+                confirmMessage: '발신자를 차단하고 로그인 세션과 기기 토큰을 회수합니다.',
+                confirmButtonLabel: '차단',
+                onConfirmed: controller.blockSelectedLetterSender,
+              ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.md),
+          _AuditSection(events: detail.auditEvents),
+        ],
+      ),
+    );
+  }
+}
+
+class _LetterReceiverCandidates extends StatelessWidget {
+  const _LetterReceiverCandidates({
+    required this.state,
+    required this.controller,
+  });
+
+  final OperationsState state;
+  final OperationsController controller;
+
+  @override
+  Widget build(BuildContext context) {
+    if (state.isLetterReceiverLoading) {
+      return const AppNotice(message: '수신자 후보를 찾는 중입니다.');
+    }
+
+    if (state.letterReceiverQuery.isEmpty) {
+      return const AppNotice(message: '검색어를 입력해 수신자를 찾습니다.');
+    }
+
+    if (state.letterReceiverCandidates.isEmpty) {
+      return const AppNotice(message: '검색된 수신자가 없습니다.');
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        for (final member in state.letterReceiverCandidates) ...[
+          AppListRow(
+            rowKey: ValueKey('operations-letter-receiver-${member.id}'),
+            title: '${member.nickname} · ${member.email}',
+            subtitle:
+                '${_memberStatusLabel(member.status)} · '
+                '${_memberRoleLabel(member.role)} · '
+                '수신 ${member.randomReceiveAllowed ? '가능' : '불가'}',
+            statusLabel: state.selectedLetterReceiverId == member.id
+                ? '선택'
+                : _memberStatusLabel(member.status),
+            statusTone: state.selectedLetterReceiverId == member.id
+                ? AppStatusTone.success
+                : _memberStatusTone(member.status),
+            leadingIcon: Icons.person_search_outlined,
+            trailingIcon: null,
+            selected: state.selectedLetterReceiverId == member.id,
+            onTap: () {
+              controller.selectLetterReceiver(member.id);
+            },
+            semanticLabel:
+                '수신자 후보: ${member.nickname}, ${member.email}, 상태 ${_memberStatusLabel(member.status)}',
+          ),
+          const SizedBox(height: AppSpacing.xs),
+        ],
+      ],
+    );
+  }
+}
+
+class _SummaryBlock extends StatelessWidget {
+  const _SummaryBlock({
+    required this.label,
+    required this.value,
+  });
+
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    final displayValue = value.isEmpty ? '-' : value;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: AppSpacing.xs),
+      child: Semantics(
+        container: true,
+        label: '$label, $displayValue',
+        child: ExcludeSemantics(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(label, style: Theme.of(context).textTheme.labelLarge),
+              const SizedBox(height: AppSpacing.xxs),
+              Text(
+                displayValue,
+                maxLines: 4,
+                overflow: TextOverflow.ellipsis,
+                softWrap: true,
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }
@@ -842,6 +1269,13 @@ class _ReportDetail extends StatelessWidget {
   }
 }
 
+String _adminMemberLabel(AdminReportMember? member) {
+  if (member == null) {
+    return '미배정';
+  }
+  return '${member.nickname} · ${member.email} · ${member.status}';
+}
+
 String _reportStatusLabel(String status) {
   return switch (status) {
     'RECEIVED' => '접수',
@@ -867,6 +1301,26 @@ AppStatusTone _reportStatusTone(String status) {
     default:
       return AppStatusTone.neutral;
   }
+}
+
+String _letterStatusLabel(String status) {
+  return switch (status) {
+    'UNASSIGNED' => '미배정',
+    'SENT' => '발송',
+    'ACCEPTED' => '수락',
+    'WRITING' => '작성 중',
+    'REPLIED' => '답장 완료',
+    _ => status.isEmpty ? '-' : status,
+  };
+}
+
+AppStatusTone _letterStatusTone(String status) {
+  return switch (status) {
+    'REPLIED' => AppStatusTone.success,
+    'UNASSIGNED' => AppStatusTone.danger,
+    'SENT' || 'ACCEPTED' || 'WRITING' => AppStatusTone.warning,
+    _ => AppStatusTone.neutral,
+  };
 }
 
 String _memberStatusLabel(String status) {

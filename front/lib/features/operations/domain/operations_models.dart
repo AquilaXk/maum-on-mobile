@@ -257,6 +257,157 @@ class AdminSessionRevokeResult {
   final AdminAuditEvent latestAudit;
 }
 
+class AdminLetterPage {
+  const AdminLetterPage({
+    required this.content,
+    required this.page,
+    required this.size,
+    required this.totalElements,
+    required this.totalPages,
+    required this.last,
+  });
+
+  factory AdminLetterPage.fromJson(Object? json) {
+    final map = _map(json, 'admin letter page');
+    return AdminLetterPage(
+      content: _list(map['content'])
+          .map(AdminLetterSummary.fromJson)
+          .toList(growable: false),
+      page: _int(map['page']),
+      size: _int(map['size']),
+      totalElements: _int(map['totalElements']),
+      totalPages: _int(map['totalPages']),
+      last: map['last'] == true,
+    );
+  }
+
+  final List<AdminLetterSummary> content;
+  final int page;
+  final int size;
+  final int totalElements;
+  final int totalPages;
+  final bool last;
+}
+
+class AdminLetterSummary {
+  const AdminLetterSummary({
+    required this.id,
+    required this.title,
+    required this.sender,
+    required this.receiver,
+    required this.status,
+    required this.createdAt,
+    required this.originalSummary,
+    required this.replySummary,
+    required this.availableReceiverCount,
+    required this.actionCount,
+  });
+
+  factory AdminLetterSummary.fromJson(Object? json) {
+    final map = _map(json, 'admin letter summary');
+    return AdminLetterSummary(
+      id: _int(map['id']),
+      title: map['title']?.toString() ?? '',
+      sender: AdminReportMember.fromJson(map['sender']),
+      receiver: map['receiver'] == null
+          ? null
+          : AdminReportMember.fromJson(map['receiver']),
+      status: map['status']?.toString() ?? '',
+      createdAt: map['createdAt']?.toString() ?? '',
+      originalSummary: map['originalSummary']?.toString() ?? '',
+      replySummary: map['replySummary']?.toString(),
+      availableReceiverCount: _int(map['availableReceiverCount']),
+      actionCount: _int(map['actionCount']),
+    );
+  }
+
+  final int id;
+  final String title;
+  final AdminReportMember sender;
+  final AdminReportMember? receiver;
+  final String status;
+  final String createdAt;
+  final String originalSummary;
+  final String? replySummary;
+  final int availableReceiverCount;
+  final int actionCount;
+}
+
+class AdminLetterDetail {
+  const AdminLetterDetail({
+    required this.id,
+    required this.title,
+    required this.sender,
+    required this.receiver,
+    required this.receivers,
+    required this.status,
+    required this.createdAt,
+    required this.replyCreatedAt,
+    required this.originalSummary,
+    required this.replySummary,
+    required this.auditEvents,
+  });
+
+  factory AdminLetterDetail.fromJson(Object? json) {
+    final map = _map(json, 'admin letter detail');
+    return AdminLetterDetail(
+      id: _int(map['id']),
+      title: map['title']?.toString() ?? '',
+      sender: AdminReportMember.fromJson(map['sender']),
+      receiver: map['receiver'] == null
+          ? null
+          : AdminReportMember.fromJson(map['receiver']),
+      receivers: _list(map['receivers'])
+          .map(AdminReportMember.fromJson)
+          .toList(growable: false),
+      status: map['status']?.toString() ?? '',
+      createdAt: map['createdAt']?.toString() ?? '',
+      replyCreatedAt: map['replyCreatedAt']?.toString(),
+      originalSummary: map['originalSummary']?.toString() ?? '',
+      replySummary: map['replySummary']?.toString(),
+      auditEvents: _list(map['auditEvents'])
+          .map(AdminAuditEvent.fromJson)
+          .toList(growable: false),
+    );
+  }
+
+  final int id;
+  final String title;
+  final AdminReportMember sender;
+  final AdminReportMember? receiver;
+  final List<AdminReportMember> receivers;
+  final String status;
+  final String createdAt;
+  final String? replyCreatedAt;
+  final String originalSummary;
+  final String? replySummary;
+  final List<AdminAuditEvent> auditEvents;
+}
+
+class AdminLetterActionResult {
+  const AdminLetterActionResult({
+    required this.letter,
+    required this.latestAudit,
+    required this.revokedRefreshTokenCount,
+    required this.disabledDeviceTokenCount,
+  });
+
+  factory AdminLetterActionResult.fromJson(Object? json) {
+    final map = _map(json, 'admin letter action result');
+    return AdminLetterActionResult(
+      letter: AdminLetterDetail.fromJson(map['letter']),
+      latestAudit: AdminAuditEvent.fromJson(map['latestAudit']),
+      revokedRefreshTokenCount: _int(map['revokedRefreshTokenCount']),
+      disabledDeviceTokenCount: _int(map['disabledDeviceTokenCount']),
+    );
+  }
+
+  final AdminLetterDetail letter;
+  final AdminAuditEvent latestAudit;
+  final int revokedRefreshTokenCount;
+  final int disabledDeviceTokenCount;
+}
+
 Map<String, Object?> _map(Object? json, String label) {
   if (json is! Map) {
     throw FormatException('Expected $label object.');

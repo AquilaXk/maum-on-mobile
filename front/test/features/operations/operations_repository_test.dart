@@ -111,6 +111,90 @@ void main() {
     expect(transport.requests[4].method, ApiMethod.post);
     expect(revoke.revokedRefreshTokenCount, 1);
   });
+
+  test('loads letters, letter detail, and letter actions', () async {
+    final transport = _FakeApiTransport([
+      ApiTransportResponse.ok({
+        'resultCode': '200-1',
+        'data': {
+          'content': [_letterSummaryJson()],
+          'page': 0,
+          'size': 20,
+          'totalElements': 1,
+          'totalPages': 1,
+          'last': true,
+        },
+      }),
+      ApiTransportResponse.ok({
+        'resultCode': '200-2',
+        'data': _letterDetailJson(),
+      }),
+      ApiTransportResponse.ok({
+        'resultCode': '200-3',
+        'data': _letterActionResultJson(),
+      }),
+      ApiTransportResponse.ok({
+        'resultCode': '200-4',
+        'data': _letterActionResultJson(receiverId: 8),
+      }),
+      ApiTransportResponse.ok({
+        'resultCode': '200-5',
+        'data': _letterActionResultJson(revokedRefreshTokenCount: 2),
+      }),
+    ]);
+    final repository = ApiOperationsRepository(
+      apiClient: ApiClient(
+        transport: transport,
+        tokenStore: MemoryAuthTokenStore(),
+      ),
+    );
+
+    final letters = await repository.fetchLetters(
+      query: '운영',
+      status: 'SENT',
+    );
+    final detail = await repository.fetchLetterDetail(12);
+    final note = await repository.addLetterNote(
+      letterId: 12,
+      note: '상담 이관',
+      reason: '운영 확인',
+    );
+    final reassign = await repository.reassignLetterReceiver(
+      letterId: 12,
+      receiverMemberId: 8,
+      reason: '수신자 변경',
+    );
+    final block = await repository.blockLetterSender(
+      letterId: 12,
+      reason: '반복 악용',
+    );
+
+    expect(letters.content.single.title, '운영 편지');
+    expect(transport.requests[0].path, '/api/v1/admin/letters');
+    expect(transport.requests[0].queryParameters['query'], '운영');
+    expect(transport.requests[0].queryParameters['status'], 'SENT');
+    expect(detail.sender.nickname, '발신자');
+    expect(transport.requests[1].path, '/api/v1/admin/letters/12');
+    expect(transport.requests[2].path, '/api/v1/admin/letters/12/notes');
+    expect(transport.requests[2].method, ApiMethod.post);
+    expect(transport.requests[2].body, {
+      'note': '상담 이관',
+      'reason': '운영 확인',
+    });
+    expect(note.letter.id, 12);
+    expect(transport.requests[3].path, '/api/v1/admin/letters/12/reassign');
+    expect(transport.requests[3].body, {
+      'receiverMemberId': 8,
+      'reason': '수신자 변경',
+    });
+    expect(reassign.letter.receiver?.id, 8);
+    expect(
+      transport.requests[4].path,
+      '/api/v1/admin/letters/12/sender/block',
+    );
+    expect(transport.requests[4].body, {'reason': '반복 악용'});
+    expect(block.revokedRefreshTokenCount, 2);
+  });
 }
 
 Map<String, Object?> _memberJson({String status = 'ACTIVE'}) {
@@ -180,6 +264,86 @@ Map<String, Object?> _auditJson(String action) {
     'newValue': 'BLOCKED',
     'reason': '반복 신고로 차단',
     'createdAt': '2026-05-25T09:10:00',
+  };
+}
+
+Map<String, Object?> _reportMemberJson({
+  required int id,
+  required String email,
+  required String nickname,
+  String status = 'ACTIVE',
+}) {
+  return {
+    'id': id,
+    'email': email,
+    'nickname': nickname,
+    'role': 'USER',
+    'status': status,
+  };
+}
+
+Map<String, Object?> _letterSummaryJson({int receiverId = 7}) {
+  return {
+    'id': 12,
+    'title': '운영 편지',
+    'sender': _reportMemberJson(
+      id: 3,
+      email: 'sender@example.com',
+      nickname: '발신자',
+    ),
+    'receiver': _reportMemberJson(
+      id: receiverId,
+      email: 'receiver@example.com',
+      nickname: '수신자',
+    ),
+    'status': 'SENT',
+    'createdAt': '2026-05-25T09:20:00',
+    'originalSummary': '검수가 필요한 편지 요약입니다.',
+    'replySummary': null,
+    'availableReceiverCount': 4,
+    'actionCount': 1,
+  };
+}
+
+Map<String, Object?> _letterDetailJson({int receiverId = 7}) {
+  return {
+    'id': 12,
+    'title': '운영 편지',
+    'sender': _reportMemberJson(
+      id: 3,
+      email: 'sender@example.com',
+      nickname: '발신자',
+    ),
+    'receiver': _reportMemberJson(
+      id: receiverId,
+      email: 'receiver@example.com',
+      nickname: '수신자',
+    ),
+    'receivers': [
+      _reportMemberJson(
+        id: receiverId,
+        email: 'receiver@example.com',
+        nickname: '수신자',
+      ),
+    ],
+    'status': 'SENT',
+    'createdAt': '2026-05-25T09:20:00',
+    'replyCreatedAt': null,
+    'originalSummary': '검수가 필요한 편지 요약입니다.',
+    'replySummary': null,
+    'auditEvents': [_auditJson('LETTER_NOTE')],
+  };
+}
+
+Map<String, Object?> _letterActionResultJson({
+  int receiverId = 7,
+  int revokedRefreshTokenCount = 0,
+}) {
+  return {
+    'letter': _letterDetailJson(receiverId: receiverId),
+    'latestAudit': _auditJson('LETTER_ACTION'),
+    'revokedRefreshTokenCount': revokedRefreshTokenCount,
+    'disabledDeviceTokenCount': revokedRefreshTokenCount,
   };
 }
 
