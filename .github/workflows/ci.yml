@@ -157,6 +157,10 @@ jobs:
         working-directory: back
         run: ./gradlew check --no-daemon
 
+      - name: Run mobile API performance smoke
+        if: ${{ steps.scaffold.outputs.present == 'true' }}
+        run: bash tools/ci/run-mobile-performance-smoke.sh
+
   frontend:
     name: Frontend
     runs-on: ubuntu-latest

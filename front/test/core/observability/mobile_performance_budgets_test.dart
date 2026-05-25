@@ -1,0 +1,53 @@
+import 'package:flutter_test/flutter_test.dart';
+import 'package:maum_on_mobile_front/core/observability/mobile_performance_budgets.dart';
+
+void main() {
+  test('declares mobile performance budgets for critical flows', () {
+    expect(
+      MobilePerformanceBudgets.all.map((budget) => budget.name),
+      containsAll([
+        'app_start',
+        'primary_tab_switch',
+        'list_scroll_frame',
+        'consultation_reply_visible',
+      ]),
+    );
+    expect(MobilePerformanceBudgets.appStart.maxDurationMs, lessThanOrEqualTo(1800));
+    expect(MobilePerformanceBudgets.primaryTabSwitch.maxDurationMs, lessThanOrEqualTo(250));
+    expect(MobilePerformanceBudgets.listScrollFrame.maxDurationMs, lessThanOrEqualTo(16));
+  });
+
+  test('sanitizes telemetry payloads before collection', () {
+    const event = MobileTelemetryEvent(
+      type: MobileTelemetryEventType.apiError,
+      name: 'api_error',
+      durationMs: 321,
+      attributes: {
+        'route': 'GET /api/v1/diaries',
+        'email': 'user@example.com',
+        'message': '상담 내용 원문',
+        'authorization': 'Bearer abc.def.ghi',
+        'statusCode': 500,
+      },
+    );
+
+    final payload = event.toSanitizedPayload();
+    final attributes = payload['attributes']! as Map<String, Object?>;
+
+    expect(attributes['route'], 'GET /api/v1/diaries');
+    expect(attributes['statusCode'], 500);
+    expect(attributes.containsKey('email'), isFalse);
+    expect(attributes.containsKey('message'), isFalse);
+    expect(attributes.containsKey('authorization'), isFalse);
+  });
+
+  test('detects budget regressions from measured durations', () {
+    const event = MobileTelemetryEvent(
+      type: MobileTelemetryEventType.routeChange,
+      name: 'primary_tab_switch',
+      durationMs: 310,
+    );
+
+    expect(event.exceeds(MobilePerformanceBudgets.primaryTabSwitch), isTrue);
+  });
+}

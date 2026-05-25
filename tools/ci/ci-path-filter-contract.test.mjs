@@ -53,6 +53,13 @@ test("platform jobs skip cleanly before scaffolds exist", async () => {
   assert.match(jobBlock(workflow, "javascript"), /JavaScript scaffold not found; skipping JavaScript checks\./);
 });
 
+test("backend job runs mobile API performance smoke gate", async () => {
+  const backend = jobBlock(await readWorkflow(), "backend");
+
+  assert.match(backend, /Run mobile API performance smoke/);
+  assert.match(backend, /bash tools\/ci\/run-mobile-performance-smoke\.sh/);
+});
+
 test("frontend job supports Flutter and Node scaffolds", async () => {
   const frontend = jobBlock(await readWorkflow(), "frontend");
 
