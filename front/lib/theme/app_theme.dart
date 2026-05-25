@@ -1,10 +1,19 @@
 import 'package:flutter/material.dart';
 
 ThemeData buildAppTheme() {
+  return _buildTheme(Brightness.light);
+}
+
+ThemeData buildDarkAppTheme() {
+  return _buildTheme(Brightness.dark);
+}
+
+ThemeData _buildTheme(Brightness brightness) {
   const seedColor = Color(0xFF2F6F5E);
+  final isDark = brightness == Brightness.dark;
   final colorScheme = ColorScheme.fromSeed(
     seedColor: seedColor,
-    brightness: Brightness.light,
+    brightness: brightness,
   );
   final textTheme = const TextTheme(
     displaySmall: TextStyle(
@@ -51,15 +60,18 @@ ThemeData buildAppTheme() {
   return ThemeData(
     useMaterial3: true,
     colorScheme: colorScheme,
-    scaffoldBackgroundColor: const Color(0xFFF7F8F5),
+    scaffoldBackgroundColor:
+        isDark ? const Color(0xFF101814) : const Color(0xFFF7F8F5),
     textTheme: textTheme,
     dividerColor: colorScheme.outlineVariant,
     cardTheme: CardThemeData(
       elevation: 0,
-      color: Colors.white,
+      color: isDark ? const Color(0xFF17211C) : Colors.white,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(8),
-        side: const BorderSide(color: Color(0xFFDCE3DD)),
+        side: BorderSide(
+          color: isDark ? const Color(0xFF33463D) : const Color(0xFFDCE3DD),
+        ),
       ),
     ),
     chipTheme: ChipThemeData(
@@ -77,7 +89,7 @@ ThemeData buildAppTheme() {
     ),
     inputDecorationTheme: InputDecorationTheme(
       filled: true,
-      fillColor: Colors.white,
+      fillColor: isDark ? const Color(0xFF17211C) : Colors.white,
       border: inputBorder,
       enabledBorder: inputBorder.copyWith(
         borderSide: BorderSide(color: colorScheme.outlineVariant),

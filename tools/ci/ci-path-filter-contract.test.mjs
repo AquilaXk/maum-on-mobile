@@ -81,6 +81,7 @@ test("android job builds a Flutter Android scaffold under front", async () => {
   assert.match(android, /subosito\/flutter-action@[a-f0-9]{40}/);
   assert.match(android, /flutter pub get/);
   assert.match(android, /flutter build apk --debug/);
+  assert.match(android, /node tools\/ci\/run-mobile-quality-gate\.mjs --platform android/);
 });
 
 test("ios job validates a Flutter iOS scaffold under front", async () => {
@@ -91,6 +92,7 @@ test("ios job validates a Flutter iOS scaffold under front", async () => {
   assert.match(ios, /subosito\/flutter-action@[a-f0-9]{40}/);
   assert.match(ios, /flutter pub get/);
   assert.match(ios, /flutter build ios --simulator --no-codesign/);
+  assert.match(ios, /node tools\/ci\/run-mobile-quality-gate\.mjs --platform ios/);
 });
 
 test("ci pins GitHub Action references to immutable commits", async () => {
