@@ -11,6 +11,7 @@ import com.maumonmobile.application.port.out.ImageStoragePort
 import com.maumonmobile.domain.image.ImageAsset
 import com.maumonmobile.domain.image.ImageAssetStatus
 import com.maumonmobile.domain.image.ImageTargetType
+import com.maumonmobile.global.observability.MobileApiMetricsRegistry
 import com.maumonmobile.global.security.AuthenticatedUser
 import com.maumonmobile.global.web.ApiException
 import com.maumonmobile.global.web.ErrorCode
@@ -26,6 +27,7 @@ import java.util.Locale
 class ImageService(
     private val imageAssetRepository: ImageAssetRepository,
     private val imageStoragePort: ImageStoragePort,
+    private val metricsRegistry: MobileApiMetricsRegistry,
     @param:Value("\${app.images.max-bytes:5242880}")
     private val maxBytes: Long,
     @param:Value("\${app.images.temporary-ttl:PT24H}")
@@ -80,7 +82,7 @@ class ImageService(
             throw ApiException(ErrorCode.INVALID_REQUEST, "사용 중인 이미지는 먼저 기록에서 제거해 주세요.")
         }
 
-        markDeleted(asset)
+        markDeleted(asset, ImageAssetStatus.CANCELLED, IMAGE_LIFECYCLE_CANCELLED)
     }
 
     override fun validateDiaryImage(memberId: Long, imageUrl: String?) {
@@ -106,6 +108,9 @@ class ImageService(
                 updatedAt = Instant.now().toString(),
             ),
         )
+        if (asset.status != ImageAssetStatus.ATTACHED) {
+            metricsRegistry.recordImageLifecycle(IMAGE_LIFECYCLE_COMPLETED)
+        }
     }
 
     @Transactional
@@ -122,7 +127,7 @@ class ImageService(
     @Transactional
     override fun deleteDiaryImage(memberId: Long, imageUrl: String?) {
         val asset = findManagedAssetOrNull(memberId, imageUrl) ?: return
-        markDeleted(asset)
+        markDeleted(asset, ImageAssetStatus.CANCELLED, IMAGE_LIFECYCLE_CANCELLED)
     }
 
     @Scheduled(fixedDelayString = "\${app.images.cleanup-fixed-delay-ms:3600000}")
@@ -130,7 +135,7 @@ class ImageService(
     override fun cleanupTemporaryImages() {
         val cutoff = Instant.now().minus(temporaryTtl).toString()
         imageAssetRepository.findTemporaryCreatedBefore(cutoff)
-            .forEach(::markDeleted)
+            .forEach { asset -> markDeleted(asset, ImageAssetStatus.EXPIRED, IMAGE_LIFECYCLE_EXPIRED) }
     }
 
     private fun validateImageFile(originalFilename: String, contentType: String, bytes: ByteArray) {
@@ -175,27 +180,28 @@ class ImageService(
         val asset = imageAssetRepository.findByUrl(imageUrl)
             ?: throw ApiException(ErrorCode.INVALID_REQUEST, "등록되지 않은 이미지 URL입니다.")
 
-        if (asset.ownerMemberId != memberId || asset.status == ImageAssetStatus.DELETED) {
+        if (asset.ownerMemberId != memberId || asset.status in terminalStatuses) {
             throw ApiException(ErrorCode.INVALID_REQUEST, "등록되지 않은 이미지 URL입니다.")
         }
 
         return asset
     }
 
-    private fun markDeleted(asset: ImageAsset) {
-        if (asset.status == ImageAssetStatus.DELETED) {
+    private fun markDeleted(asset: ImageAsset, finalStatus: ImageAssetStatus, metricStatus: String) {
+        if (asset.status in terminalStatuses) {
             return
         }
 
         imageAssetRepository.update(
             asset.copy(
-                status = ImageAssetStatus.DELETED,
+                status = finalStatus,
                 targetType = null,
                 targetId = null,
                 updatedAt = Instant.now().toString(),
             ),
         )
         imageStoragePort.delete(asset.storageKey)
+        metricsRegistry.recordImageLifecycle(metricStatus)
     }
 
     private fun ImageAsset.toUploadResult(): ImageUploadResult {
@@ -214,6 +220,14 @@ class ImageService(
 
     private companion object {
         private const val MANAGED_PUBLIC_PREFIX = "/images/uploads/"
+        private const val IMAGE_LIFECYCLE_COMPLETED = "COMPLETED"
+        private const val IMAGE_LIFECYCLE_CANCELLED = "CANCELLED"
+        private const val IMAGE_LIFECYCLE_EXPIRED = "EXPIRED"
         private val allowedExtensions = setOf("jpg", "jpeg", "png", "webp")
+        private val terminalStatuses = setOf(
+            ImageAssetStatus.CANCELLED,
+            ImageAssetStatus.EXPIRED,
+            ImageAssetStatus.DELETED,
+        )
     }
 }

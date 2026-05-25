@@ -1,12 +1,16 @@
 package com.maumonmobile.global.observability
 
 import org.springframework.stereotype.Component
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.ConcurrentLinkedQueue
+import java.util.concurrent.atomic.AtomicInteger
 import kotlin.math.ceil
 
 @Component
 class MobileApiMetricsRegistry {
     private val samples = ConcurrentLinkedQueue<MobileApiMetricSample>()
+    private val duplicatePreventions = ConcurrentHashMap<String, AtomicInteger>()
+    private val imageLifecycle = ConcurrentHashMap<String, AtomicInteger>()
 
     fun record(method: String, path: String, statusCode: Int, latencyMs: Long) {
         samples += MobileApiMetricSample(
@@ -47,11 +51,25 @@ class MobileApiMetricsRegistry {
         return MobileApiMetricsSnapshot(
             sampleCount = currentSamples.size,
             endpoints = endpoints,
+            writeRecovery = MobileWriteRecoveryMetrics(
+                duplicatePreventions = duplicatePreventions.toCountMap(),
+                imageLifecycle = imageLifecycle.toCountMap(),
+            ),
         )
+    }
+
+    fun recordIdempotencyDuplicate(operation: String) {
+        duplicatePreventions.increment(operation)
+    }
+
+    fun recordImageLifecycle(status: String) {
+        imageLifecycle.increment(status)
     }
 
     fun clear() {
         samples.clear()
+        duplicatePreventions.clear()
+        imageLifecycle.clear()
     }
 
     private fun sanitizeRoute(path: String): String {
@@ -82,6 +100,7 @@ class MobileApiMetricsRegistry {
 data class MobileApiMetricsSnapshot(
     val sampleCount: Int,
     val endpoints: List<MobileApiEndpointMetrics>,
+    val writeRecovery: MobileWriteRecoveryMetrics = MobileWriteRecoveryMetrics(),
 )
 
 data class MobileApiEndpointMetrics(
@@ -92,9 +111,24 @@ data class MobileApiEndpointMetrics(
     val errorCodes: Map<String, Int>,
 )
 
+data class MobileWriteRecoveryMetrics(
+    val duplicatePreventions: Map<String, Int> = emptyMap(),
+    val imageLifecycle: Map<String, Int> = emptyMap(),
+)
+
 private data class MobileApiMetricSample(
     val method: String,
     val route: String,
     val statusCode: Int,
     val latencyMs: Long,
 )
+
+private fun ConcurrentHashMap<String, AtomicInteger>.increment(key: String) {
+    computeIfAbsent(key) { AtomicInteger(0) }.incrementAndGet()
+}
+
+private fun ConcurrentHashMap<String, AtomicInteger>.toCountMap(): Map<String, Int> {
+    return entries
+        .associate { (key, value) -> key to value.get() }
+        .toSortedMap()
+}

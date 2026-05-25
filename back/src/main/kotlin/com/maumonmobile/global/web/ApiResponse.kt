@@ -22,6 +22,8 @@ data class ApiError(
     val code: String,
     val message: String,
     val fieldErrors: List<ApiFieldError> = emptyList(),
+    val retryable: Boolean = false,
+    val cause: String? = null,
 )
 
 data class ApiFieldError(

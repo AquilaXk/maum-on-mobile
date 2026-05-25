@@ -16,6 +16,8 @@ class GlobalExceptionHandler {
         return errorResponse(
             errorCode = exception.errorCode,
             message = exception.message,
+            retryable = exception.retryable,
+            cause = exception.reason,
         )
     }
 
@@ -32,6 +34,7 @@ class GlobalExceptionHandler {
             errorCode = ErrorCode.VALIDATION_ERROR,
             message = ErrorCode.VALIDATION_ERROR.defaultMessage,
             fieldErrors = fieldErrors,
+            cause = ErrorCode.VALIDATION_ERROR.name,
         )
     }
 
@@ -40,6 +43,7 @@ class GlobalExceptionHandler {
         return errorResponse(
             errorCode = ErrorCode.FORBIDDEN,
             message = exception.message ?: ErrorCode.FORBIDDEN.defaultMessage,
+            cause = ErrorCode.FORBIDDEN.name,
         )
     }
 
@@ -48,6 +52,7 @@ class GlobalExceptionHandler {
         return errorResponse(
             errorCode = ErrorCode.NOT_FOUND,
             message = ErrorCode.NOT_FOUND.defaultMessage,
+            cause = ErrorCode.NOT_FOUND.name,
         )
     }
 
@@ -58,6 +63,8 @@ class GlobalExceptionHandler {
         return errorResponse(
             errorCode = ErrorCode.INTERNAL_SERVER_ERROR,
             message = ErrorCode.INTERNAL_SERVER_ERROR.defaultMessage,
+            retryable = true,
+            cause = ErrorCode.INTERNAL_SERVER_ERROR.name,
         )
     }
 
@@ -65,11 +72,15 @@ class GlobalExceptionHandler {
         errorCode: ErrorCode,
         message: String,
         fieldErrors: List<ApiFieldError> = emptyList(),
+        retryable: Boolean = false,
+        cause: String? = errorCode.name,
     ): ResponseEntity<ApiResponse<Nothing>> {
         val error = ApiError(
             code = errorCode.name,
             message = message,
             fieldErrors = fieldErrors,
+            retryable = retryable,
+            cause = cause,
         )
 
         return ResponseEntity
