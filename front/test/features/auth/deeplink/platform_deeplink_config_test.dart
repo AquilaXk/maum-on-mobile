@@ -13,6 +13,7 @@ void main() {
 
     expect(manifest, contains('flutter_deeplinking_enabled'));
     expect(manifest, contains('android.permission.INTERNET'));
+    expect(manifest, contains('android.permission.CAMERA'));
     expect(manifest, contains('android.permission.POST_NOTIFICATIONS'));
     expect(manifest, contains('android.permission.READ_MEDIA_IMAGES'));
     expect(manifest, contains('android.permission.READ_EXTERNAL_STORAGE'));
@@ -50,6 +51,7 @@ void main() {
       matches(RegExp(r'<key>NSAllowsLocalNetworking</key>\s*<true/>')),
     );
     expect(plist, contains('<key>NSPhotoLibraryUsageDescription</key>'));
+    expect(plist, contains('<key>NSCameraUsageDescription</key>'));
     expect(plist, contains('<key>UIBackgroundModes</key>'));
     expect(plist, contains('<string>remote-notification</string>'));
 

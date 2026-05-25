@@ -670,8 +670,13 @@ class _FakeDiaryImagePicker implements DiaryImagePicker {
   const _FakeDiaryImagePicker();
 
   @override
-  Future<DiaryImageAttachment?> pickImage() async {
-    return null;
+  Future<DiaryImagePickResult> pickImage(DiaryImageSource source) async {
+    return const DiaryImagePickResult.cancelled();
+  }
+
+  @override
+  Future<bool> openSettings() async {
+    return true;
   }
 }
 

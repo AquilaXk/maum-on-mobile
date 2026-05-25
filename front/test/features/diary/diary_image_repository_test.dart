@@ -23,7 +23,11 @@ void main() {
       final repository = _repository(transport);
 
       final uploaded = await repository.uploadImage(
-        const DiaryImageAttachment(filename: 'mind.png', bytes: [1, 2, 3]),
+        const DiaryImageAttachment(
+          filename: 'mind.png',
+          bytes: [1, 2, 3],
+          contentType: 'image/png',
+        ),
       );
 
       final request = transport.requests.single;
@@ -35,6 +39,7 @@ void main() {
       expect(request.multipart?.files.single.fieldName, 'image');
       expect(request.multipart?.files.single.filename, 'mind.png');
       expect(request.multipart?.files.single.bytes, [1, 2, 3]);
+      expect(request.multipart?.files.single.contentType, 'image/png');
     });
 
     test('deletes a temporary uploaded image by URL', () async {

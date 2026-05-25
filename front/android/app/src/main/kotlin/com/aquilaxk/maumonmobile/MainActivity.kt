@@ -17,6 +17,7 @@ import io.flutter.plugin.common.MethodChannel
 class MainActivity : FlutterActivity() {
     private var pendingPermissionResult: MethodChannel.Result? = null
     private var pushNotificationChannel: MethodChannel? = null
+    private var diaryImagePickerChannel: DiaryImagePickerChannel? = null
     private var initialNotificationPayload: Map<String, Any?>? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -32,6 +33,10 @@ class MainActivity : FlutterActivity() {
         ).also { channel ->
             channel.setMethodCallHandler(::handlePushNotificationCall)
         }
+        diaryImagePickerChannel = DiaryImagePickerChannel(
+            this,
+            flutterEngine.dartExecutor.binaryMessenger,
+        )
     }
 
     override fun onNewIntent(intent: Intent) {
@@ -52,12 +57,20 @@ class MainActivity : FlutterActivity() {
         grantResults: IntArray,
     ) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if (diaryImagePickerChannel?.onRequestPermissionsResult(requestCode, grantResults) == true) {
+            return
+        }
         if (requestCode != NOTIFICATION_PERMISSION_REQUEST) {
             return
         }
 
         val granted = grantResults.firstOrNull() == PackageManager.PERMISSION_GRANTED
         completePermissionRequest(granted)
+    }
+
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        diaryImagePickerChannel?.onActivityResult(requestCode, resultCode, data)
     }
 
     private fun handlePushNotificationCall(call: MethodCall, result: MethodChannel.Result) {

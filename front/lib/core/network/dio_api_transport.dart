@@ -73,7 +73,13 @@ class DioApiTransport implements ApiTransport {
       formData.files.add(
         MapEntry(
           file.fieldName,
-          MultipartFile.fromBytes(file.bytes, filename: file.filename),
+          MultipartFile.fromBytes(
+            file.bytes,
+            filename: file.filename,
+            contentType: file.contentType == null
+                ? null
+                : DioMediaType.parse(file.contentType!),
+          ),
         ),
       );
     }

@@ -36,9 +36,11 @@ class MultipartFilePart {
     required this.fieldName,
     required this.filename,
     required List<int> bytes,
+    this.contentType,
   }) : bytes = List.unmodifiable(bytes);
 
   final String fieldName;
   final String filename;
   final List<int> bytes;
+  final String? contentType;
 }

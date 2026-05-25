@@ -53,6 +53,7 @@ class ApiDiaryImageRepository implements DiaryImageRepository {
           fieldName: 'image',
           filename: image.filename,
           bytes: image.bytes,
+          contentType: image.contentType,
         ),
       ),
       parser: UploadedDiaryImage.fromJson,
