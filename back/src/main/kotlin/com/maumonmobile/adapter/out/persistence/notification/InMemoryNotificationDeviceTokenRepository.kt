@@ -36,6 +36,19 @@ class InMemoryNotificationDeviceTokenRepository : NotificationDeviceTokenReposit
         return true
     }
 
+    override fun disableAll(memberId: Long): Int {
+        val now = Instant.now().toString()
+        val keys = tokensByKey.entries
+            .filter { (key, token) -> key.memberId == memberId && token.enabled }
+            .map { (key, _) -> key }
+        keys.forEach { key ->
+            tokensByKey.computeIfPresent(key) { _, token ->
+                token.copy(enabled = false, updatedAt = now)
+            }
+        }
+        return keys.size
+    }
+
     override fun findEnabledByMemberId(memberId: Long): List<NotificationDeviceToken> {
         return tokensByKey.values
             .filter { token -> token.memberId == memberId && token.enabled }

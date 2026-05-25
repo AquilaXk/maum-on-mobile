@@ -8,5 +8,7 @@ interface NotificationDeviceTokenRepository {
 
     fun disable(memberId: Long, token: String): Boolean
 
+    fun disableAll(memberId: Long): Int
+
     fun findEnabledByMemberId(memberId: Long): List<NotificationDeviceToken>
 }

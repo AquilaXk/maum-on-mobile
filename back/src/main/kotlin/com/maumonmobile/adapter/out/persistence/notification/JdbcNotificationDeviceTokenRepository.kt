@@ -78,6 +78,21 @@ class JdbcNotificationDeviceTokenRepository(
         return updatedRows > 0
     }
 
+    override fun disableAll(memberId: Long): Int {
+        return jdbc.update(
+            """
+                update notification_device_tokens
+                   set enabled = false,
+                       updated_at = :updatedAt
+                 where member_id = :memberId
+                   and enabled = true
+            """.trimIndent(),
+            params()
+                .withValue("memberId", memberId)
+                .withValue("updatedAt", Instant.now().toString()),
+        )
+    }
+
     override fun findEnabledByMemberId(memberId: Long): List<NotificationDeviceToken> {
         return jdbc.query(
             """

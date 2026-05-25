@@ -18,5 +18,6 @@ enum class AuthMemberRole {
 
 enum class AuthMemberStatus {
     ACTIVE,
+    BLOCKED,
     WITHDRAWN,
 }

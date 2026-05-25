@@ -33,6 +33,10 @@ class InMemoryAuthMemberRepository : AuthMemberRepository {
 
     override fun findById(id: Long): AuthMember? = membersById[id]
 
+    override fun findAll(): List<AuthMember> {
+        return membersById.values.sortedBy { member -> member.id }
+    }
+
     override fun findAllActive(): List<AuthMember> {
         return membersById.values
             .filter { member -> member.status == AuthMemberStatus.ACTIVE }
@@ -55,5 +59,13 @@ class InMemoryAuthMemberRepository : AuthMemberRepository {
 
     override fun revokeRefreshToken(refreshToken: String) {
         memberIdsByRefreshToken.remove(refreshToken)
+    }
+
+    override fun revokeRefreshTokens(memberId: Long): Int {
+        val tokens = memberIdsByRefreshToken.entries
+            .filter { (_, tokenMemberId) -> tokenMemberId == memberId }
+            .map { (refreshToken, _) -> refreshToken }
+        tokens.forEach(memberIdsByRefreshToken::remove)
+        return tokens.size
     }
 }
