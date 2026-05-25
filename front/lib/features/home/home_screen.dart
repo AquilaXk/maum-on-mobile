@@ -321,21 +321,25 @@ class _ActionGrid extends StatelessWidget {
           runSpacing: AppSpacing.xs,
           children: [
             FilledButton.icon(
+              key: const ValueKey('home-action-diary'),
               onPressed: onWriteDiary,
               icon: const Icon(Icons.edit_note),
               label: const Text('다이어리 쓰기'),
             ),
             FilledButton.tonalIcon(
+              key: const ValueKey('home-action-letter'),
               onPressed: onWriteLetter,
               icon: const Icon(Icons.mail_outline),
               label: const Text('편지 쓰기'),
             ),
             OutlinedButton.icon(
+              key: const ValueKey('home-action-story'),
               onPressed: onViewStory,
               icon: const Icon(Icons.forum_outlined),
               label: const Text('스토리 보기'),
             ),
             FilledButton.tonalIcon(
+              key: const ValueKey('home-action-consultation'),
               onPressed: onOpenConsultation,
               icon: const Icon(Icons.chat_bubble_outline),
               label: const Text('상담하기'),
@@ -360,16 +364,19 @@ class _ActionGrid extends StatelessWidget {
           runSpacing: AppSpacing.xs,
           children: [
             OutlinedButton.icon(
+              key: const ValueKey('home-action-notifications'),
               onPressed: onOpenNotifications,
               icon: const Icon(Icons.notifications_none),
               label: const Text('알림/신고'),
             ),
             OutlinedButton.icon(
+              key: const ValueKey('home-action-settings'),
               onPressed: onOpenSettings,
               icon: const Icon(Icons.settings_outlined),
               label: const Text('설정'),
             ),
             OutlinedButton.icon(
+              key: const ValueKey('home-action-logout'),
               onPressed: onLogout,
               icon: const Icon(Icons.logout),
               label: const Text('로그아웃'),

@@ -300,7 +300,11 @@ void main() {
     );
 
     await tester.pumpAndSettle();
-    await tester.tap(find.text('상담하기'));
+    final consultationAction =
+        find.byKey(const ValueKey('home-action-consultation'));
+    await tester.ensureVisible(consultationAction);
+    await tester.pumpAndSettle();
+    await tester.tap(consultationAction);
     await tester.pump();
     consultationRepository.emit(
       const ConsultationStreamEvent.connect('connected'),
@@ -438,7 +442,10 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey('route-tab-home')));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('로그아웃'));
+    final logoutAction = find.byKey(const ValueKey('home-action-logout'));
+    await tester.ensureVisible(logoutAction);
+    await tester.pumpAndSettle();
+    await tester.tap(logoutAction);
     await tester.pumpAndSettle();
 
     expect(notificationRepository.registeredTokens, ['IOS:ios-token-logout']);

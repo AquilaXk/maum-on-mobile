@@ -41,7 +41,10 @@ void main() {
     expect(find.text('오늘 너무 지쳐요'), findsWidgets);
     expect(find.byKey(const ValueKey('home-feed-story-1')), findsOneWidget);
 
-    await tester.tap(find.text('질문'));
+    final questionChip = find.byKey(const ValueKey('home-category-question'));
+    await tester.ensureVisible(questionChip);
+    await tester.pumpAndSettle();
+    await tester.tap(questionChip);
     await tester.pumpAndSettle();
 
     expect(find.byKey(const ValueKey('home-feed-story-2')), findsOneWidget);
@@ -86,7 +89,13 @@ void main() {
     );
 
     expect(find.text('이어쓰기'), findsOneWidget);
-    expect(find.text('오늘의 기록'), findsOneWidget);
+    expect(
+      find.descendant(
+        of: find.byKey(const ValueKey('home-draft-diary')),
+        matching: find.text('오늘의 기록'),
+      ),
+      findsOneWidget,
+    );
 
     await tester.tap(find.byKey(const ValueKey('home-draft-diary')));
 
@@ -122,12 +131,12 @@ void main() {
       ),
     );
 
-    await tester.tap(find.text('다이어리 쓰기'));
-    await tester.tap(find.text('편지 쓰기'));
-    await tester.tap(find.text('스토리 보기'));
-    await tester.tap(find.text('상담하기'));
-    await tester.tap(find.text('알림/신고'));
-    await tester.tap(find.text('설정'));
+    await tester.tap(find.byKey(const ValueKey('home-action-diary')));
+    await tester.tap(find.byKey(const ValueKey('home-action-letter')));
+    await tester.tap(find.byKey(const ValueKey('home-action-story')));
+    await tester.tap(find.byKey(const ValueKey('home-action-consultation')));
+    await tester.tap(find.byKey(const ValueKey('home-action-notifications')));
+    await tester.tap(find.byKey(const ValueKey('home-action-settings')));
 
     expect(diaryTaps, 1);
     expect(letterTaps, 1);
