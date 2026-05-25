@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import '../core/network/api_client.dart';
@@ -36,6 +37,7 @@ import '../features/notification/domain/notification_models.dart';
 import '../features/notification/presentation/notification_report_screen.dart';
 import '../features/operations/application/operations_controller.dart';
 import '../features/operations/data/operations_repository.dart';
+import '../features/operations/domain/operations_models.dart';
 import '../features/operations/presentation/operations_screen.dart';
 import '../features/report/application/report_controller.dart';
 import '../features/report/data/report_repository.dart';
@@ -239,8 +241,10 @@ class _MaumOnMobileAppState extends State<MaumOnMobileApp> {
                 onRouteSelected: _selectPrimaryRoute,
                 child: _buildAuthenticatedRoute(
                   memberId: state.member!.id,
+                  email: state.member!.email,
                   nickname: state.member!.nickname,
                   role: state.member!.role,
+                  status: state.member!.status,
                   routeTitle: initialRoute.title,
                 ),
               ),
@@ -253,8 +257,10 @@ class _MaumOnMobileAppState extends State<MaumOnMobileApp> {
 
   Widget _buildAuthenticatedRoute({
     required int memberId,
+    required String email,
     required String nickname,
     required String role,
+    required String status,
     required String routeTitle,
   }) {
     return switch (_route) {
@@ -273,6 +279,15 @@ class _MaumOnMobileAppState extends State<MaumOnMobileApp> {
           ? OperationsScreen(
               controller: _operationsControllerFor(memberId),
               onBack: _returnHome,
+              adminProfile: OperationsAdminProfile(
+                id: memberId,
+                email: email,
+                nickname: nickname,
+                role: role,
+                status: status,
+              ),
+              onOpenSettings: () => _openRoute(AuthenticatedRoute.settings),
+              onLogout: _logout,
             )
           : HomeScreen(
               routeTitle: routeTitle,
@@ -607,6 +622,7 @@ class _MaumOnMobileAppState extends State<MaumOnMobileApp> {
           widget.reportRepository ?? _buildDefaultReportRepository(),
       operationsRepository:
           widget.operationsRepository ?? _buildDefaultOperationsRepository(),
+      systemEnvironment: _operationsSystemEnvironment(),
       onUnauthorized: _handleOperationsSessionInvalidated,
     );
   }
@@ -782,6 +798,25 @@ class _MaumOnMobileAppState extends State<MaumOnMobileApp> {
     );
   }
 
+  OperationsSystemEnvironment _operationsSystemEnvironment() {
+    return OperationsSystemEnvironment(
+      apiEndpoint: _apiConfig.baseUrl.toString(),
+      appVersion: const String.fromEnvironment(
+        'APP_VERSION',
+        defaultValue: '0.1.0',
+      ),
+      buildNumber: const String.fromEnvironment(
+        'APP_BUILD_NUMBER',
+        defaultValue: '1',
+      ),
+      platform: _platformLabel(defaultTargetPlatform),
+      observabilityToolUrl: const String.fromEnvironment(
+        'OBSERVABILITY_TOOL_URL',
+        defaultValue: '',
+      ),
+    );
+  }
+
   ContentModerationRepository _buildDefaultContentModerationRepository() {
     return ApiContentModerationRepository(
       apiClient: _sessionApiClient(tokenRefresher: _tokenRefresher()),
@@ -915,6 +950,17 @@ class _MaumOnMobileAppState extends State<MaumOnMobileApp> {
       _route = AuthenticatedRoute.notifications;
     });
   }
+}
+
+String _platformLabel(TargetPlatform platform) {
+  return switch (platform) {
+    TargetPlatform.android => 'Android',
+    TargetPlatform.iOS => 'iOS',
+    TargetPlatform.macOS => 'macOS',
+    TargetPlatform.windows => 'Windows',
+    TargetPlatform.linux => 'Linux',
+    TargetPlatform.fuchsia => 'Fuchsia',
+  };
 }
 
 class _SessionRestoreScreen extends StatelessWidget {

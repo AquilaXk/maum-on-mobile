@@ -1210,6 +1210,13 @@ class _PermissionChangedOperationsRepository implements OperationsRepository {
   }
 
   @override
+  Future<OperationsSystemStatus> fetchSystemStatus(
+    OperationsSystemEnvironment environment,
+  ) {
+    throw UnimplementedError();
+  }
+
+  @override
   Future<AdminMemberPage> fetchMembers({
     String? query,
     String? status,
