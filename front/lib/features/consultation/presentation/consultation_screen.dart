@@ -160,10 +160,10 @@ class _SafetyNotice extends StatelessWidget {
           children: [
             Text(safety.message),
             const SizedBox(height: AppSpacing.sm),
-            Wrap(
+            const Wrap(
               spacing: AppSpacing.xs,
               runSpacing: AppSpacing.xs,
-              children: const [
+              children: [
                 ActionChip(
                   avatar: Icon(Icons.local_hospital_outlined),
                   label: Text('119'),
