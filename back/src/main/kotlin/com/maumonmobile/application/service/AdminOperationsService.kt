@@ -188,6 +188,10 @@ class AdminOperationsService(
         val nextStatus = command.status.toMemberStatus(allowWithdrawn = false)
         val reason = command.reason.validReason()
         val updatedMember = authMemberRepository.save(member.copy(status = nextStatus))
+        if (nextStatus != AuthMemberStatus.ACTIVE) {
+            authMemberRepository.revokeRefreshTokens(member.id)
+            notificationDeviceTokenRepository.disableAll(member.id)
+        }
         val audit = adminAuditRepository.save(
             AdminAuditEventDraft(
                 targetMemberId = member.id,
@@ -213,6 +217,9 @@ class AdminOperationsService(
         val nextRole = command.role.toMemberRole()
         val reason = command.reason.validReason()
         val updatedMember = authMemberRepository.save(member.copy(role = nextRole))
+        if (member.role != nextRole) {
+            authMemberRepository.revokeRefreshTokens(member.id)
+        }
         val audit = adminAuditRepository.save(
             AdminAuditEventDraft(
                 targetMemberId = member.id,
@@ -417,8 +424,23 @@ class AdminOperationsService(
 
         val adminId = user.id.toLongOrNull()
             ?: throw ApiException(ErrorCode.UNAUTHORIZED, "다시 로그인해 주세요.")
-        return authMemberRepository.findById(adminId)
+        val admin = authMemberRepository.findById(adminId)
             ?: throw ApiException(ErrorCode.UNAUTHORIZED, "다시 로그인해 주세요.")
+        if (admin.status != AuthMemberStatus.ACTIVE) {
+            throw ApiException(
+                ErrorCode.UNAUTHORIZED,
+                "계정 상태가 변경되었습니다. 다시 로그인해 주세요.",
+                reason = "ACCOUNT_${admin.status.name}",
+            )
+        }
+        if (admin.role != AuthMemberRole.ADMIN) {
+            throw ApiException(
+                ErrorCode.FORBIDDEN,
+                "운영 권한이 변경되었습니다.",
+                reason = "ROLE_CHANGED",
+            )
+        }
+        return admin
     }
 
     private fun findLetter(letterId: Long): Letter {

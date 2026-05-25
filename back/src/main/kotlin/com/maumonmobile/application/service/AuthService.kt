@@ -78,7 +78,7 @@ class AuthService(
             ?: throw ApiException(ErrorCode.UNAUTHORIZED, "이메일 또는 비밀번호가 올바르지 않습니다.")
 
         if (member.status != AuthMemberStatus.ACTIVE) {
-            throw ApiException(ErrorCode.UNAUTHORIZED, "다시 로그인해 주세요.")
+            throw inactiveMemberException(member.status)
         }
 
         if (!passwordEncoder.matches(command.password, member.passwordHash)) {
@@ -97,7 +97,7 @@ class AuthService(
             ?: throw ApiException(ErrorCode.UNAUTHORIZED, "다시 로그인해 주세요.")
 
         if (member.status != AuthMemberStatus.ACTIVE) {
-            throw ApiException(ErrorCode.UNAUTHORIZED, "다시 로그인해 주세요.")
+            throw inactiveMemberException(member.status)
         }
 
         authMemberRepository.revokeRefreshToken(command.refreshToken)
@@ -349,10 +349,26 @@ class AuthService(
             ?: throw ApiException(ErrorCode.UNAUTHORIZED, "다시 로그인해 주세요.")
 
         if (member.status != AuthMemberStatus.ACTIVE) {
-            throw ApiException(ErrorCode.UNAUTHORIZED, "다시 로그인해 주세요.")
+            throw inactiveMemberException(member.status)
         }
 
         return member
+    }
+
+    private fun inactiveMemberException(status: AuthMemberStatus): ApiException {
+        return when (status) {
+            AuthMemberStatus.BLOCKED -> ApiException(
+                ErrorCode.UNAUTHORIZED,
+                "계정 상태가 변경되었습니다. 다시 로그인해 주세요.",
+                reason = "ACCOUNT_BLOCKED",
+            )
+            AuthMemberStatus.WITHDRAWN -> ApiException(
+                ErrorCode.UNAUTHORIZED,
+                "탈퇴한 계정입니다. 다시 로그인해 주세요.",
+                reason = "ACCOUNT_WITHDRAWN",
+            )
+            AuthMemberStatus.ACTIVE -> ApiException(ErrorCode.UNAUTHORIZED, "다시 로그인해 주세요.")
+        }
     }
 
     private companion object {

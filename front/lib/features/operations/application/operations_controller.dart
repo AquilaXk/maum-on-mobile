@@ -283,14 +283,14 @@ class OperationsController extends ChangeNotifier {
   OperationsController({
     required ReportRepository reportRepository,
     required OperationsRepository operationsRepository,
-    VoidCallback? onUnauthorized,
+    ValueChanged<String>? onUnauthorized,
   })  : _reportRepository = reportRepository,
         _operationsRepository = operationsRepository,
         _onUnauthorized = onUnauthorized;
 
   final ReportRepository _reportRepository;
   final OperationsRepository _operationsRepository;
-  final VoidCallback? _onUnauthorized;
+  final ValueChanged<String>? _onUnauthorized;
 
   OperationsState _state = const OperationsState();
   bool _isDisposed = false;
@@ -1104,9 +1104,8 @@ class OperationsController extends ChangeNotifier {
   }
 
   void _handleError(Object error) {
-    if (error is ApiClientException &&
-        error.kind == ApiErrorKind.unauthorized) {
-      _onUnauthorized?.call();
+    if (error is ApiClientException && error.sessionInvalidated) {
+      _onUnauthorized?.call(error.message);
     }
 
     _setState(
@@ -1122,10 +1121,10 @@ class OperationsController extends ChangeNotifier {
   void _handleMetricsError(Object error) {
     final isPermissionError = error is ApiClientException &&
         (error.kind == ApiErrorKind.unauthorized ||
-            error.kind == ApiErrorKind.forbidden);
-    if (error is ApiClientException &&
-        error.kind == ApiErrorKind.unauthorized) {
-      _onUnauthorized?.call();
+            error.kind == ApiErrorKind.forbidden ||
+            error.kind == ApiErrorKind.permissionChanged);
+    if (error is ApiClientException && error.sessionInvalidated) {
+      _onUnauthorized?.call(error.message);
     }
 
     _setState(

@@ -19,6 +19,8 @@ import com.maumonmobile.domain.report.Report
 import com.maumonmobile.domain.report.ReportDraft
 import com.maumonmobile.domain.report.ReportReason
 import com.maumonmobile.domain.report.ReportTargetType
+import com.maumonmobile.domain.auth.AuthMemberRole
+import com.maumonmobile.domain.auth.AuthMemberStatus
 import com.maumonmobile.global.security.AuthenticatedUser
 import com.maumonmobile.global.web.ApiException
 import com.maumonmobile.global.web.ErrorCode
@@ -140,8 +142,23 @@ class ReportService(
 
         val adminId = user.id.toLongOrNull()
             ?: throw ApiException(ErrorCode.UNAUTHORIZED, "다시 로그인해 주세요.")
-        return authMemberRepository.findById(adminId)
+        val admin = authMemberRepository.findById(adminId)
             ?: throw ApiException(ErrorCode.UNAUTHORIZED, "다시 로그인해 주세요.")
+        if (admin.status != AuthMemberStatus.ACTIVE) {
+            throw ApiException(
+                ErrorCode.UNAUTHORIZED,
+                "계정 상태가 변경되었습니다. 다시 로그인해 주세요.",
+                reason = "ACCOUNT_${admin.status.name}",
+            )
+        }
+        if (admin.role != AuthMemberRole.ADMIN) {
+            throw ApiException(
+                ErrorCode.FORBIDDEN,
+                "운영 권한이 변경되었습니다.",
+                reason = "ROLE_CHANGED",
+            )
+        }
+        return admin
     }
 
     private fun Report.toSummary(): AdminReportSummary {

@@ -1,6 +1,10 @@
 enum ApiErrorKind {
   unauthorized,
   forbidden,
+  sessionExpired,
+  permissionChanged,
+  accountBlocked,
+  accountWithdrawn,
   network,
   emptyResponse,
   server,
@@ -24,6 +28,14 @@ class ApiClientException implements Exception {
   final List<ApiFieldError> fieldErrors;
   final Object? cause;
 
+  bool get sessionInvalidated {
+    return kind == ApiErrorKind.unauthorized ||
+        kind == ApiErrorKind.sessionExpired ||
+        kind == ApiErrorKind.permissionChanged ||
+        kind == ApiErrorKind.accountBlocked ||
+        kind == ApiErrorKind.accountWithdrawn;
+  }
+
   @override
   String toString() => 'ApiClientException($kind, $message)';
 }
@@ -32,6 +44,7 @@ class ApiErrorBody {
   const ApiErrorBody({
     this.code,
     required this.message,
+    this.reason,
     this.fieldErrors = const [],
   });
 
@@ -55,6 +68,7 @@ class ApiErrorBody {
       code: (map['code'] ?? map['resultCode'])?.toString(),
       message: (map['message'] ?? map['msg'])?.toString() ??
           '요청을 처리하지 못했습니다.',
+      reason: (map['cause'] ?? map['reason'])?.toString(),
       fieldErrors: rawFieldErrors is List
           ? rawFieldErrors.map(ApiFieldError.fromJson).toList(growable: false)
           : const [],
@@ -63,6 +77,7 @@ class ApiErrorBody {
 
   final String? code;
   final String message;
+  final String? reason;
   final List<ApiFieldError> fieldErrors;
 }
 
