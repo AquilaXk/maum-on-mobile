@@ -12,6 +12,9 @@ class MobileApiMetricsRegistry {
     private val duplicatePreventions = ConcurrentHashMap<String, AtomicInteger>()
     private val imageLifecycle = ConcurrentHashMap<String, AtomicInteger>()
     private val pushDelivery = ConcurrentHashMap<String, AtomicInteger>()
+    private val aiModel = ConcurrentHashMap<String, AtomicInteger>()
+    private val contentModeration = ConcurrentHashMap<String, AtomicInteger>()
+    private val consultationSafety = ConcurrentHashMap<String, AtomicInteger>()
 
     fun record(method: String, path: String, statusCode: Int, latencyMs: Long) {
         samples += MobileApiMetricSample(
@@ -59,6 +62,11 @@ class MobileApiMetricsRegistry {
             notifications = MobileNotificationMetrics(
                 pushDelivery = pushDelivery.toCountMap(),
             ),
+            ai = MobileAiMetrics(
+                model = aiModel.toCountMap(),
+                contentModeration = contentModeration.toCountMap(),
+                consultationSafety = consultationSafety.toCountMap(),
+            ),
         )
     }
 
@@ -75,11 +83,27 @@ class MobileApiMetricsRegistry {
         pushDelivery.increment("${platform.uppercase()}.$status")
     }
 
+    fun recordAiModel(operation: String, status: String) {
+        aiModel.increment("${operation.lowercase()}.$status")
+    }
+
+    fun recordContentModeration(target: String, riskLevel: String, allowed: Boolean) {
+        val outcome = if (allowed) "allowed" else "blocked"
+        contentModeration.increment("${target.uppercase()}.${riskLevel.uppercase()}.$outcome")
+    }
+
+    fun recordConsultationSafety(category: String, actionPolicy: String) {
+        consultationSafety.increment("${category.uppercase()}.${actionPolicy.uppercase()}")
+    }
+
     fun clear() {
         samples.clear()
         duplicatePreventions.clear()
         imageLifecycle.clear()
         pushDelivery.clear()
+        aiModel.clear()
+        contentModeration.clear()
+        consultationSafety.clear()
     }
 
     private fun sanitizeRoute(path: String): String {
@@ -112,6 +136,7 @@ data class MobileApiMetricsSnapshot(
     val endpoints: List<MobileApiEndpointMetrics>,
     val writeRecovery: MobileWriteRecoveryMetrics = MobileWriteRecoveryMetrics(),
     val notifications: MobileNotificationMetrics = MobileNotificationMetrics(),
+    val ai: MobileAiMetrics = MobileAiMetrics(),
 )
 
 data class MobileApiEndpointMetrics(
@@ -130,6 +155,12 @@ data class MobileWriteRecoveryMetrics(
 /** 푸시 발송 성공, 실패, 토큰 정리 결과를 상태별 카운터로 노출합니다. */
 data class MobileNotificationMetrics(
     val pushDelivery: Map<String, Int> = emptyMap(),
+)
+
+data class MobileAiMetrics(
+    val model: Map<String, Int> = emptyMap(),
+    val contentModeration: Map<String, Int> = emptyMap(),
+    val consultationSafety: Map<String, Int> = emptyMap(),
 )
 
 private data class MobileApiMetricSample(

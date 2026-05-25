@@ -7,6 +7,7 @@ import com.maumonmobile.application.port.out.ConsultationAiResponse
 import com.maumonmobile.application.port.out.ConsultationAiUnavailableException
 import com.maumonmobile.application.port.out.ConsultationSafetyAuditRepository
 import com.maumonmobile.domain.consultation.ConsultationRiskSeverity
+import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
@@ -17,6 +18,7 @@ import org.springframework.context.annotation.Primary
 import org.springframework.http.MediaType
 import org.springframework.mock.web.MockHttpServletResponse
 import org.springframework.test.context.ActiveProfiles
+import org.springframework.test.context.TestPropertySource
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.delete
 import org.springframework.test.web.servlet.get
@@ -25,10 +27,17 @@ import org.springframework.test.web.servlet.post
 @SpringBootTest
 @AutoConfigureMockMvc
 @ActiveProfiles("test")
+@TestPropertySource(properties = ["app.consultation.ai.timeout=50ms"])
 class ConsultationControllerTest @Autowired constructor(
     private val mockMvc: MockMvc,
     private val consultationSafetyAuditRepository: ConsultationSafetyAuditRepository,
+    private val consultationAiResponder: CapturingConsultationAiResponder,
 ) {
+
+    @BeforeEach
+    fun resetAiResponder() {
+        consultationAiResponder.clear()
+    }
 
     @Test
     fun authenticatedUsersOpenStreamAndSendConsultationMessages() {
@@ -211,6 +220,56 @@ class ConsultationControllerTest @Autowired constructor(
     }
 
     @Test
+    fun chatTimeoutStoresFallbackMessageInRecentHistory() {
+        consultationAiResponder.responseDelayMs = 200
+        val member = signupAndLogin("consultation-timeout@example.com", "지연이")
+
+        try {
+            mockMvc.post("/api/v1/consultations/chat") {
+                header("Authorization", "Bearer ${member.accessToken}")
+                contentType = MediaType.APPLICATION_JSON
+                content = """{"message":"응답 지연을 재현해요."}"""
+            }
+                .andExpect {
+                    status { isOk() }
+                }
+        } finally {
+            consultationAiResponder.responseDelayMs = 0
+        }
+
+        mockMvc.get("/api/v1/consultations/recent") {
+            header("Authorization", "Bearer ${member.accessToken}")
+        }
+            .andExpect {
+                status { isOk() }
+                jsonPath("$.data.messages[0].role") { value("USER") }
+                jsonPath("$.data.messages[1].role") { value("SYSTEM") }
+                jsonPath("$.data.messages[1].content") {
+                    value("지금은 답변을 만들지 못했습니다. 잠시 후 다시 시도해 주세요.")
+                }
+            }
+    }
+
+    @Test
+    fun promptInputRedactsContactDataBeforeModelCall() {
+        val member = signupAndLogin("consultation-redaction@example.com", "비식별이")
+
+        mockMvc.post("/api/v1/consultations/chat") {
+            header("Authorization", "Bearer ${member.accessToken}")
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"message":"연락처는 010-1234-5678이고 메일은 private@example.com이에요."}"""
+        }
+            .andExpect {
+                status { isOk() }
+            }
+
+        val modelRequest = consultationAiResponder.requests.last()
+        org.assertj.core.api.Assertions.assertThat(modelRequest.message)
+            .doesNotContain("010-1234-5678", "private@example.com")
+            .contains("[phone]", "[email]")
+    }
+
+    @Test
     fun rejectsInvalidConsultationMessagesAndUnauthenticatedStreams() {
         val member = signupAndLogin("consultation-invalid@example.com", "검증이")
 
@@ -272,14 +331,28 @@ class ConsultationControllerTest @Autowired constructor(
     class ConsultationAiTestConfig {
         @Bean
         @Primary
-        fun consultationAiResponder(): ConsultationAiResponder = object : ConsultationAiResponder {
-            override fun generate(request: ConsultationAiRequest): ConsultationAiResponse {
-                if (request.message.contains("응답 실패")) {
-                    throw ConsultationAiUnavailableException("fake failure")
-                }
-                return ConsultationAiResponse(chunks = listOf("함께 ", "살펴볼게요."))
-            }
+        fun consultationAiResponder(): CapturingConsultationAiResponder = CapturingConsultationAiResponder()
+    }
+}
+
+class CapturingConsultationAiResponder : ConsultationAiResponder {
+    val requests = mutableListOf<ConsultationAiRequest>()
+    var responseDelayMs: Long = 0
+
+    override fun generate(request: ConsultationAiRequest): ConsultationAiResponse {
+        requests += request
+        if (responseDelayMs > 0) {
+            Thread.sleep(responseDelayMs)
         }
+        if (request.message.contains("응답 실패")) {
+            throw ConsultationAiUnavailableException("fake failure")
+        }
+        return ConsultationAiResponse(chunks = listOf("함께 ", "살펴볼게요."))
+    }
+
+    fun clear() {
+        requests.clear()
+        responseDelayMs = 0
     }
 }
 
