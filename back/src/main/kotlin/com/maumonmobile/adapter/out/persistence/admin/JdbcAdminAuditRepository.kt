@@ -28,7 +28,9 @@ class JdbcAdminAuditRepository(
                     previous_value,
                     new_value,
                     reason,
-                    created_at
+                    created_at,
+                    target_resource_type,
+                    target_resource_id
                 ) values (
                     :targetMemberId,
                     :actorMemberId,
@@ -36,7 +38,9 @@ class JdbcAdminAuditRepository(
                     :previousValue,
                     :newValue,
                     :reason,
-                    :createdAt
+                    :createdAt,
+                    :targetResourceType,
+                    :targetResourceId
                 )
             """.trimIndent(),
             params()
@@ -46,7 +50,9 @@ class JdbcAdminAuditRepository(
                 .withValue("previousValue", draft.previousValue)
                 .withValue("newValue", draft.newValue)
                 .withValue("reason", draft.reason)
-                .withValue("createdAt", Instant.now().toString()),
+                .withValue("createdAt", Instant.now().toString())
+                .withValue("targetResourceType", draft.targetResourceType)
+                .withValue("targetResourceId", draft.targetResourceId),
         )
         return findById(id) ?: error("저장된 관리자 감사 이력을 확인하지 못했습니다.")
     }
@@ -60,6 +66,22 @@ class JdbcAdminAuditRepository(
                  order by created_at desc, id desc
             """.trimIndent(),
             params().withValue("memberId", memberId),
+            rowMapper,
+        )
+    }
+
+    override fun findByTargetResource(resourceType: String, resourceId: Long): List<AdminAuditEvent> {
+        return jdbc.query(
+            """
+                select *
+                  from admin_audit_events
+                 where target_resource_type = :resourceType
+                   and target_resource_id = :resourceId
+                 order by created_at desc, id desc
+            """.trimIndent(),
+            params()
+                .withValue("resourceType", resourceType)
+                .withValue("resourceId", resourceId),
             rowMapper,
         )
     }
@@ -83,6 +105,8 @@ class JdbcAdminAuditRepository(
                 newValue = rs.getString("new_value"),
                 reason = rs.getString("reason"),
                 createdAt = rs.getString("created_at"),
+                targetResourceType = rs.getString("target_resource_type"),
+                targetResourceId = rs.getLong("target_resource_id").takeUnless { rs.wasNull() },
             )
         }
     }

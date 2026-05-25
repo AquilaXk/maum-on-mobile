@@ -4,10 +4,12 @@ import com.maumonmobile.application.port.out.AuthMemberRepository
 import com.maumonmobile.application.port.out.DiaryRepository
 import com.maumonmobile.application.port.out.LetterRepository
 import com.maumonmobile.application.port.out.NotificationDeviceTokenRepository
+import com.maumonmobile.application.port.out.NotificationRepository
 import com.maumonmobile.application.port.out.ReportRepository
 import com.maumonmobile.application.port.out.StoryRepository
 import com.maumonmobile.domain.auth.AuthMember
 import com.maumonmobile.domain.auth.AuthMemberRole
+import com.maumonmobile.domain.auth.AuthMemberStatus
 import com.maumonmobile.domain.diary.DiaryDraft
 import com.maumonmobile.domain.letter.LetterDraft
 import com.maumonmobile.domain.notification.NotificationDevicePlatform
@@ -17,8 +19,10 @@ import com.maumonmobile.domain.report.ReportTargetType
 import com.maumonmobile.domain.story.StoryPostDraft
 import com.maumonmobile.global.security.JwtTokenProvider
 import org.assertj.core.api.Assertions.assertThat
+import org.hamcrest.Matchers.containsString
 import org.hamcrest.Matchers.greaterThanOrEqualTo
 import org.hamcrest.Matchers.hasItem
+import org.hamcrest.Matchers.not
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
@@ -40,6 +44,7 @@ class AdminOperationsControllerTest @Autowired constructor(
     private val diaryRepository: DiaryRepository,
     private val letterRepository: LetterRepository,
     private val notificationDeviceTokenRepository: NotificationDeviceTokenRepository,
+    private val notificationRepository: NotificationRepository,
     private val reportRepository: ReportRepository,
     private val storyRepository: StoryRepository,
     private val jwtTokenProvider: JwtTokenProvider,
@@ -224,9 +229,130 @@ class AdminOperationsControllerTest @Autowired constructor(
         assertThat(notificationDeviceTokenRepository.findEnabledByMemberId(member.id)).isEmpty()
     }
 
+    @Test
+    fun adminReviewsReassignsAndBlocksLettersWithAuditTrail() {
+        val admin = savedMember(role = AuthMemberRole.ADMIN, nickname = "편지운영자")
+        val sender = savedMember(emailPrefix = "letter-admin-sender", nickname = "편지발신자")
+        val receiver = savedMember(emailPrefix = "letter-admin-receiver", nickname = "편지수신자")
+        val blockedReceiver = savedMember(
+            emailPrefix = "letter-admin-blocked-receiver",
+            nickname = "차단수신자",
+            status = AuthMemberStatus.BLOCKED,
+        )
+        val memberToken = accessToken(sender)
+        val adminToken = accessToken(admin)
+        val letter = letterRepository.save(
+            senderId = sender.id,
+            senderNickname = sender.nickname,
+            draft = LetterDraft(
+                title = "운영 확인 편지",
+                content = "운영자가 확인해야 하는 민감한 편지 본문입니다. " +
+                    "응답에서는 요약만 제공되어야 하며 끝까지 그대로 노출되면 안 되는 마지막 문장입니다.",
+            ),
+        )
+        authMemberRepository.saveRefreshToken(sender.id, "letter-sender-refresh-token")
+        notificationDeviceTokenRepository.save(
+            memberId = sender.id,
+            platform = NotificationDevicePlatform.IOS,
+            token = "ios-letter-sender-device-token",
+        )
+
+        mockMvc.get("/api/v1/admin/letters") {
+            header("Authorization", "Bearer $memberToken")
+        }
+            .andExpect {
+                status { isForbidden() }
+            }
+
+        mockMvc.get("/api/v1/admin/letters") {
+            header("Authorization", "Bearer $adminToken")
+            param("status", "UNASSIGNED")
+            param("query", "운영 확인")
+            param("page", "0")
+            param("size", "5")
+        }
+            .andExpect {
+                status { isOk() }
+                jsonPath("$.data.content[0].id") { value(letter.id.toInt()) }
+                jsonPath("$.data.content[0].sender.email") { value(sender.email) }
+                jsonPath("$.data.content[0].availableReceiverCount") { value(greaterThanOrEqualTo(1)) }
+                jsonPath("$.data.content[0].originalSummary") {
+                    value(not(containsString("끝까지 그대로 노출되면 안 되는 마지막 문장입니다.")))
+                }
+            }
+
+        mockMvc.post("/api/v1/admin/letters/${letter.id}/reassign") {
+            header("Authorization", "Bearer $adminToken")
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"receiverMemberId":${blockedReceiver.id},"reason":"잘못된 수신자 검증"}"""
+        }
+            .andExpect {
+                status { isBadRequest() }
+                jsonPath("$.error.code") { value("INVALID_REQUEST") }
+            }
+
+        mockMvc.post("/api/v1/admin/letters/${letter.id}/notes") {
+            header("Authorization", "Bearer $adminToken")
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"note":"검수 메모를 남깁니다.","reason":"운영 확인 기록"}"""
+        }
+            .andExpect {
+                status { isOk() }
+                jsonPath("$.data.latestAudit.action") { value("LETTER_NOTE") }
+                jsonPath("$.data.letter.auditEvents[*].action") { value(hasItem("LETTER_NOTE")) }
+            }
+
+        mockMvc.post("/api/v1/admin/letters/${letter.id}/reassign") {
+            header("Authorization", "Bearer $adminToken")
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"receiverMemberId":${receiver.id},"reason":"수신 가능한 회원에게 재배정"}"""
+        }
+            .andExpect {
+                status { isOk() }
+                jsonPath("$.data.latestAudit.action") { value("LETTER_REASSIGN") }
+                jsonPath("$.data.letter.receiver.id") { value(receiver.id.toInt()) }
+                jsonPath("$.data.letter.auditEvents[*].action") { value(hasItem("LETTER_REASSIGN")) }
+            }
+
+        assertThat(letterRepository.findById(letter.id)?.receiverId).isEqualTo(receiver.id)
+        assertThat(notificationRepository.findByReceiverId(receiver.id))
+            .anyMatch { notification -> notification.content.contains("편지가 배정") }
+
+        mockMvc.get("/api/v1/admin/letters/${letter.id}") {
+            header("Authorization", "Bearer $adminToken")
+        }
+            .andExpect {
+                status { isOk() }
+                jsonPath("$.data.sender.email") { value(sender.email) }
+                jsonPath("$.data.receiver.email") { value(receiver.email) }
+                jsonPath("$.data.auditEvents[*].action") {
+                    value(hasItem("LETTER_NOTE"))
+                    value(hasItem("LETTER_REASSIGN"))
+                }
+            }
+
+        mockMvc.post("/api/v1/admin/letters/${letter.id}/sender/block") {
+            header("Authorization", "Bearer $adminToken")
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"reason":"민감한 편지 반복 발송"}"""
+        }
+            .andExpect {
+                status { isOk() }
+                jsonPath("$.data.latestAudit.action") { value("LETTER_SENDER_BLOCK") }
+                jsonPath("$.data.revokedRefreshTokenCount") { value(1) }
+                jsonPath("$.data.disabledDeviceTokenCount") { value(1) }
+            }
+
+        assertThat(authMemberRepository.findById(sender.id)?.status).isEqualTo(AuthMemberStatus.BLOCKED)
+        assertThat(authMemberRepository.findByRefreshToken("letter-sender-refresh-token")).isNull()
+        assertThat(notificationDeviceTokenRepository.findEnabledByMemberId(sender.id)).isEmpty()
+    }
+
     private fun savedMember(
         emailPrefix: String = "admin-operations-${System.nanoTime()}",
         role: AuthMemberRole = AuthMemberRole.USER,
+        status: AuthMemberStatus = AuthMemberStatus.ACTIVE,
+        randomReceiveAllowed: Boolean = true,
         nickname: String,
     ): AuthMember {
         return authMemberRepository.save(
@@ -235,7 +361,9 @@ class AdminOperationsControllerTest @Autowired constructor(
                 email = "$emailPrefix-${System.nanoTime()}@example.com",
                 passwordHash = "test",
                 nickname = nickname,
+                randomReceiveAllowed = randomReceiveAllowed,
                 role = role,
+                status = status,
             ),
         )
     }
