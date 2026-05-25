@@ -213,6 +213,9 @@ class HomeController extends ChangeNotifier {
       for (final surface in _homeDraftSurfaces.keys) {
         final entry = await repository.read(
           DraftKey(memberId: memberId, surface: surface),
+        ).timeout(
+          _draftReadTimeout,
+          onTimeout: () => null,
         );
         if (entry != null && entry.fields.isNotEmpty) {
           entries.add(entry);
@@ -302,3 +305,5 @@ const _homeDraftSurfaces = {
   DraftSurface.letter: HomeActionSurface.letter,
   DraftSurface.consultation: HomeActionSurface.consultation,
 };
+
+const _draftReadTimeout = Duration(milliseconds: 500);
