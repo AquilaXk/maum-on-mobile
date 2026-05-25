@@ -86,6 +86,8 @@ class MobileTelemetryEvent {
 bool _isSensitiveKey(String key) {
   final normalized = key.toLowerCase();
   return normalized.contains('email') ||
+      normalized.contains('authorization') ||
+      normalized.contains('auth') ||
       normalized.contains('token') ||
       normalized.contains('password') ||
       normalized.contains('phone') ||
@@ -102,4 +104,7 @@ bool _isSensitiveValue(Object? value) {
 
 final _emailPattern = RegExp(r'[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}');
 final _phonePattern = RegExp(r'01[016789][-.\s]?\d{3,4}[-.\s]?\d{4}');
-final _bearerPattern = RegExp(r'Bearer\s+[A-Za-z0-9._~+/=-]+');
+final _bearerPattern = RegExp(
+  r'^(bearer|basic)\s+[A-Za-z0-9._~+/=-]+$',
+  caseSensitive: false,
+);

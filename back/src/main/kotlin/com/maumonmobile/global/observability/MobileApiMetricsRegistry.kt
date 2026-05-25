@@ -2,6 +2,7 @@ package com.maumonmobile.global.observability
 
 import org.springframework.stereotype.Component
 import java.util.concurrent.ConcurrentLinkedQueue
+import kotlin.math.ceil
 
 @Component
 class MobileApiMetricsRegistry {
@@ -55,18 +56,19 @@ class MobileApiMetricsRegistry {
 
     private fun sanitizeRoute(path: String): String {
         return path
-            .replace(NUMERIC_SEGMENT, "/{id}")
             .replace(UUID_SEGMENT, "/{id}")
+            .replace(NUMERIC_SEGMENT, "/{id}")
             .take(MAX_ROUTE_LENGTH)
     }
 
     private fun percentile(values: List<Long>, percentile: Double): Long {
+        require(percentile in 0.0..1.0) { "percentile must be between 0 and 1" }
         if (values.isEmpty()) {
             return 0
         }
         val sorted = values.sorted()
-        val index = ((sorted.size - 1) * percentile).toInt()
-        return sorted[index]
+        val index = ceil(sorted.size * percentile).toInt() - 1
+        return sorted[index.coerceIn(0, sorted.lastIndex)]
     }
 
     private companion object {

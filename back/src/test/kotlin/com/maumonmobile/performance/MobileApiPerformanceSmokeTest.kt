@@ -12,6 +12,7 @@ import org.springframework.test.context.ActiveProfiles
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.get
 import org.springframework.test.web.servlet.post
+import kotlin.math.ceil
 import kotlin.system.measureTimeMillis
 
 @SpringBootTest
@@ -114,9 +115,11 @@ class MobileApiPerformanceSmokeTest @Autowired constructor(
     }
 
     private fun percentile(values: List<Long>, percentile: Double): Long {
+        require(values.isNotEmpty()) { "values must not be empty" }
+        require(percentile in 0.0..1.0) { "percentile must be between 0 and 1" }
         val sorted = values.sorted()
-        val index = ((sorted.size - 1) * percentile).toInt()
-        return sorted[index]
+        val index = ceil(sorted.size * percentile).toInt() - 1
+        return sorted[index.coerceIn(0, sorted.lastIndex)]
     }
 
     private companion object {

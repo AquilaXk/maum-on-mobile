@@ -39,6 +39,22 @@ void main() {
     expect(attributes.containsKey('email'), isFalse);
     expect(attributes.containsKey('message'), isFalse);
     expect(attributes.containsKey('authorization'), isFalse);
+
+    for (final authorizationValue in const <String>[
+      'bearer abc.def.ghi',
+      'Basic Zm9vOmJhcg==',
+      'BeArEr mixed.Token',
+    ]) {
+      final authPayload = MobileTelemetryEvent(
+        type: MobileTelemetryEventType.apiError,
+        name: 'api_error',
+        attributes: {'header': authorizationValue},
+      ).toSanitizedPayload();
+      final authAttributes =
+          authPayload['attributes']! as Map<String, Object?>;
+
+      expect(authAttributes.containsKey('header'), isFalse);
+    }
   });
 
   test('detects budget regressions from measured durations', () {
