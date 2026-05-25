@@ -7,6 +7,8 @@ interface AuthMemberRepository {
 
     fun findById(id: Long): AuthMember?
 
+    fun findAll(): List<AuthMember>
+
     fun findAllActive(): List<AuthMember>
 
     fun findByEmail(email: String): AuthMember?
@@ -16,4 +18,6 @@ interface AuthMemberRepository {
     fun findByRefreshToken(refreshToken: String): AuthMember?
 
     fun revokeRefreshToken(refreshToken: String)
+
+    fun revokeRefreshTokens(memberId: Long): Int
 }

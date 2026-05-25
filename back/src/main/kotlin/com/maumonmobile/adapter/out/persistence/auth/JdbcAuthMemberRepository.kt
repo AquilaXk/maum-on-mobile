@@ -100,6 +100,13 @@ class JdbcAuthMemberRepository(
         ).singleOrNull()
     }
 
+    override fun findAll(): List<AuthMember> {
+        return jdbc.query(
+            "select * from auth_members order by id asc",
+            rowMapper,
+        )
+    }
+
     override fun findAllActive(): List<AuthMember> {
         return jdbc.query(
             """
@@ -156,6 +163,13 @@ class JdbcAuthMemberRepository(
         jdbc.update(
             "delete from auth_refresh_tokens where refresh_token = :refreshToken",
             params().withValue("refreshToken", refreshToken),
+        )
+    }
+
+    override fun revokeRefreshTokens(memberId: Long): Int {
+        return jdbc.update(
+            "delete from auth_refresh_tokens where member_id = :memberId",
+            params().withValue("memberId", memberId),
         )
     }
 

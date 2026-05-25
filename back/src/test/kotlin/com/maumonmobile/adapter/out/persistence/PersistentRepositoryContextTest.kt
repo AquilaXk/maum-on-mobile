@@ -1,6 +1,7 @@
 package com.maumonmobile.adapter.out.persistence
 
 import com.maumonmobile.application.port.out.AuthMemberRepository
+import com.maumonmobile.application.port.out.AdminAuditRepository
 import com.maumonmobile.application.port.out.AuthOidcStateRepository
 import com.maumonmobile.application.port.out.ConsultationRepository
 import com.maumonmobile.application.port.out.ConsultationSafetyAuditRepository
@@ -32,6 +33,7 @@ import java.time.Instant
 class PersistentRepositoryContextTest @Autowired constructor(
     private val jdbcTemplate: JdbcTemplate,
     private val authMemberRepository: AuthMemberRepository,
+    private val adminAuditRepository: AdminAuditRepository,
     private val authOidcStateRepository: AuthOidcStateRepository,
     private val consultationRepository: ConsultationRepository,
     private val consultationSafetyAuditRepository: ConsultationSafetyAuditRepository,
@@ -47,6 +49,7 @@ class PersistentRepositoryContextTest @Autowired constructor(
     @Test
     fun defaultRepositoriesUseFlywayBackedJdbcStorage() {
         assertNotInMemoryRepository(authMemberRepository)
+        assertNotInMemoryRepository(adminAuditRepository)
         assertNotInMemoryRepository(authOidcStateRepository)
         assertNotInMemoryRepository(consultationRepository)
         assertNotInMemoryRepository(consultationSafetyAuditRepository)
@@ -68,6 +71,7 @@ class PersistentRepositoryContextTest @Autowired constructor(
         assertThat(tableExists("notifications")).isTrue()
         assertThat(tableExists("notification_device_tokens")).isTrue()
         assertThat(tableExists("reports")).isTrue()
+        assertThat(tableExists("admin_audit_events")).isTrue()
         assertThat(tableExists("consultation_sessions")).isTrue()
         assertThat(tableExists("consultation_messages")).isTrue()
         assertThat(tableExists("consultation_safety_audit_events")).isTrue()
