@@ -30,6 +30,7 @@ import '../features/moderation/data/content_moderation_repository.dart';
 import '../features/notification/application/notification_controller.dart';
 import '../features/notification/data/notification_repository.dart';
 import '../features/notification/data/push_notification_permission_client.dart';
+import '../features/notification/domain/notification_models.dart';
 import '../features/notification/presentation/notification_report_screen.dart';
 import '../features/operations/application/operations_controller.dart';
 import '../features/operations/data/operations_repository.dart';
