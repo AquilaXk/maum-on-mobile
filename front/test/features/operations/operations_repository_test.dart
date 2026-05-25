@@ -195,6 +195,73 @@ void main() {
     expect(transport.requests[4].body, {'reason': '반복 악용'});
     expect(block.revokedRefreshTokenCount, 2);
   });
+
+  test('loads mobile api metrics for operations observability', () async {
+    final transport = _FakeApiTransport([
+      ApiTransportResponse.ok({
+        'resultCode': '200-1',
+        'data': _metricsJson(),
+      }),
+    ]);
+    final repository = ApiOperationsRepository(
+      apiClient: ApiClient(
+        transport: transport,
+        tokenStore: MemoryAuthTokenStore(),
+      ),
+    );
+
+    final metrics = await repository.fetchApiMetrics();
+
+    expect(transport.requests.single.path, '/api/v1/observability/api-metrics');
+    expect(transport.requests.single.method, ApiMethod.get);
+    expect(metrics.sampleCount, 4);
+    expect(metrics.endpoints.single.endpoint, 'GET /api/v1/home/stats');
+    expect(metrics.endpoints.single.errorCodes['500'], 1);
+    expect(metrics.client.eventCount('APP_START'), 2);
+    expect(metrics.client.p95DurationMs['APP_START'], 420);
+    expect(metrics.writeRecovery.duplicatePreventions['diary'], 1);
+  });
+}
+
+Map<String, Object?> _metricsJson() {
+  return {
+    'sampleCount': 4,
+    'endpoints': [
+      {
+        'endpoint': 'GET /api/v1/home/stats',
+        'requestCount': 4,
+        'successRate': 0.75,
+        'p95LatencyMs': 1320,
+        'errorCodes': {'500': 1},
+      },
+    ],
+    'writeRecovery': {
+      'duplicatePreventions': {'diary': 1},
+      'imageLifecycle': {'compressed': 2},
+    },
+    'notifications': {
+      'pushDelivery': {'ANDROID.delivered': 3},
+    },
+    'ai': {
+      'model': {'consultation.success': 2},
+      'contentModeration': {'POST.HIGH.blocked': 1},
+      'consultationSafety': {'SELF_HARM.ESCALATE': 1},
+    },
+    'client': {
+      'events': {
+        'APP_START': 2,
+        'SCREEN_VIEW': 3,
+        'API_ERROR': 1,
+        'WRITE_RECOVERY': 1,
+      },
+      'routes': {'/home': 3},
+      'platforms': {'ANDROID': 3},
+      'appVersions': {'1.0.0': 3},
+      'networkStatus': {'WIFI': 3},
+      'p95DurationMs': {'APP_START': 420},
+      'dropped': {'sampled_out': 1},
+    },
+  };
 }
 
 Map<String, Object?> _memberJson({String status = 'ACTIVE'}) {

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 
 import '../../../core/network/api_error.dart';
@@ -6,12 +8,13 @@ import '../domain/operations_models.dart';
 import '../../report/data/report_repository.dart';
 import '../../report/domain/report_models.dart';
 
-enum OperationsView { dashboard, members, letters, reports }
+enum OperationsView { dashboard, observability, members, letters, reports }
 
 class OperationsState {
   const OperationsState({
     this.view = OperationsView.dashboard,
     this.dashboard,
+    this.apiMetrics,
     this.reports = const [],
     this.selectedReport,
     this.members = const [],
@@ -43,14 +46,19 @@ class OperationsState {
     this.isLetterActionSubmitting = false,
     this.isLetterReceiverLoading = false,
     this.isDetailLoading = false,
+    this.isMetricsLoading = false,
     this.isSubmitting = false,
     this.hasLoaded = false,
+    this.hasMetricsLoaded = false,
+    this.isMetricsPermissionError = false,
     this.errorMessage,
+    this.metricsErrorMessage,
     this.noticeMessage,
   });
 
   final OperationsView view;
   final OperationsDashboard? dashboard;
+  final MobileApiMetricsSnapshot? apiMetrics;
   final List<AdminReportSummary> reports;
   final AdminReportDetail? selectedReport;
   final List<AdminMemberSummary> members;
@@ -82,9 +90,13 @@ class OperationsState {
   final bool isLetterActionSubmitting;
   final bool isLetterReceiverLoading;
   final bool isDetailLoading;
+  final bool isMetricsLoading;
   final bool isSubmitting;
   final bool hasLoaded;
+  final bool hasMetricsLoaded;
+  final bool isMetricsPermissionError;
   final String? errorMessage;
+  final String? metricsErrorMessage;
   final String? noticeMessage;
 
   bool get isEmpty => hasLoaded && reports.isEmpty && errorMessage == null;
@@ -99,6 +111,13 @@ class OperationsState {
 
   bool get isLetterEmpty {
     return hasLoaded && letters.isEmpty && errorMessage == null;
+  }
+
+  bool get isMetricsEmpty {
+    return hasMetricsLoaded &&
+        apiMetrics != null &&
+        !apiMetrics!.hasData &&
+        metricsErrorMessage == null;
   }
 
   bool get canLoadMoreLetters {
@@ -138,6 +157,7 @@ class OperationsState {
   OperationsState copyWith({
     OperationsView? view,
     OperationsDashboard? dashboard,
+    MobileApiMetricsSnapshot? apiMetrics,
     List<AdminReportSummary>? reports,
     AdminReportDetail? selectedReport,
     bool clearSelectedReport = false,
@@ -177,16 +197,22 @@ class OperationsState {
     bool? isLetterActionSubmitting,
     bool? isLetterReceiverLoading,
     bool? isDetailLoading,
+    bool? isMetricsLoading,
     bool? isSubmitting,
     bool? hasLoaded,
+    bool? hasMetricsLoaded,
+    bool? isMetricsPermissionError,
     String? errorMessage,
     bool clearErrorMessage = false,
+    String? metricsErrorMessage,
+    bool clearMetricsErrorMessage = false,
     String? noticeMessage,
     bool clearNoticeMessage = false,
   }) {
     return OperationsState(
       view: view ?? this.view,
       dashboard: dashboard ?? this.dashboard,
+      apiMetrics: apiMetrics ?? this.apiMetrics,
       reports: reports ?? this.reports,
       selectedReport:
           clearSelectedReport ? null : selectedReport ?? this.selectedReport,
@@ -236,10 +262,17 @@ class OperationsState {
       isLetterReceiverLoading:
           isLetterReceiverLoading ?? this.isLetterReceiverLoading,
       isDetailLoading: isDetailLoading ?? this.isDetailLoading,
+      isMetricsLoading: isMetricsLoading ?? this.isMetricsLoading,
       isSubmitting: isSubmitting ?? this.isSubmitting,
       hasLoaded: hasLoaded ?? this.hasLoaded,
+      hasMetricsLoaded: hasMetricsLoaded ?? this.hasMetricsLoaded,
+      isMetricsPermissionError:
+          isMetricsPermissionError ?? this.isMetricsPermissionError,
       errorMessage:
           clearErrorMessage ? null : errorMessage ?? this.errorMessage,
+      metricsErrorMessage: clearMetricsErrorMessage
+          ? null
+          : metricsErrorMessage ?? this.metricsErrorMessage,
       noticeMessage:
           clearNoticeMessage ? null : noticeMessage ?? this.noticeMessage,
     );
@@ -299,6 +332,7 @@ class OperationsController extends ChangeNotifier {
           clearErrorMessage: true,
         ),
       );
+      await _loadObservability(showLoading: false);
       if (reports.isNotEmpty && _state.selectedReport == null) {
         await openReport(reports.first);
       }
@@ -310,6 +344,51 @@ class OperationsController extends ChangeNotifier {
 
   void selectView(OperationsView view) {
     _setState(_state.copyWith(view: view, clearNoticeMessage: true));
+    if (view == OperationsView.observability &&
+        !_state.hasMetricsLoaded &&
+        !_state.isMetricsLoading) {
+      unawaited(refreshObservability());
+    }
+  }
+
+  Future<void> refreshObservability() {
+    return _loadObservability(showLoading: true);
+  }
+
+  Future<void> _loadObservability({required bool showLoading}) async {
+    if (_state.isMetricsLoading) {
+      return;
+    }
+
+    _setState(
+      _state.copyWith(
+        isMetricsLoading: showLoading,
+        isMetricsPermissionError: false,
+        clearMetricsErrorMessage: true,
+        clearNoticeMessage: true,
+      ),
+    );
+
+    try {
+      final metrics = await _operationsRepository.fetchApiMetrics();
+      _setState(
+        _state.copyWith(
+          apiMetrics: metrics,
+          isMetricsLoading: false,
+          hasMetricsLoaded: true,
+          isMetricsPermissionError: false,
+          clearMetricsErrorMessage: true,
+        ),
+      );
+    } on Object catch (error) {
+      _handleMetricsError(error);
+      _setState(
+        _state.copyWith(
+          isMetricsLoading: false,
+          hasMetricsLoaded: true,
+        ),
+      );
+    }
   }
 
   Future<void> updateMemberQuery(String query) async {
@@ -1035,6 +1114,26 @@ class OperationsController extends ChangeNotifier {
         errorMessage: error is ApiClientException
             ? error.message
             : '운영 요청을 처리하지 못했습니다.',
+        clearNoticeMessage: true,
+      ),
+    );
+  }
+
+  void _handleMetricsError(Object error) {
+    final isPermissionError = error is ApiClientException &&
+        (error.kind == ApiErrorKind.unauthorized ||
+            error.kind == ApiErrorKind.forbidden);
+    if (error is ApiClientException &&
+        error.kind == ApiErrorKind.unauthorized) {
+      _onUnauthorized?.call();
+    }
+
+    _setState(
+      _state.copyWith(
+        metricsErrorMessage: error is ApiClientException
+            ? error.message
+            : '관측 지표를 불러오지 못했습니다.',
+        isMetricsPermissionError: isPermissionError,
         clearNoticeMessage: true,
       ),
     );

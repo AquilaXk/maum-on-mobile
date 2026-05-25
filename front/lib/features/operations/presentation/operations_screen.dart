@@ -149,12 +149,19 @@ class _OperationsScreenState extends State<OperationsScreen> {
             switch (state.view) {
               OperationsView.dashboard => _DashboardView(
                   state: state,
+                  onOpenObservability: () => widget.controller.selectView(
+                    OperationsView.observability,
+                  ),
                   onOpenMembers: () =>
                       widget.controller.selectView(OperationsView.members),
                   onOpenLetters: () =>
                       widget.controller.selectView(OperationsView.letters),
                   onOpenReports: () =>
                       widget.controller.selectView(OperationsView.reports),
+                ),
+              OperationsView.observability => _ObservabilityView(
+                  state: state,
+                  onRefresh: widget.controller.refreshObservability,
                 ),
               OperationsView.members => _MembersView(
                   state: state,
@@ -218,6 +225,12 @@ class _OperationsViewSelector extends StatelessWidget {
           onSelected: () => onSelected(OperationsView.members),
         ),
         _ViewChip(
+          key: const ValueKey('operations-view-observability'),
+          label: '관측',
+          selected: selected == OperationsView.observability,
+          onSelected: () => onSelected(OperationsView.observability),
+        ),
+        _ViewChip(
           key: const ValueKey('operations-view-letters'),
           label: '편지',
           selected: selected == OperationsView.letters,
@@ -259,12 +272,14 @@ class _ViewChip extends StatelessWidget {
 class _DashboardView extends StatelessWidget {
   const _DashboardView({
     required this.state,
+    required this.onOpenObservability,
     required this.onOpenMembers,
     required this.onOpenLetters,
     required this.onOpenReports,
   });
 
   final OperationsState state;
+  final VoidCallback onOpenObservability;
   final VoidCallback onOpenMembers;
   final VoidCallback onOpenLetters;
   final VoidCallback onOpenReports;
@@ -332,6 +347,11 @@ class _DashboardView extends StatelessWidget {
           runSpacing: AppSpacing.xs,
           children: [
             FilledButton.icon(
+              onPressed: onOpenObservability,
+              icon: const Icon(Icons.monitor_heart_outlined),
+              label: const Text('모바일 관측'),
+            ),
+            FilledButton.icon(
               onPressed: onOpenMembers,
               icon: const Icon(Icons.group_outlined),
               label: const Text('회원 관리'),
@@ -349,6 +369,443 @@ class _DashboardView extends StatelessWidget {
           ],
         ),
       ],
+    );
+  }
+}
+
+class _ObservabilityView extends StatelessWidget {
+  const _ObservabilityView({
+    required this.state,
+    required this.onRefresh,
+  });
+
+  final OperationsState state;
+  final Future<void> Function() onRefresh;
+
+  @override
+  Widget build(BuildContext context) {
+    final metrics = state.apiMetrics;
+
+    if (state.isMetricsLoading && metrics == null) {
+      return const AppStateView.loading(
+        title: '관측 지표를 불러오는 중입니다.',
+        semanticLabel: '운영 관측 지표를 불러오는 중',
+      );
+    }
+
+    if (state.metricsErrorMessage != null && metrics == null) {
+      return AppStateView(
+        title: state.isMetricsPermissionError
+            ? '관측 지표 권한이 없습니다.'
+            : '관측 지표를 불러오지 못했습니다.',
+        message: state.metricsErrorMessage,
+        kind: state.isMetricsPermissionError
+            ? AppStateKind.permission
+            : AppStateKind.error,
+        actionLabel: '다시 시도',
+        onAction: () {
+          onRefresh();
+        },
+        semanticLabel: state.isMetricsPermissionError
+            ? '운영 관측 지표 권한 오류'
+            : '운영 관측 지표 오류',
+      );
+    }
+
+    if (metrics == null || state.isMetricsEmpty) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _ObservabilityHeader(
+            isRefreshing: state.isMetricsLoading,
+            onRefresh: onRefresh,
+          ),
+          const SizedBox(height: AppSpacing.md),
+          AppStateView.empty(
+            title: '수집된 관측 지표가 없습니다.',
+            message: '수집이 지연되었거나 아직 앱 사용과 API 요청이 없습니다.',
+            actionLabel: '새로고침',
+            onAction: () {
+              onRefresh();
+            },
+            semanticLabel: '운영 관측 지표 비어 있음',
+          ),
+        ],
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _ObservabilityHeader(
+          isRefreshing: state.isMetricsLoading,
+          onRefresh: onRefresh,
+        ),
+        if (state.metricsErrorMessage != null) ...[
+          const SizedBox(height: AppSpacing.md),
+          AppNotice(
+            message: state.metricsErrorMessage!,
+            tone: state.isMetricsPermissionError
+                ? AppNoticeTone.warning
+                : AppNoticeTone.error,
+          ),
+        ],
+        const SizedBox(height: AppSpacing.md),
+        _ObservabilityMetricTiles(metrics: metrics),
+        const SizedBox(height: AppSpacing.lg),
+        Text('API endpoint 품질', style: Theme.of(context).textTheme.titleMedium),
+        const SizedBox(height: AppSpacing.xs),
+        _EndpointMetricsList(endpoints: metrics.endpoints),
+        const SizedBox(height: AppSpacing.lg),
+        _ClientTelemetrySummary(metrics: metrics.client),
+        const SizedBox(height: AppSpacing.lg),
+        _OperationalTelemetrySummary(metrics: metrics),
+      ],
+    );
+  }
+}
+
+class _ObservabilityHeader extends StatelessWidget {
+  const _ObservabilityHeader({
+    required this.isRefreshing,
+    required this.onRefresh,
+  });
+
+  final bool isRefreshing;
+  final Future<void> Function() onRefresh;
+
+  @override
+  Widget build(BuildContext context) {
+    return Wrap(
+      spacing: AppSpacing.xs,
+      runSpacing: AppSpacing.xs,
+      crossAxisAlignment: WrapCrossAlignment.center,
+      alignment: WrapAlignment.spaceBetween,
+      children: [
+        Text('운영 관측', style: Theme.of(context).textTheme.titleMedium),
+        OutlinedButton.icon(
+          key: const ValueKey('operations-observability-refresh-button'),
+          onPressed: isRefreshing
+              ? null
+              : () {
+                  onRefresh();
+                },
+          icon: const Icon(Icons.refresh),
+          label: Text(isRefreshing ? '새로고침 중' : '새로고침'),
+        ),
+      ],
+    );
+  }
+}
+
+class _ObservabilityMetricTiles extends StatelessWidget {
+  const _ObservabilityMetricTiles({required this.metrics});
+
+  final MobileApiMetricsSnapshot metrics;
+
+  @override
+  Widget build(BuildContext context) {
+    return Wrap(
+      spacing: AppSpacing.xs,
+      runSpacing: AppSpacing.xs,
+      children: [
+        AppMetricTile(
+          label: 'API 요청',
+          value: metrics.sampleCount.toString(),
+        ),
+        AppMetricTile(
+          label: '성공률 최저',
+          value: _formatPercent(1 - metrics.maxErrorRate),
+          tone: _errorRateTone(metrics.maxErrorRate),
+        ),
+        AppMetricTile(
+          label: 'p95 최대',
+          value: _formatDuration(metrics.maxP95LatencyMs),
+          tone: _latencyTone(metrics.maxP95LatencyMs),
+        ),
+        AppMetricTile(
+          label: '앱 시작',
+          value: metrics.appStartCount.toString(),
+          tone: AppStatusTone.success,
+        ),
+        AppMetricTile(
+          label: 'API 오류',
+          value: metrics.apiErrorCount.toString(),
+          tone: metrics.apiErrorCount > 0
+              ? AppStatusTone.warning
+              : AppStatusTone.neutral,
+        ),
+        AppMetricTile(
+          label: '쓰기 복구',
+          value: metrics.writeRecoveryEventCount.toString(),
+        ),
+      ],
+    );
+  }
+}
+
+class _EndpointMetricsList extends StatelessWidget {
+  const _EndpointMetricsList({required this.endpoints});
+
+  final List<MobileApiEndpointMetrics> endpoints;
+
+  @override
+  Widget build(BuildContext context) {
+    if (endpoints.isEmpty) {
+      return const AppStateView.empty(
+        title: 'API endpoint 지표가 없습니다.',
+        message: '요청이 수집되면 endpoint별 품질이 표시됩니다.',
+        semanticLabel: 'API endpoint 지표 비어 있음',
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        for (final endpoint in endpoints) ...[
+          _EndpointMetricRow(endpoint: endpoint),
+          const SizedBox(height: AppSpacing.xs),
+        ],
+      ],
+    );
+  }
+}
+
+class _EndpointMetricRow extends StatelessWidget {
+  const _EndpointMetricRow({required this.endpoint});
+
+  final MobileApiEndpointMetrics endpoint;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surface,
+        borderRadius: AppRadii.card,
+        border: Border.all(color: theme.colorScheme.outlineVariant),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(AppSpacing.md),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Wrap(
+              spacing: AppSpacing.xs,
+              runSpacing: AppSpacing.xs,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              children: [
+                ConstrainedBox(
+                  constraints: const BoxConstraints(minWidth: 180, maxWidth: 360),
+                  child: Text(
+                    _softBreakMetric(endpoint.endpoint),
+                    maxLines: 3,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
+                AppStatusPill(
+                  label: _endpointRiskLabel(endpoint),
+                  tone: _endpointTone(endpoint),
+                ),
+              ],
+            ),
+            const SizedBox(height: AppSpacing.sm),
+            Wrap(
+              spacing: AppSpacing.xs,
+              runSpacing: AppSpacing.xs,
+              children: [
+                AppStatusPill(label: '요청 ${endpoint.requestCount}'),
+                AppStatusPill(
+                  label: '성공 ${_formatPercent(endpoint.successRate)}',
+                  tone: _errorRateTone(endpoint.errorRate),
+                ),
+                AppStatusPill(
+                  label: 'p95 ${_formatDuration(endpoint.p95LatencyMs)}',
+                  tone: _latencyTone(endpoint.p95LatencyMs),
+                ),
+                if (endpoint.errorCodes.isNotEmpty)
+                  AppStatusPill(
+                    label: '오류 ${_formatCounts(endpoint.errorCodes)}',
+                    tone: AppStatusTone.danger,
+                  ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ClientTelemetrySummary extends StatelessWidget {
+  const _ClientTelemetrySummary({required this.metrics});
+
+  final MobileClientTelemetryMetrics metrics;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text('앱 이벤트 집계', style: Theme.of(context).textTheme.titleMedium),
+        const SizedBox(height: AppSpacing.xs),
+        Wrap(
+          spacing: AppSpacing.xs,
+          runSpacing: AppSpacing.xs,
+          children: [
+            AppMetricTile(
+              label: '앱 시작',
+              value: metrics.eventCount('APP_START').toString(),
+            ),
+            AppMetricTile(
+              label: '화면 이동',
+              value: metrics.eventCount('SCREEN_VIEW').toString(),
+            ),
+            AppMetricTile(
+              label: 'API 오류',
+              value: metrics.eventCount('API_ERROR').toString(),
+              tone: metrics.eventCount('API_ERROR') > 0
+                  ? AppStatusTone.warning
+                  : AppStatusTone.neutral,
+            ),
+            AppMetricTile(
+              label: '쓰기 복구',
+              value: metrics.eventCount('WRITE_RECOVERY').toString(),
+            ),
+          ],
+        ),
+        const SizedBox(height: AppSpacing.md),
+        _CounterMapSection(
+          title: '경로',
+          values: metrics.routes,
+        ),
+        _CounterMapSection(
+          title: '플랫폼',
+          values: metrics.platforms,
+        ),
+        _CounterMapSection(
+          title: '앱 버전',
+          values: metrics.appVersions,
+        ),
+        _CounterMapSection(
+          title: '네트워크',
+          values: metrics.networkStatus,
+        ),
+        _CounterMapSection(
+          title: '이벤트 p95',
+          values: metrics.p95DurationMs,
+          valueSuffix: 'ms',
+        ),
+        _CounterMapSection(
+          title: '수집 제외',
+          values: metrics.dropped,
+          tone: AppStatusTone.warning,
+        ),
+      ],
+    );
+  }
+}
+
+class _OperationalTelemetrySummary extends StatelessWidget {
+  const _OperationalTelemetrySummary({required this.metrics});
+
+  final MobileApiMetricsSnapshot metrics;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text('운영 이벤트 집계', style: Theme.of(context).textTheme.titleMedium),
+        const SizedBox(height: AppSpacing.xs),
+        Wrap(
+          spacing: AppSpacing.xs,
+          runSpacing: AppSpacing.xs,
+          children: [
+            AppMetricTile(
+              label: '쓰기 복구 서버',
+              value: metrics.writeRecovery.totalCount.toString(),
+            ),
+            AppMetricTile(
+              label: '푸시 전달',
+              value: metrics.notifications.totalCount.toString(),
+            ),
+            AppMetricTile(
+              label: 'AI 처리',
+              value: metrics.ai.totalCount.toString(),
+            ),
+          ],
+        ),
+        const SizedBox(height: AppSpacing.md),
+        _CounterMapSection(
+          title: '중복 방지',
+          values: metrics.writeRecovery.duplicatePreventions,
+        ),
+        _CounterMapSection(
+          title: '이미지 처리',
+          values: metrics.writeRecovery.imageLifecycle,
+        ),
+        _CounterMapSection(
+          title: '푸시 결과',
+          values: metrics.notifications.pushDelivery,
+        ),
+        _CounterMapSection(
+          title: 'AI 모델',
+          values: metrics.ai.model,
+        ),
+        _CounterMapSection(
+          title: '콘텐츠 검수',
+          values: metrics.ai.contentModeration,
+        ),
+      ],
+    );
+  }
+}
+
+class _CounterMapSection extends StatelessWidget {
+  const _CounterMapSection({
+    required this.title,
+    required this.values,
+    this.valueSuffix = '',
+    this.tone = AppStatusTone.neutral,
+  });
+
+  final String title;
+  final Map<String, int> values;
+  final String valueSuffix;
+  final AppStatusTone tone;
+
+  @override
+  Widget build(BuildContext context) {
+    if (values.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(title, style: Theme.of(context).textTheme.labelLarge),
+          const SizedBox(height: AppSpacing.xxs),
+          Wrap(
+            spacing: AppSpacing.xs,
+            runSpacing: AppSpacing.xs,
+            children: [
+              for (final entry in values.entries)
+                AppStatusPill(
+                  label:
+                      '${_metricKeyLabel(entry.key)} ${entry.value}$valueSuffix',
+                  tone: tone,
+                ),
+            ],
+          ),
+        ],
+      ),
     );
   }
 }
@@ -1334,6 +1791,99 @@ String _adminMemberLabel(AdminReportMember? member) {
     return '미배정';
   }
   return '${member.nickname} · ${member.email} · ${member.status}';
+}
+
+String _endpointRiskLabel(MobileApiEndpointMetrics endpoint) {
+  return switch (_endpointTone(endpoint)) {
+    AppStatusTone.danger => '위험',
+    AppStatusTone.warning => '주의',
+    AppStatusTone.success => '정상',
+    AppStatusTone.neutral => '정상',
+  };
+}
+
+AppStatusTone _endpointTone(MobileApiEndpointMetrics endpoint) {
+  if (endpoint.errorRate >= 0.05 || endpoint.p95LatencyMs >= 1200) {
+    return AppStatusTone.danger;
+  }
+  if (endpoint.errorRate >= 0.01 || endpoint.p95LatencyMs >= 800) {
+    return AppStatusTone.warning;
+  }
+  if (endpoint.requestCount > 0) {
+    return AppStatusTone.success;
+  }
+  return AppStatusTone.neutral;
+}
+
+AppStatusTone _errorRateTone(double errorRate) {
+  if (errorRate >= 0.05) {
+    return AppStatusTone.danger;
+  }
+  if (errorRate >= 0.01) {
+    return AppStatusTone.warning;
+  }
+  if (errorRate == 0) {
+    return AppStatusTone.success;
+  }
+  return AppStatusTone.neutral;
+}
+
+AppStatusTone _latencyTone(int latencyMs) {
+  if (latencyMs >= 1200) {
+    return AppStatusTone.danger;
+  }
+  if (latencyMs >= 800) {
+    return AppStatusTone.warning;
+  }
+  if (latencyMs > 0) {
+    return AppStatusTone.success;
+  }
+  return AppStatusTone.neutral;
+}
+
+String _formatDuration(int durationMs) {
+  return '${durationMs}ms';
+}
+
+String _formatPercent(double value) {
+  final percent = value * 100;
+  final rounded = percent.roundToDouble();
+  final display = (percent - rounded).abs() < 0.05
+      ? percent.toStringAsFixed(0)
+      : percent.toStringAsFixed(1);
+  return '$display%';
+}
+
+String _formatCounts(Map<String, int> values) {
+  return values.entries
+      .map((entry) => '${_metricKeyLabel(entry.key)} ${entry.value}')
+      .join(', ');
+}
+
+String _metricKeyLabel(String key) {
+  return switch (key) {
+    'APP_START' => '앱 시작',
+    'SCREEN_VIEW' => '화면 이동',
+    'API_ERROR' => 'API 오류',
+    'WRITE_RECOVERY' => '쓰기 복구',
+    'CRASH_SIGNAL' => '크래시',
+    'ANDROID' => 'Android',
+    'IOS' => 'iOS',
+    'WIFI' => 'Wi-Fi',
+    'CELLULAR' => '셀룰러',
+    'ONLINE' => '온라인',
+    'OFFLINE' => '오프라인',
+    'UNKNOWN' => '알 수 없음',
+    'sampled_out' => '샘플 제외',
+    'rate_limited' => '제한',
+    _ => key.replaceAll('_', ' ').replaceAll('.', ' '),
+  };
+}
+
+String _softBreakMetric(String value) {
+  return value.replaceAllMapped(RegExp(r'([@._/\-\s])'), (match) {
+    return '${match.group(0) ?? ''}\u{200B}';
+  });
 }
 
 String _reportStatusLabel(String status) {
