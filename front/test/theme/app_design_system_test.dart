@@ -115,11 +115,11 @@ void main() {
 
     expect(find.byType(RefreshIndicator), findsOneWidget);
 
-    final indicator = tester.state<RefreshIndicatorState>(
+    final indicator = tester.widget<RefreshIndicator>(
       find.byType(RefreshIndicator),
     );
-    await indicator.show();
-    await tester.pumpAndSettle();
+    await indicator.onRefresh();
+    await tester.pump();
 
     expect(refreshCount, 1);
   });

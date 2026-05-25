@@ -153,10 +153,10 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    final indicator = tester.state<RefreshIndicatorState>(
+    final indicator = tester.widget<RefreshIndicator>(
       find.byType(RefreshIndicator),
     );
-    await indicator.show();
+    await indicator.onRefresh();
     await tester.pumpAndSettle();
 
     expect(find.text('오래된 이야기'), findsNothing);
