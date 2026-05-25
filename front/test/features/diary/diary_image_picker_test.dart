@@ -5,7 +5,7 @@ import 'package:maum_on_mobile_front/features/diary/presentation/diary_image_pic
 void main() {
   group('DiaryImageProcessor', () {
     test('accepts supported image within upload limits', () async {
-      final processor = DiaryImageProcessor(
+      const processor = DiaryImageProcessor(
         maxOriginalBytes: 8,
         maxUploadBytes: 8,
       );
@@ -24,7 +24,7 @@ void main() {
     });
 
     test('rejects unsupported image extension before upload', () async {
-      final processor = DiaryImageProcessor();
+      const processor = DiaryImageProcessor();
 
       final result = await processor.process(
         source: DiaryImageSource.gallery,
@@ -38,7 +38,7 @@ void main() {
     });
 
     test('rejects image that exceeds original size limit', () async {
-      final processor = DiaryImageProcessor(
+      const processor = DiaryImageProcessor(
         maxOriginalBytes: 2,
         maxUploadBytes: 2,
       );
@@ -55,7 +55,7 @@ void main() {
     });
 
     test('normalizes missing content type from extension', () async {
-      final processor = DiaryImageProcessor();
+      const processor = DiaryImageProcessor();
 
       final result = await processor.process(
         source: DiaryImageSource.camera,

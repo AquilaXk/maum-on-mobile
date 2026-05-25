@@ -1,4 +1,3 @@
-import 'dart:typed_data';
 import 'dart:ui' as ui;
 
 import 'package:flutter/services.dart';
@@ -70,12 +69,12 @@ abstract interface class DiaryImagePicker {
 
 class PlatformDiaryImagePicker implements DiaryImagePicker {
   const PlatformDiaryImagePicker({
-    MethodChannel channel = _channel,
+    MethodChannel channel = _defaultChannel,
     DiaryImageProcessor processor = const DiaryImageProcessor(),
   })  : _channel = channel,
         _processor = processor;
 
-  static const MethodChannel _channel =
+  static const MethodChannel _defaultChannel =
       MethodChannel('maum_on_mobile/diary_images');
 
   final MethodChannel _channel;

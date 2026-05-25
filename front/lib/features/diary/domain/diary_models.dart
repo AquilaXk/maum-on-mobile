@@ -42,16 +42,18 @@ class DiaryImageAttachment {
     this.width,
     this.height,
     this.wasCompressed = false,
-  }) : originalByteSize = originalByteSize ?? bytes.length;
+  }) : _originalByteSize = originalByteSize;
 
   final String filename;
   final List<int> bytes;
   final DiaryImageSource source;
   final String contentType;
-  final int originalByteSize;
+  final int? _originalByteSize;
   final int? width;
   final int? height;
   final bool wasCompressed;
+
+  int get originalByteSize => _originalByteSize ?? bytes.length;
 
   int get byteSize => bytes.length;
 }

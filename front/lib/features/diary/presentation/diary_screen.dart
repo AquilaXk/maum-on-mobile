@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 
@@ -691,7 +690,7 @@ class _ImagePreview extends StatelessWidget {
               if (image.wasCompressed) const Chip(label: Text('압축됨')),
             ],
           ),
-        ),
+        ],
         if (isUploadingImage) ...[
           const SizedBox(height: AppSpacing.xs),
           LinearProgressIndicator(value: uploadProgress),
