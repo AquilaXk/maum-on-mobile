@@ -2,6 +2,8 @@ package com.maumonmobile.global.security
 
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
+import org.springframework.core.env.Environment
+import org.springframework.core.env.Profiles
 import org.springframework.http.HttpMethod
 import org.springframework.security.config.annotation.web.builders.HttpSecurity
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity
@@ -16,6 +18,7 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 class SecurityConfig(
     private val jwtAuthenticationFilter: JwtAuthenticationFilter,
     private val restAuthenticationEntryPoint: RestAuthenticationEntryPoint,
+    private val environment: Environment,
 ) {
 
     @Bean
@@ -30,6 +33,12 @@ class SecurityConfig(
                 authorize
                     .requestMatchers("/api/health", "/actuator/health")
                     .permitAll()
+                if (environment.acceptsProfiles(Profiles.of("performance"))) {
+                    authorize
+                        .requestMatchers("/api/v1/performance/**")
+                        .permitAll()
+                }
+                authorize
                     .requestMatchers(
                         HttpMethod.GET,
                         "/api/v1/posts",
