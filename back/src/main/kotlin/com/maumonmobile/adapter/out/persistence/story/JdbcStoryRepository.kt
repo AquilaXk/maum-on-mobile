@@ -124,6 +124,62 @@ class JdbcStoryRepository(
         )
     }
 
+    override fun countPostsByCategoryCreatedBetween(
+        category: String,
+        startInclusive: String,
+        endExclusive: String,
+    ): Long {
+        return jdbc.queryForObject(
+            """
+                select count(*)
+                  from story_posts
+                 where category = :category
+                   and create_date >= :startInclusive
+                   and create_date < :endExclusive
+            """.trimIndent(),
+            params()
+                .withValue("category", category)
+                .withValue("startInclusive", startInclusive)
+                .withValue("endExclusive", endExclusive),
+            Long::class.java,
+        ) ?: 0L
+    }
+
+    override fun countPostsByCategories(categories: Collection<String>): Map<String, Long> {
+        if (categories.isEmpty()) {
+            return emptyMap()
+        }
+
+        return jdbc.query(
+            """
+                select category, count(*) as post_count
+                  from story_posts
+                 where category in (:categories)
+                 group by category
+            """.trimIndent(),
+            params().withValue("categories", categories),
+        ) { rs, _ ->
+            rs.getString("category") to rs.getLong("post_count")
+        }.toMap()
+    }
+
+    override fun findTopPopularPosts(limit: Int): List<StoryPost> {
+        if (limit <= 0) {
+            return emptyList()
+        }
+
+        return jdbc.query(
+            """
+                select *
+                  from story_posts
+                 order by view_count desc, create_date desc, id desc
+                 limit :limit
+            """.trimIndent(),
+            params().withValue("limit", limit),
+            postRowMapper,
+        )
+    }
+
     override fun deletePost(id: Long) {
         jdbc.update(
             "delete from story_posts where id = :id",

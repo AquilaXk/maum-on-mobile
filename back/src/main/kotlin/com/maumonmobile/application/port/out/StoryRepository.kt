@@ -17,6 +17,16 @@ interface StoryRepository {
 
     fun findPosts(): List<StoryPost>
 
+    fun countPostsByCategoryCreatedBetween(
+        category: String,
+        startInclusive: String,
+        endExclusive: String,
+    ): Long
+
+    fun countPostsByCategories(categories: Collection<String>): Map<String, Long>
+
+    fun findTopPopularPosts(limit: Int): List<StoryPost>
+
     fun deletePost(id: Long)
 
     fun saveComment(

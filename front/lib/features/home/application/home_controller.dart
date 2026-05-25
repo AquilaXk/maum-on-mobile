@@ -102,6 +102,7 @@ class HomeController extends ChangeNotifier {
   HomeState _state = const HomeState();
   bool _isLoading = false;
   bool _isDisposed = false;
+  int _storyRequestToken = 0;
 
   HomeState get state => _state;
 
@@ -134,7 +135,6 @@ class HomeController extends ChangeNotifier {
         _state.copyWith(
           hasLoaded: true,
           isStatsLoading: false,
-          isFeedLoading: false,
           isDraftLoading: false,
         ),
       );
@@ -172,10 +172,15 @@ class HomeController extends ChangeNotifier {
   }
 
   Future<void> _loadStories({HomeStoryCategory? category}) async {
+    final requestedCategory = category ?? _state.selectedCategory;
+    final requestToken = ++_storyRequestToken;
     try {
       final page = await _homeRepository.fetchStories(
-        category: category ?? _state.selectedCategory,
+        category: requestedCategory,
       );
+      if (!_isLatestStoryRequest(requestToken, requestedCategory)) {
+        return;
+      }
       _setState(
         _state.copyWith(
           stories: page.items,
@@ -184,6 +189,9 @@ class HomeController extends ChangeNotifier {
         ),
       );
     } on Object catch (error) {
+      if (!_isLatestStoryRequest(requestToken, requestedCategory)) {
+        return;
+      }
       _setState(
         _state.copyWith(
           stories: const [],
@@ -192,6 +200,14 @@ class HomeController extends ChangeNotifier {
         ),
       );
     }
+  }
+
+  bool _isLatestStoryRequest(
+    int requestToken,
+    HomeStoryCategory requestedCategory,
+  ) {
+    return requestToken == _storyRequestToken &&
+        requestedCategory == _state.selectedCategory;
   }
 
   Future<void> _loadDrafts() async {

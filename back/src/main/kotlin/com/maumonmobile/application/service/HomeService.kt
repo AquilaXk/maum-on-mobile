@@ -8,9 +8,7 @@ import com.maumonmobile.application.port.`in`.HomeUseCase
 import com.maumonmobile.application.port.out.DiaryRepository
 import com.maumonmobile.application.port.out.LetterRepository
 import com.maumonmobile.application.port.out.StoryRepository
-import com.maumonmobile.domain.story.StoryPost
 import org.springframework.stereotype.Service
-import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.ZoneId
@@ -24,16 +22,16 @@ class HomeService(
 
     override fun stats(): HomeStatsResult {
         val today = LocalDate.now(SERVICE_ZONE)
-        val posts = storyRepository.findPosts()
-        val todayWorryCount = posts
-            .count { post -> post.category == WORRY_CATEGORY && post.createDate.isSameServiceDate(today) }
-            .toLong()
-        val todayLetterCount = letterRepository.findAll()
-            .count { letter -> letter.createdDate.isSameServiceDate(today) }
-            .toLong()
-        val todayDiaryCount = diaryRepository.findAllPublicAndPrivate()
-            .count { diary -> diary.createDate.isSameServiceDate(today) }
-            .toLong()
+        val startInclusive = today.atStartOfDay(SERVICE_ZONE).toInstant().toString()
+        val endExclusive = today.plusDays(1).atStartOfDay(SERVICE_ZONE).toInstant().toString()
+        val todayWorryCount = storyRepository.countPostsByCategoryCreatedBetween(
+            category = WORRY_CATEGORY,
+            startInclusive = startInclusive,
+            endExclusive = endExclusive,
+        )
+        val todayLetterCount = letterRepository.countCreatedBetween(startInclusive, endExclusive)
+        val todayDiaryCount = diaryRepository.countCreatedBetween(startInclusive, endExclusive)
+        val categoryCounts = storyRepository.countPostsByCategories(HOME_CATEGORIES.map(HomeCategory::apiValue))
 
         return HomeStatsResult(
             todayWorryCount = todayWorryCount,
@@ -43,18 +41,16 @@ class HomeService(
                 recoveryMessage = recoveryMessage(),
                 primaryActionLabel = primaryActionLabel(todayDiaryCount, todayLetterCount),
                 primaryActionSurface = primaryActionSurface(todayDiaryCount, todayLetterCount),
-                feedMessage = feedMessage(posts),
+                feedMessage = feedMessage(categoryCounts),
             ),
             categorySummaries = HOME_CATEGORIES.map { category ->
                 HomeCategorySummaryResult(
                     category = category.apiValue,
                     label = category.label,
-                    count = posts.count { post -> post.category == category.apiValue }.toLong(),
+                    count = categoryCounts[category.apiValue] ?: 0L,
                 )
             },
-            popularStories = posts
-                .sortedWith(compareByDescending<StoryPost> { post -> post.viewCount }.thenByDescending { post -> post.createDate })
-                .take(POPULAR_STORY_LIMIT)
+            popularStories = storyRepository.findTopPopularPosts(POPULAR_STORY_LIMIT)
                 .map { post ->
                     HomePopularStoryResult(
                         id = post.id,
@@ -93,34 +89,22 @@ class HomeService(
         }
     }
 
-    private fun feedMessage(posts: List<StoryPost>): String {
-        if (posts.isEmpty()) {
+    private fun feedMessage(categoryCounts: Map<String, Long>): String {
+        val topCategory = HOME_CATEGORIES.maxByOrNull { category ->
+            categoryCounts[category.apiValue] ?: 0L
+        }
+        if (topCategory == null || (categoryCounts[topCategory.apiValue] ?: 0L) == 0L) {
             return "아직 공개된 이야기가 없습니다. 첫 이야기를 남겨보세요."
         }
-        val topCategory = HOME_CATEGORIES
-            .maxByOrNull { category -> posts.count { post -> post.category == category.apiValue } }
-        return "${topCategory?.label ?: "전체"} 이야기가 가장 활발합니다."
+        return "${topCategory.label} 이야기가 가장 활발합니다."
     }
 
     private fun labelForCategory(category: String): String {
         return HOME_CATEGORIES.firstOrNull { item -> item.apiValue == category }?.label ?: category
     }
 
-    private fun String.isSameServiceDate(today: LocalDate): Boolean {
-        val parsedDate = runCatching {
-            Instant.parse(this).atZone(SERVICE_ZONE).toLocalDate()
-        }.getOrNull()
-
-        if (parsedDate != null) {
-            return parsedDate == today
-        }
-
-        return length >= DATE_PREFIX_LENGTH && substring(0, DATE_PREFIX_LENGTH) == today.toString()
-    }
-
     private companion object {
         private val SERVICE_ZONE: ZoneId = ZoneId.of("Asia/Seoul")
-        private const val DATE_PREFIX_LENGTH = 10
         private const val WORRY_CATEGORY = "WORRY"
         private const val POPULAR_STORY_LIMIT = 3
         private val HOME_CATEGORIES = listOf(

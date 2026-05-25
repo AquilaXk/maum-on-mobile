@@ -125,6 +125,21 @@ class JdbcDiaryRepository(
         )
     }
 
+    override fun countCreatedBetween(startInclusive: String, endExclusive: String): Long {
+        return jdbc.queryForObject(
+            """
+                select count(*)
+                  from diaries
+                 where create_date >= :startInclusive
+                   and create_date < :endExclusive
+            """.trimIndent(),
+            params()
+                .withValue("startInclusive", startInclusive)
+                .withValue("endExclusive", endExclusive),
+            Long::class.java,
+        ) ?: 0L
+    }
+
     override fun delete(id: Long) {
         jdbc.update(
             "delete from diaries where id = :id",

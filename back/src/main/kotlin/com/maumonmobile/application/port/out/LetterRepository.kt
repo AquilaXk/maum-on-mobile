@@ -11,4 +11,6 @@ interface LetterRepository {
     fun findById(id: Long): Letter?
 
     fun findAll(): List<Letter>
+
+    fun countCreatedBetween(startInclusive: String, endExclusive: String): Long
 }

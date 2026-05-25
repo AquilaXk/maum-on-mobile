@@ -126,6 +126,45 @@ void main() {
           HomeStoryCategory.question);
     });
 
+    test('ignores stale feed responses when category changes quickly', () async {
+      final initialStoriesCompleter = Completer<HomeStoryPage>();
+      final questionStoriesCompleter = Completer<HomeStoryPage>();
+      final controller = HomeController(
+        homeRepository: _FakeHomeRepository(
+          stats: _stats(),
+          storyCompletersByCategory: {
+            HomeStoryCategory.all: initialStoriesCompleter,
+            HomeStoryCategory.question: questionStoriesCompleter,
+          },
+        ),
+      );
+
+      final loadFuture = controller.load();
+      await Future<void>.delayed(Duration.zero);
+      controller.selectCategory(HomeStoryCategory.question);
+
+      questionStoriesCompleter.complete(
+        HomeStoryPage(items: [_stories().last], last: true),
+      );
+      await Future<void>.delayed(Duration.zero);
+
+      expect(controller.state.selectedCategory, HomeStoryCategory.question);
+      expect(controller.state.visibleStories, hasLength(1));
+      expect(controller.state.visibleStories.single.category,
+          HomeStoryCategory.question);
+      expect(controller.state.isFeedLoading, isFalse);
+
+      initialStoriesCompleter.complete(
+        HomeStoryPage(items: [_stories().first], last: true),
+      );
+      await loadFuture;
+
+      expect(controller.state.selectedCategory, HomeStoryCategory.question);
+      expect(controller.state.visibleStories, hasLength(1));
+      expect(controller.state.visibleStories.single.category,
+          HomeStoryCategory.question);
+    });
+
     test('ignores duplicate load calls while a request is in flight', () async {
       final statsCompleter = Completer<HomeStats>();
       final storiesCompleter = Completer<HomeStoryPage>();
@@ -222,6 +261,7 @@ class _FakeHomeRepository implements HomeRepository {
     this.storiesError,
     this.statsCompleter,
     this.storiesCompleter,
+    this.storyCompletersByCategory,
   });
 
   final HomeStats? stats;
@@ -230,6 +270,8 @@ class _FakeHomeRepository implements HomeRepository {
   final Object? storiesError;
   final Completer<HomeStats>? statsCompleter;
   final Completer<HomeStoryPage>? storiesCompleter;
+  final Map<HomeStoryCategory, Completer<HomeStoryPage>>?
+      storyCompletersByCategory;
   int statsCallCount = 0;
   int storiesCallCount = 0;
 
@@ -256,6 +298,10 @@ class _FakeHomeRepository implements HomeRepository {
     final completer = storiesCompleter;
     if (completer != null) {
       return completer.future;
+    }
+    final categoryCompleter = storyCompletersByCategory?[category];
+    if (categoryCompleter != null) {
+      return categoryCompleter.future;
     }
 
     final error = storiesError;

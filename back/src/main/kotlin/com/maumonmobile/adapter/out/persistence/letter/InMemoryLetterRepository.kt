@@ -43,4 +43,10 @@ class InMemoryLetterRepository : LetterRepository {
     override fun findById(id: Long): Letter? = lettersById[id]
 
     override fun findAll(): List<Letter> = lettersById.values.toList()
+
+    override fun countCreatedBetween(startInclusive: String, endExclusive: String): Long {
+        return lettersById.values
+            .count { letter -> letter.createdDate >= startInclusive && letter.createdDate < endExclusive }
+            .toLong()
+    }
 }

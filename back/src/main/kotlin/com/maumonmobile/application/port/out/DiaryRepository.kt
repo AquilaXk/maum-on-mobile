@@ -16,5 +16,7 @@ interface DiaryRepository {
 
     fun findAllPublicAndPrivate(): List<Diary>
 
+    fun countCreatedBetween(startInclusive: String, endExclusive: String): Long
+
     fun delete(id: Long)
 }
