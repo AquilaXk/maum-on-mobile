@@ -227,6 +227,7 @@ void main() {
       find.byKey(const ValueKey('operations-letter-note-field')),
       '상담 이관',
     );
+    await tester.pump();
     await tester.ensureVisible(
       find.byKey(const ValueKey('operations-letter-note-button')),
     );
@@ -283,6 +284,7 @@ void main() {
       find.byKey(const ValueKey('operations-letter-action-reason-field')),
       '반복 악용 차단',
     );
+    await tester.pump();
     await tester.ensureVisible(
       find.byKey(const ValueKey('operations-letter-block-sender-button')),
     );
