@@ -9,12 +9,19 @@ import kotlin.math.ceil
 @Component
 class MobileApiMetricsRegistry {
     private val samples = ConcurrentLinkedQueue<MobileApiMetricSample>()
+    private val clientTelemetryDurations = ConcurrentLinkedQueue<MobileClientTelemetryDurationSample>()
     private val duplicatePreventions = ConcurrentHashMap<String, AtomicInteger>()
     private val imageLifecycle = ConcurrentHashMap<String, AtomicInteger>()
     private val pushDelivery = ConcurrentHashMap<String, AtomicInteger>()
     private val aiModel = ConcurrentHashMap<String, AtomicInteger>()
     private val contentModeration = ConcurrentHashMap<String, AtomicInteger>()
     private val consultationSafety = ConcurrentHashMap<String, AtomicInteger>()
+    private val clientTelemetryEvents = ConcurrentHashMap<String, AtomicInteger>()
+    private val clientTelemetryRoutes = ConcurrentHashMap<String, AtomicInteger>()
+    private val clientTelemetryPlatforms = ConcurrentHashMap<String, AtomicInteger>()
+    private val clientTelemetryAppVersions = ConcurrentHashMap<String, AtomicInteger>()
+    private val clientTelemetryNetworkStatus = ConcurrentHashMap<String, AtomicInteger>()
+    private val clientTelemetryDropped = ConcurrentHashMap<String, AtomicInteger>()
 
     fun record(method: String, path: String, statusCode: Int, latencyMs: Long) {
         samples += MobileApiMetricSample(
@@ -30,6 +37,7 @@ class MobileApiMetricsRegistry {
 
     fun snapshot(): MobileApiMetricsSnapshot {
         val currentSamples = samples.toList()
+        val currentClientDurations = clientTelemetryDurations.toList()
         val endpoints = currentSamples
             .groupBy { sample -> "${sample.method} ${sample.route}" }
             .map { (name, groupedSamples) ->
@@ -67,6 +75,18 @@ class MobileApiMetricsRegistry {
                 contentModeration = contentModeration.toCountMap(),
                 consultationSafety = consultationSafety.toCountMap(),
             ),
+            client = MobileClientTelemetryMetrics(
+                events = clientTelemetryEvents.toCountMap(),
+                routes = clientTelemetryRoutes.toCountMap(),
+                platforms = clientTelemetryPlatforms.toCountMap(),
+                appVersions = clientTelemetryAppVersions.toCountMap(),
+                networkStatus = clientTelemetryNetworkStatus.toCountMap(),
+                p95DurationMs = currentClientDurations
+                    .groupBy { sample -> sample.eventType }
+                    .mapValues { (_, samples) -> percentile(samples.map { sample -> sample.durationMs }, 0.95) }
+                    .toSortedMap(),
+                dropped = clientTelemetryDropped.toCountMap(),
+            ),
         )
     }
 
@@ -96,14 +116,50 @@ class MobileApiMetricsRegistry {
         consultationSafety.increment("${category.uppercase()}.${actionPolicy.uppercase()}")
     }
 
+    fun recordClientTelemetry(
+        eventType: String,
+        route: String,
+        durationMs: Long,
+        platform: String,
+        appVersion: String,
+        networkStatus: String,
+    ) {
+        val normalizedEventType = eventType.uppercase()
+        clientTelemetryEvents.increment(normalizedEventType)
+        clientTelemetryRoutes.increment(route)
+        clientTelemetryPlatforms.increment(platform.uppercase())
+        clientTelemetryAppVersions.increment(appVersion)
+        clientTelemetryNetworkStatus.increment(networkStatus.uppercase())
+        clientTelemetryDurations += MobileClientTelemetryDurationSample(
+            eventType = normalizedEventType,
+            durationMs = durationMs.coerceAtLeast(0),
+        )
+        while (clientTelemetryDurations.size > MAX_SAMPLES) {
+            clientTelemetryDurations.poll()
+        }
+    }
+
+    fun recordClientTelemetryDropped(reason: String, count: Int = 1) {
+        repeat(count.coerceAtLeast(0)) {
+            clientTelemetryDropped.increment(reason)
+        }
+    }
+
     fun clear() {
         samples.clear()
+        clientTelemetryDurations.clear()
         duplicatePreventions.clear()
         imageLifecycle.clear()
         pushDelivery.clear()
         aiModel.clear()
         contentModeration.clear()
         consultationSafety.clear()
+        clientTelemetryEvents.clear()
+        clientTelemetryRoutes.clear()
+        clientTelemetryPlatforms.clear()
+        clientTelemetryAppVersions.clear()
+        clientTelemetryNetworkStatus.clear()
+        clientTelemetryDropped.clear()
     }
 
     private fun sanitizeRoute(path: String): String {
@@ -137,6 +193,7 @@ data class MobileApiMetricsSnapshot(
     val writeRecovery: MobileWriteRecoveryMetrics = MobileWriteRecoveryMetrics(),
     val notifications: MobileNotificationMetrics = MobileNotificationMetrics(),
     val ai: MobileAiMetrics = MobileAiMetrics(),
+    val client: MobileClientTelemetryMetrics = MobileClientTelemetryMetrics(),
 )
 
 data class MobileApiEndpointMetrics(
@@ -163,11 +220,26 @@ data class MobileAiMetrics(
     val consultationSafety: Map<String, Int> = emptyMap(),
 )
 
+data class MobileClientTelemetryMetrics(
+    val events: Map<String, Int> = emptyMap(),
+    val routes: Map<String, Int> = emptyMap(),
+    val platforms: Map<String, Int> = emptyMap(),
+    val appVersions: Map<String, Int> = emptyMap(),
+    val networkStatus: Map<String, Int> = emptyMap(),
+    val p95DurationMs: Map<String, Long> = emptyMap(),
+    val dropped: Map<String, Int> = emptyMap(),
+)
+
 private data class MobileApiMetricSample(
     val method: String,
     val route: String,
     val statusCode: Int,
     val latencyMs: Long,
+)
+
+private data class MobileClientTelemetryDurationSample(
+    val eventType: String,
+    val durationMs: Long,
 )
 
 private fun ConcurrentHashMap<String, AtomicInteger>.increment(key: String) {
