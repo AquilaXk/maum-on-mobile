@@ -11,6 +11,7 @@ class MobileApiMetricsRegistry {
     private val samples = ConcurrentLinkedQueue<MobileApiMetricSample>()
     private val duplicatePreventions = ConcurrentHashMap<String, AtomicInteger>()
     private val imageLifecycle = ConcurrentHashMap<String, AtomicInteger>()
+    private val pushDelivery = ConcurrentHashMap<String, AtomicInteger>()
 
     fun record(method: String, path: String, statusCode: Int, latencyMs: Long) {
         samples += MobileApiMetricSample(
@@ -55,6 +56,9 @@ class MobileApiMetricsRegistry {
                 duplicatePreventions = duplicatePreventions.toCountMap(),
                 imageLifecycle = imageLifecycle.toCountMap(),
             ),
+            notifications = MobileNotificationMetrics(
+                pushDelivery = pushDelivery.toCountMap(),
+            ),
         )
     }
 
@@ -66,10 +70,16 @@ class MobileApiMetricsRegistry {
         imageLifecycle.increment(status)
     }
 
+    /** 플랫폼과 발송 결과별 푸시 전달 카운터를 기록합니다. */
+    fun recordPushDelivery(platform: String, status: String) {
+        pushDelivery.increment("${platform.uppercase()}.$status")
+    }
+
     fun clear() {
         samples.clear()
         duplicatePreventions.clear()
         imageLifecycle.clear()
+        pushDelivery.clear()
     }
 
     private fun sanitizeRoute(path: String): String {
@@ -101,6 +111,7 @@ data class MobileApiMetricsSnapshot(
     val sampleCount: Int,
     val endpoints: List<MobileApiEndpointMetrics>,
     val writeRecovery: MobileWriteRecoveryMetrics = MobileWriteRecoveryMetrics(),
+    val notifications: MobileNotificationMetrics = MobileNotificationMetrics(),
 )
 
 data class MobileApiEndpointMetrics(
@@ -114,6 +125,11 @@ data class MobileApiEndpointMetrics(
 data class MobileWriteRecoveryMetrics(
     val duplicatePreventions: Map<String, Int> = emptyMap(),
     val imageLifecycle: Map<String, Int> = emptyMap(),
+)
+
+/** 푸시 발송 성공, 실패, 토큰 정리 결과를 상태별 카운터로 노출합니다. */
+data class MobileNotificationMetrics(
+    val pushDelivery: Map<String, Int> = emptyMap(),
 )
 
 private data class MobileApiMetricSample(
