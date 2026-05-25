@@ -281,18 +281,26 @@ class _FeedSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (state.isFeedLoading) {
-      return const AppNotice(message: '스토리를 불러오는 중입니다.');
+      return const AppStateView.loading(
+        title: '스토리를 불러오는 중입니다.',
+        semanticLabel: '홈 공개 스토리 목록을 불러오는 중',
+      );
     }
 
     if (state.feedErrorMessage != null) {
-      return AppNotice(
+      return AppStateView.error(
+        title: '스토리를 불러오지 못했습니다.',
         message: state.feedErrorMessage!,
-        tone: AppNoticeTone.error,
+        semanticLabel: '홈 공개 스토리 목록 오류',
       );
     }
 
     if (state.isFeedEmpty) {
-      return const AppNotice(message: '아직 공개된 스토리가 없습니다.');
+      return const AppStateView.empty(
+        title: '아직 공개된 스토리가 없습니다.',
+        message: '카테고리를 바꾸거나 잠시 뒤 다시 확인해 주세요.',
+        semanticLabel: '홈 공개 스토리 목록 비어 있음',
+      );
     }
 
     return Column(

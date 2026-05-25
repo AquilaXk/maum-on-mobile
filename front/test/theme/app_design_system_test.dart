@@ -94,6 +94,69 @@ void main() {
     expect(find.byIcon(Icons.error_outline), findsOneWidget);
   });
 
+  testWidgets('state views expose journey semantics and retry actions',
+      (tester) async {
+    tester.view.physicalSize = const Size(320, 720);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    var retryCount = 0;
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: buildAppTheme(),
+        home: Scaffold(
+          body: ListView(
+            padding: const EdgeInsets.all(AppSpacing.md),
+            children: [
+              const AppStateView.loading(
+                title: '상태를 불러오는 중입니다.',
+                semanticLabel: '공통 로딩 상태',
+              ),
+              const SizedBox(height: AppSpacing.md),
+              AppStateView.empty(
+                title: '표시할 항목이 없습니다.',
+                message: '조건을 바꿔 다시 확인해 주세요.',
+                actionLabel: '다시 시도',
+                onAction: () {
+                  retryCount += 1;
+                },
+                semanticLabel: '공통 빈 상태',
+              ),
+              const SizedBox(height: AppSpacing.md),
+              const AppStateView.permission(
+                title: '권한이 필요합니다.',
+                message: '기기 설정에서 권한을 허용해 주세요.',
+                semanticLabel: '공통 권한 상태',
+              ),
+              const SizedBox(height: AppSpacing.md),
+              const AppStateView.risk(
+                title: '즉시 도움 요청',
+                message: '위험 상황이면 주변 도움을 먼저 요청해 주세요.',
+                semanticLabel: '공통 위험 안내 상태',
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+
+    expect(find.byType(CircularProgressIndicator), findsOneWidget);
+    expect(find.byIcon(Icons.inbox_outlined), findsOneWidget);
+    expect(find.byIcon(Icons.lock_outline), findsOneWidget);
+    expect(find.byIcon(Icons.health_and_safety_outlined), findsOneWidget);
+    expect(find.bySemanticsLabel('공통 로딩 상태'), findsOneWidget);
+    expect(find.bySemanticsLabel('공통 빈 상태'), findsOneWidget);
+    expect(
+      tester.getSize(find.widgetWithText(FilledButton, '다시 시도')).height,
+      greaterThanOrEqualTo(48),
+    );
+
+    await tester.tap(find.text('다시 시도'));
+    expect(retryCount, 1);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('screen exposes pull refresh when a reload callback is provided',
       (tester) async {
     var refreshCount = 0;

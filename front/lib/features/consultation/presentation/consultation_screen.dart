@@ -153,43 +153,44 @@ class _SafetyNotice extends StatelessWidget {
         AppSpacing.md,
         AppSpacing.sm,
       ),
-      child: AppSectionCard(
-        title: '즉시 도움 요청',
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Text(safety.message),
-            const SizedBox(height: AppSpacing.sm),
-            const Wrap(
-              spacing: AppSpacing.xs,
-              runSpacing: AppSpacing.xs,
-              children: [
-                ActionChip(
-                  avatar: Icon(Icons.local_hospital_outlined),
-                  label: Text('119'),
-                  onPressed: null,
-                ),
-                ActionChip(
-                  avatar: Icon(Icons.local_police_outlined),
-                  label: Text('112'),
-                  onPressed: null,
-                ),
-                ActionChip(
-                  avatar: Icon(Icons.support_agent_outlined),
-                  label: Text('1388'),
-                  onPressed: null,
-                ),
-              ],
-            ),
-            const SizedBox(height: AppSpacing.sm),
-            OutlinedButton.icon(
-              key: const ValueKey('consultation-delete-sensitive-button'),
-              onPressed: () => onDeleteSensitive(),
-              icon: const Icon(Icons.delete_outline),
-              label: const Text('민감 기록 삭제'),
-            ),
-          ],
-        ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          AppStateView.risk(
+            title: '즉시 도움 요청',
+            message: safety.message,
+            semanticLabel: '상담 위험 상황 도움 안내',
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          const Wrap(
+            spacing: AppSpacing.xs,
+            runSpacing: AppSpacing.xs,
+            children: [
+              ActionChip(
+                avatar: Icon(Icons.local_hospital_outlined),
+                label: Text('119'),
+                onPressed: null,
+              ),
+              ActionChip(
+                avatar: Icon(Icons.local_police_outlined),
+                label: Text('112'),
+                onPressed: null,
+              ),
+              ActionChip(
+                avatar: Icon(Icons.support_agent_outlined),
+                label: Text('1388'),
+                onPressed: null,
+              ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          OutlinedButton.icon(
+            key: const ValueKey('consultation-delete-sensitive-button'),
+            onPressed: () => onDeleteSensitive(),
+            icon: const Icon(Icons.delete_outline),
+            label: const Text('민감 기록 삭제'),
+          ),
+        ],
       ),
     );
   }

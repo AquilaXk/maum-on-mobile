@@ -135,9 +135,16 @@ class _MailboxView extends StatelessWidget {
         ),
         const SizedBox(height: AppSpacing.lg),
         if (state.isLoading)
-          const AppNotice(message: '편지를 불러오는 중입니다.')
+          const AppStateView.loading(
+            title: '편지를 불러오는 중입니다.',
+            semanticLabel: '편지함을 불러오는 중',
+          )
         else if (state.isEmpty)
-          const AppNotice(message: '아직 편지가 없습니다.')
+          const AppStateView.empty(
+            title: '아직 편지가 없습니다.',
+            message: '새 편지를 쓰거나 다른 탭을 확인해 주세요.',
+            semanticLabel: '편지함 비어 있음',
+          )
         else
           for (final letter in state.visibleLetters) ...[
             _LetterCard(
@@ -265,11 +272,18 @@ class _LetterDetailView extends StatelessWidget {
     final letter = state.selectedLetter;
 
     if (state.isLoading) {
-      return const AppNotice(message: '편지를 불러오는 중입니다.');
+      return const AppStateView.loading(
+        title: '편지를 불러오는 중입니다.',
+        semanticLabel: '편지 상세를 불러오는 중',
+      );
     }
 
     if (letter == null) {
-      return const AppNotice(message: '편지를 선택해 주세요.');
+      return const AppStateView.empty(
+        title: '편지를 선택해 주세요.',
+        message: '편지함에서 확인할 편지를 선택하면 상세 내용이 열립니다.',
+        semanticLabel: '편지 상세 선택 필요',
+      );
     }
 
     return Column(

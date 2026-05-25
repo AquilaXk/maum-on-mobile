@@ -94,7 +94,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 children: [
                   _SettingsHeader(onBack: widget.onBack),
                   const Expanded(
-                    child: Center(child: CircularProgressIndicator()),
+                    child: Center(
+                      child: Padding(
+                        padding: EdgeInsets.all(AppSpacing.lg),
+                        child: AppStateView.loading(
+                          title: '설정을 불러오는 중입니다.',
+                          semanticLabel: '계정 설정을 불러오는 중',
+                        ),
+                      ),
+                    ),
                   ),
                 ],
               ),
@@ -131,12 +139,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
                               const SizedBox(height: AppSpacing.md),
                             ],
                             if (settings == null)
-                              _InlineNotice(
-                                message: state.hasLoaded
-                                    ? '설정을 불러오지 못했습니다.'
-                                    : '설정을 불러오는 중입니다.',
-                                isError: state.hasLoaded,
-                              )
+                              state.hasLoaded
+                                  ? const AppStateView.error(
+                                      title: '설정을 불러오지 못했습니다.',
+                                      message: '네트워크 상태를 확인한 뒤 다시 시도해 주세요.',
+                                      semanticLabel: '계정 설정 로드 실패',
+                                    )
+                                  : const AppStateView.loading(
+                                      title: '설정을 불러오는 중입니다.',
+                                      semanticLabel: '계정 설정을 불러오는 중',
+                                    )
                             else ...[
                               _AccountSummary(
                                 email: settings.email,

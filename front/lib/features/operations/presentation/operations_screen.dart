@@ -273,11 +273,18 @@ class _DashboardView extends StatelessWidget {
   Widget build(BuildContext context) {
     final dashboard = state.dashboard;
     if (state.isLoading && dashboard == null) {
-      return const AppNotice(message: '운영 대시보드를 불러오는 중입니다.');
+      return const AppStateView.loading(
+        title: '운영 대시보드를 불러오는 중입니다.',
+        semanticLabel: '운영 대시보드를 불러오는 중',
+      );
     }
 
     if (dashboard == null) {
-      return const AppNotice(message: '운영 대시보드 정보가 없습니다.');
+      return const AppStateView.empty(
+        title: '운영 대시보드 정보가 없습니다.',
+        message: '새 지표가 수집되면 이곳에 표시됩니다.',
+        semanticLabel: '운영 대시보드 비어 있음',
+      );
     }
 
     return Column(
@@ -481,11 +488,18 @@ class _LetterList extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (state.isLetterLoading && state.letters.isEmpty) {
-      return const AppNotice(message: '편지 목록을 불러오는 중입니다.');
+      return const AppStateView.loading(
+        title: '편지 목록을 불러오는 중입니다.',
+        semanticLabel: '운영 편지 목록을 불러오는 중',
+      );
     }
 
     if (state.isLetterEmpty) {
-      return const AppNotice(message: '조건에 맞는 편지가 없습니다.');
+      return const AppStateView.empty(
+        title: '조건에 맞는 편지가 없습니다.',
+        message: '검색어 또는 상태 필터를 바꿔 다시 확인해 주세요.',
+        semanticLabel: '운영 편지 목록 비어 있음',
+      );
     }
 
     return Column(
@@ -540,12 +554,19 @@ class _LetterDetail extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (state.isLetterDetailLoading) {
-      return const AppNotice(message: '편지 상세를 불러오는 중입니다.');
+      return const AppStateView.loading(
+        title: '편지 상세를 불러오는 중입니다.',
+        semanticLabel: '운영 편지 상세를 불러오는 중',
+      );
     }
 
     final detail = state.selectedLetter;
     if (detail == null) {
-      return const AppNotice(message: '검수할 편지를 선택해 주세요.');
+      return const AppStateView.empty(
+        title: '검수할 편지를 선택해 주세요.',
+        message: '목록에서 편지를 선택하면 조치와 메모를 남길 수 있습니다.',
+        semanticLabel: '운영 편지 상세 선택 필요',
+      );
     }
 
     return AppSectionCard(
@@ -675,15 +696,26 @@ class _LetterReceiverCandidates extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (state.isLetterReceiverLoading) {
-      return const AppNotice(message: '수신자 후보를 찾는 중입니다.');
+      return const AppStateView.loading(
+        title: '수신자 후보를 찾는 중입니다.',
+        semanticLabel: '수신자 후보를 찾는 중',
+      );
     }
 
     if (state.letterReceiverQuery.isEmpty) {
-      return const AppNotice(message: '검색어를 입력해 수신자를 찾습니다.');
+      return const AppStateView.empty(
+        title: '검색어를 입력해 수신자를 찾습니다.',
+        message: '닉네임 또는 이메일로 재배정할 수신자를 검색해 주세요.',
+        semanticLabel: '수신자 검색어 입력 필요',
+      );
     }
 
     if (state.letterReceiverCandidates.isEmpty) {
-      return const AppNotice(message: '검색된 수신자가 없습니다.');
+      return const AppStateView.empty(
+        title: '검색된 수신자가 없습니다.',
+        message: '다른 검색어로 다시 시도해 주세요.',
+        semanticLabel: '수신자 후보 비어 있음',
+      );
     }
 
     return Column(
@@ -825,11 +857,18 @@ class _MemberList extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (state.isMemberLoading && state.members.isEmpty) {
-      return const AppNotice(message: '회원 목록을 불러오는 중입니다.');
+      return const AppStateView.loading(
+        title: '회원 목록을 불러오는 중입니다.',
+        semanticLabel: '운영 회원 목록을 불러오는 중',
+      );
     }
 
     if (state.isMemberEmpty) {
-      return const AppNotice(message: '조건에 맞는 회원이 없습니다.');
+      return const AppStateView.empty(
+        title: '조건에 맞는 회원이 없습니다.',
+        message: '검색어 또는 필터를 바꿔 다시 확인해 주세요.',
+        semanticLabel: '운영 회원 목록 비어 있음',
+      );
     }
 
     return Column(
@@ -880,12 +919,19 @@ class _MemberDetail extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (state.isMemberDetailLoading) {
-      return const AppNotice(message: '회원 상세를 불러오는 중입니다.');
+      return const AppStateView.loading(
+        title: '회원 상세를 불러오는 중입니다.',
+        semanticLabel: '운영 회원 상세를 불러오는 중',
+      );
     }
 
     final detail = state.selectedMember;
     if (detail == null) {
-      return const AppNotice(message: '확인할 회원을 선택해 주세요.');
+      return const AppStateView.empty(
+        title: '확인할 회원을 선택해 주세요.',
+        message: '목록에서 회원을 선택하면 계정 상태와 조치 이력을 볼 수 있습니다.',
+        semanticLabel: '운영 회원 상세 선택 필요',
+      );
     }
 
     final member = detail.member;
@@ -1081,11 +1127,18 @@ class _ReportQueue extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (state.isLoading && !state.hasLoaded) {
-      return const AppNotice(message: '신고 목록을 불러오는 중입니다.');
+      return const AppStateView.loading(
+        title: '신고 목록을 불러오는 중입니다.',
+        semanticLabel: '운영 신고 목록을 불러오는 중',
+      );
     }
 
     if (state.isEmpty) {
-      return const AppNotice(message: '처리할 신고가 없습니다.');
+      return const AppStateView.empty(
+        title: '처리할 신고가 없습니다.',
+        message: '새 신고가 접수되면 이곳에 표시됩니다.',
+        semanticLabel: '운영 신고 목록 비어 있음',
+      );
     }
 
     return Column(
@@ -1157,11 +1210,18 @@ class _ReportDetail extends StatelessWidget {
   Widget build(BuildContext context) {
     final report = state.selectedReport;
     if (state.isDetailLoading) {
-      return const AppNotice(message: '신고 상세를 불러오는 중입니다.');
+      return const AppStateView.loading(
+        title: '신고 상세를 불러오는 중입니다.',
+        semanticLabel: '운영 신고 상세를 불러오는 중',
+      );
     }
 
     if (report == null) {
-      return const AppNotice(message: '검수할 신고를 선택해 주세요.');
+      return const AppStateView.empty(
+        title: '검수할 신고를 선택해 주세요.',
+        message: '신고 대기열에서 항목을 선택하면 상세 검수와 조치를 진행할 수 있습니다.',
+        semanticLabel: '운영 신고 상세 선택 필요',
+      );
     }
 
     return AppSectionCard(
