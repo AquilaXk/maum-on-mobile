@@ -19,6 +19,8 @@ import 'package:maum_on_mobile_front/features/letter/domain/letter_models.dart';
 import 'package:maum_on_mobile_front/features/notification/data/notification_repository.dart';
 import 'package:maum_on_mobile_front/features/notification/data/push_notification_permission_client.dart';
 import 'package:maum_on_mobile_front/features/notification/domain/notification_models.dart';
+import 'package:maum_on_mobile_front/features/operations/data/operations_repository.dart';
+import 'package:maum_on_mobile_front/features/operations/domain/operations_models.dart';
 import 'package:maum_on_mobile_front/features/report/data/report_repository.dart';
 import 'package:maum_on_mobile_front/features/report/domain/report_models.dart';
 import 'package:maum_on_mobile_front/features/settings/data/settings_repository.dart';
@@ -451,6 +453,59 @@ void main() {
     expect(notificationRepository.registeredTokens, ['IOS:ios-token-logout']);
     expect(notificationRepository.unregisteredTokens, ['ios-token-logout']);
     expect(authRepository.logoutCount, 1);
+  });
+
+  testWidgets('clears session and push state when operations permission changes',
+      (tester) async {
+    final authRepository = _FakeAuthRepository(
+      restoredSession: _session(role: 'ADMIN'),
+    );
+    final notificationRepository = _FakeNotificationRepository();
+
+    await tester.pumpWidget(
+      MaumOnMobileApp(
+        authRepository: authRepository,
+        homeRepository: const _FakeHomeRepository(),
+        notificationRepository: notificationRepository,
+        pushNotificationPermissionClient: _FakePushNotificationPermissionClient(
+          permissionResult: const PushNotificationPermissionResult(
+            granted: true,
+            platform: NotificationDevicePlatform.ios,
+            token: 'ios-token-permission-change',
+          ),
+        ),
+        operationsRepository: _PermissionChangedOperationsRepository(),
+        reportRepository: _FakeReportRepository(),
+        diaryRepository: _FakeDiaryRepository(),
+        diaryImagePicker: const _FakeDiaryImagePicker(),
+        storyRepository: _FakeStoryRepository(),
+        letterRepository: _FakeLetterRepository(),
+        listenForDeepLinks: false,
+      ),
+    );
+
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('알림/신고'));
+    await tester.tap(find.text('알림/신고'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('notification-push-button')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('route-tab-home')));
+    await tester.pumpAndSettle();
+    final operationsAction = find.byKey(
+      const ValueKey('home-operations-button'),
+    );
+    await tester.ensureVisible(operationsAction);
+    await tester.pumpAndSettle();
+    await tester.tap(operationsAction);
+    await tester.pumpAndSettle();
+
+    expect(notificationRepository.unregisteredTokens, [
+      'ios-token-permission-change',
+    ]);
+    expect(authRepository.clearLocalSessionCount, 1);
+    expect(find.byKey(const ValueKey('login-email-field')), findsOneWidget);
+    expect(find.text('운영 권한이 변경되었습니다.'), findsOneWidget);
   });
 
   testWidgets('navigates authenticated users to settings and clears session',
@@ -1123,8 +1178,8 @@ class _FakeLetterRepository implements LetterRepository {
   }
 }
 
-AuthSession _session() {
-  return const AuthSession(
+AuthSession _session({String role = 'USER'}) {
+  return AuthSession(
     accessToken: 'access-token',
     tokenType: 'Bearer',
     expiresInSeconds: 3600,
@@ -1132,10 +1187,111 @@ AuthSession _session() {
       id: 7,
       email: 'me@example.com',
       nickname: '마음이',
-      role: 'USER',
+      role: role,
       status: 'ACTIVE',
     ),
   );
+}
+
+class _PermissionChangedOperationsRepository implements OperationsRepository {
+  @override
+  Future<OperationsDashboard> fetchDashboard() {
+    throw const ApiClientException(
+      kind: ApiErrorKind.permissionChanged,
+      message: '운영 권한이 변경되었습니다.',
+      statusCode: 403,
+      code: 'FORBIDDEN',
+    );
+  }
+
+  @override
+  Future<MobileApiMetricsSnapshot> fetchApiMetrics() {
+    throw UnimplementedError();
+  }
+
+  @override
+  Future<AdminMemberPage> fetchMembers({
+    String? query,
+    String? status,
+    String? role,
+    bool? socialAccount,
+    int page = 0,
+    int size = 20,
+  }) {
+    throw UnimplementedError();
+  }
+
+  @override
+  Future<AdminMemberDetail> fetchMemberDetail(int id) {
+    throw UnimplementedError();
+  }
+
+  @override
+  Future<AdminMemberActionResult> updateMemberStatus({
+    required int memberId,
+    required String status,
+    required String reason,
+  }) {
+    throw UnimplementedError();
+  }
+
+  @override
+  Future<AdminMemberActionResult> updateMemberRole({
+    required int memberId,
+    required String role,
+    required String reason,
+  }) {
+    throw UnimplementedError();
+  }
+
+  @override
+  Future<AdminSessionRevokeResult> revokeMemberSessions({
+    required int memberId,
+    required String reason,
+  }) {
+    throw UnimplementedError();
+  }
+
+  @override
+  Future<AdminLetterPage> fetchLetters({
+    String? status,
+    String? query,
+    int page = 0,
+    int size = 20,
+  }) {
+    throw UnimplementedError();
+  }
+
+  @override
+  Future<AdminLetterDetail> fetchLetterDetail(int id) {
+    throw UnimplementedError();
+  }
+
+  @override
+  Future<AdminLetterActionResult> addLetterNote({
+    required int letterId,
+    required String note,
+    required String reason,
+  }) {
+    throw UnimplementedError();
+  }
+
+  @override
+  Future<AdminLetterActionResult> reassignLetterReceiver({
+    required int letterId,
+    required int receiverMemberId,
+    required String reason,
+  }) {
+    throw UnimplementedError();
+  }
+
+  @override
+  Future<AdminLetterActionResult> blockLetterSender({
+    required int letterId,
+    required String reason,
+  }) {
+    throw UnimplementedError();
+  }
 }
 
 class _FakeAuthRepository implements AuthRepository {
@@ -1149,6 +1305,7 @@ class _FakeAuthRepository implements AuthRepository {
   final Object? restoreError;
   final Object? loginError;
   int logoutCount = 0;
+  int clearLocalSessionCount = 0;
 
   @override
   Future<AuthMember> signup(SignupRequest request) {
@@ -1189,5 +1346,10 @@ class _FakeAuthRepository implements AuthRepository {
   @override
   Future<void> logout() async {
     logoutCount += 1;
+  }
+
+  @override
+  Future<void> clearLocalSession() async {
+    clearLocalSessionCount += 1;
   }
 }

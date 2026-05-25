@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:flutter_test/flutter_test.dart';
@@ -93,6 +94,62 @@ void main() {
       expect(await tokenStore.readRefreshToken(), 'new-refresh');
     });
 
+    test('shares an in-flight token refresh across concurrent 401s', () async {
+      final transport = _FakeApiTransport([
+        const ApiTransportResponse(statusCode: 401),
+        const ApiTransportResponse(statusCode: 401),
+        ApiTransportResponse.ok({
+          'success': true,
+          'data': {'id': 1},
+        }),
+        ApiTransportResponse.ok({
+          'success': true,
+          'data': {'id': 2},
+        }),
+      ]);
+      final tokenStore = MemoryAuthTokenStore(
+        initialTokens: const TokenPair(
+          accessToken: 'old-access',
+          refreshToken: 'refresh-token',
+        ),
+      );
+      final refresher = _CompletingTokenRefresher();
+      final client = ApiClient(
+        transport: transport,
+        tokenStore: tokenStore,
+        tokenRefresher: refresher,
+        tokenRefreshCoordinator: AuthTokenRefreshCoordinator(),
+      );
+
+      final first = client.get<Map<String, Object?>>(
+        '/me',
+        parser: (json) => json as Map<String, Object?>,
+      );
+      final second = client.get<Map<String, Object?>>(
+        '/home',
+        parser: (json) => json as Map<String, Object?>,
+      );
+      await Future<void>.delayed(Duration.zero);
+
+      expect(refresher.refreshCount, 1);
+      refresher.complete(
+        const TokenPair(
+          accessToken: 'new-access',
+          refreshToken: 'new-refresh',
+        ),
+      );
+
+      final results = await Future.wait([first, second]);
+
+      expect(results, [
+        {'id': 1},
+        {'id': 2},
+      ]);
+      expect(transport.requests, hasLength(4));
+      expect(await tokenStore.readAccessToken(), 'new-access');
+      expect(await tokenStore.readRefreshToken(), 'new-refresh');
+    });
+
     test('clears tokens when refresh fails', () async {
       final transport = _FakeApiTransport([
         const ApiTransportResponse(statusCode: 401),
@@ -118,7 +175,7 @@ void main() {
           isA<ApiClientException>().having(
             (error) => error.kind,
             'kind',
-            ApiErrorKind.unauthorized,
+            ApiErrorKind.sessionExpired,
           ),
         ),
       );
@@ -151,7 +208,7 @@ void main() {
           isA<ApiClientException>().having(
             (error) => error.kind,
             'kind',
-            ApiErrorKind.unauthorized,
+            ApiErrorKind.sessionExpired,
           ),
         ),
       );
@@ -224,6 +281,63 @@ void main() {
           isA<ApiClientException>()
               .having((error) => error.kind, 'kind', ApiErrorKind.forbidden)
               .having((error) => error.message, 'message', '권한이 없습니다.'),
+        ),
+      );
+    });
+
+    test('maps account and role invalidation responses to session errors',
+        () async {
+      final transport = _FakeApiTransport([
+        const ApiTransportResponse(
+          statusCode: 401,
+          body: {
+            'success': false,
+            'error': {
+              'code': 'UNAUTHORIZED',
+              'message': '계정 상태가 변경되었습니다.',
+              'cause': 'ACCOUNT_BLOCKED',
+            },
+          },
+        ),
+        const ApiTransportResponse(
+          statusCode: 403,
+          body: {
+            'success': false,
+            'error': {
+              'code': 'FORBIDDEN',
+              'message': '운영 권한이 변경되었습니다.',
+              'cause': 'ROLE_CHANGED',
+            },
+          },
+        ),
+      ]);
+      final client = ApiClient(
+        transport: transport,
+        tokenStore: MemoryAuthTokenStore(),
+      );
+
+      await expectLater(
+        client.get<Map<String, Object?>>(
+          '/me',
+          parser: (json) => json as Map<String, Object?>,
+        ),
+        throwsA(
+          isA<ApiClientException>()
+              .having((error) => error.kind, 'kind', ApiErrorKind.accountBlocked)
+              .having((error) => error.sessionInvalidated,
+                  'sessionInvalidated', isTrue),
+        ),
+      );
+      await expectLater(
+        client.get<Map<String, Object?>>(
+          '/admin',
+          parser: (json) => json as Map<String, Object?>,
+        ),
+        throwsA(
+          isA<ApiClientException>()
+              .having((error) => error.kind, 'kind', ApiErrorKind.permissionChanged)
+              .having((error) => error.sessionInvalidated,
+                  'sessionInvalidated', isTrue),
         ),
       );
     });
@@ -464,5 +578,20 @@ class _ThrowingTokenRefresher implements AuthTokenRefresher {
   @override
   Future<TokenPair?> refresh(String refreshToken) {
     throw StateError('Refresh failed.');
+  }
+}
+
+class _CompletingTokenRefresher implements AuthTokenRefresher {
+  final Completer<TokenPair?> _completer = Completer<TokenPair?>();
+  int refreshCount = 0;
+
+  @override
+  Future<TokenPair?> refresh(String refreshToken) {
+    refreshCount += 1;
+    return _completer.future;
+  }
+
+  void complete(TokenPair tokens) {
+    _completer.complete(tokens);
   }
 }

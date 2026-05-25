@@ -53,6 +53,26 @@ void main() {
       expect(controller.state.member?.email, 'me@example.com');
     });
 
+    test('restoreSession keeps a session invalidation message', () async {
+      final controller = AuthController(
+        authRepository: _FakeAuthRepository(
+          restoreError: const ApiClientException(
+            kind: ApiErrorKind.accountBlocked,
+            message: '계정 상태가 변경되었습니다. 다시 로그인해 주세요.',
+            statusCode: 401,
+          ),
+        ),
+      );
+
+      await controller.restoreSession();
+
+      expect(controller.state.isAuthenticated, isFalse);
+      expect(
+        controller.state.infoMessage,
+        '계정 상태가 변경되었습니다. 다시 로그인해 주세요.',
+      );
+    });
+
     test('logout clears authenticated state immediately', () async {
       final repository = _FakeAuthRepository(loginSession: _session());
       final controller = AuthController(authRepository: repository);
@@ -63,6 +83,26 @@ void main() {
       expect(repository.logoutCalled, isTrue);
       expect(controller.state.isAuthenticated, isFalse);
       expect(controller.state.member, isNull);
+    });
+
+    test('invalidateSession clears local tokens once for concurrent failures',
+        () async {
+      final repository = _FakeAuthRepository(loginSession: _session());
+      final controller = AuthController(authRepository: repository);
+
+      await controller.login(email: 'me@example.com', password: 'secret');
+      final authenticatedRevision = controller.state.sessionRevision;
+
+      await Future.wait([
+        controller.invalidateSession(message: '다시 로그인해 주세요.'),
+        controller.invalidateSession(message: '다시 로그인해 주세요.'),
+      ]);
+
+      expect(repository.clearLocalSessionCount, 1);
+      expect(repository.logoutCalled, isFalse);
+      expect(controller.state.isAuthenticated, isFalse);
+      expect(controller.state.infoMessage, '다시 로그인해 주세요.');
+      expect(controller.state.sessionRevision, authenticatedRevision + 1);
     });
   });
 }
@@ -87,12 +127,15 @@ class _FakeAuthRepository implements AuthRepository {
     this.loginSession,
     this.restoredSession,
     this.loginError,
+    this.restoreError,
   });
 
   final AuthSession? loginSession;
   final AuthSession? restoredSession;
   final Object? loginError;
+  final Object? restoreError;
   bool logoutCalled = false;
+  int clearLocalSessionCount = 0;
 
   @override
   Future<AuthMember> signup(SignupRequest request) {
@@ -110,6 +153,10 @@ class _FakeAuthRepository implements AuthRepository {
 
   @override
   Future<AuthSession> restoreSession() async {
+    final error = restoreError;
+    if (error != null) {
+      throw error;
+    }
     return restoredSession!;
   }
 
@@ -129,5 +176,10 @@ class _FakeAuthRepository implements AuthRepository {
   @override
   Future<void> logout() async {
     logoutCalled = true;
+  }
+
+  @override
+  Future<void> clearLocalSession() async {
+    clearLocalSessionCount += 1;
   }
 }

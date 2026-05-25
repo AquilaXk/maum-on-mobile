@@ -75,6 +75,7 @@ class AuthController extends ChangeNotifier {
   final AuthRepository _authRepository;
 
   AuthState _state = const AuthState.initial();
+  Future<void>? _sessionInvalidationFuture;
 
   AuthState get state => _state;
 
@@ -90,11 +91,16 @@ class AuthController extends ChangeNotifier {
     try {
       final session = await _authRepository.restoreSession();
       _setAuthenticated(session.member, hasRestored: true);
-    } on Object {
+    } on Object catch (error) {
+      final infoMessage =
+          error is ApiClientException && error.sessionInvalidated
+              ? error.message
+              : null;
       _setState(
         AuthState(
           status: AuthStatus.unauthenticated,
           hasRestored: true,
+          infoMessage: infoMessage,
           sessionRevision: _state.sessionRevision + 1,
         ),
       );
@@ -177,13 +183,7 @@ class AuthController extends ChangeNotifier {
 
   Future<void> logout() async {
     await _authRepository.logout();
-    _setState(
-      AuthState(
-        status: AuthStatus.unauthenticated,
-        hasRestored: true,
-        sessionRevision: _state.sessionRevision + 1,
-      ),
-    );
+    _setUnauthenticated();
   }
 
   Future<void> completeExternalLogin(AuthSession session) async {
@@ -198,13 +198,30 @@ class AuthController extends ChangeNotifier {
       // 회원 탈퇴 후에는 서버 로그아웃 실패와 관계없이 로컬 세션을 정리한다.
     }
 
-    _setState(
-      AuthState(
-        status: AuthStatus.unauthenticated,
-        hasRestored: true,
-        sessionRevision: _state.sessionRevision + 1,
-      ),
-    );
+    _setUnauthenticated(infoMessage: '회원 탈퇴가 완료되었습니다.');
+  }
+
+  Future<void> invalidateSession({required String message}) {
+    final currentInvalidation = _sessionInvalidationFuture;
+    if (currentInvalidation != null) {
+      return currentInvalidation;
+    }
+
+    final nextInvalidation = _invalidateSession(message);
+    _sessionInvalidationFuture = nextInvalidation;
+    return nextInvalidation.whenComplete(() {
+      if (identical(_sessionInvalidationFuture, nextInvalidation)) {
+        _sessionInvalidationFuture = null;
+      }
+    });
+  }
+
+  Future<void> _invalidateSession(String message) async {
+    await _authRepository.clearLocalSession();
+    if (_state.status == AuthStatus.unauthenticated && _state.hasRestored) {
+      return;
+    }
+    _setUnauthenticated(infoMessage: message);
   }
 
   void _setAuthenticated(AuthMember member, {required bool hasRestored}) {
@@ -213,6 +230,17 @@ class AuthController extends ChangeNotifier {
         status: AuthStatus.authenticated,
         member: member,
         hasRestored: hasRestored,
+        sessionRevision: _state.sessionRevision + 1,
+      ),
+    );
+  }
+
+  void _setUnauthenticated({String? infoMessage}) {
+    _setState(
+      AuthState(
+        status: AuthStatus.unauthenticated,
+        hasRestored: true,
+        infoMessage: infoMessage,
         sessionRevision: _state.sessionRevision + 1,
       ),
     );

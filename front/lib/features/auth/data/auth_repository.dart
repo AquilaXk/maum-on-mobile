@@ -17,6 +17,8 @@ abstract interface class AuthRepository {
   Future<AuthMember> me();
 
   Future<void> logout();
+
+  Future<void> clearLocalSession();
 }
 
 class ApiAuthRepository implements AuthRepository {
@@ -122,6 +124,11 @@ class ApiAuthRepository implements AuthRepository {
     } finally {
       await _tokenStore.clear();
     }
+  }
+
+  @override
+  Future<void> clearLocalSession() {
+    return _tokenStore.clear();
   }
 
   Future<void> _saveSession(AuthSession session) {

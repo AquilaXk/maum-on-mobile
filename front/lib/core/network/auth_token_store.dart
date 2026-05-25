@@ -22,6 +22,28 @@ abstract interface class AuthTokenRefresher {
   Future<TokenPair?> refresh(String refreshToken);
 }
 
+class AuthTokenRefreshCoordinator {
+  Future<TokenPair?>? _inFlightRefresh;
+
+  Future<TokenPair?> refresh(
+    String refreshToken,
+    Future<TokenPair?> Function(String refreshToken) refreshTokenCallback,
+  ) {
+    final currentRefresh = _inFlightRefresh;
+    if (currentRefresh != null) {
+      return currentRefresh;
+    }
+
+    final nextRefresh = refreshTokenCallback(refreshToken);
+    _inFlightRefresh = nextRefresh;
+    return nextRefresh.whenComplete(() {
+      if (identical(_inFlightRefresh, nextRefresh)) {
+        _inFlightRefresh = null;
+      }
+    });
+  }
+}
+
 class MemoryAuthTokenStore implements AuthTokenStore {
   MemoryAuthTokenStore({
     TokenPair? initialTokens,

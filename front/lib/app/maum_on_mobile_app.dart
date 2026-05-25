@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 
 import '../core/network/api_client.dart';
 import '../core/network/api_config.dart';
+import '../core/network/api_error.dart';
+import '../core/network/auth_token_store.dart';
 import '../core/network/dio_api_transport.dart';
 import '../core/network/secure_auth_token_store.dart';
 import '../features/auth/application/auth_controller.dart';
@@ -104,6 +106,8 @@ class MaumOnMobileApp extends StatefulWidget {
 class _MaumOnMobileAppState extends State<MaumOnMobileApp> {
   late final ApiConfig _apiConfig = ApiConfig.fromEnvironment();
   late final SecureAuthTokenStore _tokenStore = const SecureAuthTokenStore();
+  late final AuthTokenRefreshCoordinator _tokenRefreshCoordinator =
+      AuthTokenRefreshCoordinator();
   late final DioApiTransport _apiTransport = DioApiTransport.fromConfig(
     _apiConfig,
   );
@@ -141,6 +145,9 @@ class _MaumOnMobileAppState extends State<MaumOnMobileApp> {
   LetterController? _letterController;
   int? _letterMemberId;
   bool _openLetterComposer = false;
+  String? _authenticatedSessionKey;
+  Future<void>? _authenticatedInvalidationFuture;
+  bool _pushTokenUnregisterRequested = false;
   ReportTarget? _pendingReportTarget;
   NotificationTapPayload? _pendingNotificationTap;
   AuthenticatedRoute _route = AuthenticatedRoute.home;
@@ -210,7 +217,10 @@ class _MaumOnMobileAppState extends State<MaumOnMobileApp> {
             }
 
             if (!state.isAuthenticated || state.member == null) {
-              _disposeAuthenticatedControllers(unregisterPushToken: true);
+              _disposeAuthenticatedControllers(
+                unregisterPushToken: _authenticatedSessionKey != null,
+              );
+              _authenticatedSessionKey = null;
               _route = AuthenticatedRoute.home;
               return AuthScreen(
                 controller: _authController,
@@ -218,15 +228,21 @@ class _MaumOnMobileAppState extends State<MaumOnMobileApp> {
               );
             }
 
+            _syncAuthenticatedSession(state);
             _applyPendingNotificationTap();
-            return AuthenticatedAppShell(
-              currentRoute: _route,
-              onRouteSelected: _selectPrimaryRoute,
-              child: _buildAuthenticatedRoute(
-                memberId: state.member!.id,
-                nickname: state.member!.nickname,
-                role: state.member!.role,
-                routeTitle: initialRoute.title,
+            return KeyedSubtree(
+              key: ValueKey(
+                'authenticated-${state.member!.id}-${state.sessionRevision}',
+              ),
+              child: AuthenticatedAppShell(
+                currentRoute: _route,
+                onRouteSelected: _selectPrimaryRoute,
+                child: _buildAuthenticatedRoute(
+                  memberId: state.member!.id,
+                  nickname: state.member!.nickname,
+                  role: state.member!.role,
+                  routeTitle: initialRoute.title,
+                ),
               ),
             );
           },
@@ -276,7 +292,7 @@ class _MaumOnMobileAppState extends State<MaumOnMobileApp> {
                 AuthenticatedRoute.notifications,
               ),
               onOpenSettings: () => _openRoute(AuthenticatedRoute.settings),
-          onLogout: () {
+              onLogout: () {
                 _logout();
               },
             ),
@@ -336,7 +352,85 @@ class _MaumOnMobileAppState extends State<MaumOnMobileApp> {
     _disposeAuthenticatedControllers(unregisterPushToken: true);
     _pendingNotificationTap = null;
     _route = AuthenticatedRoute.home;
+    _authenticatedSessionKey = null;
     unawaited(_authController.logout());
+  }
+
+  void _syncAuthenticatedSession(AuthState state) {
+    final member = state.member;
+    if (member == null) {
+      return;
+    }
+
+    final sessionKey = '${member.id}:${state.sessionRevision}';
+    if (_authenticatedSessionKey == sessionKey) {
+      return;
+    }
+
+    final hadAuthenticatedSession = _authenticatedSessionKey != null;
+    _disposeAuthenticatedControllers(
+      unregisterPushToken: hadAuthenticatedSession,
+    );
+    _openLetterComposer = false;
+    _pendingReportTarget = null;
+    _route = AuthenticatedRoute.home;
+    _authenticatedSessionKey = sessionKey;
+    _pushTokenUnregisterRequested = false;
+  }
+
+  Future<void> _handleApiSessionInvalidated(
+    ApiClientException exception,
+  ) {
+    return _invalidateAuthenticatedSession(exception.message);
+  }
+
+  void _handleControllerSessionInvalidated() {
+    unawaited(_invalidateAuthenticatedSession('다시 로그인해 주세요.'));
+  }
+
+  void _handleOperationsSessionInvalidated(String message) {
+    unawaited(_invalidateAuthenticatedSession(message));
+  }
+
+  Future<void> _invalidateAuthenticatedSession(String message) {
+    final currentInvalidation = _authenticatedInvalidationFuture;
+    if (currentInvalidation != null) {
+      return currentInvalidation;
+    }
+
+    final nextInvalidation = _runAuthenticatedSessionInvalidation(message);
+    _authenticatedInvalidationFuture = nextInvalidation;
+    return nextInvalidation.whenComplete(() {
+      if (identical(_authenticatedInvalidationFuture, nextInvalidation)) {
+        _authenticatedInvalidationFuture = null;
+      }
+    });
+  }
+
+  Future<void> _runAuthenticatedSessionInvalidation(String message) async {
+    _disposeAuthenticatedControllers(unregisterPushToken: true);
+    _pendingNotificationTap = null;
+    _pendingReportTarget = null;
+    _openLetterComposer = false;
+    _route = AuthenticatedRoute.home;
+    _authenticatedSessionKey = null;
+    await _authController.invalidateSession(message: message);
+    if (mounted) {
+      setState(() {});
+    }
+  }
+
+  Future<void> _handleWithdrawn() async {
+    _disposeAuthenticatedControllers(unregisterPushToken: true);
+    _pendingNotificationTap = null;
+    _pendingReportTarget = null;
+    _openLetterComposer = false;
+    _route = AuthenticatedRoute.home;
+    _authenticatedSessionKey = null;
+    await _authController.clearSession();
+    if (mounted) {
+      setState(() {});
+    }
   }
 
   Widget _buildLetterRoute(int memberId) {
@@ -419,9 +513,7 @@ class _MaumOnMobileAppState extends State<MaumOnMobileApp> {
           _buildDefaultConsultationRepository(),
       currentMemberId: memberId,
       draftRepository: _draftRecoveryRepository,
-      onUnauthorized: () {
-        _authController.logout();
-      },
+      onUnauthorized: _handleControllerSessionInvalidated,
     );
     unawaited(controller.restoreDraft());
     return _consultationController = controller;
@@ -445,20 +537,39 @@ class _MaumOnMobileAppState extends State<MaumOnMobileApp> {
       repository:
           widget.notificationRepository ?? _buildDefaultNotificationRepository(),
       pushPermissionClient: _pushNotificationClient,
-      onUnauthorized: () {
-        _authController.logout();
-      },
+      onUnauthorized: _handleControllerSessionInvalidated,
     );
   }
 
   void _disposeNotificationController({bool unregisterPushToken = false}) {
     final controller = _notificationController;
-    if (unregisterPushToken) {
-      unawaited(controller?.unregisterRegisteredDeviceToken());
+    if (unregisterPushToken && !_pushTokenUnregisterRequested) {
+      _pushTokenUnregisterRequested = true;
+      if (controller != null) {
+        unawaited(controller.unregisterRegisteredDeviceToken());
+      } else {
+        unawaited(_unregisterCurrentPushToken());
+      }
     }
     controller?.dispose();
     _notificationController = null;
     _notificationMemberId = null;
+  }
+
+  Future<void> _unregisterCurrentPushToken() async {
+    try {
+      final token = (await _pushNotificationClient.getPermissionStatus())
+          .token
+          ?.trim();
+      if (token == null || token.isEmpty) {
+        return;
+      }
+      await (widget.notificationRepository ??
+              _buildDefaultNotificationRepository())
+          .unregisterDeviceToken(token);
+    } on Object {
+      // 세션 폐기 중 푸시 해제 실패는 서버 측 토큰 폐기 또는 다음 로그인 동기화로 보정한다.
+    }
   }
 
   ReportController _reportControllerFor(int memberId) {
@@ -473,9 +584,7 @@ class _MaumOnMobileAppState extends State<MaumOnMobileApp> {
       repository: widget.reportRepository ?? _buildDefaultReportRepository(),
       moderationRepository: widget.contentModerationRepository ??
           _buildDefaultContentModerationRepository(),
-      onUnauthorized: () {
-        _authController.logout();
-      },
+      onUnauthorized: _handleControllerSessionInvalidated,
     );
   }
 
@@ -498,9 +607,7 @@ class _MaumOnMobileAppState extends State<MaumOnMobileApp> {
           widget.reportRepository ?? _buildDefaultReportRepository(),
       operationsRepository:
           widget.operationsRepository ?? _buildDefaultOperationsRepository(),
-      onUnauthorized: () {
-        _authController.logout();
-      },
+      onUnauthorized: _handleOperationsSessionInvalidated,
     );
   }
 
@@ -521,10 +628,8 @@ class _MaumOnMobileAppState extends State<MaumOnMobileApp> {
     return _settingsController = SettingsController(
       repository:
           widget.settingsRepository ?? _buildDefaultSettingsRepository(),
-      onUnauthorized: () {
-        _authController.logout();
-      },
-      onWithdrawn: _authController.clearSession,
+      onUnauthorized: _handleControllerSessionInvalidated,
+      onWithdrawn: _handleWithdrawn,
     );
   }
 
@@ -550,9 +655,7 @@ class _MaumOnMobileAppState extends State<MaumOnMobileApp> {
           _buildDefaultContentModerationRepository(),
       currentMemberId: memberId,
       draftRepository: _draftRecoveryRepository,
-      onUnauthorized: () {
-        _authController.logout();
-      },
+      onUnauthorized: _handleControllerSessionInvalidated,
     );
     unawaited(controller.restoreDraft());
     return _diaryController = controller;
@@ -578,9 +681,7 @@ class _MaumOnMobileAppState extends State<MaumOnMobileApp> {
       draftRepository: _draftRecoveryRepository,
       moderationRepository: widget.contentModerationRepository ??
           _buildDefaultContentModerationRepository(),
-      onUnauthorized: () {
-        _authController.logout();
-      },
+      onUnauthorized: _handleControllerSessionInvalidated,
       onReportTargetSelected: _handleStoryReportTarget,
     );
     unawaited(controller.restoreDraft());
@@ -608,9 +709,7 @@ class _MaumOnMobileAppState extends State<MaumOnMobileApp> {
           _buildDefaultContentModerationRepository(),
       currentMemberId: memberId,
       draftRepository: _draftRecoveryRepository,
-      onUnauthorized: () {
-        _authController.logout();
-      },
+      onUnauthorized: _handleControllerSessionInvalidated,
       onReportTargetSelected: _handleLetterReportTarget,
     );
     unawaited(controller.restoreDraft());
@@ -624,97 +723,39 @@ class _MaumOnMobileAppState extends State<MaumOnMobileApp> {
   }
 
   AuthRepository _buildDefaultAuthRepository() {
-    final refreshRepository = ApiAuthRepository(
-      apiClient: ApiClient(transport: _apiTransport, tokenStore: _tokenStore),
-      tokenStore: _tokenStore,
-    );
-
     return ApiAuthRepository(
-      apiClient: ApiClient(
-        transport: _apiTransport,
-        tokenStore: _tokenStore,
-        tokenRefresher: AuthSessionTokenRefresher(
-          authRepository: refreshRepository,
-        ),
-      ),
+      apiClient: _sessionApiClient(tokenRefresher: _tokenRefresher()),
       tokenStore: _tokenStore,
     );
   }
 
   HomeRepository _buildDefaultHomeRepository() {
     return ApiHomeRepository(
-      apiClient: ApiClient(
-        transport: _apiTransport,
-        tokenStore: _tokenStore,
-      ),
+      apiClient: _sessionApiClient(),
     );
   }
 
   DiaryRepository _buildDefaultDiaryRepository() {
-    final refreshRepository = ApiAuthRepository(
-      apiClient: ApiClient(transport: _apiTransport, tokenStore: _tokenStore),
-      tokenStore: _tokenStore,
-    );
-
     return ApiDiaryRepository(
-      apiClient: ApiClient(
-        transport: _apiTransport,
-        tokenStore: _tokenStore,
-        tokenRefresher: AuthSessionTokenRefresher(
-          authRepository: refreshRepository,
-        ),
-      ),
+      apiClient: _sessionApiClient(tokenRefresher: _tokenRefresher()),
     );
   }
 
   DiaryImageRepository _buildDefaultDiaryImageRepository() {
-    final refreshRepository = ApiAuthRepository(
-      apiClient: ApiClient(transport: _apiTransport, tokenStore: _tokenStore),
-      tokenStore: _tokenStore,
-    );
-
     return ApiDiaryImageRepository(
-      apiClient: ApiClient(
-        transport: _apiTransport,
-        tokenStore: _tokenStore,
-        tokenRefresher: AuthSessionTokenRefresher(
-          authRepository: refreshRepository,
-        ),
-      ),
+      apiClient: _sessionApiClient(tokenRefresher: _tokenRefresher()),
     );
   }
 
   LetterRepository _buildDefaultLetterRepository() {
-    final refreshRepository = ApiAuthRepository(
-      apiClient: ApiClient(transport: _apiTransport, tokenStore: _tokenStore),
-      tokenStore: _tokenStore,
-    );
-
     return ApiLetterRepository(
-      apiClient: ApiClient(
-        transport: _apiTransport,
-        tokenStore: _tokenStore,
-        tokenRefresher: AuthSessionTokenRefresher(
-          authRepository: refreshRepository,
-        ),
-      ),
+      apiClient: _sessionApiClient(tokenRefresher: _tokenRefresher()),
     );
   }
 
   ConsultationRepository _buildDefaultConsultationRepository() {
-    final refreshRepository = ApiAuthRepository(
-      apiClient: ApiClient(transport: _apiTransport, tokenStore: _tokenStore),
-      tokenStore: _tokenStore,
-    );
-
     return ApiConsultationRepository(
-      apiClient: ApiClient(
-        transport: _apiTransport,
-        tokenStore: _tokenStore,
-        tokenRefresher: AuthSessionTokenRefresher(
-          authRepository: refreshRepository,
-        ),
-      ),
+      apiClient: _sessionApiClient(tokenRefresher: _tokenRefresher()),
       streamClient: DioConsultationStreamClient(
         apiConfig: _apiConfig,
         tokenStore: _tokenStore,
@@ -723,105 +764,65 @@ class _MaumOnMobileAppState extends State<MaumOnMobileApp> {
   }
 
   NotificationRepository _buildDefaultNotificationRepository() {
-    final refreshRepository = ApiAuthRepository(
-      apiClient: ApiClient(transport: _apiTransport, tokenStore: _tokenStore),
-      tokenStore: _tokenStore,
-    );
-
     return ApiNotificationRepository(
-      apiClient: ApiClient(
-        transport: _apiTransport,
-        tokenStore: _tokenStore,
-        tokenRefresher: AuthSessionTokenRefresher(
-          authRepository: refreshRepository,
-        ),
-      ),
+      apiClient: _sessionApiClient(tokenRefresher: _tokenRefresher()),
       streamClient: DioNotificationStreamClient(apiConfig: _apiConfig),
     );
   }
 
   ReportRepository _buildDefaultReportRepository() {
-    final refreshRepository = ApiAuthRepository(
-      apiClient: ApiClient(transport: _apiTransport, tokenStore: _tokenStore),
-      tokenStore: _tokenStore,
-    );
-
     return ApiReportRepository(
-      apiClient: ApiClient(
-        transport: _apiTransport,
-        tokenStore: _tokenStore,
-        tokenRefresher: AuthSessionTokenRefresher(
-          authRepository: refreshRepository,
-        ),
-      ),
+      apiClient: _sessionApiClient(tokenRefresher: _tokenRefresher()),
     );
   }
 
   OperationsRepository _buildDefaultOperationsRepository() {
-    final refreshRepository = ApiAuthRepository(
-      apiClient: ApiClient(transport: _apiTransport, tokenStore: _tokenStore),
-      tokenStore: _tokenStore,
-    );
-
     return ApiOperationsRepository(
-      apiClient: ApiClient(
-        transport: _apiTransport,
-        tokenStore: _tokenStore,
-        tokenRefresher: AuthSessionTokenRefresher(
-          authRepository: refreshRepository,
-        ),
-      ),
+      apiClient: _sessionApiClient(tokenRefresher: _tokenRefresher()),
     );
   }
 
   ContentModerationRepository _buildDefaultContentModerationRepository() {
-    final refreshRepository = ApiAuthRepository(
-      apiClient: ApiClient(transport: _apiTransport, tokenStore: _tokenStore),
-      tokenStore: _tokenStore,
-    );
-
     return ApiContentModerationRepository(
-      apiClient: ApiClient(
-        transport: _apiTransport,
-        tokenStore: _tokenStore,
-        tokenRefresher: AuthSessionTokenRefresher(
-          authRepository: refreshRepository,
-        ),
-      ),
+      apiClient: _sessionApiClient(tokenRefresher: _tokenRefresher()),
     );
   }
 
   SettingsRepository _buildDefaultSettingsRepository() {
-    final refreshRepository = ApiAuthRepository(
-      apiClient: ApiClient(transport: _apiTransport, tokenStore: _tokenStore),
-      tokenStore: _tokenStore,
-    );
-
     return ApiSettingsRepository(
-      apiClient: ApiClient(
-        transport: _apiTransport,
-        tokenStore: _tokenStore,
-        tokenRefresher: AuthSessionTokenRefresher(
-          authRepository: refreshRepository,
-        ),
-      ),
+      apiClient: _sessionApiClient(tokenRefresher: _tokenRefresher()),
     );
   }
 
   StoryRepository _buildDefaultStoryRepository() {
-    final refreshRepository = ApiAuthRepository(
-      apiClient: ApiClient(transport: _apiTransport, tokenStore: _tokenStore),
-      tokenStore: _tokenStore,
-    );
-
     return ApiStoryRepository(
-      apiClient: ApiClient(
-        transport: _apiTransport,
+      apiClient: _sessionApiClient(tokenRefresher: _tokenRefresher()),
+    );
+  }
+
+  AuthSessionTokenRefresher _tokenRefresher() {
+    return AuthSessionTokenRefresher(
+      authRepository: ApiAuthRepository(
+        apiClient: _rawApiClient(),
         tokenStore: _tokenStore,
-        tokenRefresher: AuthSessionTokenRefresher(
-          authRepository: refreshRepository,
-        ),
       ),
+    );
+  }
+
+  ApiClient _sessionApiClient({AuthTokenRefresher? tokenRefresher}) {
+    return ApiClient(
+      transport: _apiTransport,
+      tokenStore: _tokenStore,
+      tokenRefresher: tokenRefresher,
+      tokenRefreshCoordinator: _tokenRefreshCoordinator,
+      onSessionInvalidated: _handleApiSessionInvalidated,
+    );
+  }
+
+  ApiClient _rawApiClient() {
+    return ApiClient(
+      transport: _apiTransport,
+      tokenStore: _tokenStore,
     );
   }
 
@@ -852,7 +853,8 @@ class _MaumOnMobileAppState extends State<MaumOnMobileApp> {
 
   void _handleNotificationTap(NotificationTapPayload payload) {
     if (!_authController.state.isAuthenticated ||
-        _authController.state.member == null) {
+        _authController.state.member == null ||
+        _authenticatedSessionKey == null) {
       _pendingNotificationTap = payload;
       return;
     }

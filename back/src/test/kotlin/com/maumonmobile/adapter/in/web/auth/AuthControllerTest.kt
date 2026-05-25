@@ -1,10 +1,12 @@
 package com.maumonmobile.adapter.`in`.web.auth
 
 import com.jayway.jsonpath.JsonPath
+import com.maumonmobile.application.port.out.AuthMemberRepository
 import com.maumonmobile.application.port.out.AuthOidcIdentity
 import com.maumonmobile.application.port.out.AuthOidcIdentityProvider
 import com.maumonmobile.application.port.out.AuthOidcTokenCommand
 import com.maumonmobile.application.port.out.AuthOidcVerificationException
+import com.maumonmobile.domain.auth.AuthMemberStatus
 import org.assertj.core.api.Assertions.assertThat
 import org.hamcrest.Matchers.blankOrNullString
 import org.hamcrest.Matchers.greaterThan
@@ -29,6 +31,7 @@ import java.net.URI
 @ActiveProfiles("test")
 class AuthControllerTest @Autowired constructor(
     private val mockMvc: MockMvc,
+    private val authMemberRepository: AuthMemberRepository,
 ) {
 
     @Test
@@ -124,6 +127,43 @@ class AuthControllerTest @Autowired constructor(
                 status { isUnauthorized() }
                 jsonPath("$.success") { value(false) }
                 jsonPath("$.error.code") { value("UNAUTHORIZED") }
+            }
+    }
+
+    @Test
+    fun blockedMemberSessionReturnsSessionInvalidationReason() {
+        val email = "blocked-session-${System.nanoTime()}@example.com"
+        val loginResult = mockMvc.post("/api/v1/auth/signup") {
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"email":"$email","password":"pass1234","nickname":"차단회원"}"""
+        }
+            .andExpect {
+                status { isOk() }
+            }
+            .andReturn()
+
+        val memberId = loginResult.response.readJsonLong("$.data.id")
+        val authResult = mockMvc.post("/api/v1/auth/login") {
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"email":"$email","password":"pass1234"}"""
+        }
+            .andExpect {
+                status { isOk() }
+            }
+            .andReturn()
+        val accessToken = authResult.response.readJsonString("$.data.accessToken")
+
+        authMemberRepository.save(
+            authMemberRepository.findById(memberId)!!.copy(status = AuthMemberStatus.BLOCKED),
+        )
+
+        mockMvc.get("/api/v1/auth/session") {
+            header("Authorization", "Bearer $accessToken")
+        }
+            .andExpect {
+                status { isUnauthorized() }
+                jsonPath("$.error.code") { value("UNAUTHORIZED") }
+                jsonPath("$.error.cause") { value("ACCOUNT_BLOCKED") }
             }
     }
 
@@ -288,6 +328,10 @@ class AuthControllerTest @Autowired constructor(
 
 private fun MockHttpServletResponse.readJsonString(path: String): String {
     return JsonPath.read<String>(contentAsString, path)
+}
+
+private fun MockHttpServletResponse.readJsonLong(path: String): Long {
+    return JsonPath.read<Number>(contentAsString, path).toLong()
 }
 
 private fun URI.queryParameters(): Map<String, String> {

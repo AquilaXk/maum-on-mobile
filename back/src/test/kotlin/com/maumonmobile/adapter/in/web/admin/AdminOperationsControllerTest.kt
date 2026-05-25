@@ -202,6 +202,37 @@ class AdminOperationsControllerTest @Autowired constructor(
     }
 
     @Test
+    fun demotedAdminCannotUsePreviousAdminAccessToken() {
+        val actor = savedMember(role = AuthMemberRole.ADMIN, nickname = "권한관리자")
+        val demotedAdmin = savedMember(
+            emailPrefix = "demoted-admin",
+            role = AuthMemberRole.ADMIN,
+            nickname = "강등관리자",
+        )
+        val actorToken = accessToken(actor)
+        val staleAdminToken = accessToken(demotedAdmin)
+
+        mockMvc.patch("/api/v1/admin/members/${demotedAdmin.id}/role") {
+            header("Authorization", "Bearer $actorToken")
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"role":"USER","reason":"운영 권한 회수"}"""
+        }
+            .andExpect {
+                status { isOk() }
+                jsonPath("$.data.role") { value("USER") }
+            }
+
+        mockMvc.get("/api/v1/admin/dashboard") {
+            header("Authorization", "Bearer $staleAdminToken")
+        }
+            .andExpect {
+                status { isForbidden() }
+                jsonPath("$.error.code") { value("FORBIDDEN") }
+                jsonPath("$.error.cause") { value("ROLE_CHANGED") }
+            }
+    }
+
+    @Test
     fun adminRevokesRefreshTokensAndDeviceTokensWithAuditTrail() {
         val admin = savedMember(role = AuthMemberRole.ADMIN, nickname = "회수자")
         val member = savedMember(emailPrefix = "revoke-member", nickname = "회수대상")

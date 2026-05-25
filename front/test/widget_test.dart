@@ -63,4 +63,7 @@ class _UnauthenticatedRepository implements AuthRepository {
 
   @override
   Future<void> logout() async {}
+
+  @override
+  Future<void> clearLocalSession() async {}
 }

@@ -4,16 +4,25 @@ import 'api_transport.dart';
 import 'auth_token_store.dart';
 import 'multipart_body.dart';
 
+typedef ApiSessionInvalidationHandler = Future<void> Function(
+  ApiClientException exception,
+);
+
 class ApiClient {
-  const ApiClient({
+  ApiClient({
     required this.transport,
     required this.tokenStore,
     this.tokenRefresher,
-  });
+    this.onSessionInvalidated,
+    AuthTokenRefreshCoordinator? tokenRefreshCoordinator,
+  }) : _tokenRefreshCoordinator =
+            tokenRefreshCoordinator ?? AuthTokenRefreshCoordinator();
 
   final ApiTransport transport;
   final AuthTokenStore tokenStore;
   final AuthTokenRefresher? tokenRefresher;
+  final ApiSessionInvalidationHandler? onSessionInvalidated;
+  final AuthTokenRefreshCoordinator _tokenRefreshCoordinator;
 
   Future<T> get<T>(
     String path, {
@@ -258,17 +267,23 @@ class ApiClient {
     final preparedRequest = await _applyAuthorization(request);
     final response = await _sendTransport(preparedRequest);
 
-    if (response.statusCode == 401 && request.retryOnUnauthorized) {
+    if (response.statusCode == 401) {
+      final exception =
+          _exceptionFromResponse(response, ApiErrorKind.unauthorized);
+      if (exception.kind != ApiErrorKind.unauthorized ||
+          !request.retryOnUnauthorized) {
+        await _throwSessionInvalidated(exception);
+      }
       return _handleUnauthorized(request, parser, hasRetried: hasRetried);
     }
 
-    if (response.statusCode == 401) {
-      await tokenStore.clear();
-      throw _exceptionFromResponse(response, ApiErrorKind.unauthorized);
-    }
-
     if (response.statusCode == 403) {
-      throw _exceptionFromResponse(response, ApiErrorKind.forbidden);
+      final exception =
+          _exceptionFromResponse(response, ApiErrorKind.forbidden);
+      if (exception.sessionInvalidated) {
+        await _throwSessionInvalidated(exception);
+      }
+      throw exception;
     }
 
     if (!response.isSuccessful) {
@@ -318,7 +333,13 @@ class ApiClient {
     final preparedRequest = await _applyAuthorization(request);
     final response = await _sendTransport(preparedRequest);
 
-    if (response.statusCode == 401 && request.retryOnUnauthorized) {
+    if (response.statusCode == 401) {
+      final exception =
+          _exceptionFromResponse(response, ApiErrorKind.unauthorized);
+      if (exception.kind != ApiErrorKind.unauthorized ||
+          !request.retryOnUnauthorized) {
+        await _throwSessionInvalidated(exception);
+      }
       await _handleUnauthorized<void>(
         request,
         (_) {},
@@ -327,13 +348,13 @@ class ApiClient {
       return;
     }
 
-    if (response.statusCode == 401) {
-      await tokenStore.clear();
-      throw _exceptionFromResponse(response, ApiErrorKind.unauthorized);
-    }
-
     if (response.statusCode == 403) {
-      throw _exceptionFromResponse(response, ApiErrorKind.forbidden);
+      final exception =
+          _exceptionFromResponse(response, ApiErrorKind.forbidden);
+      if (exception.sessionInvalidated) {
+        await _throwSessionInvalidated(exception);
+      }
+      throw exception;
     }
 
     if (!response.isSuccessful) {
@@ -401,43 +422,50 @@ class ApiClient {
     required bool hasRetried,
   }) async {
     if (hasRetried || tokenRefresher == null) {
-      await tokenStore.clear();
-      throw const ApiClientException(
-        kind: ApiErrorKind.unauthorized,
-        message: '다시 로그인해 주세요.',
-        statusCode: 401,
+      await _throwSessionInvalidated(
+        const ApiClientException(
+          kind: ApiErrorKind.unauthorized,
+          message: '다시 로그인해 주세요.',
+          statusCode: 401,
+        ),
       );
     }
 
     final refreshToken = await tokenStore.readRefreshToken();
     if (refreshToken == null || refreshToken.isEmpty) {
-      await tokenStore.clear();
-      throw const ApiClientException(
-        kind: ApiErrorKind.unauthorized,
-        message: '다시 로그인해 주세요.',
-        statusCode: 401,
+      await _throwSessionInvalidated(
+        const ApiClientException(
+          kind: ApiErrorKind.unauthorized,
+          message: '다시 로그인해 주세요.',
+          statusCode: 401,
+        ),
       );
     }
 
     final TokenPair? refreshedTokens;
     try {
-      refreshedTokens = await tokenRefresher!.refresh(refreshToken);
+      refreshedTokens = await _tokenRefreshCoordinator.refresh(
+        refreshToken,
+        tokenRefresher!.refresh,
+      );
     } on Object catch (error) {
-      await tokenStore.clear();
-      throw ApiClientException(
-        kind: ApiErrorKind.unauthorized,
-        message: '다시 로그인해 주세요.',
-        statusCode: 401,
-        cause: error,
+      await _throwSessionInvalidated(
+        ApiClientException(
+          kind: ApiErrorKind.sessionExpired,
+          message: '다시 로그인해 주세요.',
+          statusCode: 401,
+          cause: error,
+        ),
       );
     }
 
     if (refreshedTokens == null) {
-      await tokenStore.clear();
-      throw const ApiClientException(
-        kind: ApiErrorKind.unauthorized,
-        message: '다시 로그인해 주세요.',
-        statusCode: 401,
+      await _throwSessionInvalidated(
+        const ApiClientException(
+          kind: ApiErrorKind.sessionExpired,
+          message: '다시 로그인해 주세요.',
+          statusCode: 401,
+        ),
       );
     }
 
@@ -459,12 +487,49 @@ class ApiClient {
     ApiErrorKind fallbackKind,
   ) {
     return ApiClientException(
-      kind: fallbackKind,
+      kind: _errorKind(error, statusCode, fallbackKind),
       message: error?.message ?? '요청을 처리하지 못했습니다.',
       statusCode: statusCode,
       code: error?.code,
       fieldErrors: error?.fieldErrors ?? const [],
     );
+  }
+
+  ApiErrorKind _errorKind(
+    ApiErrorBody? error,
+    int statusCode,
+    ApiErrorKind fallbackKind,
+  ) {
+    final reason = (error?.reason ?? error?.code ?? '').toUpperCase();
+    if (statusCode == 401) {
+      if (reason == 'ACCOUNT_BLOCKED') {
+        return ApiErrorKind.accountBlocked;
+      }
+      if (reason == 'ACCOUNT_WITHDRAWN') {
+        return ApiErrorKind.accountWithdrawn;
+      }
+      if (reason == 'SESSION_REVOKED' || reason == 'REFRESH_TOKEN_REVOKED') {
+        return ApiErrorKind.sessionExpired;
+      }
+    }
+
+    if (statusCode == 403 && reason == 'ROLE_CHANGED') {
+      return ApiErrorKind.permissionChanged;
+    }
+
+    return fallbackKind;
+  }
+
+  Future<Never> _throwSessionInvalidated(
+    ApiClientException exception,
+  ) async {
+    final handler = onSessionInvalidated;
+    if (handler != null) {
+      await handler(exception);
+    } else {
+      await tokenStore.clear();
+    }
+    throw exception;
   }
 
   ApiErrorBody? _errorFromBody(Object? body) {
