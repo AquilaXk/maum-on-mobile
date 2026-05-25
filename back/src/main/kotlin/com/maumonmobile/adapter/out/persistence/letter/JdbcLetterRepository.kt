@@ -25,6 +25,7 @@ class JdbcLetterRepository(
                 insert into letters (
                     sender_id,
                     sender_nickname,
+                    receiver_id,
                     title,
                     content,
                     status,
@@ -34,6 +35,7 @@ class JdbcLetterRepository(
                 ) values (
                     :senderId,
                     :senderNickname,
+                    :receiverId,
                     :title,
                     :content,
                     :status,
@@ -45,6 +47,7 @@ class JdbcLetterRepository(
             params()
                 .withValue("senderId", senderId)
                 .withValue("senderNickname", senderNickname)
+                .withValue("receiverId", null)
                 .withValue("title", draft.title)
                 .withValue("content", draft.content)
                 .withValue("status", "SENT")
@@ -62,6 +65,7 @@ class JdbcLetterRepository(
                 update letters
                    set sender_id = :senderId,
                        sender_nickname = :senderNickname,
+                       receiver_id = :receiverId,
                        title = :title,
                        content = :content,
                        status = :status,
@@ -135,6 +139,7 @@ class JdbcLetterRepository(
         .withValue("id", id)
         .withValue("senderId", senderId)
         .withValue("senderNickname", senderNickname)
+        .withValue("receiverId", receiverId)
         .withValue("title", title)
         .withValue("content", content)
         .withValue("status", status)
@@ -148,6 +153,7 @@ class JdbcLetterRepository(
                 id = rs.getLong("id"),
                 senderId = rs.getLong("sender_id"),
                 senderNickname = rs.getString("sender_nickname"),
+                receiverId = rs.getLong("receiver_id").takeUnless { rs.wasNull() },
                 title = rs.getString("title"),
                 content = rs.getString("content"),
                 status = rs.getString("status"),

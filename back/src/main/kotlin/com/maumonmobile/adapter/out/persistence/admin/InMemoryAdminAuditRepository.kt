@@ -25,6 +25,8 @@ class InMemoryAdminAuditRepository : AdminAuditRepository {
             newValue = draft.newValue,
             reason = draft.reason,
             createdAt = Instant.now().toString(),
+            targetResourceType = draft.targetResourceType,
+            targetResourceId = draft.targetResourceId,
         )
         eventsById[event.id] = event
         return event
@@ -33,6 +35,14 @@ class InMemoryAdminAuditRepository : AdminAuditRepository {
     override fun findByTargetMemberId(memberId: Long): List<AdminAuditEvent> {
         return eventsById.values
             .filter { event -> event.targetMemberId == memberId }
+            .sortedByDescending { event -> event.createdAt }
+    }
+
+    override fun findByTargetResource(resourceType: String, resourceId: Long): List<AdminAuditEvent> {
+        return eventsById.values
+            .filter { event ->
+                event.targetResourceType == resourceType && event.targetResourceId == resourceId
+            }
             .sortedByDescending { event -> event.createdAt }
     }
 }

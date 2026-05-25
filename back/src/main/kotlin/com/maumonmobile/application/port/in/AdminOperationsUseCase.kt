@@ -34,6 +34,34 @@ interface AdminOperationsUseCase {
         memberId: Long,
         command: AdminSessionRevokeCommand,
     ): AdminSessionRevokeResult
+
+    fun listLetters(
+        user: AuthenticatedUser,
+        status: String?,
+        query: String?,
+        page: Int,
+        size: Int,
+    ): AdminLetterPage
+
+    fun getLetter(user: AuthenticatedUser, letterId: Long): AdminLetterDetail
+
+    fun addLetterNote(
+        user: AuthenticatedUser,
+        letterId: Long,
+        command: AdminLetterNoteCommand,
+    ): AdminLetterActionResult
+
+    fun reassignLetterReceiver(
+        user: AuthenticatedUser,
+        letterId: Long,
+        command: AdminLetterReassignCommand,
+    ): AdminLetterActionResult
+
+    fun blockLetterSender(
+        user: AuthenticatedUser,
+        letterId: Long,
+        command: AdminLetterSenderBlockCommand,
+    ): AdminLetterActionResult
 }
 
 data class AdminDashboardResult(
@@ -111,6 +139,63 @@ data class AdminSessionRevokeResult(
     val latestAudit: AdminAuditEventResult,
 )
 
+data class AdminLetterPage(
+    val content: List<AdminLetterSummary>,
+    val page: Int,
+    val size: Int,
+    val totalElements: Int,
+    val totalPages: Int,
+    val last: Boolean,
+)
+
+data class AdminLetterSummary(
+    val id: Long,
+    val title: String,
+    val sender: AdminReportMember,
+    val receiver: AdminReportMember?,
+    val status: String,
+    val createdAt: String,
+    val originalSummary: String,
+    val replySummary: String?,
+    val availableReceiverCount: Int,
+    val actionCount: Int,
+)
+
+data class AdminLetterDetail(
+    val id: Long,
+    val title: String,
+    val sender: AdminReportMember,
+    val receiver: AdminReportMember?,
+    val receivers: List<AdminReportMember>,
+    val status: String,
+    val createdAt: String,
+    val replyCreatedAt: String?,
+    val originalSummary: String,
+    val replySummary: String?,
+    val auditEvents: List<AdminAuditEventResult>,
+)
+
+data class AdminLetterNoteCommand(
+    val note: String?,
+    val reason: String?,
+)
+
+data class AdminLetterReassignCommand(
+    val receiverMemberId: Long?,
+    val reason: String?,
+)
+
+data class AdminLetterSenderBlockCommand(
+    val reason: String?,
+)
+
+data class AdminLetterActionResult(
+    val letter: AdminLetterDetail,
+    val latestAudit: AdminAuditEventResult,
+    val revokedRefreshTokenCount: Int = 0,
+    val disabledDeviceTokenCount: Int = 0,
+)
+
 data class AdminAuditEventResult(
     val id: Long,
     val targetMemberId: Long,
@@ -120,4 +205,6 @@ data class AdminAuditEventResult(
     val newValue: String,
     val reason: String,
     val createdAt: String,
+    val targetResourceType: String?,
+    val targetResourceId: Long?,
 )

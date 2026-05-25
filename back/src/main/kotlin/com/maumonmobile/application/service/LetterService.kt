@@ -193,7 +193,11 @@ private fun LetterSaveCommand.toDraft(): LetterDraft {
 }
 
 private fun Letter.isReceivedBy(memberId: Long): Boolean {
-    return senderId != memberId && memberId !in rejectedMemberIds
+    if (memberId in rejectedMemberIds) {
+        return false
+    }
+
+    return receiverId?.let { receiverId -> receiverId == memberId } ?: (senderId != memberId)
 }
 
 private fun List<Letter>.toPage(page: Int, size: Int): LetterListResult {

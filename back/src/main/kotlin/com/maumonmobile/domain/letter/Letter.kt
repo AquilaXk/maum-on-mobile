@@ -4,6 +4,7 @@ data class Letter(
     val id: Long,
     val senderId: Long,
     val senderNickname: String,
+    val receiverId: Long? = null,
     val title: String,
     val content: String,
     val status: String,

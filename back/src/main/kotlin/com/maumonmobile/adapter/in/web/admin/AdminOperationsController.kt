@@ -1,6 +1,12 @@
 package com.maumonmobile.adapter.`in`.web.admin
 
 import com.maumonmobile.application.port.`in`.AdminDashboardResult
+import com.maumonmobile.application.port.`in`.AdminLetterActionResult
+import com.maumonmobile.application.port.`in`.AdminLetterDetail
+import com.maumonmobile.application.port.`in`.AdminLetterNoteCommand
+import com.maumonmobile.application.port.`in`.AdminLetterPage
+import com.maumonmobile.application.port.`in`.AdminLetterReassignCommand
+import com.maumonmobile.application.port.`in`.AdminLetterSenderBlockCommand
 import com.maumonmobile.application.port.`in`.AdminMemberActionResult
 import com.maumonmobile.application.port.`in`.AdminMemberDetail
 import com.maumonmobile.application.port.`in`.AdminMemberPage
@@ -111,6 +117,80 @@ class AdminOperationsController(
             ),
         )
     }
+
+    @GetMapping("/letters")
+    fun listLetters(
+        authentication: Authentication,
+        @RequestParam(required = false) status: String?,
+        @RequestParam(required = false) query: String?,
+        @RequestParam(defaultValue = "0") page: Int,
+        @RequestParam(defaultValue = "20") size: Int,
+    ): ApiResponse<AdminLetterPage> {
+        return ApiResponse.success(
+            adminOperationsUseCase.listLetters(
+                user = authentication.authenticatedUser(),
+                status = status,
+                query = query,
+                page = page,
+                size = size,
+            ),
+        )
+    }
+
+    @GetMapping("/letters/{id}")
+    fun getLetter(
+        authentication: Authentication,
+        @PathVariable id: Long,
+    ): ApiResponse<AdminLetterDetail> {
+        return ApiResponse.success(
+            adminOperationsUseCase.getLetter(authentication.authenticatedUser(), id),
+        )
+    }
+
+    @PostMapping("/letters/{id}/notes")
+    fun addLetterNote(
+        authentication: Authentication,
+        @PathVariable id: Long,
+        @RequestBody request: AdminLetterNoteRequest,
+    ): ApiResponse<AdminLetterActionResult> {
+        return ApiResponse.success(
+            adminOperationsUseCase.addLetterNote(
+                user = authentication.authenticatedUser(),
+                letterId = id,
+                command = request.toCommand(),
+            ),
+        )
+    }
+
+    @PostMapping("/letters/{id}/reassign")
+    fun reassignLetter(
+        authentication: Authentication,
+        @PathVariable id: Long,
+        @RequestBody request: AdminLetterReassignRequest,
+    ): ApiResponse<AdminLetterActionResult> {
+        return ApiResponse.success(
+            adminOperationsUseCase.reassignLetterReceiver(
+                user = authentication.authenticatedUser(),
+                letterId = id,
+                command = request.toCommand(),
+            ),
+        )
+    }
+
+    @PostMapping("/letters/{id}/sender/block")
+    fun blockLetterSender(
+        authentication: Authentication,
+        @PathVariable id: Long,
+        @RequestBody request: AdminLetterSenderBlockRequest,
+    ): ApiResponse<AdminLetterActionResult> {
+        return ApiResponse.success(
+            adminOperationsUseCase.blockLetterSender(
+                user = authentication.authenticatedUser(),
+                letterId = id,
+                command = request.toCommand(),
+            ),
+        )
+    }
 }
 
 data class AdminMemberStatusUpdateRequest(
@@ -127,6 +207,20 @@ data class AdminSessionRevokeRequest(
     val reason: String? = null,
 )
 
+data class AdminLetterNoteRequest(
+    val note: String? = null,
+    val reason: String? = null,
+)
+
+data class AdminLetterReassignRequest(
+    val receiverMemberId: Long? = null,
+    val reason: String? = null,
+)
+
+data class AdminLetterSenderBlockRequest(
+    val reason: String? = null,
+)
+
 private fun AdminMemberStatusUpdateRequest.toCommand(): AdminMemberStatusUpdateCommand {
     return AdminMemberStatusUpdateCommand(status = status, reason = reason)
 }
@@ -137,6 +231,18 @@ private fun AdminMemberRoleUpdateRequest.toCommand(): AdminMemberRoleUpdateComma
 
 private fun AdminSessionRevokeRequest.toCommand(): AdminSessionRevokeCommand {
     return AdminSessionRevokeCommand(reason = reason)
+}
+
+private fun AdminLetterNoteRequest.toCommand(): AdminLetterNoteCommand {
+    return AdminLetterNoteCommand(note = note, reason = reason)
+}
+
+private fun AdminLetterReassignRequest.toCommand(): AdminLetterReassignCommand {
+    return AdminLetterReassignCommand(receiverMemberId = receiverMemberId, reason = reason)
+}
+
+private fun AdminLetterSenderBlockRequest.toCommand(): AdminLetterSenderBlockCommand {
+    return AdminLetterSenderBlockCommand(reason = reason)
 }
 
 private fun Authentication.authenticatedUser(): AuthenticatedUser {

@@ -22,6 +22,7 @@ class InMemoryLetterRepository : LetterRepository {
             id = id,
             senderId = senderId,
             senderNickname = senderNickname,
+            receiverId = null,
             title = draft.title,
             content = draft.content,
             status = "SENT",

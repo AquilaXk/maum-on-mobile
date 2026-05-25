@@ -9,6 +9,8 @@ data class AdminAuditEvent(
     val newValue: String,
     val reason: String,
     val createdAt: String,
+    val targetResourceType: String? = null,
+    val targetResourceId: Long? = null,
 )
 
 data class AdminAuditEventDraft(
@@ -18,4 +20,6 @@ data class AdminAuditEventDraft(
     val previousValue: String,
     val newValue: String,
     val reason: String,
+    val targetResourceType: String? = null,
+    val targetResourceId: Long? = null,
 )
