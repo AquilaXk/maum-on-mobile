@@ -31,6 +31,32 @@ abstract interface class OperationsRepository {
     required int memberId,
     required String reason,
   });
+
+  Future<AdminLetterPage> fetchLetters({
+    String? status,
+    String? query,
+    int page = 0,
+    int size = 20,
+  });
+
+  Future<AdminLetterDetail> fetchLetterDetail(int id);
+
+  Future<AdminLetterActionResult> addLetterNote({
+    required int letterId,
+    required String note,
+    required String reason,
+  });
+
+  Future<AdminLetterActionResult> reassignLetterReceiver({
+    required int letterId,
+    required int receiverMemberId,
+    required String reason,
+  });
+
+  Future<AdminLetterActionResult> blockLetterSender({
+    required int letterId,
+    required String reason,
+  });
 }
 
 class ApiOperationsRepository implements OperationsRepository {
@@ -114,6 +140,71 @@ class ApiOperationsRepository implements OperationsRepository {
       '/api/v1/admin/members/$memberId/sessions/revoke',
       body: {'reason': reason},
       parser: AdminSessionRevokeResult.fromJson,
+    );
+  }
+
+  @override
+  Future<AdminLetterPage> fetchLetters({
+    String? status,
+    String? query,
+    int page = 0,
+    int size = 20,
+  }) {
+    return _apiClient.get<AdminLetterPage>(
+      '/api/v1/admin/letters',
+      queryParameters: {
+        if (status != null && status.isNotEmpty) 'status': status,
+        if (query != null && query.trim().isNotEmpty) 'query': query.trim(),
+        'page': page,
+        'size': size,
+      },
+      parser: AdminLetterPage.fromJson,
+    );
+  }
+
+  @override
+  Future<AdminLetterDetail> fetchLetterDetail(int id) {
+    return _apiClient.get<AdminLetterDetail>(
+      '/api/v1/admin/letters/$id',
+      parser: AdminLetterDetail.fromJson,
+    );
+  }
+
+  @override
+  Future<AdminLetterActionResult> addLetterNote({
+    required int letterId,
+    required String note,
+    required String reason,
+  }) {
+    return _apiClient.post<AdminLetterActionResult>(
+      '/api/v1/admin/letters/$letterId/notes',
+      body: {'note': note, 'reason': reason},
+      parser: AdminLetterActionResult.fromJson,
+    );
+  }
+
+  @override
+  Future<AdminLetterActionResult> reassignLetterReceiver({
+    required int letterId,
+    required int receiverMemberId,
+    required String reason,
+  }) {
+    return _apiClient.post<AdminLetterActionResult>(
+      '/api/v1/admin/letters/$letterId/reassign',
+      body: {'receiverMemberId': receiverMemberId, 'reason': reason},
+      parser: AdminLetterActionResult.fromJson,
+    );
+  }
+
+  @override
+  Future<AdminLetterActionResult> blockLetterSender({
+    required int letterId,
+    required String reason,
+  }) {
+    return _apiClient.post<AdminLetterActionResult>(
+      '/api/v1/admin/letters/$letterId/sender/block',
+      body: {'reason': reason},
+      parser: AdminLetterActionResult.fromJson,
     );
   }
 }

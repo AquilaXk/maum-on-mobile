@@ -6,7 +6,7 @@ import '../domain/operations_models.dart';
 import '../../report/data/report_repository.dart';
 import '../../report/domain/report_models.dart';
 
-enum OperationsView { dashboard, members, reports }
+enum OperationsView { dashboard, members, letters, reports }
 
 class OperationsState {
   const OperationsState({
@@ -17,17 +17,31 @@ class OperationsState {
     this.members = const [],
     this.memberPage,
     this.selectedMember,
+    this.letters = const [],
+    this.letterPage,
+    this.selectedLetter,
     this.memberQuery = '',
     this.memberStatusFilter,
     this.memberRoleFilter,
     this.memberSocialAccountFilter,
     this.memberActionReason = '',
+    this.letterQuery = '',
+    this.letterStatusFilter,
+    this.letterActionReason = '',
+    this.letterNote = '',
+    this.letterReceiverQuery = '',
+    this.letterReceiverCandidates = const [],
+    this.selectedLetterReceiverId,
     this.selectedAction = AdminReportAction.resolved,
     this.actionReason = '',
     this.isLoading = false,
     this.isMemberLoading = false,
     this.isMemberDetailLoading = false,
     this.isMemberActionSubmitting = false,
+    this.isLetterLoading = false,
+    this.isLetterDetailLoading = false,
+    this.isLetterActionSubmitting = false,
+    this.isLetterReceiverLoading = false,
     this.isDetailLoading = false,
     this.isSubmitting = false,
     this.hasLoaded = false,
@@ -42,17 +56,31 @@ class OperationsState {
   final List<AdminMemberSummary> members;
   final AdminMemberPage? memberPage;
   final AdminMemberDetail? selectedMember;
+  final List<AdminLetterSummary> letters;
+  final AdminLetterPage? letterPage;
+  final AdminLetterDetail? selectedLetter;
   final String memberQuery;
   final String? memberStatusFilter;
   final String? memberRoleFilter;
   final bool? memberSocialAccountFilter;
   final String memberActionReason;
+  final String letterQuery;
+  final String? letterStatusFilter;
+  final String letterActionReason;
+  final String letterNote;
+  final String letterReceiverQuery;
+  final List<AdminMemberSummary> letterReceiverCandidates;
+  final int? selectedLetterReceiverId;
   final AdminReportAction selectedAction;
   final String actionReason;
   final bool isLoading;
   final bool isMemberLoading;
   final bool isMemberDetailLoading;
   final bool isMemberActionSubmitting;
+  final bool isLetterLoading;
+  final bool isLetterDetailLoading;
+  final bool isLetterActionSubmitting;
+  final bool isLetterReceiverLoading;
   final bool isDetailLoading;
   final bool isSubmitting;
   final bool hasLoaded;
@@ -69,6 +97,14 @@ class OperationsState {
     return memberPage != null && !memberPage!.last && !isMemberLoading;
   }
 
+  bool get isLetterEmpty {
+    return hasLoaded && letters.isEmpty && errorMessage == null;
+  }
+
+  bool get canLoadMoreLetters {
+    return letterPage != null && !letterPage!.last && !isLetterLoading;
+  }
+
   bool get canSubmitAction {
     return selectedReport != null &&
         actionReason.trim().length >= actionReasonMinLength &&
@@ -81,7 +117,23 @@ class OperationsState {
         !isMemberActionSubmitting;
   }
 
+  bool get canSubmitLetterAction {
+    return selectedLetter != null &&
+        letterActionReason.trim().length >= actionReasonMinLength &&
+        !isLetterActionSubmitting;
+  }
+
+  bool get canSubmitLetterNote {
+    return canSubmitLetterAction &&
+        letterNote.trim().length >= letterNoteMinLength;
+  }
+
+  bool get canSubmitLetterReassign {
+    return canSubmitLetterAction && selectedLetterReceiverId != null;
+  }
+
   static const int actionReasonMinLength = 4;
+  static const int letterNoteMinLength = 2;
 
   OperationsState copyWith({
     OperationsView? view,
@@ -93,6 +145,10 @@ class OperationsState {
     AdminMemberPage? memberPage,
     AdminMemberDetail? selectedMember,
     bool clearSelectedMember = false,
+    List<AdminLetterSummary>? letters,
+    AdminLetterPage? letterPage,
+    AdminLetterDetail? selectedLetter,
+    bool clearSelectedLetter = false,
     String? memberQuery,
     String? memberStatusFilter,
     bool clearMemberStatusFilter = false,
@@ -101,12 +157,25 @@ class OperationsState {
     bool? memberSocialAccountFilter,
     bool clearMemberSocialAccountFilter = false,
     String? memberActionReason,
+    String? letterQuery,
+    String? letterStatusFilter,
+    bool clearLetterStatusFilter = false,
+    String? letterActionReason,
+    String? letterNote,
+    String? letterReceiverQuery,
+    List<AdminMemberSummary>? letterReceiverCandidates,
+    int? selectedLetterReceiverId,
+    bool clearSelectedLetterReceiver = false,
     AdminReportAction? selectedAction,
     String? actionReason,
     bool? isLoading,
     bool? isMemberLoading,
     bool? isMemberDetailLoading,
     bool? isMemberActionSubmitting,
+    bool? isLetterLoading,
+    bool? isLetterDetailLoading,
+    bool? isLetterActionSubmitting,
+    bool? isLetterReceiverLoading,
     bool? isDetailLoading,
     bool? isSubmitting,
     bool? hasLoaded,
@@ -125,6 +194,10 @@ class OperationsState {
       memberPage: memberPage ?? this.memberPage,
       selectedMember:
           clearSelectedMember ? null : selectedMember ?? this.selectedMember,
+      letters: letters ?? this.letters,
+      letterPage: letterPage ?? this.letterPage,
+      selectedLetter:
+          clearSelectedLetter ? null : selectedLetter ?? this.selectedLetter,
       memberQuery: memberQuery ?? this.memberQuery,
       memberStatusFilter: clearMemberStatusFilter
           ? null
@@ -136,6 +209,18 @@ class OperationsState {
           ? null
           : memberSocialAccountFilter ?? this.memberSocialAccountFilter,
       memberActionReason: memberActionReason ?? this.memberActionReason,
+      letterQuery: letterQuery ?? this.letterQuery,
+      letterStatusFilter: clearLetterStatusFilter
+          ? null
+          : letterStatusFilter ?? this.letterStatusFilter,
+      letterActionReason: letterActionReason ?? this.letterActionReason,
+      letterNote: letterNote ?? this.letterNote,
+      letterReceiverQuery: letterReceiverQuery ?? this.letterReceiverQuery,
+      letterReceiverCandidates:
+          letterReceiverCandidates ?? this.letterReceiverCandidates,
+      selectedLetterReceiverId: clearSelectedLetterReceiver
+          ? null
+          : selectedLetterReceiverId ?? this.selectedLetterReceiverId,
       selectedAction: selectedAction ?? this.selectedAction,
       actionReason: actionReason ?? this.actionReason,
       isLoading: isLoading ?? this.isLoading,
@@ -143,6 +228,13 @@ class OperationsState {
       isMemberDetailLoading: isMemberDetailLoading ?? this.isMemberDetailLoading,
       isMemberActionSubmitting:
           isMemberActionSubmitting ?? this.isMemberActionSubmitting,
+      isLetterLoading: isLetterLoading ?? this.isLetterLoading,
+      isLetterDetailLoading:
+          isLetterDetailLoading ?? this.isLetterDetailLoading,
+      isLetterActionSubmitting:
+          isLetterActionSubmitting ?? this.isLetterActionSubmitting,
+      isLetterReceiverLoading:
+          isLetterReceiverLoading ?? this.isLetterReceiverLoading,
       isDetailLoading: isDetailLoading ?? this.isDetailLoading,
       isSubmitting: isSubmitting ?? this.isSubmitting,
       hasLoaded: hasLoaded ?? this.hasLoaded,
@@ -190,12 +282,18 @@ class OperationsController extends ChangeNotifier {
         role: _state.memberRoleFilter,
         socialAccount: _state.memberSocialAccountFilter,
       );
+      final letterPage = await _operationsRepository.fetchLetters(
+        query: _state.letterQuery,
+        status: _state.letterStatusFilter,
+      );
       _setState(
         _state.copyWith(
           dashboard: dashboard,
           reports: reports,
           members: memberPage.content,
           memberPage: memberPage,
+          letters: letterPage.content,
+          letterPage: letterPage,
           isLoading: false,
           hasLoaded: true,
           clearErrorMessage: true,
@@ -340,6 +438,174 @@ class OperationsController extends ChangeNotifier {
 
   Future<void> revokeSelectedMemberSessions() {
     return _submitMemberSessionRevoke();
+  }
+
+  Future<void> updateLetterQuery(String query) async {
+    _setState(_state.copyWith(letterQuery: query));
+    await loadLetters(reset: true);
+  }
+
+  Future<void> selectLetterStatusFilter(String? status) async {
+    _setState(
+      _state.copyWith(
+        letterStatusFilter: status,
+        clearLetterStatusFilter: status == null,
+      ),
+    );
+    await loadLetters(reset: true);
+  }
+
+  Future<void> loadLetters({bool reset = false}) async {
+    if (_state.isLetterLoading) {
+      return;
+    }
+
+    final nextPage = reset ? 0 : (_state.letterPage?.page ?? -1) + 1;
+    _setState(
+      _state.copyWith(
+        isLetterLoading: true,
+        clearErrorMessage: true,
+        clearNoticeMessage: true,
+      ),
+    );
+
+    try {
+      final page = await _operationsRepository.fetchLetters(
+        status: _state.letterStatusFilter,
+        query: _state.letterQuery,
+        page: nextPage,
+      );
+      _setState(
+        _state.copyWith(
+          letters: reset ? page.content : [..._state.letters, ...page.content],
+          letterPage: page,
+          isLetterLoading: false,
+          hasLoaded: true,
+          clearErrorMessage: true,
+        ),
+      );
+    } on Object catch (error) {
+      _handleError(error);
+      _setState(_state.copyWith(isLetterLoading: false, hasLoaded: true));
+    }
+  }
+
+  Future<void> openLetter(AdminLetterSummary letter) async {
+    _setState(
+      _state.copyWith(
+        isLetterDetailLoading: true,
+        letterActionReason: '',
+        letterNote: '',
+        letterReceiverQuery: '',
+        letterReceiverCandidates: const [],
+        clearSelectedLetter: true,
+        clearSelectedLetterReceiver: true,
+        clearErrorMessage: true,
+        clearNoticeMessage: true,
+      ),
+    );
+
+    try {
+      final detail = await _operationsRepository.fetchLetterDetail(letter.id);
+      _setState(
+        _state.copyWith(
+          selectedLetter: detail,
+          isLetterDetailLoading: false,
+          clearErrorMessage: true,
+        ),
+      );
+    } on Object catch (error) {
+      _handleError(error);
+      _setState(_state.copyWith(isLetterDetailLoading: false));
+    }
+  }
+
+  void updateLetterActionReason(String reason) {
+    _setState(
+      _state.copyWith(
+        letterActionReason: reason,
+        clearErrorMessage: true,
+        clearNoticeMessage: true,
+      ),
+    );
+  }
+
+  void updateLetterNote(String note) {
+    _setState(
+      _state.copyWith(
+        letterNote: note,
+        clearErrorMessage: true,
+        clearNoticeMessage: true,
+      ),
+    );
+  }
+
+  Future<void> searchLetterReceivers(String query) async {
+    final trimmedQuery = query.trim();
+    if (trimmedQuery.isEmpty) {
+      _setState(
+        _state.copyWith(
+          letterReceiverQuery: '',
+          letterReceiverCandidates: const [],
+          isLetterReceiverLoading: false,
+          clearSelectedLetterReceiver: true,
+          clearErrorMessage: true,
+          clearNoticeMessage: true,
+        ),
+      );
+      return;
+    }
+
+    _setState(
+      _state.copyWith(
+        letterReceiverQuery: trimmedQuery,
+        isLetterReceiverLoading: true,
+        clearSelectedLetterReceiver: true,
+        clearErrorMessage: true,
+        clearNoticeMessage: true,
+      ),
+    );
+
+    try {
+      final page = await _operationsRepository.fetchMembers(
+        query: trimmedQuery,
+        status: 'ACTIVE',
+        page: 0,
+        size: 10,
+      );
+      _setState(
+        _state.copyWith(
+          letterReceiverCandidates: page.content,
+          isLetterReceiverLoading: false,
+          clearErrorMessage: true,
+        ),
+      );
+    } on Object catch (error) {
+      _handleError(error);
+      _setState(_state.copyWith(isLetterReceiverLoading: false));
+    }
+  }
+
+  void selectLetterReceiver(int memberId) {
+    _setState(
+      _state.copyWith(
+        selectedLetterReceiverId: memberId,
+        clearErrorMessage: true,
+        clearNoticeMessage: true,
+      ),
+    );
+  }
+
+  Future<void> addSelectedLetterNote() {
+    return _submitLetterNote();
+  }
+
+  Future<void> reassignSelectedLetter() {
+    return _submitLetterReassign();
+  }
+
+  Future<void> blockSelectedLetterSender() {
+    return _submitLetterSenderBlock();
   }
 
   Future<void> openReport(AdminReportSummary report) async {
@@ -564,9 +830,168 @@ class OperationsController extends ChangeNotifier {
     }
   }
 
+  Future<void> _submitLetterNote() async {
+    final letter = _state.selectedLetter;
+    if (letter == null || _state.isLetterActionSubmitting) {
+      return;
+    }
+
+    final reason = _validLetterReasonOrSetError() ?? '';
+    if (reason.isEmpty) {
+      return;
+    }
+
+    if (_state.letterNote.trim().length < OperationsState.letterNoteMinLength) {
+      _setState(
+        _state.copyWith(
+          errorMessage:
+              '편지 운영 메모를 ${OperationsState.letterNoteMinLength}자 이상 입력해 주세요.',
+          clearNoticeMessage: true,
+        ),
+      );
+      return;
+    }
+
+    _setState(
+      _state.copyWith(
+        isLetterActionSubmitting: true,
+        clearErrorMessage: true,
+        clearNoticeMessage: true,
+      ),
+    );
+
+    try {
+      await _operationsRepository.addLetterNote(
+        letterId: letter.id,
+        note: _state.letterNote.trim(),
+        reason: reason,
+      );
+      await _refreshSelectedLetter(letter.id);
+      await loadLetters(reset: true);
+      _setState(
+        _state.copyWith(
+          isLetterActionSubmitting: false,
+          letterActionReason: '',
+          letterNote: '',
+          letterReceiverQuery: '',
+          letterReceiverCandidates: const [],
+          clearSelectedLetterReceiver: true,
+          noticeMessage: '편지 조치가 저장되었습니다.',
+          clearErrorMessage: true,
+        ),
+      );
+    } on Object catch (error) {
+      _handleError(error);
+      _setState(_state.copyWith(isLetterActionSubmitting: false));
+    }
+  }
+
+  Future<void> _submitLetterReassign() async {
+    final letter = _state.selectedLetter;
+    final receiverId = _state.selectedLetterReceiverId;
+    if (letter == null || _state.isLetterActionSubmitting) {
+      return;
+    }
+
+    if (receiverId == null) {
+      _setState(
+        _state.copyWith(
+          errorMessage: '재배정할 수신자를 선택해 주세요.',
+          clearNoticeMessage: true,
+        ),
+      );
+      return;
+    }
+
+    final reason = _validLetterReasonOrSetError() ?? '';
+    if (reason.isEmpty) {
+      return;
+    }
+
+    _setState(
+      _state.copyWith(
+        isLetterActionSubmitting: true,
+        clearErrorMessage: true,
+        clearNoticeMessage: true,
+      ),
+    );
+
+    try {
+      await _operationsRepository.reassignLetterReceiver(
+        letterId: letter.id,
+        receiverMemberId: receiverId,
+        reason: reason,
+      );
+      await _refreshSelectedLetter(letter.id);
+      await loadLetters(reset: true);
+      _setState(
+        _state.copyWith(
+          isLetterActionSubmitting: false,
+          letterActionReason: '',
+          letterReceiverQuery: '',
+          letterReceiverCandidates: const [],
+          clearSelectedLetterReceiver: true,
+          noticeMessage: '편지 조치가 저장되었습니다.',
+          clearErrorMessage: true,
+        ),
+      );
+    } on Object catch (error) {
+      _handleError(error);
+      _setState(_state.copyWith(isLetterActionSubmitting: false));
+    }
+  }
+
+  Future<void> _submitLetterSenderBlock() async {
+    final letter = _state.selectedLetter;
+    if (letter == null || _state.isLetterActionSubmitting) {
+      return;
+    }
+
+    final reason = _validLetterReasonOrSetError() ?? '';
+    if (reason.isEmpty) {
+      return;
+    }
+
+    _setState(
+      _state.copyWith(
+        isLetterActionSubmitting: true,
+        clearErrorMessage: true,
+        clearNoticeMessage: true,
+      ),
+    );
+
+    try {
+      await _operationsRepository.blockLetterSender(
+        letterId: letter.id,
+        reason: reason,
+      );
+      await _refreshSelectedLetter(letter.id);
+      await loadLetters(reset: true);
+      _setState(
+        _state.copyWith(
+          isLetterActionSubmitting: false,
+          letterActionReason: '',
+          letterReceiverQuery: '',
+          letterReceiverCandidates: const [],
+          clearSelectedLetterReceiver: true,
+          noticeMessage: '편지 조치가 저장되었습니다.',
+          clearErrorMessage: true,
+        ),
+      );
+    } on Object catch (error) {
+      _handleError(error);
+      _setState(_state.copyWith(isLetterActionSubmitting: false));
+    }
+  }
+
   Future<void> _refreshSelectedMember(int memberId) async {
     final detail = await _operationsRepository.fetchMemberDetail(memberId);
     _setState(_state.copyWith(selectedMember: detail));
+  }
+
+  Future<void> _refreshSelectedLetter(int letterId) async {
+    final detail = await _operationsRepository.fetchLetterDetail(letterId);
+    _setState(_state.copyWith(selectedLetter: detail));
   }
 
   String? _validMemberReasonOrSetError() {
@@ -576,6 +1001,21 @@ class OperationsController extends ChangeNotifier {
         _state.copyWith(
           errorMessage:
               '관리자 조치 사유를 ${OperationsState.actionReasonMinLength}자 이상 입력해 주세요.',
+          clearNoticeMessage: true,
+        ),
+      );
+      return null;
+    }
+    return reason;
+  }
+
+  String? _validLetterReasonOrSetError() {
+    final reason = _state.letterActionReason.trim();
+    if (reason.length < OperationsState.actionReasonMinLength) {
+      _setState(
+        _state.copyWith(
+          errorMessage:
+              '편지 조치 사유를 ${OperationsState.actionReasonMinLength}자 이상 입력해 주세요.',
           clearNoticeMessage: true,
         ),
       );

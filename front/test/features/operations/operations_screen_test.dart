@@ -178,6 +178,129 @@ void main() {
     expect(operationsRepository.statusActions.single.status, 'BLOCKED');
     expect(find.text('회원 조치가 저장되었습니다.'), findsOneWidget);
   });
+
+  testWidgets('shows letter review and confirms reassign and block actions',
+      (tester) async {
+    final operationsRepository = _FakeOperationsRepository();
+    final controller = OperationsController(
+      reportRepository: _FakeReportRepository(),
+      operationsRepository: operationsRepository,
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: OperationsScreen(controller: controller, onBack: () {}),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const ValueKey('operations-view-letters')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('편지 검수'), findsOneWidget);
+    expect(find.text('운영 편지'), findsWidgets);
+    expect(
+      find.bySemanticsLabel(RegExp('편지 항목: 운영 편지')),
+      findsOneWidget,
+    );
+
+    await tester.enterText(
+      find.byKey(const ValueKey('operations-letter-search-field')),
+      '운영',
+    );
+    await tester.pumpAndSettle();
+
+    expect(operationsRepository.letterQueries.last, '운영');
+
+    await tester.tap(find.byKey(const ValueKey('operations-letter-12')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('편지 상세'), findsOneWidget);
+    expect(find.text('원문 요약'), findsOneWidget);
+    expect(find.text('LETTER_NOTE'), findsOneWidget);
+
+    await tester.enterText(
+      find.byKey(const ValueKey('operations-letter-action-reason-field')),
+      '운영 메모 저장',
+    );
+    await tester.enterText(
+      find.byKey(const ValueKey('operations-letter-note-field')),
+      '상담 이관',
+    );
+    await tester.ensureVisible(
+      find.byKey(const ValueKey('operations-letter-note-button')),
+    );
+    await tester.tap(find.byKey(const ValueKey('operations-letter-note-button')));
+    await tester.pumpAndSettle();
+
+    expect(operationsRepository.letterNotes, isEmpty);
+    expect(find.text('편지 메모 저장 확인'), findsOneWidget);
+
+    await tester.tap(
+      find.byKey(const ValueKey('operations-confirm-letter-note-button')),
+    );
+    await tester.pumpAndSettle();
+
+    expect(operationsRepository.letterNotes.single.note, '상담 이관');
+
+    await tester.enterText(
+      find.byKey(const ValueKey('operations-letter-action-reason-field')),
+      '수신자 변경',
+    );
+    await tester.enterText(
+      find.byKey(const ValueKey('operations-letter-receiver-search-field')),
+      'receiver',
+    );
+    await tester.pumpAndSettle();
+
+    expect(operationsRepository.memberQueries.last, 'receiver');
+
+    await tester.tap(
+      find.byKey(const ValueKey('operations-letter-receiver-8')),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.ensureVisible(
+      find.byKey(const ValueKey('operations-letter-reassign-button')),
+    );
+    await tester.tap(
+      find.byKey(const ValueKey('operations-letter-reassign-button')),
+    );
+    await tester.pumpAndSettle();
+
+    expect(operationsRepository.reassignActions, isEmpty);
+    expect(find.text('편지 재배정 확인'), findsOneWidget);
+
+    await tester.tap(
+      find.byKey(const ValueKey('operations-confirm-letter-reassign-button')),
+    );
+    await tester.pumpAndSettle();
+
+    expect(operationsRepository.reassignActions.single.receiverMemberId, 8);
+    expect(find.text('편지 조치가 저장되었습니다.'), findsOneWidget);
+
+    await tester.enterText(
+      find.byKey(const ValueKey('operations-letter-action-reason-field')),
+      '반복 악용 차단',
+    );
+    await tester.ensureVisible(
+      find.byKey(const ValueKey('operations-letter-block-sender-button')),
+    );
+    await tester.tap(
+      find.byKey(const ValueKey('operations-letter-block-sender-button')),
+    );
+    await tester.pumpAndSettle();
+
+    expect(operationsRepository.blockedLetterIds, isEmpty);
+    expect(find.text('발신자 차단 확인'), findsOneWidget);
+
+    await tester.tap(
+      find.byKey(const ValueKey('operations-confirm-letter-block-button')),
+    );
+    await tester.pumpAndSettle();
+
+    expect(operationsRepository.blockedLetterIds.single, 12);
+  });
 }
 
 class _FakeReportRepository implements ReportRepository {
@@ -281,7 +404,12 @@ class _FakeReportRepository implements ReportRepository {
 
 class _FakeOperationsRepository implements OperationsRepository {
   final List<String?> memberQueries = [];
+  final List<String?> letterQueries = [];
   final List<_StatusAction> statusActions = [];
+  final List<_LetterNoteAction> letterNotes = [];
+  final List<_LetterReassignAction> reassignActions = [];
+  final List<int> blockedLetterIds = [];
+  int currentReceiverId = 7;
 
   @override
   Future<OperationsDashboard> fetchDashboard() async {
@@ -305,10 +433,17 @@ class _FakeOperationsRepository implements OperationsRepository {
     int size = 20,
   }) async {
     memberQueries.add(query);
+    final content = query == 'receiver'
+        ? [
+            _member(
+              id: 8,
+              email: 'receiver@example.com',
+              nickname: '새 수신자',
+            ),
+          ]
+        : [_member()];
     return AdminMemberPage(
-      content: [
-        _member(),
-      ],
+      content: content,
       page: page,
       size: size,
       totalElements: 1,
@@ -415,14 +550,87 @@ class _FakeOperationsRepository implements OperationsRepository {
     );
   }
 
+  @override
+  Future<AdminLetterPage> fetchLetters({
+    String? status,
+    String? query,
+    int page = 0,
+    int size = 20,
+  }) async {
+    letterQueries.add(query);
+    return AdminLetterPage(
+      content: [_letterSummary()],
+      page: page,
+      size: size,
+      totalElements: 1,
+      totalPages: 1,
+      last: true,
+    );
+  }
+
+  @override
+  Future<AdminLetterDetail> fetchLetterDetail(int id) async {
+    return _letterDetail(id: id);
+  }
+
+  @override
+  Future<AdminLetterActionResult> addLetterNote({
+    required int letterId,
+    required String note,
+    required String reason,
+  }) async {
+    letterNotes.add(_LetterNoteAction(letterId, note, reason));
+    return AdminLetterActionResult(
+      letter: _letterDetail(id: letterId),
+      latestAudit: _letterAudit('LETTER_NOTE', reason),
+      revokedRefreshTokenCount: 0,
+      disabledDeviceTokenCount: 0,
+    );
+  }
+
+  @override
+  Future<AdminLetterActionResult> reassignLetterReceiver({
+    required int letterId,
+    required int receiverMemberId,
+    required String reason,
+  }) async {
+    reassignActions.add(
+      _LetterReassignAction(letterId, receiverMemberId, reason),
+    );
+    currentReceiverId = receiverMemberId;
+    return AdminLetterActionResult(
+      letter: _letterDetail(id: letterId),
+      latestAudit: _letterAudit('LETTER_REASSIGN', reason),
+      revokedRefreshTokenCount: 0,
+      disabledDeviceTokenCount: 0,
+    );
+  }
+
+  @override
+  Future<AdminLetterActionResult> blockLetterSender({
+    required int letterId,
+    required String reason,
+  }) async {
+    blockedLetterIds.add(letterId);
+    return AdminLetterActionResult(
+      letter: _letterDetail(id: letterId),
+      latestAudit: _letterAudit('LETTER_SENDER_BLOCK', reason),
+      revokedRefreshTokenCount: 1,
+      disabledDeviceTokenCount: 1,
+    );
+  }
+
   AdminMemberSummary _member({
+    int id = 7,
+    String email = 'member@example.com',
+    String nickname = '회원',
     String status = 'ACTIVE',
     String role = 'USER',
   }) {
     return AdminMemberSummary(
-      id: 7,
-      email: 'member@example.com',
-      nickname: '회원',
+      id: id,
+      email: email,
+      nickname: nickname,
       role: role,
       status: status,
       socialAccount: false,
@@ -431,6 +639,72 @@ class _FakeOperationsRepository implements OperationsRepository {
       postCount: 1,
       letterCount: 0,
       diaryCount: 0,
+    );
+  }
+
+  AdminLetterSummary _letterSummary() {
+    return AdminLetterSummary(
+      id: 12,
+      title: '운영 편지',
+      sender: _memberLabel(
+        id: 3,
+        email: 'sender@example.com',
+        nickname: '발신자',
+      ),
+      receiver: _memberLabel(
+        id: currentReceiverId,
+        email: 'receiver@example.com',
+        nickname: '수신자',
+      ),
+      status: 'SENT',
+      createdAt: '2026-05-25T09:20:00',
+      originalSummary: '검수가 필요한 편지 요약입니다.',
+      replySummary: null,
+      availableReceiverCount: 3,
+      actionCount: 1,
+    );
+  }
+
+  AdminLetterDetail _letterDetail({required int id}) {
+    return AdminLetterDetail(
+      id: id,
+      title: '운영 편지',
+      sender: _memberLabel(
+        id: 3,
+        email: 'sender@example.com',
+        nickname: '발신자',
+      ),
+      receiver: _memberLabel(
+        id: currentReceiverId,
+        email: 'receiver@example.com',
+        nickname: '수신자',
+      ),
+      receivers: [
+        _memberLabel(
+          id: currentReceiverId,
+          email: 'receiver@example.com',
+          nickname: '수신자',
+        ),
+      ],
+      status: 'SENT',
+      createdAt: '2026-05-25T09:20:00',
+      replyCreatedAt: null,
+      originalSummary: '검수가 필요한 편지 요약입니다.',
+      replySummary: null,
+      auditEvents: [_letterAudit('LETTER_NOTE', '운영 확인')],
+    );
+  }
+
+  AdminAuditEvent _letterAudit(String action, String reason) {
+    return AdminAuditEvent(
+      id: 10,
+      targetMemberId: 3,
+      actorMemberId: 1,
+      action: action,
+      previousValue: 'SENT',
+      newValue: 'SENT',
+      reason: reason,
+      createdAt: '2026-05-25T09:30:00',
     );
   }
 }
@@ -443,7 +717,41 @@ class _StatusAction {
   final String reason;
 }
 
+class _LetterNoteAction {
+  const _LetterNoteAction(this.letterId, this.note, this.reason);
+
+  final int letterId;
+  final String note;
+  final String reason;
+}
+
+class _LetterReassignAction {
+  const _LetterReassignAction(
+    this.letterId,
+    this.receiverMemberId,
+    this.reason,
+  );
+
+  final int letterId;
+  final int receiverMemberId;
+  final String reason;
+}
+
 AdminReportMember _member({
+  required int id,
+  required String email,
+  required String nickname,
+}) {
+  return AdminReportMember(
+    id: id,
+    email: email,
+    nickname: nickname,
+    role: 'USER',
+    status: 'ACTIVE',
+  );
+}
+
+AdminReportMember _memberLabel({
   required int id,
   required String email,
   required String nickname,
