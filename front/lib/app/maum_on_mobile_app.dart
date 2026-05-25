@@ -31,6 +31,7 @@ import '../features/notification/data/notification_repository.dart';
 import '../features/notification/data/push_notification_permission_client.dart';
 import '../features/notification/presentation/notification_report_screen.dart';
 import '../features/operations/application/operations_controller.dart';
+import '../features/operations/data/operations_repository.dart';
 import '../features/operations/presentation/operations_screen.dart';
 import '../features/report/application/report_controller.dart';
 import '../features/report/data/report_repository.dart';
@@ -57,6 +58,7 @@ class MaumOnMobileApp extends StatefulWidget {
     this.notificationRepository,
     this.pushNotificationPermissionClient,
     this.reportRepository,
+    this.operationsRepository,
     this.settingsRepository,
     this.diaryRepository,
     this.diaryImageRepository,
@@ -79,6 +81,7 @@ class MaumOnMobileApp extends StatefulWidget {
   final NotificationRepository? notificationRepository;
   final PushNotificationPermissionClient? pushNotificationPermissionClient;
   final ReportRepository? reportRepository;
+  final OperationsRepository? operationsRepository;
   final SettingsRepository? settingsRepository;
   final DiaryRepository? diaryRepository;
   final DiaryImageRepository? diaryImageRepository;
@@ -460,7 +463,10 @@ class _MaumOnMobileAppState extends State<MaumOnMobileApp> {
     currentController?.dispose();
     _operationsMemberId = memberId;
     return _operationsController = OperationsController(
-      repository: widget.reportRepository ?? _buildDefaultReportRepository(),
+      reportRepository:
+          widget.reportRepository ?? _buildDefaultReportRepository(),
+      operationsRepository:
+          widget.operationsRepository ?? _buildDefaultOperationsRepository(),
       onUnauthorized: () {
         _authController.logout();
       },
@@ -699,6 +705,23 @@ class _MaumOnMobileAppState extends State<MaumOnMobileApp> {
     );
 
     return ApiReportRepository(
+      apiClient: ApiClient(
+        transport: _apiTransport,
+        tokenStore: _tokenStore,
+        tokenRefresher: AuthSessionTokenRefresher(
+          authRepository: refreshRepository,
+        ),
+      ),
+    );
+  }
+
+  OperationsRepository _buildDefaultOperationsRepository() {
+    final refreshRepository = ApiAuthRepository(
+      apiClient: ApiClient(transport: _apiTransport, tokenStore: _tokenStore),
+      tokenStore: _tokenStore,
+    );
+
+    return ApiOperationsRepository(
       apiClient: ApiClient(
         transport: _apiTransport,
         tokenStore: _tokenStore,
