@@ -6,6 +6,8 @@ import com.maumonmobile.application.port.`in`.StoryPageResult
 import com.maumonmobile.application.port.`in`.StoryResult
 import com.maumonmobile.application.port.`in`.StorySaveCommand
 import com.maumonmobile.application.port.`in`.StoryUseCase
+import com.maumonmobile.application.service.WriteIdempotencyService
+import com.maumonmobile.domain.write.WriteOperation
 import com.maumonmobile.global.security.AuthenticatedUser
 import com.maumonmobile.global.web.ApiResponse
 import jakarta.validation.Valid
@@ -20,12 +22,14 @@ import org.springframework.web.bind.annotation.PutMapping
 import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RequestParam
+import org.springframework.web.bind.annotation.RequestHeader
 import org.springframework.web.bind.annotation.RestController
 
 @RestController
 @RequestMapping("/api/v1")
 class StoryController(
     private val storyUseCase: StoryUseCase,
+    private val writeIdempotencyService: WriteIdempotencyService,
 ) {
 
     @GetMapping("/posts")
@@ -46,10 +50,14 @@ class StoryController(
     @PostMapping("/posts")
     fun createPost(
         authentication: Authentication,
+        @RequestHeader(name = IDEMPOTENCY_HEADER, required = false) idempotencyKey: String?,
         @Valid @RequestBody request: StorySaveRequest,
     ): ApiResponse<Long> {
+        val user = authentication.authenticatedUser()
         return ApiResponse.success(
-            storyUseCase.create(authentication.authenticatedUser(), request.toCommand()),
+            writeIdempotencyService.executeLong(user, WriteOperation.STORY_POST_CREATE, idempotencyKey) {
+                storyUseCase.create(user, request.toCommand())
+            },
         )
     }
 
@@ -99,14 +107,18 @@ class StoryController(
     fun createComment(
         authentication: Authentication,
         @PathVariable postId: Long,
+        @RequestHeader(name = IDEMPOTENCY_HEADER, required = false) idempotencyKey: String?,
         @Valid @RequestBody request: CommentSaveRequest,
     ): ApiResponse<Long> {
+        val user = authentication.authenticatedUser()
         return ApiResponse.success(
-            storyUseCase.createComment(
-                user = authentication.authenticatedUser(),
-                postId = postId,
-                command = request.toCommand(),
-            ),
+            writeIdempotencyService.executeLong(user, WriteOperation.STORY_COMMENT_CREATE, idempotencyKey) {
+                storyUseCase.createComment(
+                    user = user,
+                    postId = postId,
+                    command = request.toCommand(),
+                )
+            },
         )
     }
 
@@ -180,3 +192,5 @@ private fun CommentSaveRequest.toCommand(): StoryCommentSaveCommand {
 private fun Authentication.authenticatedUser(): AuthenticatedUser {
     return principal as AuthenticatedUser
 }
+
+private const val IDEMPOTENCY_HEADER = "X-Idempotency-Key"

@@ -5,6 +5,8 @@ import com.maumonmobile.application.port.`in`.DiaryPageResult
 import com.maumonmobile.application.port.`in`.DiaryResult
 import com.maumonmobile.application.port.`in`.DiarySaveCommand
 import com.maumonmobile.application.port.`in`.DiaryUseCase
+import com.maumonmobile.application.service.WriteIdempotencyService
+import com.maumonmobile.domain.write.WriteOperation
 import com.maumonmobile.global.security.AuthenticatedUser
 import com.maumonmobile.global.web.ApiResponse
 import jakarta.validation.Valid
@@ -17,6 +19,7 @@ import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.PutMapping
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RequestParam
+import org.springframework.web.bind.annotation.RequestHeader
 import org.springframework.web.bind.annotation.RequestPart
 import org.springframework.web.bind.annotation.RestController
 import org.springframework.web.multipart.MultipartFile
@@ -25,19 +28,24 @@ import org.springframework.web.multipart.MultipartFile
 @RequestMapping("/api/v1/diaries")
 class DiaryController(
     private val diaryUseCase: DiaryUseCase,
+    private val writeIdempotencyService: WriteIdempotencyService,
 ) {
 
     @PostMapping
     fun create(
         authentication: Authentication,
+        @RequestHeader(name = IDEMPOTENCY_HEADER, required = false) idempotencyKey: String?,
         @Valid @RequestPart("data") request: DiarySaveRequest,
         @RequestPart("image", required = false) image: MultipartFile?,
     ): ApiResponse<Long> {
+        val user = authentication.authenticatedUser()
         return ApiResponse.success(
-            diaryUseCase.create(
-                user = authentication.authenticatedUser(),
-                command = request.toCommand(image),
-            ),
+            writeIdempotencyService.executeLong(user, WriteOperation.DIARY_CREATE, idempotencyKey) {
+                diaryUseCase.create(
+                    user = user,
+                    command = request.toCommand(image),
+                )
+            },
         )
     }
 
@@ -124,3 +132,5 @@ private fun DiarySaveRequest.toCommand(image: MultipartFile?): DiarySaveCommand 
 private fun Authentication.authenticatedUser(): AuthenticatedUser {
     return principal as AuthenticatedUser
 }
+
+private const val IDEMPOTENCY_HEADER = "X-Idempotency-Key"

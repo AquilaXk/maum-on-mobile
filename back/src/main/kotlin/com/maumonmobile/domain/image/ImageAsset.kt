@@ -18,6 +18,8 @@ data class ImageAsset(
 enum class ImageAssetStatus {
     TEMPORARY,
     ATTACHED,
+    CANCELLED,
+    EXPIRED,
     DELETED,
 }
 
