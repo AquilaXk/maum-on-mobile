@@ -4,9 +4,13 @@ import com.maumonmobile.application.port.out.NotificationDeliveryPort
 import com.maumonmobile.application.port.out.NotificationDeviceTokenRepository
 import com.maumonmobile.application.port.out.NotificationEventPublisher
 import com.maumonmobile.application.port.out.NotificationPushCommand
+import com.maumonmobile.application.port.out.NotificationPushSendResult
+import com.maumonmobile.application.port.out.NotificationPushSendStatus
 import com.maumonmobile.application.port.out.NotificationPushSender
 import com.maumonmobile.application.port.out.NotificationRepository
 import com.maumonmobile.domain.notification.Notification
+import com.maumonmobile.domain.notification.NotificationDeviceToken
+import com.maumonmobile.global.observability.MobileApiMetricsRegistry
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
 
@@ -16,6 +20,8 @@ class NotificationDeliveryService(
     private val notificationEventPublisher: NotificationEventPublisher,
     private val notificationDeviceTokenRepository: NotificationDeviceTokenRepository,
     private val notificationPushSender: NotificationPushSender,
+    private val pushRetryProperties: NotificationPushRetryProperties,
+    private val metricsRegistry: MobileApiMetricsRegistry,
 ) : NotificationDeliveryPort {
 
     override fun deliver(
@@ -51,26 +57,80 @@ class NotificationDeliveryService(
 
     private fun dispatchPush(memberId: Long, message: String, payload: Map<String, Any?>) {
         notificationDeviceTokenRepository.findEnabledByMemberId(memberId).forEach { deviceToken ->
-            runCatching {
-                notificationPushSender.send(
-                    NotificationPushCommand(
-                        memberId = memberId,
-                        platform = deviceToken.platform,
-                        token = deviceToken.token,
-                        title = PUSH_TITLE,
-                        body = message,
-                        data = payload.mapValues { (_, value) -> value?.toString() ?: "" },
-                    ),
-                )
-            }.onFailure { exception ->
+            dispatchPushToToken(memberId, deviceToken, message, payload)
+        }
+    }
+
+    private fun dispatchPushToToken(
+        memberId: Long,
+        deviceToken: NotificationDeviceToken,
+        message: String,
+        payload: Map<String, Any?>,
+    ) {
+        val command = NotificationPushCommand(
+            memberId = memberId,
+            platform = deviceToken.platform,
+            token = deviceToken.token,
+            title = PUSH_TITLE,
+            body = message,
+            data = payload.mapValues { (_, value) -> value?.toString() ?: "" },
+        )
+        val result = sendWithRetry(command)
+        when (result.status) {
+            NotificationPushSendStatus.SUCCESS -> {
+                metricsRegistry.recordPushDelivery(deviceToken.platform.name, "success")
+            }
+            NotificationPushSendStatus.TEMPORARY_FAILURE -> {
+                metricsRegistry.recordPushDelivery(deviceToken.platform.name, "temporary_failure")
                 log.warn(
-                    "Failed to dispatch push notification. memberId={}, platform={}",
+                    "Temporary push dispatch failure. memberId={}, platform={}, providerStatusCode={}, providerMessage={}",
                     memberId,
                     deviceToken.platform,
-                    exception,
+                    result.providerStatusCode,
+                    result.providerMessage,
+                )
+            }
+            NotificationPushSendStatus.PERMANENT_FAILURE -> {
+                metricsRegistry.recordPushDelivery(deviceToken.platform.name, "permanent_failure")
+                val disabled = notificationDeviceTokenRepository.disable(memberId, deviceToken.token)
+                if (disabled) {
+                    metricsRegistry.recordPushDelivery(deviceToken.platform.name, "disabled")
+                }
+                log.warn(
+                    "Permanent push dispatch failure disabled token. memberId={}, platform={}, disabled={}, providerStatusCode={}, providerMessage={}",
+                    memberId,
+                    deviceToken.platform,
+                    disabled,
+                    result.providerStatusCode,
+                    result.providerMessage,
                 )
             }
         }
+    }
+
+    private fun sendWithRetry(command: NotificationPushCommand): NotificationPushSendResult {
+        var lastResult = NotificationPushSendResult.temporaryFailure(providerMessage = "not attempted")
+        for (attempt in 1..pushRetryProperties.attempts()) {
+            lastResult = runCatching {
+                notificationPushSender.send(command)
+            }.getOrElse { exception ->
+                NotificationPushSendResult.temporaryFailure(
+                    providerMessage = exception.message,
+                )
+            }
+            if (lastResult.status != NotificationPushSendStatus.TEMPORARY_FAILURE) {
+                return lastResult
+            }
+            if (attempt < pushRetryProperties.attempts()) {
+                log.info(
+                    "Retrying temporary push dispatch failure. memberId={}, platform={}, attempt={}",
+                    command.memberId,
+                    command.platform,
+                    attempt + 1,
+                )
+            }
+        }
+        return lastResult
     }
 
     private companion object {

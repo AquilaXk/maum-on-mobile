@@ -16,3 +16,16 @@ app:
       issuer: maum-on-mobile
       secret: ${APP_JWT_SECRET}
       access-token-ttl: PT1H
+  notifications:
+    push:
+      request-timeout: ${PUSH_REQUEST_TIMEOUT:PT5S}
+      retry:
+        max-attempts: ${PUSH_RETRY_MAX_ATTEMPTS:2}
+      fcm:
+        project-id: ${PUSH_FCM_PROJECT_ID:}
+        access-token: ${PUSH_FCM_ACCESS_TOKEN:}
+        endpoint: ${PUSH_FCM_ENDPOINT:https://fcm.googleapis.com/v1/projects/{projectId}/messages:send}
+      apns:
+        topic: ${PUSH_APNS_TOPIC:}
+        authorization-token: ${PUSH_APNS_AUTHORIZATION_TOKEN:}
+        endpoint: ${PUSH_APNS_ENDPOINT:https://api.push.apple.com/3/device/{deviceToken}}

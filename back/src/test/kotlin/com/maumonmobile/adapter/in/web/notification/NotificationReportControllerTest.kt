@@ -4,6 +4,7 @@ import com.jayway.jsonpath.JsonPath
 import com.maumonmobile.application.port.out.AuthMemberRepository
 import com.maumonmobile.application.port.out.NotificationEventPublisher
 import com.maumonmobile.application.port.out.NotificationPushCommand
+import com.maumonmobile.application.port.out.NotificationPushSendResult
 import com.maumonmobile.application.port.out.NotificationPushSender
 import com.maumonmobile.domain.auth.AuthMember
 import com.maumonmobile.domain.auth.AuthMemberRole
@@ -494,10 +495,10 @@ class NotificationReportControllerTest @Autowired constructor(
         }
             .andExpect {
                 status { isOk() }
-            }
+        }
 
         val postId = createPost(owner.accessToken, "푸시 실패 신고 대상")
-        notificationPushSender.failNextSend = true
+        notificationPushSender.alwaysFail = true
 
         mockMvc.post("/api/v1/reports") {
             header("Authorization", "Bearer ${reporter.accessToken}")
@@ -628,18 +629,21 @@ data class PublishedNotificationEvent(
 class CapturingNotificationPushSender : NotificationPushSender {
     val commands = mutableListOf<NotificationPushCommand>()
     var failNextSend = false
+    var alwaysFail = false
 
-    override fun send(command: NotificationPushCommand) {
-        if (failNextSend) {
+    override fun send(command: NotificationPushCommand): NotificationPushSendResult {
+        if (alwaysFail || failNextSend) {
             failNextSend = false
             throw IllegalStateException("push failed")
         }
         commands += command
+        return NotificationPushSendResult.success()
     }
 
     fun clear() {
         commands.clear()
         failNextSend = false
+        alwaysFail = false
     }
 }
 
