@@ -828,6 +828,13 @@ class StoryController extends ChangeNotifier {
     );
   }
 
+  String _messageFromError(Object error) {
+    if (error is ApiClientException) {
+      return error.message;
+    }
+    return '요청을 처리하지 못했습니다.';
+  }
+
   void _setState(StoryState nextState) {
     if (_isDisposed) {
       return;
