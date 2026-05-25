@@ -25,6 +25,7 @@ void main() {
       find.byKey(const ValueKey('operations-reason-field')),
       '개인정보 노출로 숨김 처리',
     );
+    await tester.pump();
     await tester.ensureVisible(
       find.byKey(const ValueKey('operations-submit-button')),
     );
