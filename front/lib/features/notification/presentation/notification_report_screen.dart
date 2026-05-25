@@ -127,6 +127,8 @@ class _NotificationReportScreenState extends State<NotificationReportScreen>
                         widget.notificationController.state.connectionState,
                     pushNotificationState: widget
                         .notificationController.state.pushNotificationState,
+                    canOpenPushSettings: widget
+                        .notificationController.state.canOpenPushSettings,
                     unreadCount:
                         widget.notificationController.state.unreadCount,
                     lastReceivedAt:
@@ -135,6 +137,8 @@ class _NotificationReportScreenState extends State<NotificationReportScreen>
                     onReconnect: widget.notificationController.reconnect,
                     onRequestPush:
                         widget.notificationController.requestPushPermission,
+                    onOpenPushSettings:
+                        widget.notificationController.openPushNotificationSettings,
                     onMarkAllRead: widget.notificationController.markAllRead,
                   ),
                   const TabBar(
@@ -188,21 +192,25 @@ class _Header extends StatelessWidget {
   const _Header({
     required this.connectionState,
     required this.pushNotificationState,
+    required this.canOpenPushSettings,
     required this.unreadCount,
     required this.lastReceivedAt,
     required this.onBack,
     required this.onReconnect,
     required this.onRequestPush,
+    required this.onOpenPushSettings,
     required this.onMarkAllRead,
   });
 
   final NotificationConnectionState connectionState;
   final PushNotificationState pushNotificationState;
+  final bool canOpenPushSettings;
   final int unreadCount;
   final String? lastReceivedAt;
   final VoidCallback onBack;
   final Future<void> Function() onReconnect;
   final Future<void> Function() onRequestPush;
+  final Future<void> Function() onOpenPushSettings;
   final Future<void> Function() onMarkAllRead;
 
   @override
@@ -223,6 +231,10 @@ class _Header extends StatelessWidget {
     final summary = lastReceivedAt == null
         ? '$statusText · 읽지 않음 $unreadCount'
         : '$statusText · 읽지 않음 $unreadCount · $lastReceivedAt';
+    final pushAction = pushNotificationState == PushNotificationState.denied &&
+            canOpenPushSettings
+        ? onOpenPushSettings
+        : onRequestPush;
     final permissionState = switch (pushNotificationState) {
       PushNotificationState.idle => AppStateView.permission(
           title: '푸시 알림 권한을 확인해 주세요.',
@@ -238,8 +250,10 @@ class _Header extends StatelessWidget {
       PushNotificationState.denied => AppStateView.permission(
           title: '푸시 알림 권한이 꺼져 있습니다.',
           message: '기기 설정에서 알림 권한을 허용한 뒤 다시 시도해 주세요.',
-          actionLabel: '다시 확인',
-          onAction: () => unawaited(onRequestPush()),
+          actionLabel: canOpenPushSettings ? '설정 열기' : '다시 시도',
+          onAction: () => unawaited(
+            canOpenPushSettings ? onOpenPushSettings() : onRequestPush(),
+          ),
           semanticLabel: '푸시 알림 권한 거부됨',
         ),
       PushNotificationState.error => AppStateView.error(
@@ -280,7 +294,7 @@ class _Header extends StatelessWidget {
                 onPressed:
                     pushNotificationState == PushNotificationState.requesting
                         ? null
-                        : () => onRequestPush(),
+                        : () => unawaited(pushAction()),
                 icon: Icon(pushIcon),
               ),
               if (connectionState == NotificationConnectionState.error)

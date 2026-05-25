@@ -38,6 +38,13 @@ enum NotificationDevicePlatform {
   }
 }
 
+enum NotificationTapDestination {
+  notifications,
+  letter,
+  consultation,
+  operations,
+}
+
 class NotificationItem {
   const NotificationItem({
     required this.id,
@@ -88,6 +95,61 @@ class NotificationItem {
       readAt: readAt ?? this.readAt,
     );
   }
+}
+
+class NotificationTapPayload {
+  const NotificationTapPayload({
+    required this.destination,
+    this.notificationId,
+    this.letterId,
+    this.reportId,
+    this.rawType,
+  });
+
+  factory NotificationTapPayload.fromJson(Object? json) {
+    if (json is! Map) {
+      return const NotificationTapPayload(
+        destination: NotificationTapDestination.notifications,
+      );
+    }
+
+    final map = _stringKeyedMap(json);
+    final rawType = (map['type'] ??
+            map['event'] ??
+            map['route'] ??
+            map['destination'] ??
+            '')
+        .toString()
+        .trim()
+        .toLowerCase();
+    final destination = switch (rawType) {
+      'letter' ||
+      'letters' ||
+      'new_letter' ||
+      'letter_read' ||
+      'writing_status' ||
+      'reply_arrival' =>
+        NotificationTapDestination.letter,
+      'consultation' || 'consultation_reply' =>
+        NotificationTapDestination.consultation,
+      'operations' || 'admin' => NotificationTapDestination.operations,
+      _ => NotificationTapDestination.notifications,
+    };
+
+    return NotificationTapPayload(
+      destination: destination,
+      notificationId: _readOptionalInt(map, 'notificationId'),
+      letterId: _readOptionalInt(map, 'letterId'),
+      reportId: _readOptionalInt(map, 'reportId'),
+      rawType: rawType.isEmpty ? null : rawType,
+    );
+  }
+
+  final NotificationTapDestination destination;
+  final int? notificationId;
+  final int? letterId;
+  final int? reportId;
+  final String? rawType;
 }
 
 class NotificationSubscriptionTicket {

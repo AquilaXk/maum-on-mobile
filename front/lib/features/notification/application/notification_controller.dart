@@ -22,6 +22,7 @@ class NotificationState {
     this.pushNotificationState = PushNotificationState.idle,
     this.isLoading = false,
     this.hasLoaded = false,
+    this.canOpenPushSettings = false,
     this.errorMessage,
     this.noticeMessage,
     this.lastReceivedAt,
@@ -32,6 +33,7 @@ class NotificationState {
   final PushNotificationState pushNotificationState;
   final bool isLoading;
   final bool hasLoaded;
+  final bool canOpenPushSettings;
   final String? errorMessage;
   final String? noticeMessage;
   final String? lastReceivedAt;
@@ -48,6 +50,7 @@ class NotificationState {
     PushNotificationState? pushNotificationState,
     bool? isLoading,
     bool? hasLoaded,
+    bool? canOpenPushSettings,
     String? errorMessage,
     String? noticeMessage,
     String? lastReceivedAt,
@@ -61,6 +64,7 @@ class NotificationState {
           pushNotificationState ?? this.pushNotificationState,
       isLoading: isLoading ?? this.isLoading,
       hasLoaded: hasLoaded ?? this.hasLoaded,
+      canOpenPushSettings: canOpenPushSettings ?? this.canOpenPushSettings,
       errorMessage:
           clearErrorMessage ? null : errorMessage ?? this.errorMessage,
       noticeMessage:
@@ -98,6 +102,7 @@ class NotificationController extends ChangeNotifier {
   bool _isDisposed = false;
   int _localEventSequence = 0;
   int _reconnectAttempts = 0;
+  String? _registeredDeviceToken;
   final Set<String> _seenStreamEventKeys = <String>{};
 
   NotificationState get state => _state;
@@ -202,25 +207,43 @@ class NotificationController extends ChangeNotifier {
 
     try {
       final permission = await client.requestPermission();
-      final token = permission.token;
-      if (!permission.granted || token == null || token.isEmpty) {
+      final token = permission.token?.trim();
+      if (!permission.granted) {
         _setState(
           _state.copyWith(
             pushNotificationState: PushNotificationState.denied,
             errorMessage: permission.message ?? '푸시 알림 권한이 허용되지 않았습니다.',
+            canOpenPushSettings: permission.canOpenSettings,
           ),
         );
         return;
       }
 
+      if (token == null || token.isEmpty) {
+        _setState(
+          _state.copyWith(
+            pushNotificationState: PushNotificationState.error,
+            errorMessage: permission.message ?? '푸시 토큰을 받을 수 없습니다.',
+            canOpenPushSettings: permission.canOpenSettings,
+          ),
+        );
+        return;
+      }
+
+      final previousToken = _registeredDeviceToken;
+      if (previousToken != null && previousToken != token) {
+        await _repository.unregisterDeviceToken(previousToken);
+      }
       await _repository.registerDeviceToken(
         platform: permission.platform,
         token: token,
       );
+      _registeredDeviceToken = token;
       _setState(
         _state.copyWith(
           pushNotificationState: PushNotificationState.registered,
           noticeMessage: '푸시 알림이 켜졌습니다.',
+          canOpenPushSettings: permission.canOpenSettings,
           clearErrorMessage: true,
         ),
       );
@@ -233,6 +256,114 @@ class NotificationController extends ChangeNotifier {
         ),
       );
     }
+  }
+
+  Future<void> syncPushPermissionStatus() async {
+    final client = _pushPermissionClient;
+    if (client == null) {
+      return;
+    }
+
+    try {
+      final permission = await client.getPermissionStatus();
+      final token = permission.token?.trim();
+      if (!permission.granted) {
+        _setState(
+          _state.copyWith(
+            pushNotificationState: PushNotificationState.denied,
+            canOpenPushSettings: permission.canOpenSettings,
+            errorMessage:
+                permission.message ?? '푸시 알림 권한이 허용되지 않았습니다.',
+          ),
+        );
+        return;
+      }
+
+      if (token == null || token.isEmpty) {
+        _setState(
+          _state.copyWith(
+            pushNotificationState: PushNotificationState.error,
+            canOpenPushSettings: permission.canOpenSettings,
+            errorMessage: permission.message ?? '푸시 토큰을 받을 수 없습니다.',
+          ),
+        );
+        return;
+      }
+
+      _registeredDeviceToken = token;
+      _setState(
+        _state.copyWith(
+          pushNotificationState: PushNotificationState.registered,
+          canOpenPushSettings: permission.canOpenSettings,
+          clearErrorMessage: true,
+        ),
+      );
+    } on Object catch (error) {
+      _setState(
+        _state.copyWith(
+          pushNotificationState: PushNotificationState.error,
+          errorMessage: _messageFromError(error),
+        ),
+      );
+    }
+  }
+
+  Future<void> openPushNotificationSettings() async {
+    final client = _pushPermissionClient;
+    if (client == null) {
+      _setState(
+        _state.copyWith(errorMessage: '알림 설정을 열 수 없습니다.'),
+      );
+      return;
+    }
+
+    final opened = await client.openSettings();
+    _setState(
+      _state.copyWith(
+        noticeMessage: opened ? '설정에서 알림 권한을 확인해 주세요.' : null,
+        errorMessage: opened ? null : '알림 설정을 열 수 없습니다.',
+        clearErrorMessage: opened,
+        clearNoticeMessage: !opened,
+      ),
+    );
+  }
+
+  Future<void> unregisterRegisteredDeviceToken() async {
+    final client = _pushPermissionClient;
+    final knownToken = _registeredDeviceToken;
+    String? token = knownToken;
+    if ((token == null || token.isEmpty) && client != null) {
+      try {
+        token = (await client.getPermissionStatus()).token?.trim();
+      } on Object {
+        token = null;
+      }
+    }
+
+    if (token == null || token.isEmpty) {
+      return;
+    }
+
+    try {
+      await _repository.unregisterDeviceToken(token);
+    } on Object catch (error) {
+      if (!_isDisposed) {
+        _setState(
+          _state.copyWith(errorMessage: _messageFromError(error)),
+        );
+      }
+      return;
+    }
+    if (_registeredDeviceToken == token) {
+      _registeredDeviceToken = null;
+    }
+    _setState(
+      _state.copyWith(
+        pushNotificationState: PushNotificationState.idle,
+        clearErrorMessage: true,
+        clearNoticeMessage: true,
+      ),
+    );
   }
 
   Future<void> connect() async {
@@ -288,6 +419,7 @@ class NotificationController extends ChangeNotifier {
   void handleLifecycleState(AppLifecycleState lifecycleState) {
     if (lifecycleState == AppLifecycleState.resumed) {
       unawaited(load(silent: true));
+      unawaited(syncPushPermissionStatus());
       if (_shouldRestoreConnection &&
           _streamSubscription == null &&
           !_isConnecting) {

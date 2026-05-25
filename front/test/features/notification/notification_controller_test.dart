@@ -9,6 +9,23 @@ import 'package:maum_on_mobile_front/features/notification/data/push_notificatio
 import 'package:maum_on_mobile_front/features/notification/domain/notification_models.dart';
 
 void main() {
+  test('maps notification tap payloads to authenticated routes', () {
+    expect(
+      NotificationTapPayload.fromJson({'type': 'reply_arrival', 'letterId': 7})
+          .destination,
+      NotificationTapDestination.letter,
+    );
+    expect(
+      NotificationTapPayload.fromJson({'event': 'consultation_reply'})
+          .destination,
+      NotificationTapDestination.consultation,
+    );
+    expect(
+      NotificationTapPayload.fromJson({'route': 'notifications'}).destination,
+      NotificationTapDestination.notifications,
+    );
+  });
+
   group('NotificationController', () {
     test('loads notifications and prepends streamed notification events',
         () async {
@@ -163,6 +180,94 @@ void main() {
       );
     });
 
+    test('replaces refreshed push tokens and unregisters on cleanup', () async {
+      final repository = _FakeNotificationRepository();
+      final permissionClient = _QueuePushNotificationPermissionClient([
+        const PushNotificationPermissionResult(
+          granted: true,
+          platform: NotificationDevicePlatform.android,
+          token: 'android-token-a',
+        ),
+        const PushNotificationPermissionResult(
+          granted: true,
+          platform: NotificationDevicePlatform.android,
+          token: 'android-token-b',
+        ),
+        const PushNotificationPermissionResult(
+          granted: true,
+          platform: NotificationDevicePlatform.android,
+          token: 'android-token-b',
+        ),
+      ]);
+      final controller = NotificationController(
+        repository: repository,
+        pushPermissionClient: permissionClient,
+      );
+
+      await controller.requestPushPermission();
+      await controller.requestPushPermission();
+      await controller.unregisterRegisteredDeviceToken();
+
+      expect(repository.registeredTokens, [
+        'ANDROID:android-token-a',
+        'ANDROID:android-token-b',
+      ]);
+      expect(repository.unregisteredTokens, [
+        'android-token-a',
+        'android-token-b',
+      ]);
+    });
+
+    test('opens device notification settings after a denied permission',
+        () async {
+      final repository = _FakeNotificationRepository();
+      final permissionClient = _FakePushNotificationPermissionClient(
+        const PushNotificationPermissionResult(
+          granted: false,
+          platform: NotificationDevicePlatform.ios,
+          message: '권한 거부',
+          canOpenSettings: true,
+        ),
+      );
+      final controller = NotificationController(
+        repository: repository,
+        pushPermissionClient: permissionClient,
+      );
+
+      await controller.requestPushPermission();
+      await controller.openPushNotificationSettings();
+
+      expect(
+        controller.state.pushNotificationState,
+        PushNotificationState.denied,
+      );
+      expect(controller.state.canOpenPushSettings, isTrue);
+      expect(permissionClient.openSettingsCount, 1);
+      expect(controller.state.noticeMessage, '설정에서 알림 권한을 확인해 주세요.');
+    });
+
+    test('does not mark push status registered without a token', () async {
+      final controller = NotificationController(
+        repository: _FakeNotificationRepository(),
+        pushPermissionClient: _FakePushNotificationPermissionClient(
+          const PushNotificationPermissionResult(
+            granted: true,
+            platform: NotificationDevicePlatform.android,
+            message: '토큰 없음',
+            canOpenSettings: true,
+          ),
+        ),
+      );
+
+      await controller.syncPushPermissionStatus();
+
+      expect(
+        controller.state.pushNotificationState,
+        PushNotificationState.error,
+      );
+      expect(controller.state.errorMessage, '토큰 없음');
+    });
+
     test('does not request duplicate tickets while connecting', () async {
       final ticketCompleter = Completer<NotificationSubscriptionTicket>();
       final repository = _FakeNotificationRepository(
@@ -272,6 +377,7 @@ class _FakeNotificationRepository implements NotificationRepository {
   final List<String> connectTickets = [];
   final List<int> markReadIds = [];
   final List<String> registeredTokens = [];
+  final List<String> unregisteredTokens = [];
   int ticketRequestCount = 0;
   int fetchCount = 0;
   int cancelCount = 0;
@@ -321,6 +427,7 @@ class _FakeNotificationRepository implements NotificationRepository {
 
   @override
   Future<bool> unregisterDeviceToken(String token) async {
+    unregisteredTokens.add(token);
     registeredTokens.removeWhere((registered) => registered.endsWith(':$token'));
     return true;
   }
@@ -369,11 +476,59 @@ class _FakePushNotificationPermissionClient
   _FakePushNotificationPermissionClient(this.result);
 
   final PushNotificationPermissionResult result;
+  final StreamController<NotificationTapPayload> _tapController =
+      StreamController<NotificationTapPayload>.broadcast();
   int requestCount = 0;
+  int openSettingsCount = 0;
 
   @override
   Future<PushNotificationPermissionResult> requestPermission() async {
     requestCount += 1;
     return result;
   }
+
+  @override
+  Future<PushNotificationPermissionResult> getPermissionStatus() async {
+    return result;
+  }
+
+  @override
+  Future<bool> openSettings() async {
+    openSettingsCount += 1;
+    return true;
+  }
+
+  @override
+  Future<NotificationTapPayload?> takeInitialNotificationTap() async => null;
+
+  @override
+  Stream<NotificationTapPayload> get notificationTaps => _tapController.stream;
+}
+
+class _QueuePushNotificationPermissionClient
+    implements PushNotificationPermissionClient {
+  _QueuePushNotificationPermissionClient(this.results);
+
+  final List<PushNotificationPermissionResult> results;
+  final StreamController<NotificationTapPayload> _tapController =
+      StreamController<NotificationTapPayload>.broadcast();
+
+  @override
+  Future<PushNotificationPermissionResult> requestPermission() async {
+    return results.removeAt(0);
+  }
+
+  @override
+  Future<PushNotificationPermissionResult> getPermissionStatus() async {
+    return results.first;
+  }
+
+  @override
+  Future<bool> openSettings() async => true;
+
+  @override
+  Future<NotificationTapPayload?> takeInitialNotificationTap() async => null;
+
+  @override
+  Stream<NotificationTapPayload> get notificationTaps => _tapController.stream;
 }
