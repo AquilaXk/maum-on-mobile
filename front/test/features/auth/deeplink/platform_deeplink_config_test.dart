@@ -13,6 +13,7 @@ void main() {
 
     expect(manifest, contains('flutter_deeplinking_enabled'));
     expect(manifest, contains('android.permission.INTERNET'));
+    expect(manifest, contains('android.permission.POST_NOTIFICATIONS'));
     expect(manifest, contains('android.permission.READ_MEDIA_IMAGES'));
     expect(manifest, contains('android.permission.READ_EXTERNAL_STORAGE'));
     expect(manifest, isNot(contains('android:usesCleartextTraffic="true"')));
@@ -21,8 +22,16 @@ void main() {
     expect(manifest, contains('android:host="auth"'));
     expect(manifest, contains('android:path="/callback"'));
     expect(manifest, contains('android.intent.action.VIEW'));
+    expect(manifest, contains('com.google.firebase.MESSAGING_EVENT'));
+    expect(manifest, contains('maum_on.firebase.application_id'));
+    expect(manifest, contains('maum_on.firebase.sender_id'));
     expect(manifest, contains('android:scheme="https"'));
     expect(manifest, contains('android:scheme="http"'));
+
+    final buildGradle = File('android/app/build.gradle.kts').readAsStringSync();
+    expect(buildGradle, contains('com.google.firebase:firebase-messaging'));
+    expect(buildGradle, contains('MAUMON_FIREBASE_APP_ID'));
+    expect(buildGradle, contains('MAUMON_FIREBASE_SENDER_ID'));
   });
 
   test('iOS Info.plist registers the external login callback scheme', () {
@@ -41,5 +50,10 @@ void main() {
       matches(RegExp(r'<key>NSAllowsLocalNetworking</key>\s*<true/>')),
     );
     expect(plist, contains('<key>NSPhotoLibraryUsageDescription</key>'));
+    expect(plist, contains('<key>UIBackgroundModes</key>'));
+    expect(plist, contains('<string>remote-notification</string>'));
+
+    final entitlements = File('ios/Runner/Runner.entitlements').readAsStringSync();
+    expect(entitlements, contains('<key>aps-environment</key>'));
   });
 }

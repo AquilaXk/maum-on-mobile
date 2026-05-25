@@ -47,6 +47,14 @@ android {
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
+        manifestPlaceholders["maumonFirebaseApplicationId"] =
+            releaseSigningValue("MAUMON_FIREBASE_APP_ID") ?: ""
+        manifestPlaceholders["maumonFirebaseProjectId"] =
+            releaseSigningValue("MAUMON_FIREBASE_PROJECT_ID") ?: ""
+        manifestPlaceholders["maumonFirebaseApiKey"] =
+            releaseSigningValue("MAUMON_FIREBASE_API_KEY") ?: ""
+        manifestPlaceholders["maumonFirebaseSenderId"] =
+            releaseSigningValue("MAUMON_FIREBASE_SENDER_ID") ?: ""
     }
 
     signingConfigs {
@@ -91,4 +99,8 @@ kotlin {
 
 flutter {
     source = "../.."
+}
+
+dependencies {
+    implementation("com.google.firebase:firebase-messaging:25.0.2")
 }

@@ -17,6 +17,7 @@ import 'package:maum_on_mobile_front/features/home/domain/home_models.dart';
 import 'package:maum_on_mobile_front/features/letter/data/letter_repository.dart';
 import 'package:maum_on_mobile_front/features/letter/domain/letter_models.dart';
 import 'package:maum_on_mobile_front/features/notification/data/notification_repository.dart';
+import 'package:maum_on_mobile_front/features/notification/data/push_notification_permission_client.dart';
 import 'package:maum_on_mobile_front/features/notification/domain/notification_models.dart';
 import 'package:maum_on_mobile_front/features/report/data/report_repository.dart';
 import 'package:maum_on_mobile_front/features/report/domain/report_models.dart';
@@ -344,6 +345,107 @@ void main() {
     expect(notificationRepository.ticketRequestCount, 1);
   });
 
+  testWidgets('opens target route from an initial notification tap',
+      (tester) async {
+    final pushClient = _FakePushNotificationPermissionClient(
+      initialPayload: const NotificationTapPayload(
+        destination: NotificationTapDestination.letter,
+        letterId: 7,
+      ),
+    );
+
+    await tester.pumpWidget(
+      MaumOnMobileApp(
+        authRepository: _FakeAuthRepository(restoredSession: _session()),
+        homeRepository: const _FakeHomeRepository(),
+        notificationRepository: _FakeNotificationRepository(),
+        pushNotificationPermissionClient: pushClient,
+        diaryRepository: _FakeDiaryRepository(),
+        diaryImagePicker: const _FakeDiaryImagePicker(),
+        storyRepository: _FakeStoryRepository(),
+        letterRepository: _FakeLetterRepository(),
+        listenForDeepLinks: false,
+      ),
+    );
+
+    await tester.pumpAndSettle();
+
+    expect(find.text('편지함'), findsOneWidget);
+  });
+
+  testWidgets('routes live notification taps while authenticated',
+      (tester) async {
+    final pushClient = _FakePushNotificationPermissionClient();
+    final consultationRepository = _FakeConsultationRepository();
+
+    await tester.pumpWidget(
+      MaumOnMobileApp(
+        authRepository: _FakeAuthRepository(restoredSession: _session()),
+        homeRepository: const _FakeHomeRepository(),
+        consultationRepository: consultationRepository,
+        notificationRepository: _FakeNotificationRepository(),
+        pushNotificationPermissionClient: pushClient,
+        diaryRepository: _FakeDiaryRepository(),
+        diaryImagePicker: const _FakeDiaryImagePicker(),
+        storyRepository: _FakeStoryRepository(),
+        letterRepository: _FakeLetterRepository(),
+        listenForDeepLinks: false,
+      ),
+    );
+
+    await tester.pumpAndSettle();
+    await pushClient.waitForTapListener();
+    pushClient.emitTap(
+      const NotificationTapPayload(
+        destination: NotificationTapDestination.consultation,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('실시간 상담'), findsOneWidget);
+  });
+
+  testWidgets('unregisters the push token on logout', (tester) async {
+    final authRepository = _FakeAuthRepository(restoredSession: _session());
+    final notificationRepository = _FakeNotificationRepository();
+
+    await tester.pumpWidget(
+      MaumOnMobileApp(
+        authRepository: authRepository,
+        homeRepository: const _FakeHomeRepository(),
+        notificationRepository: notificationRepository,
+        pushNotificationPermissionClient: _FakePushNotificationPermissionClient(
+          permissionResult: const PushNotificationPermissionResult(
+            granted: true,
+            platform: NotificationDevicePlatform.ios,
+            token: 'ios-token-logout',
+          ),
+        ),
+        reportRepository: _FakeReportRepository(),
+        diaryRepository: _FakeDiaryRepository(),
+        diaryImagePicker: const _FakeDiaryImagePicker(),
+        storyRepository: _FakeStoryRepository(),
+        letterRepository: _FakeLetterRepository(),
+        listenForDeepLinks: false,
+      ),
+    );
+
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('알림/신고'));
+    await tester.tap(find.text('알림/신고'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('notification-push-button')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('route-tab-home')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('로그아웃'));
+    await tester.pumpAndSettle();
+
+    expect(notificationRepository.registeredTokens, ['IOS:ios-token-logout']);
+    expect(notificationRepository.unregisteredTokens, ['ios-token-logout']);
+    expect(authRepository.logoutCount, 1);
+  });
+
   testWidgets('navigates authenticated users to settings and clears session',
       (tester) async {
     final authRepository = _FakeAuthRepository(restoredSession: _session());
@@ -602,6 +704,8 @@ class _FakeConsultationRepository implements ConsultationRepository {
 
 class _FakeNotificationRepository implements NotificationRepository {
   int ticketRequestCount = 0;
+  final List<String> registeredTokens = [];
+  final List<String> unregisteredTokens = [];
   StreamController<NotificationStreamEvent>? _controller;
 
   @override
@@ -637,6 +741,7 @@ class _FakeNotificationRepository implements NotificationRepository {
     required NotificationDevicePlatform platform,
     required String token,
   }) async {
+    registeredTokens.add('${platform.apiValue}:$token');
     return NotificationDeviceTokenResult(
       platform: platform,
       enabled: true,
@@ -646,6 +751,7 @@ class _FakeNotificationRepository implements NotificationRepository {
 
   @override
   Future<bool> unregisterDeviceToken(String token) async {
+    unregisteredTokens.add(token);
     return true;
   }
 
@@ -666,6 +772,67 @@ class _FakeNotificationRepository implements NotificationRepository {
 
   void emit(NotificationStreamEvent event) {
     _controller?.add(event);
+  }
+}
+
+class _FakePushNotificationPermissionClient
+    implements PushNotificationPermissionClient {
+  _FakePushNotificationPermissionClient({
+    this.initialPayload,
+    this.permissionResult = const PushNotificationPermissionResult(
+      granted: true,
+      platform: NotificationDevicePlatform.ios,
+      token: 'ios-token',
+    ),
+  });
+
+  final NotificationTapPayload? initialPayload;
+  final PushNotificationPermissionResult permissionResult;
+  final Completer<void> _tapListenerReady = Completer<void>();
+  final StreamController<NotificationTapPayload> _tapController =
+      StreamController<NotificationTapPayload>.broadcast();
+  bool initialPayloadConsumed = false;
+  int openSettingsCount = 0;
+
+  @override
+  Future<PushNotificationPermissionResult> requestPermission() async {
+    return permissionResult;
+  }
+
+  @override
+  Future<PushNotificationPermissionResult> getPermissionStatus() async {
+    return permissionResult;
+  }
+
+  @override
+  Future<bool> openSettings() async {
+    openSettingsCount += 1;
+    return true;
+  }
+
+  @override
+  Future<NotificationTapPayload?> takeInitialNotificationTap() async {
+    if (initialPayloadConsumed) {
+      return null;
+    }
+    initialPayloadConsumed = true;
+    return initialPayload;
+  }
+
+  @override
+  Stream<NotificationTapPayload> get notificationTaps {
+    if (!_tapListenerReady.isCompleted) {
+      _tapListenerReady.complete();
+    }
+    return _tapController.stream;
+  }
+
+  Future<void> waitForTapListener() {
+    return _tapListenerReady.future;
+  }
+
+  void emitTap(NotificationTapPayload payload) {
+    _tapController.add(payload);
   }
 }
 

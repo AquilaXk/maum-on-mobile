@@ -30,6 +30,7 @@ import '../features/moderation/data/content_moderation_repository.dart';
 import '../features/notification/application/notification_controller.dart';
 import '../features/notification/data/notification_repository.dart';
 import '../features/notification/data/push_notification_permission_client.dart';
+import '../features/notification/domain/notification_models.dart';
 import '../features/notification/presentation/notification_report_screen.dart';
 import '../features/operations/application/operations_controller.dart';
 import '../features/operations/data/operations_repository.dart';
@@ -116,7 +117,11 @@ class _MaumOnMobileAppState extends State<MaumOnMobileApp> {
     config: widget.externalLoginConfig ??
         ExternalLoginConfig(apiBaseUrl: _apiConfig.baseUrl),
   );
+  late final PushNotificationPermissionClient _pushNotificationClient =
+      widget.pushNotificationPermissionClient ??
+          MethodChannelPushNotificationPermissionClient();
   StreamSubscription<Uri>? _deepLinkSubscription;
+  StreamSubscription<NotificationTapPayload>? _pushTapSubscription;
   HomeController? _homeController;
   int? _homeMemberId;
   ConsultationController? _consultationController;
@@ -137,6 +142,7 @@ class _MaumOnMobileAppState extends State<MaumOnMobileApp> {
   int? _letterMemberId;
   bool _openLetterComposer = false;
   ReportTarget? _pendingReportTarget;
+  NotificationTapPayload? _pendingNotificationTap;
   AuthenticatedRoute _route = AuthenticatedRoute.home;
   late final DraftRecoveryRepository _draftRecoveryRepository =
       widget.draftRecoveryRepository ??
@@ -151,11 +157,13 @@ class _MaumOnMobileAppState extends State<MaumOnMobileApp> {
     if (widget.listenForDeepLinks) {
       Future<void>.microtask(_bindDeepLinks);
     }
+    Future<void>.microtask(_bindPushNotifications);
   }
 
   @override
   void dispose() {
     _deepLinkSubscription?.cancel();
+    _pushTapSubscription?.cancel();
     _externalLoginController.dispose();
     _authController.dispose();
     _disposeHomeController();
@@ -202,7 +210,7 @@ class _MaumOnMobileAppState extends State<MaumOnMobileApp> {
             }
 
             if (!state.isAuthenticated || state.member == null) {
-              _disposeAuthenticatedControllers();
+              _disposeAuthenticatedControllers(unregisterPushToken: true);
               _route = AuthenticatedRoute.home;
               return AuthScreen(
                 controller: _authController,
@@ -210,6 +218,7 @@ class _MaumOnMobileAppState extends State<MaumOnMobileApp> {
               );
             }
 
+            _applyPendingNotificationTap();
             return AuthenticatedAppShell(
               currentRoute: _route,
               onRouteSelected: _selectPrimaryRoute,
@@ -267,10 +276,8 @@ class _MaumOnMobileAppState extends State<MaumOnMobileApp> {
                 AuthenticatedRoute.notifications,
               ),
               onOpenSettings: () => _openRoute(AuthenticatedRoute.settings),
-              onLogout: () {
-                _disposeAuthenticatedControllers();
-                _route = AuthenticatedRoute.home;
-                _authController.logout();
+          onLogout: () {
+                _logout();
               },
             ),
       AuthenticatedRoute.settings => SettingsScreen(
@@ -304,9 +311,7 @@ class _MaumOnMobileAppState extends State<MaumOnMobileApp> {
               ? () => _openRoute(AuthenticatedRoute.operations)
               : null,
           onLogout: () {
-            _disposeAuthenticatedControllers();
-            _route = AuthenticatedRoute.home;
-            _authController.logout();
+            _logout();
           },
         ),
     };
@@ -325,6 +330,13 @@ class _MaumOnMobileAppState extends State<MaumOnMobileApp> {
       reportController: reportController,
       onBack: _returnHome,
     );
+  }
+
+  void _logout() {
+    _disposeAuthenticatedControllers(unregisterPushToken: true);
+    _pendingNotificationTap = null;
+    _route = AuthenticatedRoute.home;
+    unawaited(_authController.logout());
   }
 
   Widget _buildLetterRoute(int memberId) {
@@ -361,10 +373,10 @@ class _MaumOnMobileAppState extends State<MaumOnMobileApp> {
     });
   }
 
-  void _disposeAuthenticatedControllers() {
+  void _disposeAuthenticatedControllers({bool unregisterPushToken = false}) {
     _disposeHomeController();
     _disposeConsultationController();
-    _disposeNotificationController();
+    _disposeNotificationController(unregisterPushToken: unregisterPushToken);
     _disposeReportController();
     _disposeOperationsController();
     _disposeSettingsController();
@@ -425,21 +437,24 @@ class _MaumOnMobileAppState extends State<MaumOnMobileApp> {
       return currentController;
     }
 
-    currentController?.dispose();
+    _disposeNotificationController(unregisterPushToken: true);
     _notificationMemberId = memberId;
     return _notificationController = NotificationController(
       repository:
           widget.notificationRepository ?? _buildDefaultNotificationRepository(),
-      pushPermissionClient: widget.pushNotificationPermissionClient ??
-          const MethodChannelPushNotificationPermissionClient(),
+      pushPermissionClient: _pushNotificationClient,
       onUnauthorized: () {
         _authController.logout();
       },
     );
   }
 
-  void _disposeNotificationController() {
-    _notificationController?.dispose();
+  void _disposeNotificationController({bool unregisterPushToken = false}) {
+    final controller = _notificationController;
+    if (unregisterPushToken) {
+      unawaited(controller?.unregisterRegisteredDeviceToken());
+    }
+    controller?.dispose();
     _notificationController = null;
     _notificationMemberId = null;
   }
@@ -819,6 +834,53 @@ class _MaumOnMobileAppState extends State<MaumOnMobileApp> {
     _deepLinkSubscription = source.uriStream.listen(
       _externalLoginController.handleIncomingUri,
     );
+  }
+
+  Future<void> _bindPushNotifications() async {
+    _pushTapSubscription = _pushNotificationClient.notificationTaps.listen(
+      _handleNotificationTap,
+    );
+
+    final initialPayload =
+        await _pushNotificationClient.takeInitialNotificationTap();
+    if (initialPayload != null) {
+      _handleNotificationTap(initialPayload);
+    }
+  }
+
+  void _handleNotificationTap(NotificationTapPayload payload) {
+    if (!_authController.state.isAuthenticated ||
+        _authController.state.member == null) {
+      _pendingNotificationTap = payload;
+      return;
+    }
+
+    setState(() {
+      _applyNotificationTap(payload);
+    });
+  }
+
+  void _applyPendingNotificationTap() {
+    final payload = _pendingNotificationTap;
+    if (payload == null) {
+      return;
+    }
+
+    _pendingNotificationTap = null;
+    _applyNotificationTap(payload);
+  }
+
+  void _applyNotificationTap(NotificationTapPayload payload) {
+    _openLetterComposer = false;
+    _pendingReportTarget = null;
+    _route = switch (payload.destination) {
+      NotificationTapDestination.letter => AuthenticatedRoute.letter,
+      NotificationTapDestination.consultation =>
+        AuthenticatedRoute.consultation,
+      NotificationTapDestination.operations => AuthenticatedRoute.operations,
+      NotificationTapDestination.notifications =>
+        AuthenticatedRoute.notifications,
+    };
   }
 
   void _handleStoryReportTarget(StoryReportTarget target) {
