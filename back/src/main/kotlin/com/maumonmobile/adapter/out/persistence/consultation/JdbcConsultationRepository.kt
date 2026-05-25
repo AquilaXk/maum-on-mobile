@@ -24,18 +24,37 @@ class JdbcConsultationRepository(
         memberId: Long,
         sender: ConsultationMessageSender,
         content: String,
+        sensitive: Boolean,
+        retentionUntil: String?,
     ): ConsultationMessage {
         val sessionId = findSessionId(memberId) ?: createSession(memberId)
         val id = jdbc.insertAndReturnId(
             """
-                insert into consultation_messages (session_id, sender, content, created_at)
-                values (:sessionId, :sender, :content, :createdAt)
+                insert into consultation_messages (
+                    session_id,
+                    sender,
+                    content,
+                    created_at,
+                    sensitive,
+                    retention_until,
+                    hidden
+                ) values (
+                    :sessionId,
+                    :sender,
+                    :content,
+                    :createdAt,
+                    :sensitive,
+                    :retentionUntil,
+                    false
+                )
             """.trimIndent(),
             params()
                 .withValue("sessionId", sessionId)
                 .withValue("sender", sender.name)
                 .withValue("content", content)
-                .withValue("createdAt", Instant.now().toString()),
+                .withValue("createdAt", Instant.now().toString())
+                .withValue("sensitive", sensitive)
+                .withValue("retentionUntil", retentionUntil),
         )
         touchSession(sessionId)
         return findById(id) ?: error("저장된 상담 메시지를 확인하지 못했습니다.")
@@ -44,10 +63,17 @@ class JdbcConsultationRepository(
     override fun findByMemberId(memberId: Long): List<ConsultationMessage> {
         return jdbc.query(
             """
-                select m.id, s.member_id, m.sender, m.content, m.created_at
+                select m.id,
+                       s.member_id,
+                       m.sender,
+                       m.content,
+                       m.created_at,
+                       m.sensitive,
+                       m.retention_until
                   from consultation_messages m
                   join consultation_sessions s on s.id = m.session_id
                  where s.member_id = :memberId
+                   and m.hidden = false
                  order by m.created_at asc, m.id asc
             """.trimIndent(),
             params().withValue("memberId", memberId),
@@ -55,10 +81,33 @@ class JdbcConsultationRepository(
         )
     }
 
+    override fun hideSensitiveByMemberId(memberId: Long): Int {
+        return jdbc.update(
+            """
+                update consultation_messages
+                   set hidden = true
+                 where hidden = false
+                   and sensitive = true
+                   and session_id in (
+                       select id
+                         from consultation_sessions
+                        where member_id = :memberId
+                   )
+            """.trimIndent(),
+            params().withValue("memberId", memberId),
+        )
+    }
+
     private fun findById(id: Long): ConsultationMessage? {
         return jdbc.query(
             """
-                select m.id, s.member_id, m.sender, m.content, m.created_at
+                select m.id,
+                       s.member_id,
+                       m.sender,
+                       m.content,
+                       m.created_at,
+                       m.sensitive,
+                       m.retention_until
                   from consultation_messages m
                   join consultation_sessions s on s.id = m.session_id
                  where m.id = :id
@@ -112,6 +161,8 @@ class JdbcConsultationRepository(
                 sender = ConsultationMessageSender.valueOf(rs.getString("sender")),
                 content = rs.getString("content"),
                 createdAt = rs.getString("created_at"),
+                sensitive = rs.getBoolean("sensitive"),
+                retentionUntil = rs.getString("retention_until"),
             )
         }
     }

@@ -93,6 +93,47 @@ void main() {
       );
     });
 
+    test('safety result replaces pending reply and can clear sensitive history',
+        () async {
+      final repository = _FakeConsultationRepository(
+        sendResult: const ConsultationSendResult(
+          accepted: false,
+          safety: ConsultationSafetyResult(
+            category: ConsultationRiskCategory.selfHarm,
+            severity: ConsultationRiskSeverity.critical,
+            actionPolicy: ConsultationActionPolicy.blockAndEscalate,
+            message: '지금 안전이 가장 중요합니다. 119에 도움을 요청해 주세요.',
+          ),
+        ),
+      );
+      final controller = ConsultationController(repository: repository);
+
+      await controller.connect();
+      repository.emit(const ConsultationStreamEvent.connect('connected'));
+      controller.updateDraft('죽고 싶어요');
+      await controller.submitMessage();
+
+      expect(controller.state.isStreaming, isFalse);
+      expect(controller.state.safetyNotice?.actionPolicy,
+          ConsultationActionPolicy.blockAndEscalate);
+      expect(controller.state.messages.last.role, ConsultationMessageRole.system);
+      expect(controller.state.messages.last.content, contains('119'));
+
+      repository.recentMessagesAfterDelete = [
+        ConsultationMessage(
+          id: 'remote-safe',
+          role: ConsultationMessageRole.assistant,
+          content: '다시 대화를 시작할 수 있어요.',
+          createdAt: DateTime.parse('2026-05-25T00:00:02Z'),
+        ),
+      ];
+      await controller.deleteSensitiveMessages();
+
+      expect(repository.deleteSensitiveCount, 1);
+      expect(controller.state.safetyNotice, isNull);
+      expect(controller.state.messages.single.id, 'remote-safe');
+    });
+
     test('does not create duplicate stream connections', () async {
       final repository = _FakeConsultationRepository();
       final controller = ConsultationController(repository: repository);
@@ -193,13 +234,17 @@ void main() {
 class _FakeConsultationRepository implements ConsultationRepository {
   _FakeConsultationRepository({
     this.recentMessages = const [],
+    this.sendResult = const ConsultationSendResult(accepted: true),
   });
 
   final List<ConsultationMessage> recentMessages;
+  final ConsultationSendResult sendResult;
   final List<String> sentMessages = [];
   int connectCount = 0;
   int cancelCount = 0;
   int loadRecentCount = 0;
+  int deleteSensitiveCount = 0;
+  List<ConsultationMessage>? recentMessagesAfterDelete;
   StreamController<ConsultationStreamEvent>? _controller;
 
   @override
@@ -215,14 +260,21 @@ class _FakeConsultationRepository implements ConsultationRepository {
   }
 
   @override
-  Future<void> sendMessage(String message) async {
+  Future<ConsultationSendResult> sendMessage(String message) async {
     sentMessages.add(message);
+    return sendResult;
   }
 
   @override
   Future<List<ConsultationMessage>> loadRecentMessages() async {
     loadRecentCount += 1;
-    return recentMessages;
+    return recentMessagesAfterDelete ?? recentMessages;
+  }
+
+  @override
+  Future<int> deleteSensitiveMessages() async {
+    deleteSensitiveCount += 1;
+    return 2;
   }
 
   void emit(ConsultationStreamEvent event) {

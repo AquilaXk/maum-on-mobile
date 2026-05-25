@@ -68,11 +68,67 @@ void main() {
 
     expect(repository.connectCount, 2);
   });
+
+  testWidgets('shows safety guidance and deletes sensitive history',
+      (tester) async {
+    final repository = _FakeConsultationRepository(
+      sendResult: const ConsultationSendResult(
+        accepted: false,
+        safety: ConsultationSafetyResult(
+          category: ConsultationRiskCategory.selfHarm,
+          severity: ConsultationRiskSeverity.critical,
+          actionPolicy: ConsultationActionPolicy.blockAndEscalate,
+          message: '지금 안전이 가장 중요합니다. 119에 도움을 요청해 주세요.',
+        ),
+      ),
+    );
+    final controller = ConsultationController(repository: repository);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: ConsultationScreen(
+          controller: controller,
+          onBack: () {},
+        ),
+      ),
+    );
+    await tester.pump();
+    repository.emit(const ConsultationStreamEvent.connect('connected'));
+    await tester.pump();
+
+    await tester.enterText(
+      find.byKey(const ValueKey('consultation-message-field')),
+      '죽고 싶어요',
+    );
+    await tester.pump();
+    await tester.tap(find.byKey(const ValueKey('consultation-send-button')));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const ValueKey('consultation-safety-notice')), findsOneWidget);
+    expect(find.text('즉시 도움 요청'), findsOneWidget);
+    expect(find.text('119'), findsOneWidget);
+
+    repository.recentMessagesAfterDelete = const [];
+    await tester.tap(
+      find.byKey(const ValueKey('consultation-delete-sensitive-button')),
+    );
+    await tester.pumpAndSettle();
+
+    expect(repository.deleteSensitiveCount, 1);
+    expect(find.byKey(const ValueKey('consultation-safety-notice')), findsNothing);
+  });
 }
 
 class _FakeConsultationRepository implements ConsultationRepository {
+  _FakeConsultationRepository({
+    this.sendResult = const ConsultationSendResult(accepted: true),
+  });
+
+  final ConsultationSendResult sendResult;
   final List<String> sentMessages = [];
   int connectCount = 0;
+  int deleteSensitiveCount = 0;
+  List<ConsultationMessage>? recentMessagesAfterDelete;
   StreamController<ConsultationStreamEvent>? _controller;
 
   @override
@@ -83,12 +139,21 @@ class _FakeConsultationRepository implements ConsultationRepository {
   }
 
   @override
-  Future<void> sendMessage(String message) async {
+  Future<ConsultationSendResult> sendMessage(String message) async {
     sentMessages.add(message);
+    return sendResult;
   }
 
   @override
-  Future<List<ConsultationMessage>> loadRecentMessages() async => const [];
+  Future<List<ConsultationMessage>> loadRecentMessages() async {
+    return recentMessagesAfterDelete ?? const [];
+  }
+
+  @override
+  Future<int> deleteSensitiveMessages() async {
+    deleteSensitiveCount += 1;
+    return 2;
+  }
 
   void emit(ConsultationStreamEvent event) {
     _controller?.add(event);

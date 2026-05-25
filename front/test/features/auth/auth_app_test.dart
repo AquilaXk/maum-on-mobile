@@ -585,10 +585,15 @@ class _FakeConsultationRepository implements ConsultationRepository {
   }
 
   @override
-  Future<void> sendMessage(String message) async {}
+  Future<ConsultationSendResult> sendMessage(String message) async {
+    return const ConsultationSendResult(accepted: true);
+  }
 
   @override
   Future<List<ConsultationMessage>> loadRecentMessages() async => const [];
+
+  @override
+  Future<int> deleteSensitiveMessages() async => 0;
 
   void emit(ConsultationStreamEvent event) {
     _controller?.add(event);

@@ -3,6 +3,7 @@ package com.maumonmobile.adapter.out.persistence
 import com.maumonmobile.application.port.out.AuthMemberRepository
 import com.maumonmobile.application.port.out.AuthOidcStateRepository
 import com.maumonmobile.application.port.out.ConsultationRepository
+import com.maumonmobile.application.port.out.ConsultationSafetyAuditRepository
 import com.maumonmobile.application.port.out.DiaryRepository
 import com.maumonmobile.application.port.out.ImageAssetRepository
 import com.maumonmobile.application.port.out.LetterRepository
@@ -13,6 +14,10 @@ import com.maumonmobile.application.port.out.StoryRepository
 import com.maumonmobile.domain.auth.AuthMember
 import com.maumonmobile.domain.auth.AuthOidcState
 import com.maumonmobile.domain.consultation.ConsultationMessageSender
+import com.maumonmobile.domain.consultation.ConsultationActionPolicy
+import com.maumonmobile.domain.consultation.ConsultationRiskCategory
+import com.maumonmobile.domain.consultation.ConsultationRiskSeverity
+import com.maumonmobile.domain.consultation.ConsultationSafetyAuditEvent
 import com.maumonmobile.domain.story.StoryPostDraft
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
@@ -29,6 +34,7 @@ class PersistentRepositoryContextTest @Autowired constructor(
     private val authMemberRepository: AuthMemberRepository,
     private val authOidcStateRepository: AuthOidcStateRepository,
     private val consultationRepository: ConsultationRepository,
+    private val consultationSafetyAuditRepository: ConsultationSafetyAuditRepository,
     private val diaryRepository: DiaryRepository,
     private val imageAssetRepository: ImageAssetRepository,
     private val storyRepository: StoryRepository,
@@ -43,6 +49,7 @@ class PersistentRepositoryContextTest @Autowired constructor(
         assertNotInMemoryRepository(authMemberRepository)
         assertNotInMemoryRepository(authOidcStateRepository)
         assertNotInMemoryRepository(consultationRepository)
+        assertNotInMemoryRepository(consultationSafetyAuditRepository)
         assertNotInMemoryRepository(diaryRepository)
         assertNotInMemoryRepository(imageAssetRepository)
         assertNotInMemoryRepository(storyRepository)
@@ -63,6 +70,7 @@ class PersistentRepositoryContextTest @Autowired constructor(
         assertThat(tableExists("reports")).isTrue()
         assertThat(tableExists("consultation_sessions")).isTrue()
         assertThat(tableExists("consultation_messages")).isTrue()
+        assertThat(tableExists("consultation_safety_audit_events")).isTrue()
     }
 
     @Test
@@ -174,6 +182,38 @@ class PersistentRepositoryContextTest @Autowired constructor(
         assertThat(consultationRepository.findByMemberId(member.id))
             .extracting<String> { it.content }
             .containsExactly("불안해요", "함께 정리해 볼게요.")
+    }
+
+    @Test
+    fun consultationSafetyAuditEventsRoundTripThroughStorage() {
+        val member = authMemberRepository.save(
+            AuthMember(
+                id = 0,
+                email = "consultation-safety-audit@example.com",
+                passwordHash = "hashed-password",
+                nickname = "감사회원",
+            ),
+        )
+        val now = Instant.now().toString()
+
+        consultationSafetyAuditRepository.save(
+            ConsultationSafetyAuditEvent(
+                memberId = member.id,
+                category = ConsultationRiskCategory.SELF_HARM,
+                severity = ConsultationRiskSeverity.CRITICAL,
+                actionPolicy = ConsultationActionPolicy.BLOCK_AND_ESCALATE,
+                messagePreview = "자해 위험 표현",
+                createdAt = now,
+            ),
+        )
+
+        assertThat(
+            consultationSafetyAuditRepository.countSince(
+                memberId = member.id,
+                severity = ConsultationRiskSeverity.CRITICAL,
+                since = "1970-01-01T00:00:00Z",
+            ),
+        ).isEqualTo(1)
     }
 
     private fun tableExists(tableName: String): Boolean {

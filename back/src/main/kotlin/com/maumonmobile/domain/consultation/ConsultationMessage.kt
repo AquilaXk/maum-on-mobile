@@ -6,6 +6,8 @@ data class ConsultationMessage(
     val sender: ConsultationMessageSender,
     val content: String,
     val createdAt: String,
+    val sensitive: Boolean = false,
+    val retentionUntil: String? = null,
 )
 
 enum class ConsultationMessageSender {

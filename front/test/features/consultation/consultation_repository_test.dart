@@ -9,18 +9,32 @@ void main() {
   group('ApiConsultationRepository', () {
     test('sends chat messages to the consultation API', () async {
       final transport = _FakeApiTransport([
-        ApiTransportResponse.ok({'resultCode': '200-1'}),
+        ApiTransportResponse.ok({
+          'success': true,
+          'data': {
+            'accepted': false,
+            'safety': {
+              'category': 'SELF_HARM',
+              'severity': 'CRITICAL',
+              'actionPolicy': 'BLOCK_AND_ESCALATE',
+              'message': '지금 안전이 가장 중요합니다.',
+            },
+          },
+        }),
       ]);
       final repository = _repository(
         transport,
         streamClient: _FakeConsultationStreamClient(),
       );
 
-      await repository.sendMessage('도움이 필요해요');
+      final result = await repository.sendMessage('도움이 필요해요');
 
       expect(transport.requests.single.path, '/api/v1/consultations/chat');
       expect(transport.requests.single.method, ApiMethod.post);
       expect(transport.requests.single.body, {'message': '도움이 필요해요'});
+      expect(result.accepted, isFalse);
+      expect(result.safety?.actionPolicy,
+          ConsultationActionPolicy.blockAndEscalate);
     });
 
     test('opens the consultation stream through the stream client', () async {
@@ -72,6 +86,25 @@ void main() {
       expect(messages, hasLength(2));
       expect(messages.first.role, ConsultationMessageRole.user);
       expect(messages.last.content, '천천히 볼게요.');
+    });
+
+    test('deletes sensitive consultation messages', () async {
+      final transport = _FakeApiTransport([
+        ApiTransportResponse.ok({
+          'success': true,
+          'data': {'deletedCount': 2},
+        }),
+      ]);
+      final repository = _repository(
+        transport,
+        streamClient: _FakeConsultationStreamClient(),
+      );
+
+      final deletedCount = await repository.deleteSensitiveMessages();
+
+      expect(transport.requests.single.path, '/api/v1/consultations/sensitive');
+      expect(transport.requests.single.method, ApiMethod.delete);
+      expect(deletedCount, 2);
     });
   });
 }
