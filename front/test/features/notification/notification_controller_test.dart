@@ -208,10 +208,11 @@ void main() {
       await controller.requestPushPermission();
       await controller.unregisterRegisteredDeviceToken();
 
-      expect(repository.registeredTokens, [
+      expect(repository.registrationRequests, [
         'ANDROID:android-token-a',
         'ANDROID:android-token-b',
       ]);
+      expect(repository.registeredTokens, isEmpty);
       expect(repository.unregisteredTokens, [
         'android-token-a',
         'android-token-b',
@@ -376,6 +377,7 @@ class _FakeNotificationRepository implements NotificationRepository {
   final Object? ticketError;
   final List<String> connectTickets = [];
   final List<int> markReadIds = [];
+  final List<String> registrationRequests = [];
   final List<String> registeredTokens = [];
   final List<String> unregisteredTokens = [];
   int ticketRequestCount = 0;
@@ -417,7 +419,9 @@ class _FakeNotificationRepository implements NotificationRepository {
     required NotificationDevicePlatform platform,
     required String token,
   }) async {
-    registeredTokens.add('${platform.apiValue}:$token');
+    final value = '${platform.apiValue}:$token';
+    registrationRequests.add(value);
+    registeredTokens.add(value);
     return NotificationDeviceTokenResult(
       platform: platform,
       enabled: true,

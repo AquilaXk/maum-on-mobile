@@ -837,15 +837,15 @@ class _MaumOnMobileAppState extends State<MaumOnMobileApp> {
   }
 
   Future<void> _bindPushNotifications() async {
+    _pushTapSubscription = _pushNotificationClient.notificationTaps.listen(
+      _handleNotificationTap,
+    );
+
     final initialPayload =
         await _pushNotificationClient.takeInitialNotificationTap();
     if (initialPayload != null) {
       _handleNotificationTap(initialPayload);
     }
-
-    _pushTapSubscription = _pushNotificationClient.notificationTaps.listen(
-      _handleNotificationTap,
-    );
   }
 
   void _handleNotificationTap(NotificationTapPayload payload) {
