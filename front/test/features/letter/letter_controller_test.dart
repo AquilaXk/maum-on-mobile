@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:maum_on_mobile_front/core/network/api_error.dart';
+import 'package:maum_on_mobile_front/features/draft_recovery/data/draft_recovery_repository.dart';
 import 'package:maum_on_mobile_front/features/moderation/data/content_moderation_repository.dart';
 import 'package:maum_on_mobile_front/features/moderation/domain/content_moderation_models.dart';
 import 'package:maum_on_mobile_front/features/letter/application/letter_controller.dart';
@@ -211,6 +212,54 @@ void main() {
 
       expect(controller.state.errorMessage, '전송하지 못했습니다.');
       expect(controller.state.noticeMessage, isNull);
+    });
+
+    test('restores compose and reply drafts per member', () async {
+      final draftRepository = StorageDraftRecoveryRepository(
+        storage: MemoryDraftRecoveryStorage(),
+      );
+      final controller = LetterController(
+        letterRepository: _FakeLetterRepository(),
+        currentMemberId: 7,
+        draftRepository: draftRepository,
+      );
+
+      controller.startCompose();
+      controller.updateTitle('임시 편지');
+      controller.updateContent('다시 열어도 남을 편지');
+      await Future<void>.delayed(Duration.zero);
+
+      final restoredComposeController = LetterController(
+        letterRepository: _FakeLetterRepository(),
+        currentMemberId: 7,
+        draftRepository: draftRepository,
+      );
+      await restoredComposeController.restoreDraft();
+
+      expect(restoredComposeController.state.title, '임시 편지');
+      expect(restoredComposeController.state.content, '다시 열어도 남을 편지');
+
+      final replyController = LetterController(
+        letterRepository: _FakeLetterRepository(
+          details: [_detail(id: 5, status: LetterStatus.accepted)],
+        ),
+        currentMemberId: 7,
+        draftRepository: draftRepository,
+      );
+      await replyController.openLetterById(5);
+      replyController.updateReplyContent('작성 중 답장');
+      await Future<void>.delayed(Duration.zero);
+
+      final restoredReplyController = LetterController(
+        letterRepository: _FakeLetterRepository(
+          details: [_detail(id: 5, status: LetterStatus.accepted)],
+        ),
+        currentMemberId: 7,
+        draftRepository: draftRepository,
+      );
+      await restoredReplyController.openLetterById(5);
+
+      expect(restoredReplyController.state.replyContent, '작성 중 답장');
     });
   });
 }

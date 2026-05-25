@@ -3,6 +3,8 @@ import 'dart:async';
 import 'package:flutter/widgets.dart';
 
 import '../../../core/network/api_error.dart';
+import '../../draft_recovery/data/draft_recovery_repository.dart';
+import '../../draft_recovery/domain/draft_recovery_models.dart';
 import '../data/consultation_repository.dart';
 import '../domain/consultation_models.dart';
 
@@ -61,8 +63,12 @@ class ConsultationState {
 class ConsultationController extends ChangeNotifier {
   ConsultationController({
     required ConsultationRepository repository,
+    int currentMemberId = 0,
+    DraftRecoveryRepository? draftRepository,
     VoidCallback? onUnauthorized,
   })  : _repository = repository,
+        _currentMemberId = currentMemberId,
+        _draftRepository = draftRepository,
         _onUnauthorized = onUnauthorized,
         _state = ConsultationState(
           messages: [
@@ -78,6 +84,8 @@ class ConsultationController extends ChangeNotifier {
   static const int maxMessageLength = 600;
 
   final ConsultationRepository _repository;
+  final int _currentMemberId;
+  final DraftRecoveryRepository? _draftRepository;
   final VoidCallback? _onUnauthorized;
 
   ConsultationState _state;
@@ -89,6 +97,27 @@ class ConsultationController extends ChangeNotifier {
   String? _activeAssistantMessageId;
 
   ConsultationState get state => _state;
+
+  DraftKey get _draftKey => DraftKey(
+        memberId: _currentMemberId,
+        surface: DraftSurface.consultation,
+      );
+
+  Future<void> restoreDraft() async {
+    final entry = await _draftRepository?.read(_draftKey);
+    final draft = entry?.fields['content'];
+    if (draft == null || draft.isEmpty) {
+      return;
+    }
+
+    _setState(
+      _state.copyWith(
+        draft: draft,
+        clearErrorMessage: true,
+        clearSafetyNotice: true,
+      ),
+    );
+  }
 
   Future<void> connect() async {
     if (_streamSubscription != null) {
@@ -160,6 +189,7 @@ class ConsultationController extends ChangeNotifier {
         clearSafetyNotice: true,
       ),
     );
+    _saveDraft();
   }
 
   Future<void> submitMessage() async {
@@ -201,6 +231,7 @@ class ConsultationController extends ChangeNotifier {
       final result = await _repository.sendMessage(content);
       final safety = result.safety;
       if (safety != null && safety.blocksConversation) {
+        await _draftRepository?.delete(_draftKey);
         _replaceActiveAssistantWithSystem(safety.message);
         _activeAssistantMessageId = null;
         _setState(
@@ -214,8 +245,10 @@ class ConsultationController extends ChangeNotifier {
         return;
       }
 
+      await _draftRepository?.delete(_draftKey);
       _setState(_state.copyWith(isSending: false, clearSafetyNotice: true));
     } on Object catch (error) {
+      await _markDraftFailed(content, error);
       _replaceActiveAssistantWithSystem('전송 실패: ${_messageFromError(error)}');
       _activeAssistantMessageId = null;
       _setState(
@@ -231,6 +264,7 @@ class ConsultationController extends ChangeNotifier {
   Future<void> deleteSensitiveMessages() async {
     try {
       await _repository.deleteSensitiveMessages();
+      await _draftRepository?.delete(_draftKey);
       final messages = await _repository.loadRecentMessages();
       _setState(
         _state.copyWith(
@@ -246,6 +280,31 @@ class ConsultationController extends ChangeNotifier {
         ),
       );
     }
+  }
+
+  void _saveDraft() {
+    final repository = _draftRepository;
+    if (repository == null) {
+      return;
+    }
+    unawaited(
+      repository.saveEditing(
+        _draftKey,
+        fields: {'content': _state.draft},
+      ),
+    );
+  }
+
+  Future<void> _markDraftFailed(String content, Object error) async {
+    final repository = _draftRepository;
+    if (repository == null) {
+      return;
+    }
+    await repository.markFailed(
+      _draftKey,
+      fields: {'content': content},
+      failureMessage: _messageFromError(error),
+    );
   }
 
   void _handleStreamEvent(ConsultationStreamEvent event) {

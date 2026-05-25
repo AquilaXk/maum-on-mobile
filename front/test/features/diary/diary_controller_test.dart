@@ -5,6 +5,8 @@ import 'package:maum_on_mobile_front/features/diary/application/diary_controller
 import 'package:maum_on_mobile_front/features/diary/data/diary_image_repository.dart';
 import 'package:maum_on_mobile_front/features/diary/data/diary_repository.dart';
 import 'package:maum_on_mobile_front/features/diary/domain/diary_models.dart';
+import 'package:maum_on_mobile_front/features/draft_recovery/data/draft_recovery_repository.dart';
+import 'package:maum_on_mobile_front/features/draft_recovery/domain/draft_recovery_models.dart';
 import 'package:maum_on_mobile_front/features/moderation/data/content_moderation_repository.dart';
 import 'package:maum_on_mobile_front/features/moderation/domain/content_moderation_models.dart';
 
@@ -312,6 +314,55 @@ void main() {
 
       expect(imageRepository.deletedUrls, ['/images/uploads/temp-mind.png']);
       expect(controller.state.imageUrl, isNull);
+    });
+
+    test('restores member-scoped draft and marks failed diary for retry',
+        () async {
+      final draftRepository = StorageDraftRecoveryRepository(
+        storage: MemoryDraftRecoveryStorage(),
+      );
+      const key = DraftKey(memberId: 7, surface: DraftSurface.diary);
+      await draftRepository.saveEditing(
+        key,
+        fields: {
+          'title': '임시 기록',
+          'content': '닫았다가 다시 열어도 남을 내용',
+          'category': 'etc',
+          'isPrivate': 'false',
+          'imageFilename': 'mind.png',
+          'imageByteLength': '3',
+        },
+      );
+      final controller = DiaryController(
+        diaryRepository: _FakeDiaryRepository(
+          pages: [_page([])],
+          createError: const ApiClientException(
+            kind: ApiErrorKind.network,
+            message: '네트워크 연결을 확인해 주세요.',
+          ),
+        ),
+        imageRepository: _FakeDiaryImageRepository(),
+        currentMemberId: 7,
+        draftRepository: draftRepository,
+        now: DateTime(2026, 5, 20),
+      );
+
+      await controller.restoreDraft();
+
+      expect(controller.state.title, '임시 기록');
+      expect(controller.state.content, '닫았다가 다시 열어도 남을 내용');
+      expect(controller.state.category, DiaryCategory.etc);
+      expect(controller.state.isPrivate, isFalse);
+      expect(controller.state.noticeMessage, contains('임시 저장'));
+
+      await controller.submit();
+
+      final failed = await draftRepository.listFailed(
+        memberId: 7,
+        surface: DraftSurface.diary,
+      );
+      expect(failed.single.fields['title'], '임시 기록');
+      expect(failed.single.failureMessage, '네트워크 연결을 확인해 주세요.');
     });
 
     test('invokes unauthorized callback on expired auth', () async {

@@ -18,6 +18,7 @@ import '../features/diary/data/diary_image_repository.dart';
 import '../features/diary/data/diary_repository.dart';
 import '../features/diary/presentation/diary_image_picker.dart';
 import '../features/diary/presentation/diary_screen.dart';
+import '../features/draft_recovery/data/draft_recovery_repository.dart';
 import '../features/home/application/home_controller.dart';
 import '../features/home/data/home_repository.dart';
 import '../features/home/home_screen.dart';
@@ -63,6 +64,7 @@ class MaumOnMobileApp extends StatefulWidget {
     this.diaryRepository,
     this.diaryImageRepository,
     this.diaryImagePicker,
+    this.draftRecoveryRepository,
     this.contentModerationRepository,
     this.storyRepository,
     this.onStoryReportTarget,
@@ -86,6 +88,7 @@ class MaumOnMobileApp extends StatefulWidget {
   final DiaryRepository? diaryRepository;
   final DiaryImageRepository? diaryImageRepository;
   final DiaryImagePicker? diaryImagePicker;
+  final DraftRecoveryRepository? draftRecoveryRepository;
   final ContentModerationRepository? contentModerationRepository;
   final StoryRepository? storyRepository;
   final ValueChanged<StoryReportTarget>? onStoryReportTarget;
@@ -135,6 +138,11 @@ class _MaumOnMobileAppState extends State<MaumOnMobileApp> {
   bool _openLetterComposer = false;
   ReportTarget? _pendingReportTarget;
   AuthenticatedRoute _route = AuthenticatedRoute.home;
+  late final DraftRecoveryRepository _draftRecoveryRepository =
+      widget.draftRecoveryRepository ??
+          const StorageDraftRecoveryRepository(
+            storage: SecureDraftRecoveryStorage(),
+          );
 
   @override
   void initState() {
@@ -390,13 +398,17 @@ class _MaumOnMobileAppState extends State<MaumOnMobileApp> {
 
     currentController?.dispose();
     _consultationMemberId = memberId;
-    return _consultationController = ConsultationController(
+    final controller = ConsultationController(
       repository: widget.consultationRepository ??
           _buildDefaultConsultationRepository(),
+      currentMemberId: memberId,
+      draftRepository: _draftRecoveryRepository,
       onUnauthorized: () {
         _authController.logout();
       },
     );
+    unawaited(controller.restoreDraft());
+    return _consultationController = controller;
   }
 
   void _disposeConsultationController() {
@@ -511,16 +523,20 @@ class _MaumOnMobileAppState extends State<MaumOnMobileApp> {
 
     currentController?.dispose();
     _diaryMemberId = memberId;
-    return _diaryController = DiaryController(
+    final controller = DiaryController(
       diaryRepository: widget.diaryRepository ?? _buildDefaultDiaryRepository(),
       imageRepository:
           widget.diaryImageRepository ?? _buildDefaultDiaryImageRepository(),
       moderationRepository: widget.contentModerationRepository ??
           _buildDefaultContentModerationRepository(),
+      currentMemberId: memberId,
+      draftRepository: _draftRecoveryRepository,
       onUnauthorized: () {
         _authController.logout();
       },
     );
+    unawaited(controller.restoreDraft());
+    return _diaryController = controller;
   }
 
   void _disposeDiaryController() {
@@ -537,9 +553,10 @@ class _MaumOnMobileAppState extends State<MaumOnMobileApp> {
 
     currentController?.dispose();
     _storyMemberId = memberId;
-    return _storyController = StoryController(
+    final controller = StoryController(
       storyRepository: widget.storyRepository ?? _buildDefaultStoryRepository(),
       currentMemberId: memberId,
+      draftRepository: _draftRecoveryRepository,
       moderationRepository: widget.contentModerationRepository ??
           _buildDefaultContentModerationRepository(),
       onUnauthorized: () {
@@ -547,6 +564,8 @@ class _MaumOnMobileAppState extends State<MaumOnMobileApp> {
       },
       onReportTargetSelected: _handleStoryReportTarget,
     );
+    unawaited(controller.restoreDraft());
+    return _storyController = controller;
   }
 
   void _disposeStoryController() {
@@ -563,16 +582,20 @@ class _MaumOnMobileAppState extends State<MaumOnMobileApp> {
 
     currentController?.dispose();
     _letterMemberId = memberId;
-    return _letterController = LetterController(
+    final controller = LetterController(
       letterRepository:
           widget.letterRepository ?? _buildDefaultLetterRepository(),
       moderationRepository: widget.contentModerationRepository ??
           _buildDefaultContentModerationRepository(),
+      currentMemberId: memberId,
+      draftRepository: _draftRecoveryRepository,
       onUnauthorized: () {
         _authController.logout();
       },
       onReportTargetSelected: _handleLetterReportTarget,
     );
+    unawaited(controller.restoreDraft());
+    return _letterController = controller;
   }
 
   void _disposeLetterController() {

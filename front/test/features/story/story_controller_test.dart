@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:maum_on_mobile_front/core/network/api_error.dart';
 import 'package:maum_on_mobile_front/core/network/api_response.dart';
+import 'package:maum_on_mobile_front/features/draft_recovery/data/draft_recovery_repository.dart';
 import 'package:maum_on_mobile_front/features/moderation/data/content_moderation_repository.dart';
 import 'package:maum_on_mobile_front/features/moderation/domain/content_moderation_models.dart';
 import 'package:maum_on_mobile_front/features/story/application/story_controller.dart';
@@ -146,6 +147,53 @@ void main() {
 
       expect(controller.state.errorMessage, '등록하지 못했습니다.');
       expect(controller.state.noticeMessage, isNull);
+    });
+
+    test('restores story and comment drafts for the active member', () async {
+      final draftRepository = StorageDraftRecoveryRepository(
+        storage: MemoryDraftRecoveryStorage(),
+      );
+      final controller = StoryController(
+        storyRepository: _FakeStoryRepository(
+          details: [_detail(id: 42, title: '댓글 글', authorId: 7)],
+          commentPages: [_commentPage([])],
+        ),
+        currentMemberId: 7,
+        draftRepository: draftRepository,
+      );
+
+      controller.startCreate();
+      controller.updateStoryTitle('작성 중 글');
+      controller.updateStoryContent('이어 쓸 본문');
+      controller.updateStoryCategory(StoryCategory.question);
+      await Future<void>.delayed(Duration.zero);
+
+      final restoredStoryController = StoryController(
+        storyRepository: _FakeStoryRepository(),
+        currentMemberId: 7,
+        draftRepository: draftRepository,
+      );
+      await restoredStoryController.restoreDraft();
+
+      expect(restoredStoryController.state.storyTitle, '작성 중 글');
+      expect(restoredStoryController.state.storyContent, '이어 쓸 본문');
+      expect(restoredStoryController.state.storyCategory, StoryCategory.question);
+
+      await controller.openStoryById(42);
+      controller.updateCommentDraft('작성 중 댓글');
+      await Future<void>.delayed(Duration.zero);
+
+      final restoredCommentController = StoryController(
+        storyRepository: _FakeStoryRepository(
+          details: [_detail(id: 42, title: '댓글 글', authorId: 7)],
+          commentPages: [_commentPage([])],
+        ),
+        currentMemberId: 7,
+        draftRepository: draftRepository,
+      );
+      await restoredCommentController.openStoryById(42);
+
+      expect(restoredCommentController.state.commentDraft, '작성 중 댓글');
     });
 
     test(

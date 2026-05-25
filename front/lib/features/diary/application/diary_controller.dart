@@ -1,6 +1,10 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 
 import '../../../core/network/api_error.dart';
+import '../../draft_recovery/data/draft_recovery_repository.dart';
+import '../../draft_recovery/domain/draft_recovery_models.dart';
 import '../../moderation/data/content_moderation_repository.dart';
 import '../../moderation/domain/content_moderation_models.dart';
 import '../data/diary_image_repository.dart';
@@ -173,11 +177,15 @@ class DiaryController extends ChangeNotifier {
     required DiaryRepository diaryRepository,
     required DiaryImageRepository imageRepository,
     ContentModerationRepository? moderationRepository,
+    int currentMemberId = 0,
+    DraftRecoveryRepository? draftRepository,
     DateTime? now,
     VoidCallback? onUnauthorized,
   })  : _diaryRepository = diaryRepository,
         _imageRepository = imageRepository,
         _moderationRepository = moderationRepository,
+        _currentMemberId = currentMemberId,
+        _draftRepository = draftRepository,
         _onUnauthorized = onUnauthorized,
         _state = DiaryState(
           visibleMonth: firstDayOfMonth(now ?? DateTime.now()),
@@ -187,6 +195,8 @@ class DiaryController extends ChangeNotifier {
   final DiaryRepository _diaryRepository;
   final DiaryImageRepository _imageRepository;
   final ContentModerationRepository? _moderationRepository;
+  final int _currentMemberId;
+  final DraftRecoveryRepository? _draftRepository;
   final VoidCallback? _onUnauthorized;
 
   DiaryState _state;
@@ -194,6 +204,32 @@ class DiaryController extends ChangeNotifier {
   String? _temporaryUploadedImageUrl;
 
   DiaryState get state => _state;
+
+  DraftKey get _draftKey => DraftKey(
+        memberId: _currentMemberId,
+        surface: DraftSurface.diary,
+      );
+
+  Future<void> restoreDraft() async {
+    final entry = await _draftRepository?.read(_draftKey);
+    if (entry == null || entry.fields.isEmpty) {
+      return;
+    }
+
+    _setState(
+      _state.copyWith(
+        title: entry.fields['title'] ?? '',
+        content: entry.fields['content'] ?? '',
+        category: _categoryFromDraft(entry.fields['category']),
+        isPrivate: entry.fields['isPrivate'] != 'false',
+        imageUrl: entry.fields['imageUrl']?.isEmpty == true
+            ? null
+            : entry.fields['imageUrl'],
+        noticeMessage: '임시 저장된 기록을 복원했습니다.',
+        clearErrorMessage: true,
+      ),
+    );
+  }
 
   Future<void> load() async {
     await _loadMonth(_state.visibleMonth);
@@ -257,18 +293,22 @@ class DiaryController extends ChangeNotifier {
 
   void updateTitle(String title) {
     _setState(_state.copyWith(title: title, clearErrorMessage: true));
+    _saveDraft();
   }
 
   void updateContent(String content) {
     _setState(_state.copyWith(content: content, clearErrorMessage: true));
+    _saveDraft();
   }
 
   void updateCategory(DiaryCategory category) {
     _setState(_state.copyWith(category: category));
+    _saveDraft();
   }
 
   void updatePrivacy(bool isPrivate) {
     _setState(_state.copyWith(isPrivate: isPrivate));
+    _saveDraft();
   }
 
   void attachImage(DiaryImageAttachment image) {
@@ -279,6 +319,7 @@ class DiaryController extends ChangeNotifier {
         clearErrorMessage: true,
       ),
     );
+    _saveDraft();
   }
 
   Future<void> clearImage() async {
@@ -287,6 +328,7 @@ class DiaryController extends ChangeNotifier {
         : null;
     _temporaryUploadedImageUrl = null;
     _setState(_state.copyWith(clearSelectedImage: true, clearImageUrl: true));
+    _saveDraft();
     if (temporaryUrl != null) {
       await _deleteTemporaryImage(temporaryUrl);
     }
@@ -324,6 +366,7 @@ class DiaryController extends ChangeNotifier {
         clearNoticeMessage: true,
       ),
     );
+    unawaited(_draftRepository?.delete(_draftKey));
   }
 
   Future<void> submit() async {
@@ -375,6 +418,7 @@ class DiaryController extends ChangeNotifier {
         await _diaryRepository.updateDiary(editingId, draft);
       }
 
+      await _draftRepository?.delete(_draftKey);
       _resetFormSilently();
       await _loadMonth(_state.visibleMonth, showLoading: false);
       _setState(
@@ -387,6 +431,7 @@ class DiaryController extends ChangeNotifier {
         ),
       );
     } on Object catch (error) {
+      await _markDraftFailed(error);
       _handleError(
         error,
         nextAction: _state.selectedImage == null
@@ -550,6 +595,46 @@ class DiaryController extends ChangeNotifier {
       clearSelectedImage: true,
       isUploadingImage: false,
       clearImageUploadProgress: true,
+    );
+  }
+
+  void _saveDraft() {
+    final repository = _draftRepository;
+    if (repository == null) {
+      return;
+    }
+    unawaited(repository.saveEditing(_draftKey, fields: _draftFields()));
+  }
+
+  Future<void> _markDraftFailed(Object error) async {
+    final repository = _draftRepository;
+    if (repository == null) {
+      return;
+    }
+    await repository.markFailed(
+      _draftKey,
+      fields: _draftFields(),
+      failureMessage: _messageFromError(error, '요청을 처리하지 못했습니다.'),
+    );
+  }
+
+  Map<String, String> _draftFields() {
+    final selectedImage = _state.selectedImage;
+    return {
+      'title': _state.title,
+      'content': _state.content,
+      'category': _state.category.name,
+      'isPrivate': _state.isPrivate.toString(),
+      'imageUrl': _state.imageUrl ?? '',
+      'imageFilename': selectedImage?.filename ?? '',
+      'imageByteLength': selectedImage?.bytes.length.toString() ?? '',
+    };
+  }
+
+  DiaryCategory _categoryFromDraft(String? value) {
+    return DiaryCategory.values.firstWhere(
+      (category) => category.name == value,
+      orElse: () => DiaryCategory.daily,
     );
   }
 
