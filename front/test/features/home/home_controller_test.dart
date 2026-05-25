@@ -2,6 +2,8 @@ import 'dart:async';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:maum_on_mobile_front/core/network/api_error.dart';
+import 'package:maum_on_mobile_front/features/draft_recovery/data/draft_recovery_repository.dart';
+import 'package:maum_on_mobile_front/features/draft_recovery/domain/draft_recovery_models.dart';
 import 'package:maum_on_mobile_front/features/home/application/home_controller.dart';
 import 'package:maum_on_mobile_front/features/home/data/home_repository.dart';
 import 'package:maum_on_mobile_front/features/home/domain/home_models.dart';
@@ -56,6 +58,41 @@ void main() {
       expect(controller.state.feedErrorMessage, isNull);
     });
 
+    test('loads active member draft summaries for home continuation', () async {
+      final draftRepository = StorageDraftRecoveryRepository(
+        storage: MemoryDraftRecoveryStorage(),
+      );
+      await draftRepository.saveEditing(
+        const DraftKey(memberId: 7, surface: DraftSurface.diary),
+        fields: {
+          'title': '오늘의 기록',
+          'content': '퇴근길에 마음이 조금 가벼워졌어요.',
+        },
+      );
+      await draftRepository.saveEditing(
+        const DraftKey(memberId: 7, surface: DraftSurface.consultation),
+        fields: {'content': '상담에서 이어서 묻고 싶은 내용'},
+      );
+
+      final controller = HomeController(
+        homeRepository: _FakeHomeRepository(
+          stats: _stats(),
+          stories: _stories(),
+        ),
+        draftRepository: draftRepository,
+        currentMemberId: 7,
+      );
+
+      await controller.load();
+
+      expect(controller.state.drafts, hasLength(2));
+      expect(
+        controller.state.drafts.map((draft) => draft.surface),
+        containsAll([HomeActionSurface.diary, HomeActionSurface.consultation]),
+      );
+      expect(controller.state.draftErrorMessage, isNull);
+    });
+
     test('stores feed error when feed request fails', () async {
       final controller = HomeController(
         homeRepository: _FakeHomeRepository(
@@ -84,6 +121,45 @@ void main() {
       await controller.load();
       controller.selectCategory(HomeStoryCategory.question);
 
+      expect(controller.state.visibleStories, hasLength(1));
+      expect(controller.state.visibleStories.single.category,
+          HomeStoryCategory.question);
+    });
+
+    test('ignores stale feed responses when category changes quickly', () async {
+      final initialStoriesCompleter = Completer<HomeStoryPage>();
+      final questionStoriesCompleter = Completer<HomeStoryPage>();
+      final controller = HomeController(
+        homeRepository: _FakeHomeRepository(
+          stats: _stats(),
+          storyCompletersByCategory: {
+            HomeStoryCategory.all: initialStoriesCompleter,
+            HomeStoryCategory.question: questionStoriesCompleter,
+          },
+        ),
+      );
+
+      final loadFuture = controller.load();
+      await Future<void>.delayed(Duration.zero);
+      controller.selectCategory(HomeStoryCategory.question);
+
+      questionStoriesCompleter.complete(
+        HomeStoryPage(items: [_stories().last], last: true),
+      );
+      await Future<void>.delayed(Duration.zero);
+
+      expect(controller.state.selectedCategory, HomeStoryCategory.question);
+      expect(controller.state.visibleStories, hasLength(1));
+      expect(controller.state.visibleStories.single.category,
+          HomeStoryCategory.question);
+      expect(controller.state.isFeedLoading, isFalse);
+
+      initialStoriesCompleter.complete(
+        HomeStoryPage(items: [_stories().first], last: true),
+      );
+      await loadFuture;
+
+      expect(controller.state.selectedCategory, HomeStoryCategory.question);
       expect(controller.state.visibleStories, hasLength(1));
       expect(controller.state.visibleStories.single.category,
           HomeStoryCategory.question);
@@ -119,6 +195,29 @@ HomeStats _stats() {
     todayWorryCount: 2,
     todayLetterCount: 3,
     todayDiaryCount: 4,
+    summary: HomeSummary(
+      recoveryMessage: '지금 마음을 천천히 살펴보세요.',
+      primaryActionLabel: '오늘 마음 기록하기',
+      primaryActionSurface: HomeActionSurface.diary,
+      feedMessage: '고민 이야기가 가장 활발합니다.',
+    ),
+    categorySummaries: [
+      HomeCategorySummary(
+        category: HomeStoryCategory.worry,
+        label: '고민',
+        count: 2,
+      ),
+    ],
+    popularStories: [
+      HomePopularStory(
+        id: 1,
+        title: '오늘 너무 지쳐요',
+        category: HomeStoryCategory.worry,
+        label: '고민',
+        viewCount: 42,
+        nickname: '마음온데모',
+      ),
+    ],
   );
 }
 
@@ -162,6 +261,7 @@ class _FakeHomeRepository implements HomeRepository {
     this.storiesError,
     this.statsCompleter,
     this.storiesCompleter,
+    this.storyCompletersByCategory,
   });
 
   final HomeStats? stats;
@@ -170,6 +270,8 @@ class _FakeHomeRepository implements HomeRepository {
   final Object? storiesError;
   final Completer<HomeStats>? statsCompleter;
   final Completer<HomeStoryPage>? storiesCompleter;
+  final Map<HomeStoryCategory, Completer<HomeStoryPage>>?
+      storyCompletersByCategory;
   int statsCallCount = 0;
   int storiesCallCount = 0;
 
@@ -196,6 +298,10 @@ class _FakeHomeRepository implements HomeRepository {
     final completer = storiesCompleter;
     if (completer != null) {
       return completer.future;
+    }
+    final categoryCompleter = storyCompletersByCategory?[category];
+    if (categoryCompleter != null) {
+      return categoryCompleter.future;
     }
 
     final error = storiesError;

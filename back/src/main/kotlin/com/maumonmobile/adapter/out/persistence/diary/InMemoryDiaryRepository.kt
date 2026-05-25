@@ -71,6 +71,12 @@ class InMemoryDiaryRepository : DiaryRepository {
         return diariesById.values.toList()
     }
 
+    override fun countCreatedBetween(startInclusive: String, endExclusive: String): Long {
+        return diariesById.values
+            .count { diary -> diary.createDate >= startInclusive && diary.createDate < endExclusive }
+            .toLong()
+    }
+
     override fun delete(id: Long) {
         diariesById.remove(id)
     }

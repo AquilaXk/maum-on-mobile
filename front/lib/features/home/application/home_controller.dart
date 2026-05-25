@@ -1,6 +1,10 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 
 import '../../../core/network/api_error.dart';
+import '../../draft_recovery/data/draft_recovery_repository.dart';
+import '../../draft_recovery/domain/draft_recovery_models.dart';
 import '../data/home_repository.dart';
 import '../domain/home_models.dart';
 
@@ -8,24 +12,30 @@ class HomeState {
   const HomeState({
     this.stats,
     this.stories = const [],
+    this.drafts = const [],
     this.selectedCategory = HomeStoryCategory.all,
     this.isStatsLoading = false,
     this.isFeedLoading = false,
+    this.isDraftLoading = false,
     this.hasLoaded = false,
     this.statsErrorMessage,
     this.feedErrorMessage,
+    this.draftErrorMessage,
   });
 
   final HomeStats? stats;
   final List<HomeStory> stories;
+  final List<HomeDraftSummary> drafts;
   final HomeStoryCategory selectedCategory;
   final bool isStatsLoading;
   final bool isFeedLoading;
+  final bool isDraftLoading;
   final bool hasLoaded;
   final String? statsErrorMessage;
   final String? feedErrorMessage;
+  final String? draftErrorMessage;
 
-  bool get isLoading => isStatsLoading || isFeedLoading;
+  bool get isLoading => isStatsLoading || isFeedLoading || isDraftLoading;
 
   bool get isFeedEmpty =>
       hasLoaded && feedErrorMessage == null && visibleStories.isEmpty;
@@ -44,26 +54,34 @@ class HomeState {
     HomeStats? stats,
     bool clearStats = false,
     List<HomeStory>? stories,
+    List<HomeDraftSummary>? drafts,
     HomeStoryCategory? selectedCategory,
     bool? isStatsLoading,
     bool? isFeedLoading,
+    bool? isDraftLoading,
     bool? hasLoaded,
     String? statsErrorMessage,
     bool clearStatsError = false,
     String? feedErrorMessage,
     bool clearFeedError = false,
+    String? draftErrorMessage,
+    bool clearDraftError = false,
   }) {
     return HomeState(
       stats: clearStats ? null : stats ?? this.stats,
       stories: stories ?? this.stories,
+      drafts: drafts ?? this.drafts,
       selectedCategory: selectedCategory ?? this.selectedCategory,
       isStatsLoading: isStatsLoading ?? this.isStatsLoading,
       isFeedLoading: isFeedLoading ?? this.isFeedLoading,
+      isDraftLoading: isDraftLoading ?? this.isDraftLoading,
       hasLoaded: hasLoaded ?? this.hasLoaded,
       statsErrorMessage:
           clearStatsError ? null : statsErrorMessage ?? this.statsErrorMessage,
       feedErrorMessage:
           clearFeedError ? null : feedErrorMessage ?? this.feedErrorMessage,
+      draftErrorMessage:
+          clearDraftError ? null : draftErrorMessage ?? this.draftErrorMessage,
     );
   }
 }
@@ -71,13 +89,20 @@ class HomeState {
 class HomeController extends ChangeNotifier {
   HomeController({
     required HomeRepository homeRepository,
-  }) : _homeRepository = homeRepository;
+    DraftRecoveryRepository? draftRepository,
+    int? currentMemberId,
+  })  : _homeRepository = homeRepository,
+        _draftRepository = draftRepository,
+        _currentMemberId = currentMemberId;
 
   final HomeRepository _homeRepository;
+  final DraftRecoveryRepository? _draftRepository;
+  final int? _currentMemberId;
 
   HomeState _state = const HomeState();
   bool _isLoading = false;
   bool _isDisposed = false;
+  int _storyRequestToken = 0;
 
   HomeState get state => _state;
 
@@ -91,8 +116,10 @@ class HomeController extends ChangeNotifier {
       _state.copyWith(
         isStatsLoading: true,
         isFeedLoading: true,
+        isDraftLoading: _draftRepository != null && _currentMemberId != null,
         clearStatsError: true,
         clearFeedError: true,
+        clearDraftError: true,
       ),
     );
 
@@ -100,6 +127,7 @@ class HomeController extends ChangeNotifier {
       await Future.wait([
         _loadStats(),
         _loadStories(),
+        _loadDrafts(),
       ]);
     } finally {
       _isLoading = false;
@@ -107,14 +135,21 @@ class HomeController extends ChangeNotifier {
         _state.copyWith(
           hasLoaded: true,
           isStatsLoading: false,
-          isFeedLoading: false,
+          isDraftLoading: false,
         ),
       );
     }
   }
 
   void selectCategory(HomeStoryCategory category) {
-    _setState(_state.copyWith(selectedCategory: category));
+    _setState(
+      _state.copyWith(
+        selectedCategory: category,
+        isFeedLoading: true,
+        clearFeedError: true,
+      ),
+    );
+    unawaited(_loadStories(category: category));
   }
 
   Future<void> _loadStats() async {
@@ -136,23 +171,124 @@ class HomeController extends ChangeNotifier {
     }
   }
 
-  Future<void> _loadStories() async {
+  Future<void> _loadStories({HomeStoryCategory? category}) async {
+    final requestedCategory = category ?? _state.selectedCategory;
+    final requestToken = ++_storyRequestToken;
     try {
-      final page = await _homeRepository.fetchStories();
+      final page = await _homeRepository.fetchStories(
+        category: requestedCategory,
+      );
+      if (!_isLatestStoryRequest(requestToken, requestedCategory)) {
+        return;
+      }
       _setState(
         _state.copyWith(
           stories: page.items,
+          isFeedLoading: false,
           clearFeedError: true,
+        ),
+      );
+    } on Object catch (error) {
+      if (!_isLatestStoryRequest(requestToken, requestedCategory)) {
+        return;
+      }
+      _setState(
+        _state.copyWith(
+          stories: const [],
+          isFeedLoading: false,
+          feedErrorMessage: _messageFromError(error, '스토리를 불러오지 못했습니다.'),
+        ),
+      );
+    }
+  }
+
+  bool _isLatestStoryRequest(
+    int requestToken,
+    HomeStoryCategory requestedCategory,
+  ) {
+    return requestToken == _storyRequestToken &&
+        requestedCategory == _state.selectedCategory;
+  }
+
+  Future<void> _loadDrafts() async {
+    final repository = _draftRepository;
+    final memberId = _currentMemberId;
+    if (repository == null || memberId == null) {
+      _setState(
+        _state.copyWith(
+          drafts: const [],
+          isDraftLoading: false,
+          clearDraftError: true,
+        ),
+      );
+      return;
+    }
+
+    try {
+      final entries = <DraftEntry>[];
+      for (final surface in _homeDraftSurfaces.keys) {
+        final entry = await repository.read(
+          DraftKey(memberId: memberId, surface: surface),
+        ).timeout(
+          _draftReadTimeout,
+          onTimeout: () => null,
+        );
+        if (entry != null && entry.fields.isNotEmpty) {
+          entries.add(entry);
+        }
+      }
+
+      final drafts = entries.map(_homeDraftSummary).toList()
+        ..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
+      _setState(
+        _state.copyWith(
+          drafts: drafts,
+          clearDraftError: true,
         ),
       );
     } on Object catch (error) {
       _setState(
         _state.copyWith(
-          stories: const [],
-          feedErrorMessage: _messageFromError(error, '스토리를 불러오지 못했습니다.'),
+          drafts: const [],
+          draftErrorMessage: _messageFromError(
+            error,
+            '임시 저장 내용을 불러오지 못했습니다.',
+          ),
         ),
       );
     }
+  }
+
+  HomeDraftSummary _homeDraftSummary(DraftEntry entry) {
+    final surface = _homeDraftSurfaces[entry.key.surface]!;
+    final title = _draftTitle(surface, entry.fields);
+    final preview = _draftPreview(entry.fields);
+    return HomeDraftSummary(
+      surface: surface,
+      title: title,
+      preview: preview,
+      updatedAt: entry.updatedAt,
+      failed: entry.isFailed,
+    );
+  }
+
+  String _draftTitle(
+    HomeActionSurface surface,
+    Map<String, String> fields,
+  ) {
+    final title = fields['title']?.trim() ?? '';
+    if (title.isNotEmpty) {
+      return title;
+    }
+    return '${surface.label} 작성 중';
+  }
+
+  String _draftPreview(Map<String, String> fields) {
+    final content = fields['content']?.trim() ?? '';
+    if (content.isNotEmpty) {
+      return content.length > 48 ? '${content.substring(0, 48)}...' : content;
+    }
+    return '마지막 작성 내용을 이어갈 수 있습니다.';
   }
 
   String _messageFromError(Object error, String fallback) {
@@ -178,3 +314,12 @@ class HomeController extends ChangeNotifier {
     super.dispose();
   }
 }
+
+const _homeDraftSurfaces = {
+  DraftSurface.diary: HomeActionSurface.diary,
+  DraftSurface.story: HomeActionSurface.story,
+  DraftSurface.letter: HomeActionSurface.letter,
+  DraftSurface.consultation: HomeActionSurface.consultation,
+};
+
+const _draftReadTimeout = Duration(milliseconds: 500);

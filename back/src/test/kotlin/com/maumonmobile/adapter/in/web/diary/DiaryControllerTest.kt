@@ -108,8 +108,8 @@ class DiaryControllerTest @Autowired constructor(
     @Test
     fun publicDiaryListExcludesPrivateEntriesWithoutAuth() {
         val accessToken = signupAndLogin("diary-public@example.com", "공개이")
-        val publicTitle = "공개 기록 ${System.nanoTime()}"
-        val privateTitle = "비공개 기록 ${System.nanoTime()}"
+        val publicTitle = "공개 기록 알파"
+        val privateTitle = "비공개 기록 베타"
 
         mockMvc.perform(
             multipart("/api/v1/diaries")

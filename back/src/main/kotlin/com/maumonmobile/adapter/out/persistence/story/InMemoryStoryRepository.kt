@@ -70,6 +70,41 @@ class InMemoryStoryRepository : StoryRepository {
 
     override fun findPosts(): List<StoryPost> = postsById.values.toList()
 
+    override fun countPostsByCategoryCreatedBetween(
+        category: String,
+        startInclusive: String,
+        endExclusive: String,
+    ): Long {
+        return postsById.values
+            .count { post ->
+                post.category == category && post.createDate.isBetween(startInclusive, endExclusive)
+            }
+            .toLong()
+    }
+
+    override fun countPostsByCategories(categories: Collection<String>): Map<String, Long> {
+        val categorySet = categories.toSet()
+        if (categorySet.isEmpty()) {
+            return emptyMap()
+        }
+
+        return postsById.values
+            .filter { post -> post.category in categorySet }
+            .groupingBy(StoryPost::category)
+            .eachCount()
+            .mapValues { (_, count) -> count.toLong() }
+    }
+
+    override fun findTopPopularPosts(limit: Int): List<StoryPost> {
+        if (limit <= 0) {
+            return emptyList()
+        }
+
+        return postsById.values
+            .sortedWith(compareByDescending<StoryPost> { post -> post.viewCount }.thenByDescending { post -> post.createDate })
+            .take(limit)
+    }
+
     override fun deletePost(id: Long) {
         postsById.remove(id)
     }
@@ -130,5 +165,9 @@ class InMemoryStoryRepository : StoryRepository {
             .filter { comment -> comment.postId == postId }
             .map(StoryComment::id)
             .forEach(commentsById::remove)
+    }
+
+    private fun String.isBetween(startInclusive: String, endExclusive: String): Boolean {
+        return this >= startInclusive && this < endExclusive
     }
 }

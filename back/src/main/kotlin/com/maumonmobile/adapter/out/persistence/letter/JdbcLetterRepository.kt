@@ -116,6 +116,21 @@ class JdbcLetterRepository(
         }
     }
 
+    override fun countCreatedBetween(startInclusive: String, endExclusive: String): Long {
+        return jdbc.queryForObject(
+            """
+                select count(*)
+                  from letters
+                 where created_date >= :startInclusive
+                   and created_date < :endExclusive
+            """.trimIndent(),
+            params()
+                .withValue("startInclusive", startInclusive)
+                .withValue("endExclusive", endExclusive),
+            Long::class.java,
+        ) ?: 0L
+    }
+
     private fun rejectedMemberIdsByLetterIds(letterIds: List<Long>): Map<Long, Set<Long>> {
         if (letterIds.isEmpty()) {
             return emptyMap()
