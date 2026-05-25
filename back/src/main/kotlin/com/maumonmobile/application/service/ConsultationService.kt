@@ -23,6 +23,7 @@ import com.maumonmobile.domain.consultation.ConsultationRiskCategory
 import com.maumonmobile.domain.consultation.ConsultationRiskSeverity
 import com.maumonmobile.domain.consultation.ConsultationSafetyAssessment
 import com.maumonmobile.domain.consultation.ConsultationSafetyAuditEvent
+import com.maumonmobile.global.observability.MobileApiMetricsRegistry
 import com.maumonmobile.global.security.AuthenticatedUser
 import com.maumonmobile.global.web.ApiException
 import com.maumonmobile.global.web.ErrorCode
@@ -42,6 +43,7 @@ class ConsultationService(
     private val consultationSafetyAuditRepository: ConsultationSafetyAuditRepository,
     private val consultationAiResponder: ConsultationAiResponder,
     private val notificationDeliveryPort: NotificationDeliveryPort,
+    private val metricsRegistry: MobileApiMetricsRegistry,
     @param:Value("\${app.consultation.ai.timeout:PT8S}")
     private val aiTimeout: Duration,
 ) : ConsultationUseCase {
@@ -158,6 +160,7 @@ class ConsultationService(
                 createdAt = now.toString(),
             ),
         )
+        metricsRegistry.recordConsultationSafety(safety.category.name, safety.actionPolicy.name)
         notificationDeliveryPort.deliver(
             memberId = member.id,
             eventName = CONSULTATION_REPLY_EVENT,
@@ -255,18 +258,24 @@ class ConsultationService(
             val response = generateWithTimeout(member, message)
             val chunks = response.chunks.filter(String::isNotBlank)
             if (chunks.isEmpty()) {
+                metricsRegistry.recordAiModel("consultation", "empty")
                 fallbackReply()
             } else {
+                metricsRegistry.recordAiModel("consultation", "success")
                 ConsultationReplyResult(chunks = chunks)
             }
         } catch (_: ConsultationAiUnavailableException) {
+            metricsRegistry.recordAiModel("consultation", "fallback")
             fallbackReply()
         } catch (_: TimeoutException) {
+            metricsRegistry.recordAiModel("consultation", "timeout")
             fallbackReply()
         } catch (_: ExecutionException) {
+            metricsRegistry.recordAiModel("consultation", "fallback")
             fallbackReply()
         } catch (_: InterruptedException) {
             Thread.currentThread().interrupt()
+            metricsRegistry.recordAiModel("consultation", "interrupted")
             fallbackReply()
         }
     }
@@ -276,8 +285,15 @@ class ConsultationService(
             consultationAiResponder.generate(
                 ConsultationAiRequest(
                     memberId = member.id,
-                    message = message,
-                    recentMessages = consultationRepository.findByMemberId(member.id),
+                    message = message.minimizeForModel(),
+                    recentMessages = consultationRepository.findByMemberId(member.id)
+                        .filterNot { recentMessage -> recentMessage.sensitive }
+                        .takeLast(AI_CONTEXT_MESSAGE_LIMIT)
+                        .map { recentMessage ->
+                            recentMessage.copy(
+                                content = recentMessage.content.minimizeForModel(),
+                            )
+                        },
                     timeout = aiTimeout,
                 ),
             )
@@ -309,6 +325,7 @@ class ConsultationService(
         private const val FALLBACK_MESSAGE = "지금은 답변을 만들지 못했습니다. 잠시 후 다시 시도해 주세요."
         private const val CONSULTATION_REPLY_EVENT = "consultation_reply"
         private const val SAFETY_AUDIT_PREVIEW_LENGTH = 120
+        private const val AI_CONTEXT_MESSAGE_LIMIT = 6
         private const val CRITICAL_RATE_LIMIT = 2
         private val SAFETY_RATE_WINDOW: Duration = Duration.ofMinutes(30)
         private val SENSITIVE_RETENTION: Duration = Duration.ofDays(30)
@@ -326,6 +343,16 @@ class ConsultationService(
         private val VIOLENCE_TERMS = setOf("죽일", "해치고 싶", "때리고 싶", "칼로", "복수할 거")
         private val ABUSE_TERMS = setOf("학대", "맞고 있어", "폭행", "성폭력", "감금")
     }
+}
+
+private const val MODEL_TEXT_LIMIT = 1_000
+private val EMAIL_PATTERN = Regex("""[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}""")
+private val PHONE_PATTERN = Regex("""01[016789][-.\s]?\d{3,4}[-.\s]?\d{4}""")
+
+private fun String.minimizeForModel(): String {
+    return replace(EMAIL_PATTERN, "[email]")
+        .replace(PHONE_PATTERN, "[phone]")
+        .take(MODEL_TEXT_LIMIT)
 }
 
 private fun ConsultationMessage.toResult(): ConsultationMessageResult {
