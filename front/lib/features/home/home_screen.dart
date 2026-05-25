@@ -60,6 +60,23 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  void _openSurface(HomeActionSurface surface) {
+    switch (surface) {
+      case HomeActionSurface.diary:
+        widget.onWriteDiary();
+        break;
+      case HomeActionSurface.story:
+        widget.onViewStory();
+        break;
+      case HomeActionSurface.letter:
+        widget.onWriteLetter();
+        break;
+      case HomeActionSurface.consultation:
+        widget.onOpenConsultation();
+        break;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return AnimatedBuilder(
@@ -75,7 +92,15 @@ class _HomeScreenState extends State<HomeScreen> {
           children: [
             _StatsSection(state: state),
             const SizedBox(height: AppSpacing.lg),
-            const _HealingQuote(),
+            _HealingQuote(
+              summary: state.stats?.summary,
+              onPrimaryAction: _openSurface,
+            ),
+            const SizedBox(height: AppSpacing.lg),
+            _DraftContinuationSection(
+              state: state,
+              onContinue: _openSurface,
+            ),
             const SizedBox(height: AppSpacing.lg),
             _ActionGrid(
               onWriteDiary: widget.onWriteDiary,
@@ -89,10 +114,18 @@ class _HomeScreenState extends State<HomeScreen> {
               onOpenOperations: widget.onOpenOperations,
             ),
             const SizedBox(height: AppSpacing.xl),
+            _CategoryOverview(
+              stats: state.stats,
+              selectedCategory: state.selectedCategory,
+              onSelected: widget.homeController.selectCategory,
+            ),
+            const SizedBox(height: AppSpacing.md),
             _CategoryFilter(
               selectedCategory: state.selectedCategory,
               onSelected: widget.homeController.selectCategory,
             ),
+            const SizedBox(height: AppSpacing.md),
+            _PopularStorySection(stats: state.stats),
             const SizedBox(height: AppSpacing.md),
             _FeedSection(state: state),
             const SizedBox(height: AppSpacing.xl),
@@ -163,13 +196,94 @@ class _StatsSection extends StatelessWidget {
 }
 
 class _HealingQuote extends StatelessWidget {
-  const _HealingQuote();
+  const _HealingQuote({
+    required this.summary,
+    required this.onPrimaryAction,
+  });
+
+  final HomeSummary? summary;
+  final ValueChanged<HomeActionSurface> onPrimaryAction;
 
   @override
   Widget build(BuildContext context) {
-    return const AppNotice(
-      message: '조금 느려도 괜찮아요. 오늘의 마음을 하나씩 살펴보세요.',
-      tone: AppNoticeTone.success,
+    final homeSummary = summary ?? const HomeSummary();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        AppNotice(
+          message: homeSummary.recoveryMessage,
+          tone: AppNoticeTone.success,
+        ),
+        const SizedBox(height: AppSpacing.xs),
+        FilledButton.icon(
+          key: const ValueKey('home-primary-action-button'),
+          onPressed: () => onPrimaryAction(homeSummary.primaryActionSurface),
+          icon: const Icon(Icons.favorite_border),
+          label: Text(homeSummary.primaryActionLabel),
+        ),
+      ],
+    );
+  }
+}
+
+class _DraftContinuationSection extends StatelessWidget {
+  const _DraftContinuationSection({
+    required this.state,
+    required this.onContinue,
+  });
+
+  final HomeState state;
+  final ValueChanged<HomeActionSurface> onContinue;
+
+  @override
+  Widget build(BuildContext context) {
+    if (state.isDraftLoading) {
+      return const AppStateView.loading(
+        title: '이어쓸 내용을 확인하는 중입니다.',
+        semanticLabel: '홈 임시 저장 내용을 확인하는 중',
+      );
+    }
+
+    if (state.draftErrorMessage != null) {
+      return AppStateView.error(
+        title: '이어쓰기 내용을 불러오지 못했습니다.',
+        message: state.draftErrorMessage!,
+        semanticLabel: '홈 임시 저장 내용 오류',
+      );
+    }
+
+    if (state.drafts.isEmpty) {
+      return const AppStateView.empty(
+        title: '이어쓸 내용이 없습니다.',
+        message: '새 기록, 편지, 스토리, 상담을 바로 시작할 수 있습니다.',
+        semanticLabel: '홈 이어쓰기 비어 있음',
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text('이어쓰기', style: Theme.of(context).textTheme.titleMedium),
+        const SizedBox(height: AppSpacing.xs),
+        for (final draft in state.drafts) ...[
+          AppListRow(
+            rowKey: ValueKey('home-draft-${draft.surface.name}'),
+            title: draft.title,
+            subtitle:
+                '${draft.surface.label} · ${draft.preview} · ${_formatDraftDate(draft.updatedAt)}',
+            statusLabel: draft.failed ? '전송 실패' : '임시 저장',
+            statusTone:
+                draft.failed ? AppStatusTone.warning : AppStatusTone.success,
+            leadingIcon: _draftIcon(draft.surface),
+            trailingIcon: Icons.play_arrow,
+            onTap: () => onContinue(draft.surface),
+            semanticLabel:
+                '${draft.surface.label} 이어쓰기: ${draft.title}, ${draft.failed ? '전송 실패' : '임시 저장'}',
+          ),
+          const SizedBox(height: AppSpacing.xs),
+        ],
+      ],
     );
   }
 }
@@ -199,47 +313,68 @@ class _ActionGrid extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Wrap(
-      spacing: AppSpacing.xs,
-      runSpacing: AppSpacing.xs,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        FilledButton(
-          onPressed: onWriteDiary,
-          child: const Text('다이어리 쓰기'),
+        Wrap(
+          spacing: AppSpacing.xs,
+          runSpacing: AppSpacing.xs,
+          children: [
+            FilledButton.icon(
+              onPressed: onWriteDiary,
+              icon: const Icon(Icons.edit_note),
+              label: const Text('다이어리 쓰기'),
+            ),
+            FilledButton.tonalIcon(
+              onPressed: onWriteLetter,
+              icon: const Icon(Icons.mail_outline),
+              label: const Text('편지 쓰기'),
+            ),
+            OutlinedButton.icon(
+              onPressed: onViewStory,
+              icon: const Icon(Icons.forum_outlined),
+              label: const Text('스토리 보기'),
+            ),
+            FilledButton.tonalIcon(
+              onPressed: onOpenConsultation,
+              icon: const Icon(Icons.chat_bubble_outline),
+              label: const Text('상담하기'),
+            ),
+          ],
         ),
-        FilledButton.tonal(
-          onPressed: onWriteLetter,
-          child: const Text('편지 쓰기'),
-        ),
-        OutlinedButton(
-          onPressed: onViewStory,
-          child: const Text('스토리 보기'),
-        ),
-        FilledButton.tonalIcon(
-          onPressed: onOpenConsultation,
-          icon: const Icon(Icons.chat_bubble_outline),
-          label: const Text('상담하기'),
-        ),
-        OutlinedButton.icon(
-          onPressed: onOpenNotifications,
-          icon: const Icon(Icons.notifications_none),
-          label: const Text('알림/신고'),
-        ),
-        OutlinedButton.icon(
-          onPressed: onOpenSettings,
-          icon: const Icon(Icons.settings_outlined),
-          label: const Text('설정'),
-        ),
-        if (isAdmin && onOpenOperations != null)
-          OutlinedButton.icon(
-            key: const ValueKey('home-operations-button'),
-            onPressed: onOpenOperations,
-            icon: const Icon(Icons.admin_panel_settings_outlined),
-            label: const Text('운영 검수'),
+        if (isAdmin && onOpenOperations != null) ...[
+          const SizedBox(height: AppSpacing.xs),
+          Align(
+            alignment: AlignmentDirectional.centerStart,
+            child: OutlinedButton.icon(
+              key: const ValueKey('home-operations-button'),
+              onPressed: onOpenOperations,
+              icon: const Icon(Icons.admin_panel_settings_outlined),
+              label: const Text('운영 검수'),
+            ),
           ),
-        OutlinedButton(
-          onPressed: onLogout,
-          child: const Text('로그아웃'),
+        ],
+        const SizedBox(height: AppSpacing.xs),
+        Wrap(
+          spacing: AppSpacing.xs,
+          runSpacing: AppSpacing.xs,
+          children: [
+            OutlinedButton.icon(
+              onPressed: onOpenNotifications,
+              icon: const Icon(Icons.notifications_none),
+              label: const Text('알림/신고'),
+            ),
+            OutlinedButton.icon(
+              onPressed: onOpenSettings,
+              icon: const Icon(Icons.settings_outlined),
+              label: const Text('설정'),
+            ),
+            OutlinedButton.icon(
+              onPressed: onLogout,
+              icon: const Icon(Icons.logout),
+              label: const Text('로그아웃'),
+            ),
+          ],
         ),
       ],
     );
@@ -268,6 +403,85 @@ class _CategoryFilter extends StatelessWidget {
             selected: category == selectedCategory,
             onSelected: (_) => onSelected(category),
           ),
+      ],
+    );
+  }
+}
+
+class _CategoryOverview extends StatelessWidget {
+  const _CategoryOverview({
+    required this.stats,
+    required this.selectedCategory,
+    required this.onSelected,
+  });
+
+  final HomeStats? stats;
+  final HomeStoryCategory selectedCategory;
+  final ValueChanged<HomeStoryCategory> onSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    final summaries = stats?.categorySummaries ?? const [];
+    if (summaries.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (stats?.summary.feedMessage.isNotEmpty == true) ...[
+          AppNotice(message: stats!.summary.feedMessage),
+          const SizedBox(height: AppSpacing.xs),
+        ],
+        Wrap(
+          spacing: AppSpacing.xs,
+          runSpacing: AppSpacing.xs,
+          children: [
+            for (final summary in summaries)
+              ChoiceChip(
+                key: ValueKey('home-category-summary-${summary.category.name}'),
+                label: Text('${summary.label} ${summary.count}'),
+                selected: selectedCategory == summary.category,
+                onSelected: (_) => onSelected(summary.category),
+              ),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+class _PopularStorySection extends StatelessWidget {
+  const _PopularStorySection({required this.stats});
+
+  final HomeStats? stats;
+
+  @override
+  Widget build(BuildContext context) {
+    final stories = stats?.popularStories ?? const [];
+    if (stories.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text('최근 인기', style: Theme.of(context).textTheme.titleMedium),
+        const SizedBox(height: AppSpacing.xs),
+        for (final story in stories) ...[
+          AppListRow(
+            rowKey: ValueKey('home-popular-story-${story.id}'),
+            title: story.title,
+            subtitle: '${story.label} · ${story.nickname} · 조회 ${story.viewCount}',
+            statusLabel: story.label,
+            statusTone: AppStatusTone.success,
+            leadingIcon: Icons.trending_up,
+            trailingIcon: null,
+            semanticLabel:
+                '인기 스토리: ${story.title}, ${story.label}, 조회 ${story.viewCount}',
+          ),
+          const SizedBox(height: AppSpacing.xs),
+        ],
       ],
     );
   }
@@ -325,6 +539,7 @@ class _StoryCard extends StatelessWidget {
     final theme = Theme.of(context);
 
     return Card(
+      key: ValueKey('home-feed-story-${story.id}'),
       margin: EdgeInsets.zero,
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -377,4 +592,21 @@ class _PlatformRow extends StatelessWidget {
       ],
     );
   }
+}
+
+IconData _draftIcon(HomeActionSurface surface) {
+  return switch (surface) {
+    HomeActionSurface.diary => Icons.edit_note,
+    HomeActionSurface.story => Icons.forum_outlined,
+    HomeActionSurface.letter => Icons.mail_outline,
+    HomeActionSurface.consultation => Icons.chat_bubble_outline,
+  };
+}
+
+String _formatDraftDate(DateTime updatedAt) {
+  if (updatedAt.millisecondsSinceEpoch == 0) {
+    return '시간 없음';
+  }
+  final local = updatedAt.toLocal();
+  return '${local.month}/${local.day} ${local.hour.toString().padLeft(2, '0')}:${local.minute.toString().padLeft(2, '0')}';
 }

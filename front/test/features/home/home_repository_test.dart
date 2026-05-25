@@ -16,6 +16,25 @@ void main() {
             'todayWorryCount': 18,
             'todayLetterCount': 42,
             'todayDiaryCount': 11,
+            'summary': {
+              'recoveryMessage': '오전에는 천천히 마음을 열어보세요.',
+              'primaryActionLabel': '오늘 마음 기록하기',
+              'primaryActionSurface': 'diary',
+              'feedMessage': '고민 이야기가 가장 활발합니다.',
+            },
+            'categorySummaries': [
+              {'category': 'WORRY', 'label': '고민', 'count': 7},
+            ],
+            'popularStories': [
+              {
+                'id': 5,
+                'title': '많이 읽힌 이야기',
+                'category': 'WORRY',
+                'label': '고민',
+                'viewCount': 99,
+                'nickname': '마음이',
+              },
+            ],
           },
         }),
       ]);
@@ -29,6 +48,10 @@ void main() {
       final stats = await repository.fetchStats();
 
       expect(stats.todayWorryCount, 18);
+      expect(stats.summary.recoveryMessage, '오전에는 천천히 마음을 열어보세요.');
+      expect(stats.summary.primaryActionSurface, HomeActionSurface.diary);
+      expect(stats.categorySummaries.single.count, 7);
+      expect(stats.popularStories.single.title, '많이 읽힌 이야기');
       expect(transport.requests.single.path, '/api/v1/home/stats');
       expect(transport.requests.single.requiresAuth, isFalse);
       expect(transport.requests.single.retryOnUnauthorized, isFalse);

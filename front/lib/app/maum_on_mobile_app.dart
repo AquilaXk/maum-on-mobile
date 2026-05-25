@@ -395,6 +395,8 @@ class _MaumOnMobileAppState extends State<MaumOnMobileApp> {
     _homeMemberId = memberId;
     return _homeController = HomeController(
       homeRepository: widget.homeRepository ?? _buildDefaultHomeRepository(),
+      draftRepository: _draftRecoveryRepository,
+      currentMemberId: memberId,
     );
   }
 

@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:maum_on_mobile_front/features/draft_recovery/data/draft_recovery_repository.dart';
+import 'package:maum_on_mobile_front/features/draft_recovery/domain/draft_recovery_models.dart';
 import 'package:maum_on_mobile_front/features/home/application/home_controller.dart';
 import 'package:maum_on_mobile_front/features/home/data/home_repository.dart';
 import 'package:maum_on_mobile_front/features/home/domain/home_models.dart';
@@ -34,13 +36,61 @@ void main() {
     expect(find.text('오늘 올라온 고민'), findsOneWidget);
     expect(find.text('전달된 비밀 편지'), findsOneWidget);
     expect(find.text('오늘의 기록'), findsOneWidget);
-    expect(find.text('오늘 너무 지쳐요'), findsOneWidget);
+    expect(find.text('지금 마음을 천천히 살펴보세요.'), findsOneWidget);
+    expect(find.text('최근 인기'), findsOneWidget);
+    expect(find.text('오늘 너무 지쳐요'), findsWidgets);
+    expect(find.byKey(const ValueKey('home-feed-story-1')), findsOneWidget);
 
     await tester.tap(find.text('질문'));
     await tester.pumpAndSettle();
 
-    expect(find.text('어떻게 말해야 할까요?'), findsOneWidget);
-    expect(find.text('오늘 너무 지쳐요'), findsNothing);
+    expect(find.byKey(const ValueKey('home-feed-story-2')), findsOneWidget);
+    expect(find.byKey(const ValueKey('home-feed-story-1')), findsNothing);
+  });
+
+  testWidgets('routes draft continuation cards to their writing surfaces',
+      (tester) async {
+    final draftRepository = StorageDraftRecoveryRepository(
+      storage: MemoryDraftRecoveryStorage(),
+    );
+    await draftRepository.saveEditing(
+      const DraftKey(memberId: 7, surface: DraftSurface.diary),
+      fields: {
+        'title': '오늘의 기록',
+        'content': '퇴근길 마음을 이어서 적기',
+      },
+    );
+    final controller = HomeController(
+      homeRepository: const _FakeHomeRepository(),
+      draftRepository: draftRepository,
+      currentMemberId: 7,
+    );
+    await controller.load();
+    var diaryTaps = 0;
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: HomeScreen(
+          routeTitle: '홈',
+          nickname: '마음이',
+          homeController: controller,
+          onWriteDiary: () => diaryTaps += 1,
+          onWriteLetter: () {},
+          onViewStory: () {},
+          onOpenConsultation: () {},
+          onOpenNotifications: () {},
+          onOpenSettings: () {},
+          onLogout: () {},
+        ),
+      ),
+    );
+
+    expect(find.text('이어쓰기'), findsOneWidget);
+    expect(find.text('오늘의 기록'), findsOneWidget);
+
+    await tester.tap(find.byKey(const ValueKey('home-draft-diary')));
+
+    expect(diaryTaps, 1);
   });
 
   testWidgets('runs home action callbacks', (tester) async {
@@ -152,6 +202,34 @@ class _FakeHomeRepository implements HomeRepository {
       todayWorryCount: 2,
       todayLetterCount: 3,
       todayDiaryCount: 4,
+      summary: HomeSummary(
+        recoveryMessage: '지금 마음을 천천히 살펴보세요.',
+        primaryActionLabel: '오늘 마음 기록하기',
+        primaryActionSurface: HomeActionSurface.diary,
+        feedMessage: '고민 이야기가 가장 활발합니다.',
+      ),
+      categorySummaries: [
+        HomeCategorySummary(
+          category: HomeStoryCategory.worry,
+          label: '고민',
+          count: 2,
+        ),
+        HomeCategorySummary(
+          category: HomeStoryCategory.question,
+          label: '질문',
+          count: 1,
+        ),
+      ],
+      popularStories: [
+        HomePopularStory(
+          id: 1,
+          title: '오늘 너무 지쳐요',
+          category: HomeStoryCategory.worry,
+          label: '고민',
+          viewCount: 42,
+          nickname: '마음온데모',
+        ),
+      ],
     );
   }
 
