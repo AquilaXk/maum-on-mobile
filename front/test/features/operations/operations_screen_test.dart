@@ -663,7 +663,6 @@ class _FakeOperationsRepository implements OperationsRepository {
     MobileApiMetricsSnapshot? metrics,
     this.metricsError,
     this.systemStatus,
-    this.systemError,
   }) : metrics = metrics ?? _metrics();
 
   final List<String?> memberQueries = [];
@@ -675,7 +674,6 @@ class _FakeOperationsRepository implements OperationsRepository {
   final MobileApiMetricsSnapshot metrics;
   final Object? metricsError;
   final OperationsSystemStatus? systemStatus;
-  final Object? systemError;
   int currentReceiverId = 7;
   int metricsFetchCount = 0;
   int systemStatusFetchCount = 0;
@@ -707,10 +705,6 @@ class _FakeOperationsRepository implements OperationsRepository {
     OperationsSystemEnvironment environment,
   ) async {
     systemStatusFetchCount += 1;
-    final error = systemError;
-    if (error != null) {
-      throw error;
-    }
     return systemStatus ?? OperationsSystemStatus.connected(environment);
   }
 
