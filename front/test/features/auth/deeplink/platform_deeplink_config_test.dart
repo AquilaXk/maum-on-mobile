@@ -17,6 +17,9 @@ void main() {
     expect(manifest, contains('android.permission.POST_NOTIFICATIONS'));
     expect(manifest, contains('android.permission.READ_MEDIA_IMAGES'));
     expect(manifest, contains('android.permission.READ_EXTERNAL_STORAGE'));
+    expect(manifest, contains('androidx.core.content.FileProvider'));
+    expect(manifest, contains(r'${applicationId}.diaryimageprovider'));
+    expect(manifest, contains('@xml/diary_image_paths'));
     expect(manifest, isNot(contains('android:usesCleartextTraffic="true"')));
     expect(debugManifest, contains('android:usesCleartextTraffic="true"'));
     expect(manifest, contains('android:scheme="maumon"'));
@@ -30,9 +33,23 @@ void main() {
     expect(manifest, contains('android:scheme="http"'));
 
     final buildGradle = File('android/app/build.gradle.kts').readAsStringSync();
+    expect(buildGradle, contains('androidx.core:core'));
     expect(buildGradle, contains('com.google.firebase:firebase-messaging'));
     expect(buildGradle, contains('MAUMON_FIREBASE_APP_ID'));
     expect(buildGradle, contains('MAUMON_FIREBASE_SENDER_ID'));
+
+    final imagePaths = File(
+      'android/app/src/main/res/xml/diary_image_paths.xml',
+    ).readAsStringSync();
+    expect(imagePaths, contains('<cache-path'));
+    expect(imagePaths, contains('diary_images/'));
+
+    final pickerChannel = File(
+      'android/app/src/main/kotlin/com/aquilaxk/maumonmobile/DiaryImagePickerChannel.kt',
+    ).readAsStringSync();
+    expect(pickerChannel, contains('FileProvider.getUriForFile'));
+    expect(pickerChannel, contains('MediaStore.EXTRA_OUTPUT'));
+    expect(pickerChannel, contains('deletePendingCameraImage'));
   });
 
   test('iOS Info.plist registers the external login callback scheme', () {

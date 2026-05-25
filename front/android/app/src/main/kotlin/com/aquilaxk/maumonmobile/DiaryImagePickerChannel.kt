@@ -10,11 +10,13 @@ import android.os.Build
 import android.provider.MediaStore
 import android.provider.OpenableColumns
 import android.provider.Settings
+import androidx.core.content.FileProvider
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.plugin.common.BinaryMessenger
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
 import java.io.ByteArrayOutputStream
+import java.io.File
 
 class DiaryImagePickerChannel(
     private val activity: FlutterActivity,
@@ -22,6 +24,8 @@ class DiaryImagePickerChannel(
 ) {
     private val channel = MethodChannel(binaryMessenger, CHANNEL_NAME)
     private var pendingResult: MethodChannel.Result? = null
+    private var pendingCameraImageUri: Uri? = null
+    private var pendingCameraImageFile: File? = null
 
     init {
         channel.setMethodCallHandler(::handleCall)
@@ -62,6 +66,9 @@ class DiaryImagePickerChannel(
         }
 
         if (resultCode != Activity.RESULT_OK) {
+            if (source == DiaryImageSource.CAMERA) {
+                deletePendingCameraImage()
+            }
             complete(mapOf("status" to "cancelled", "source" to source.platformValue))
             return true
         }
@@ -93,12 +100,15 @@ class DiaryImagePickerChannel(
             return
         }
 
-        pendingResult?.success(
-            mapOf(
-                "status" to "error",
-                "message" to "다른 이미지 선택이 진행 중입니다.",
-            ),
-        )
+        if (pendingResult != null) {
+            deletePendingCameraImage()
+            pendingResult?.success(
+                mapOf(
+                    "status" to "error",
+                    "message" to "다른 이미지 선택이 진행 중입니다.",
+                ),
+            )
+        }
         pendingResult = result
 
         val permission = permissionFor(source)
@@ -121,10 +131,24 @@ class DiaryImagePickerChannel(
 
     private fun launchPicker(source: DiaryImageSource) {
         val intent = when (source) {
-            DiaryImageSource.CAMERA -> Intent(MediaStore.ACTION_IMAGE_CAPTURE)
+            DiaryImageSource.CAMERA -> cameraIntent()
             DiaryImageSource.GALLERY -> galleryIntent()
         }
+        if (intent == null) {
+            complete(
+                mapOf(
+                    "status" to "error",
+                    "source" to source.platformValue,
+                    "message" to "${source.label} 임시 파일을 준비하지 못했습니다.",
+                ),
+            )
+            return
+        }
+
         if (intent.resolveActivity(activity.packageManager) == null) {
+            if (source == DiaryImageSource.CAMERA) {
+                deletePendingCameraImage()
+            }
             complete(
                 mapOf(
                     "status" to "unsupported",
@@ -135,14 +159,37 @@ class DiaryImagePickerChannel(
             return
         }
 
-        activity.startActivityForResult(
-            intent,
+        runCatching {
+            activity.startActivityForResult(
+                intent,
+                if (source == DiaryImageSource.CAMERA) {
+                    CAMERA_PICK_REQUEST
+                } else {
+                    GALLERY_PICK_REQUEST
+                },
+            )
+        }.onFailure {
             if (source == DiaryImageSource.CAMERA) {
-                CAMERA_PICK_REQUEST
-            } else {
-                GALLERY_PICK_REQUEST
-            },
-        )
+                deletePendingCameraImage()
+            }
+            complete(
+                mapOf(
+                    "status" to "error",
+                    "source" to source.platformValue,
+                    "message" to "${source.label}을 시작하지 못했습니다.",
+                ),
+            )
+        }
+    }
+
+    private fun cameraIntent(): Intent? {
+        val uri = createCameraImageUri() ?: return null
+        val intent = Intent(MediaStore.ACTION_IMAGE_CAPTURE).apply {
+            putExtra(MediaStore.EXTRA_OUTPUT, uri)
+            addFlags(CAMERA_URI_GRANT_FLAGS)
+        }
+        grantCameraUriAccess(intent, uri)
+        return intent
     }
 
     private fun galleryIntent(): Intent {
@@ -159,8 +206,30 @@ class DiaryImagePickerChannel(
     }
 
     private fun completeCameraResult(data: Intent?) {
+        val cameraUri = pendingCameraImageUri
+        if (cameraUri != null) {
+            val bytes = readUriBytes(cameraUri)
+            if (bytes != null && bytes.isNotEmpty()) {
+                val filename = pendingCameraImageFile?.name
+                    ?: "diary-camera-${System.currentTimeMillis()}.jpg"
+                val contentType = activity.contentResolver.getType(cameraUri) ?: "image/jpeg"
+                deletePendingCameraImage()
+                complete(
+                    pickedPayload(
+                        source = DiaryImageSource.CAMERA,
+                        filename = filename,
+                        contentType = contentType,
+                        bytes = bytes,
+                    ),
+                )
+                return
+            }
+        }
+
+        // 일부 카메라 앱은 EXTRA_OUTPUT 대신 축소 썸네일만 돌려준다.
         val bitmap = data?.extras?.get("data") as? Bitmap
         if (bitmap == null) {
+            deletePendingCameraImage()
             complete(
                 mapOf(
                     "status" to "error",
@@ -173,6 +242,7 @@ class DiaryImagePickerChannel(
 
         val output = ByteArrayOutputStream()
         bitmap.compress(Bitmap.CompressFormat.JPEG, 88, output)
+        deletePendingCameraImage()
         complete(
             pickedPayload(
                 source = DiaryImageSource.CAMERA,
@@ -218,6 +288,54 @@ class DiaryImagePickerChannel(
                 bytes = bytes,
             ),
         )
+    }
+
+    private fun createCameraImageUri(): Uri? {
+        val directory = File(activity.cacheDir, CAMERA_CACHE_DIRECTORY)
+        if (!directory.exists() && !directory.mkdirs()) {
+            return null
+        }
+
+        val imageFile = File(directory, "diary-camera-${System.currentTimeMillis()}.jpg")
+        val authority = "${activity.packageName}.diaryimageprovider"
+        return runCatching {
+            FileProvider.getUriForFile(activity, authority, imageFile)
+        }.onSuccess { uri ->
+            pendingCameraImageUri = uri
+            pendingCameraImageFile = imageFile
+        }.getOrNull()
+    }
+
+    private fun readUriBytes(uri: Uri): ByteArray? {
+        return runCatching {
+            activity.contentResolver.openInputStream(uri)?.use { stream ->
+                stream.readBytes()
+            }
+        }.getOrNull()
+    }
+
+    private fun grantCameraUriAccess(intent: Intent, uri: Uri) {
+        activity.packageManager
+            .queryIntentActivities(intent, PackageManager.MATCH_DEFAULT_ONLY)
+            .forEach { resolveInfo ->
+                activity.grantUriPermission(
+                    resolveInfo.activityInfo.packageName,
+                    uri,
+                    CAMERA_URI_GRANT_FLAGS,
+                )
+            }
+    }
+
+    private fun deletePendingCameraImage() {
+        val uri = pendingCameraImageUri
+        if (uri != null) {
+            runCatching {
+                activity.revokeUriPermission(uri, CAMERA_URI_GRANT_FLAGS)
+            }
+        }
+        pendingCameraImageFile?.delete()
+        pendingCameraImageUri = null
+        pendingCameraImageFile = null
     }
 
     private fun pickedPayload(
@@ -301,5 +419,8 @@ class DiaryImagePickerChannel(
         private const val GALLERY_PERMISSION_REQUEST = 9202
         private const val CAMERA_PICK_REQUEST = 9203
         private const val GALLERY_PICK_REQUEST = 9204
+        private const val CAMERA_CACHE_DIRECTORY = "diary_images"
+        private val CAMERA_URI_GRANT_FLAGS =
+            Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
     }
 }
