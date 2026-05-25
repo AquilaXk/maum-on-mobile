@@ -1,0 +1,85 @@
+{
+  "version": 1,
+  "profile": "performance",
+  "budgets": {
+    "p95LatencyMs": 2500,
+    "maxErrorRate": 0.01,
+    "minSuccessRate": 0.99,
+    "cleanupRetainedRecords": 101
+  },
+  "report": {
+    "requiredFields": [
+      "runId",
+      "profile",
+      "status",
+      "summary",
+      "scenarios",
+      "cleanup",
+      "reproduce"
+    ]
+  },
+  "scenarios": [
+    {
+      "id": "auth.session",
+      "area": "auth",
+      "endpoints": [
+        "POST /api/v1/auth/signup",
+        "POST /api/v1/auth/login",
+        "GET /api/v1/auth/session"
+      ]
+    },
+    {
+      "id": "home.feed",
+      "area": "home",
+      "endpoints": [
+        "GET /api/v1/home/stats"
+      ]
+    },
+    {
+      "id": "diary.write",
+      "area": "diary",
+      "endpoints": [
+        "POST /api/v1/diaries",
+        "GET /api/v1/diaries"
+      ]
+    },
+    {
+      "id": "story.feed",
+      "area": "story",
+      "endpoints": [
+        "POST /api/v1/posts",
+        "GET /api/v1/posts"
+      ]
+    },
+    {
+      "id": "letter.flow",
+      "area": "letter",
+      "endpoints": [
+        "GET /api/v1/letters/stats",
+        "POST /api/v1/letters"
+      ]
+    },
+    {
+      "id": "report.flow",
+      "area": "report",
+      "endpoints": [
+        "POST /api/v1/reports"
+      ]
+    },
+    {
+      "id": "notification.flow",
+      "area": "notification",
+      "endpoints": [
+        "GET /api/v1/notifications"
+      ]
+    },
+    {
+      "id": "operations.actions",
+      "area": "operations",
+      "endpoints": [
+        "GET /api/v1/admin/dashboard",
+        "GET /api/v1/observability/api-metrics"
+      ]
+    }
+  ]
+}

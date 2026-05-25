@@ -1,0 +1,52 @@
+name: Mobile Performance
+
+on:
+  workflow_dispatch:
+    inputs:
+      samples:
+        description: "Scenario samples per endpoint"
+        required: false
+        default: "3"
+      p95_latency_ms:
+        description: "p95 latency budget in milliseconds"
+        required: false
+        default: "2500"
+
+permissions:
+  contents: read
+
+jobs:
+  mobile-performance:
+    name: Mobile Performance Gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          persist-credentials: false
+
+      - name: Set up Java
+        uses: actions/setup-java@be666c2fcd27ec809703dec50e508c2fdc7f6654
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: gradle
+
+      - name: Run mobile performance smoke
+        env:
+          MOBILE_PERFORMANCE_PROFILE: performance
+          MOBILE_PERFORMANCE_SAMPLES: ${{ inputs.samples }}
+          MOBILE_PERFORMANCE_P95_BUDGET_MS: ${{ inputs.p95_latency_ms }}
+          MOBILE_PERFORMANCE_ERROR_RATE_BUDGET: "0.01"
+          MOBILE_PERFORMANCE_MIN_SUCCESS_RATE: "0.99"
+          MOBILE_PERFORMANCE_REPORT_DIR: build/reports/mobile-performance
+        run: tools/ci/run-mobile-performance-smoke.sh
+
+      - name: Upload mobile performance report
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: mobile-performance-smoke
+          path: build/reports/mobile-performance/mobile-performance-smoke.json
+          if-no-files-found: error
