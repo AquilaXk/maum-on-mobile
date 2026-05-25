@@ -93,6 +93,44 @@ void main() {
     expect(find.byKey(const ValueKey('letter-content-field')), findsOneWidget);
   });
 
+  testWidgets('loads the next mailbox page from the list footer',
+      (tester) async {
+    final repository = _FakeLetterRepository(
+      statsQueue: [_stats()],
+      receivedPages: [
+        _page(
+          [_summary(id: 1, title: '첫 편지')],
+          totalPages: 2,
+          isLast: false,
+        ),
+        _page(
+          [_summary(id: 2, title: '다음 편지')],
+          currentPage: 1,
+          totalPages: 2,
+        ),
+      ],
+    );
+    final controller = LetterController(letterRepository: repository);
+
+    await tester.pumpWidget(
+      MaterialApp(home: LetterScreen(controller: controller, onBack: () {})),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('첫 편지'), findsOneWidget);
+    expect(find.text('다음 편지'), findsNothing);
+
+    await tester.ensureVisible(
+      find.byKey(const ValueKey('letter-load-more-button')),
+    );
+    await tester.tap(find.byKey(const ValueKey('letter-load-more-button')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('첫 편지'), findsOneWidget);
+    expect(find.text('다음 편지'), findsOneWidget);
+    expect(find.text('마지막 편지입니다.'), findsOneWidget);
+  });
+
   testWidgets('accepts a letter, writes a reply, and selects report target',
       (tester) async {
     LetterReportTarget? reportTarget;
@@ -179,14 +217,19 @@ void main() {
   });
 }
 
-LetterListPage _page(List<LetterSummary> items) {
+LetterListPage _page(
+  List<LetterSummary> items, {
+  int currentPage = 0,
+  int totalPages = 1,
+  bool isLast = true,
+}) {
   return LetterListPage(
     items: items,
-    totalPages: 1,
+    totalPages: totalPages,
     totalElements: items.length,
-    currentPage: 0,
-    isFirst: true,
-    isLast: true,
+    currentPage: currentPage,
+    isFirst: currentPage == 0,
+    isLast: isLast,
   );
 }
 

@@ -285,6 +285,7 @@ class _NotificationCenter extends StatelessWidget {
       onRefresh: () => onRefresh(silent: false),
       child: ListView(
         key: const ValueKey('notification-list'),
+        physics: const AlwaysScrollableScrollPhysics(),
         padding: const EdgeInsets.all(AppSpacing.lg),
         children: [
           if (state.errorMessage != null) ...[

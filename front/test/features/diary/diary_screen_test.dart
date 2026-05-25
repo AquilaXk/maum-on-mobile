@@ -124,6 +124,69 @@ void main() {
     expect(find.text('제목과 본문을 입력해 주세요.'), findsOneWidget);
   });
 
+  testWidgets('loads the next public diary page from the list footer',
+      (tester) async {
+    final controller = DiaryController(
+      diaryRepository: _FakeDiaryRepository(
+        pages: [_page([])],
+        publicPages: [
+          _page(
+            [
+              _entry(
+                id: 1,
+                title: '처음 공개 기록',
+                createDate: '2026-05-20T08:00:00',
+                isPrivate: false,
+              ),
+            ],
+            totalPages: 2,
+            last: false,
+          ),
+          _page(
+            [
+              _entry(
+                id: 2,
+                title: '다음 공개 기록',
+                createDate: '2026-05-21T08:00:00',
+                isPrivate: false,
+              ),
+            ],
+            page: 1,
+            totalPages: 2,
+          ),
+        ],
+      ),
+      imageRepository: _FakeDiaryImageRepository(),
+      now: DateTime(2026, 5, 20),
+    );
+    await controller.load();
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: DiaryScreen(
+          controller: controller,
+          imagePicker: const _FakeDiaryImagePicker(),
+          onBack: () {},
+        ),
+      ),
+    );
+
+    expect(find.text('처음 공개 기록'), findsOneWidget);
+    expect(find.text('다음 공개 기록'), findsNothing);
+
+    await tester.ensureVisible(
+      find.byKey(const ValueKey('diary-public-load-more-button')),
+    );
+    await tester.tap(
+      find.byKey(const ValueKey('diary-public-load-more-button')),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('처음 공개 기록'), findsOneWidget);
+    expect(find.text('다음 공개 기록'), findsOneWidget);
+    expect(find.text('마지막 공개 기록입니다.'), findsOneWidget);
+  });
+
   testWidgets('cancels editing and clears the form', (tester) async {
     final entry = _entry(
       id: 1,
@@ -228,14 +291,19 @@ class _FakeDiaryImageRepository implements DiaryImageRepository {
   Future<void> deleteImage(String imageUrl) async {}
 }
 
-PageResponse<DiaryEntry> _page(List<DiaryEntry> items) {
+PageResponse<DiaryEntry> _page(
+  List<DiaryEntry> items, {
+  int page = 0,
+  int totalPages = 1,
+  bool last = true,
+}) {
   return PageResponse(
     items: items,
-    page: 0,
+    page: page,
     size: 100,
     totalElements: items.length,
-    totalPages: 1,
-    last: true,
+    totalPages: totalPages,
+    last: last,
   );
 }
 

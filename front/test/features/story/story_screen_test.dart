@@ -92,6 +92,77 @@ void main() {
     expect(find.text('질문 본문'), findsOneWidget);
   });
 
+  testWidgets('loads the next story page from the list footer',
+      (tester) async {
+    final repository = _FakeStoryRepository(
+      storyPages: [
+        _storyPage(
+          [_summary(id: 1, title: '첫 번째 이야기')],
+          totalPages: 2,
+          last: false,
+        ),
+        _storyPage(
+          [_summary(id: 2, title: '두 번째 이야기')],
+          page: 1,
+          totalPages: 2,
+        ),
+      ],
+    );
+    final controller = StoryController(
+      storyRepository: repository,
+      currentMemberId: 7,
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: StoryScreen(controller: controller, onBack: () {}),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('첫 번째 이야기'), findsOneWidget);
+    expect(find.text('두 번째 이야기'), findsNothing);
+
+    await tester.ensureVisible(
+      find.byKey(const ValueKey('story-load-more-button')),
+    );
+    await tester.tap(find.byKey(const ValueKey('story-load-more-button')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('첫 번째 이야기'), findsOneWidget);
+    expect(find.text('두 번째 이야기'), findsOneWidget);
+    expect(find.text('마지막 스토리입니다.'), findsOneWidget);
+  });
+
+  testWidgets('pull refresh reloads the visible story list', (tester) async {
+    final repository = _FakeStoryRepository(
+      storyPages: [
+        _storyPage([_summary(id: 1, title: '오래된 이야기')]),
+        _storyPage([_summary(id: 2, title: '새 이야기')]),
+      ],
+    );
+    final controller = StoryController(
+      storyRepository: repository,
+      currentMemberId: 7,
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: StoryScreen(controller: controller, onBack: () {}),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final indicator = tester.state<RefreshIndicatorState>(
+      find.byType(RefreshIndicator),
+    );
+    await indicator.show();
+    await tester.pumpAndSettle();
+
+    expect(find.text('오래된 이야기'), findsNothing);
+    expect(find.text('새 이야기'), findsOneWidget);
+  });
+
   testWidgets('shows author-only story and comment actions', (tester) async {
     StoryReportTarget? reportTarget;
     final comment = _comment(id: 40, content: '내 댓글', authorId: 7);
@@ -173,14 +244,19 @@ void main() {
   });
 }
 
-PageResponse<StorySummary> _storyPage(List<StorySummary> items) {
+PageResponse<StorySummary> _storyPage(
+  List<StorySummary> items, {
+  int page = 0,
+  int totalPages = 1,
+  bool last = true,
+}) {
   return PageResponse(
     items: items,
-    page: 0,
+    page: page,
     size: 20,
     totalElements: items.length,
-    totalPages: 1,
-    last: true,
+    totalPages: totalPages,
+    last: last,
   );
 }
 

@@ -24,6 +24,11 @@ class LetterState {
     this.content = '',
     this.replyContent = '',
     this.isLoading = false,
+    this.isLoadingMore = false,
+    this.receivedPage = 0,
+    this.receivedLastPage = true,
+    this.sentPage = 0,
+    this.sentLastPage = true,
     this.isSubmitting = false,
     this.hasLoaded = false,
     this.errorMessage,
@@ -41,6 +46,11 @@ class LetterState {
   final String content;
   final String replyContent;
   final bool isLoading;
+  final bool isLoadingMore;
+  final int receivedPage;
+  final bool receivedLastPage;
+  final int sentPage;
+  final bool sentLastPage;
   final bool isSubmitting;
   final bool hasLoaded;
   final String? errorMessage;
@@ -78,6 +88,25 @@ class LetterState {
   bool get isEmpty =>
       hasLoaded && visibleLetters.isEmpty && !isLoading && errorMessage == null;
 
+  int get visiblePage {
+    return activeTab == LetterMailboxTab.received ? receivedPage : sentPage;
+  }
+
+  bool get isVisibleLastPage {
+    return activeTab == LetterMailboxTab.received
+        ? receivedLastPage
+        : sentLastPage;
+  }
+
+  bool get canLoadMoreLetters {
+    return hasLoaded &&
+        visibleLetters.isNotEmpty &&
+        !isLoading &&
+        !isLoadingMore &&
+        !isVisibleLastPage &&
+        errorMessage == null;
+  }
+
   LetterState copyWith({
     LetterViewMode? mode,
     LetterMailboxTab? activeTab,
@@ -91,6 +120,11 @@ class LetterState {
     String? content,
     String? replyContent,
     bool? isLoading,
+    bool? isLoadingMore,
+    int? receivedPage,
+    bool? receivedLastPage,
+    int? sentPage,
+    bool? sentLastPage,
     bool? isSubmitting,
     bool? hasLoaded,
     String? errorMessage,
@@ -112,6 +146,11 @@ class LetterState {
       content: content ?? this.content,
       replyContent: replyContent ?? this.replyContent,
       isLoading: isLoading ?? this.isLoading,
+      isLoadingMore: isLoadingMore ?? this.isLoadingMore,
+      receivedPage: receivedPage ?? this.receivedPage,
+      receivedLastPage: receivedLastPage ?? this.receivedLastPage,
+      sentPage: sentPage ?? this.sentPage,
+      sentLastPage: sentLastPage ?? this.sentLastPage,
       isSubmitting: isSubmitting ?? this.isSubmitting,
       hasLoaded: hasLoaded ?? this.hasLoaded,
       errorMessage:
@@ -154,6 +193,7 @@ class LetterController extends ChangeNotifier {
     _setState(
       _state.copyWith(
         isLoading: true,
+        isLoadingMore: false,
         clearErrorMessage: true,
         clearNoticeMessage: true,
       ),
@@ -161,12 +201,12 @@ class LetterController extends ChangeNotifier {
 
     try {
       final stats = await _letterRepository.fetchStats();
-      final page = await _fetchPage(tab);
+      final page = await _fetchPage(tab, page: 0);
       if (requestId != _loadRequestId) {
         return;
       }
 
-      _setMailboxPage(tab, page, stats);
+      _setMailboxPage(tab, page, stats: stats);
     } on Object catch (error) {
       if (requestId != _loadRequestId) {
         return;
@@ -188,6 +228,40 @@ class LetterController extends ChangeNotifier {
       ),
     );
     await load();
+  }
+
+  Future<void> loadMore() async {
+    if (!_state.canLoadMoreLetters) {
+      return;
+    }
+
+    final requestId = ++_loadRequestId;
+    final tab = _state.activeTab;
+    final nextPage = _state.visiblePage + 1;
+
+    _setState(
+      _state.copyWith(
+        isLoadingMore: true,
+        clearErrorMessage: true,
+        clearNoticeMessage: true,
+      ),
+    );
+
+    try {
+      final page = await _fetchPage(tab, page: nextPage);
+      if (requestId != _loadRequestId || tab != _state.activeTab) {
+        return;
+      }
+
+      _setMailboxPage(tab, page, append: true);
+    } on Object catch (error) {
+      if (requestId != _loadRequestId) {
+        return;
+      }
+
+      _handleError(error);
+      _setState(_state.copyWith(isLoadingMore: false, hasLoaded: true));
+    }
   }
 
   void startCompose() {
@@ -457,23 +531,41 @@ class LetterController extends ChangeNotifier {
     );
   }
 
-  Future<LetterListPage> _fetchPage(LetterMailboxTab tab) {
+  Future<LetterListPage> _fetchPage(LetterMailboxTab tab, {required int page}) {
     return tab == LetterMailboxTab.received
-        ? _letterRepository.fetchReceivedLetters()
-        : _letterRepository.fetchSentLetters();
+        ? _letterRepository.fetchReceivedLetters(page: page)
+        : _letterRepository.fetchSentLetters(page: page);
   }
 
   void _setMailboxPage(
     LetterMailboxTab tab,
-    LetterListPage page,
-    LetterStats stats,
-  ) {
+    LetterListPage page, {
+    LetterStats? stats,
+    bool append = false,
+  }) {
+    final nextReceivedLetters = tab == LetterMailboxTab.received
+        ? append
+            ? _mergeLetterPages(_state.receivedLetters, page.items)
+            : page.items
+        : null;
+    final nextSentLetters = tab == LetterMailboxTab.sent
+        ? append
+            ? _mergeLetterPages(_state.sentLetters, page.items)
+            : page.items
+        : null;
+
     _setState(
       _state.copyWith(
-        receivedLetters: tab == LetterMailboxTab.received ? page.items : null,
-        sentLetters: tab == LetterMailboxTab.sent ? page.items : null,
+        receivedLetters: nextReceivedLetters,
+        sentLetters: nextSentLetters,
+        receivedPage:
+            tab == LetterMailboxTab.received ? page.currentPage : null,
+        receivedLastPage: tab == LetterMailboxTab.received ? page.isLast : null,
+        sentPage: tab == LetterMailboxTab.sent ? page.currentPage : null,
+        sentLastPage: tab == LetterMailboxTab.sent ? page.isLast : null,
         stats: stats,
         isLoading: false,
+        isLoadingMore: false,
         hasLoaded: true,
         clearErrorMessage: true,
       ),
@@ -493,8 +585,8 @@ class LetterController extends ChangeNotifier {
 
   Future<void> _refreshMailboxSilently() async {
     final stats = await _letterRepository.fetchStats();
-    final page = await _fetchPage(_state.activeTab);
-    _setMailboxPage(_state.activeTab, page, stats);
+    final page = await _fetchPage(_state.activeTab, page: 0);
+    _setMailboxPage(_state.activeTab, page, stats: stats);
   }
 
   Future<bool> _ensureModerationAllowed(String text) async {
@@ -553,6 +645,18 @@ class LetterController extends ChangeNotifier {
 
     _state = nextState;
     notifyListeners();
+  }
+
+  List<LetterSummary> _mergeLetterPages(
+    List<LetterSummary> current,
+    List<LetterSummary> next,
+  ) {
+    final seenIds = current.map((letter) => letter.id).toSet();
+    return [
+      ...current,
+      for (final letter in next)
+        if (seenIds.add(letter.id)) letter,
+    ];
   }
 
   @override

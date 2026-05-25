@@ -29,6 +29,9 @@ class StoryState {
     this.editingCommentContent = '',
     this.isListLoading = false,
     this.isDetailLoading = false,
+    this.isLoadingMore = false,
+    this.storyPage = 0,
+    this.isLastStoryPage = true,
     this.isSubmitting = false,
     this.hasLoaded = false,
     this.errorMessage,
@@ -51,6 +54,9 @@ class StoryState {
   final String editingCommentContent;
   final bool isListLoading;
   final bool isDetailLoading;
+  final bool isLoadingMore;
+  final int storyPage;
+  final bool isLastStoryPage;
   final bool isSubmitting;
   final bool hasLoaded;
   final String? errorMessage;
@@ -76,6 +82,15 @@ class StoryState {
   bool get isEmpty =>
       hasLoaded && stories.isEmpty && errorMessage == null && !isListLoading;
 
+  bool get canLoadMoreStories {
+    return hasLoaded &&
+        stories.isNotEmpty &&
+        !isListLoading &&
+        !isLoadingMore &&
+        !isLastStoryPage &&
+        errorMessage == null;
+  }
+
   StoryState copyWith({
     StoryViewMode? mode,
     List<StorySummary>? stories,
@@ -95,6 +110,9 @@ class StoryState {
     String? editingCommentContent,
     bool? isListLoading,
     bool? isDetailLoading,
+    bool? isLoadingMore,
+    int? storyPage,
+    bool? isLastStoryPage,
     bool? isSubmitting,
     bool? hasLoaded,
     String? errorMessage,
@@ -125,6 +143,9 @@ class StoryState {
           editingCommentContent ?? this.editingCommentContent,
       isListLoading: isListLoading ?? this.isListLoading,
       isDetailLoading: isDetailLoading ?? this.isDetailLoading,
+      isLoadingMore: isLoadingMore ?? this.isLoadingMore,
+      storyPage: storyPage ?? this.storyPage,
+      isLastStoryPage: isLastStoryPage ?? this.isLastStoryPage,
       isSubmitting: isSubmitting ?? this.isSubmitting,
       hasLoaded: hasLoaded ?? this.hasLoaded,
       errorMessage:
@@ -164,30 +185,58 @@ class StoryController extends ChangeNotifier {
   int get currentMemberId => _currentMemberId;
 
   Future<void> loadStories() async {
+    await _loadStoriesPage(pageIndex: 0, append: false);
+  }
+
+  Future<void> loadMoreStories() async {
+    if (!_state.canLoadMoreStories) {
+      return;
+    }
+
+    await _loadStoriesPage(pageIndex: _state.storyPage + 1, append: true);
+  }
+
+  Future<void> _loadStoriesPage({
+    required int pageIndex,
+    required bool append,
+  }) async {
     _setState(
       _state.copyWith(
-        isListLoading: true,
+        isListLoading: append ? false : true,
+        isLoadingMore: append,
         clearErrorMessage: true,
         clearNoticeMessage: true,
       ),
     );
 
     try {
-      final page = await _storyRepository.fetchStories(
+      final response = await _storyRepository.fetchStories(
         title: _state.searchQuery,
         category: _state.selectedCategory,
+        page: pageIndex,
       );
       _setState(
         _state.copyWith(
-          stories: page.items,
+          stories: append
+              ? _mergeStoryPages(_state.stories, response.items)
+              : response.items,
+          storyPage: response.page,
+          isLastStoryPage: response.last,
           isListLoading: false,
+          isLoadingMore: false,
           hasLoaded: true,
           clearErrorMessage: true,
         ),
       );
     } on Object catch (error) {
       _handleError(error);
-      _setState(_state.copyWith(isListLoading: false, hasLoaded: true));
+      _setState(
+        _state.copyWith(
+          isListLoading: false,
+          isLoadingMore: false,
+          hasLoaded: true,
+        ),
+      );
     }
   }
 
@@ -667,6 +716,18 @@ class StoryController extends ChangeNotifier {
 
     _state = nextState;
     notifyListeners();
+  }
+
+  List<StorySummary> _mergeStoryPages(
+    List<StorySummary> current,
+    List<StorySummary> next,
+  ) {
+    final seenIds = current.map((story) => story.id).toSet();
+    return [
+      ...current,
+      for (final story in next)
+        if (seenIds.add(story.id)) story,
+    ];
   }
 
   @override
