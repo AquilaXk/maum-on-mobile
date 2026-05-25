@@ -4,6 +4,8 @@ import '../domain/operations_models.dart';
 abstract interface class OperationsRepository {
   Future<OperationsDashboard> fetchDashboard();
 
+  Future<MobileApiMetricsSnapshot> fetchApiMetrics();
+
   Future<AdminMemberPage> fetchMembers({
     String? query,
     String? status,
@@ -71,6 +73,14 @@ class ApiOperationsRepository implements OperationsRepository {
     return _apiClient.get<OperationsDashboard>(
       '/api/v1/admin/dashboard',
       parser: OperationsDashboard.fromJson,
+    );
+  }
+
+  @override
+  Future<MobileApiMetricsSnapshot> fetchApiMetrics() {
+    return _apiClient.get<MobileApiMetricsSnapshot>(
+      '/api/v1/observability/api-metrics',
+      parser: MobileApiMetricsSnapshot.fromJson,
     );
   }
 

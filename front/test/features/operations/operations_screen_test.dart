@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:maum_on_mobile_front/core/network/api_error.dart';
 import 'package:maum_on_mobile_front/features/operations/application/operations_controller.dart';
 import 'package:maum_on_mobile_front/features/operations/data/operations_repository.dart';
 import 'package:maum_on_mobile_front/features/operations/domain/operations_models.dart';
@@ -177,6 +178,107 @@ void main() {
 
     expect(operationsRepository.statusActions.single.status, 'BLOCKED');
     expect(find.text('회원 조치가 저장되었습니다.'), findsOneWidget);
+  });
+
+  testWidgets('shows observability metrics without narrow screen overflow',
+      (tester) async {
+    tester.view.physicalSize = const Size(320, 780);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    final operationsRepository = _FakeOperationsRepository();
+    final controller = OperationsController(
+      reportRepository: _FakeReportRepository(),
+      operationsRepository: operationsRepository,
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        builder: (context, child) {
+          return MediaQuery(
+            data: MediaQuery.of(context).copyWith(
+              textScaler: const TextScaler.linear(1.35),
+            ),
+            child: child!,
+          );
+        },
+        home: OperationsScreen(controller: controller, onBack: () {}),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(
+      find.byKey(const ValueKey('operations-view-observability')),
+    );
+    await tester.pumpAndSettle();
+
+    expect(operationsRepository.metricsFetchCount, greaterThanOrEqualTo(1));
+    expect(find.text('운영 관측'), findsOneWidget);
+    expect(find.text('API endpoint 품질'), findsOneWidget);
+    expect(find.textContaining('stats'), findsOneWidget);
+    expect(find.text('위험'), findsWidgets);
+    expect(find.text('앱 이벤트 집계'), findsOneWidget);
+    expect(find.text('쓰기 복구'), findsWidgets);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('shows empty observability state', (tester) async {
+    final controller = OperationsController(
+      reportRepository: _FakeReportRepository(),
+      operationsRepository: _FakeOperationsRepository(
+        metrics: const MobileApiMetricsSnapshot(
+          sampleCount: 0,
+          endpoints: [],
+        ),
+      ),
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: OperationsScreen(controller: controller, onBack: () {}),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(
+      find.byKey(const ValueKey('operations-view-observability')),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('수집된 관측 지표가 없습니다.'), findsOneWidget);
+    expect(find.text('새로고침'), findsWidgets);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('shows observability permission errors separately',
+      (tester) async {
+    final controller = OperationsController(
+      reportRepository: _FakeReportRepository(),
+      operationsRepository: _FakeOperationsRepository(
+        metricsError: const ApiClientException(
+          kind: ApiErrorKind.forbidden,
+          message: '운영 관측 권한이 없습니다.',
+          statusCode: 403,
+        ),
+      ),
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: OperationsScreen(controller: controller, onBack: () {}),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(
+      find.byKey(const ValueKey('operations-view-observability')),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('관측 지표 권한이 없습니다.'), findsOneWidget);
+    expect(find.text('운영 관측 권한이 없습니다.'), findsOneWidget);
+    expect(find.text('운영 대시보드 정보가 없습니다.'), findsNothing);
   });
 
   testWidgets('shows letter review and confirms reassign and block actions',
@@ -405,13 +507,21 @@ class _FakeReportRepository implements ReportRepository {
 }
 
 class _FakeOperationsRepository implements OperationsRepository {
+  _FakeOperationsRepository({
+    MobileApiMetricsSnapshot? metrics,
+    this.metricsError,
+  }) : metrics = metrics ?? _metrics();
+
   final List<String?> memberQueries = [];
   final List<String?> letterQueries = [];
   final List<_StatusAction> statusActions = [];
   final List<_LetterNoteAction> letterNotes = [];
   final List<_LetterReassignAction> reassignActions = [];
   final List<int> blockedLetterIds = [];
+  final MobileApiMetricsSnapshot metrics;
+  final Object? metricsError;
   int currentReceiverId = 7;
+  int metricsFetchCount = 0;
 
   @override
   Future<OperationsDashboard> fetchDashboard() async {
@@ -423,6 +533,16 @@ class _FakeOperationsRepository implements OperationsRepository {
       todayDiaryCount: 4,
       receivableMemberCount: 5,
     );
+  }
+
+  @override
+  Future<MobileApiMetricsSnapshot> fetchApiMetrics() async {
+    metricsFetchCount += 1;
+    final error = metricsError;
+    if (error != null) {
+      throw error;
+    }
+    return metrics;
   }
 
   @override
@@ -709,6 +829,54 @@ class _FakeOperationsRepository implements OperationsRepository {
       createdAt: '2026-05-25T09:30:00',
     );
   }
+}
+
+MobileApiMetricsSnapshot _metrics() {
+  return const MobileApiMetricsSnapshot(
+    sampleCount: 5,
+    endpoints: [
+      MobileApiEndpointMetrics(
+        endpoint: 'GET /api/v1/home/stats',
+        requestCount: 3,
+        successRate: 0.66,
+        p95LatencyMs: 1320,
+        errorCodes: {'500': 1},
+      ),
+      MobileApiEndpointMetrics(
+        endpoint: 'POST /api/v1/telemetry/events',
+        requestCount: 2,
+        successRate: 1,
+        p95LatencyMs: 210,
+        errorCodes: {},
+      ),
+    ],
+    writeRecovery: MobileWriteRecoveryMetrics(
+      duplicatePreventions: {'diary': 1},
+      imageLifecycle: {'compressed': 2},
+    ),
+    notifications: MobileNotificationMetrics(
+      pushDelivery: {'ANDROID.delivered': 3},
+    ),
+    ai: MobileAiMetrics(
+      model: {'consultation.success': 2},
+      contentModeration: {'POST.HIGH.blocked': 1},
+      consultationSafety: {'SELF_HARM.ESCALATE': 1},
+    ),
+    client: MobileClientTelemetryMetrics(
+      events: {
+        'APP_START': 1,
+        'SCREEN_VIEW': 3,
+        'API_ERROR': 1,
+        'WRITE_RECOVERY': 2,
+      },
+      routes: {'/home': 3, '/letter': 2},
+      platforms: {'ANDROID': 3, 'IOS': 2},
+      appVersions: {'1.0.0': 5},
+      networkStatus: {'WIFI': 4, 'CELLULAR': 1},
+      p95DurationMs: {'APP_START': 420, 'SCREEN_VIEW': 180},
+      dropped: {'sampled_out': 1},
+    ),
+  );
 }
 
 class _StatusAction {

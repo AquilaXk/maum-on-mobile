@@ -30,6 +30,252 @@ class OperationsDashboard {
   final int receivableMemberCount;
 }
 
+class MobileApiMetricsSnapshot {
+  const MobileApiMetricsSnapshot({
+    required this.sampleCount,
+    required this.endpoints,
+    this.writeRecovery = const MobileWriteRecoveryMetrics(),
+    this.notifications = const MobileNotificationMetrics(),
+    this.ai = const MobileAiMetrics(),
+    this.client = const MobileClientTelemetryMetrics(),
+  });
+
+  factory MobileApiMetricsSnapshot.fromJson(Object? json) {
+    final map = _map(json, 'mobile api metrics');
+    return MobileApiMetricsSnapshot(
+      sampleCount: _int(map['sampleCount']),
+      endpoints: _list(map['endpoints'])
+          .map(MobileApiEndpointMetrics.fromJson)
+          .toList(growable: false),
+      writeRecovery: MobileWriteRecoveryMetrics.fromJson(
+        map['writeRecovery'],
+      ),
+      notifications: MobileNotificationMetrics.fromJson(map['notifications']),
+      ai: MobileAiMetrics.fromJson(map['ai']),
+      client: MobileClientTelemetryMetrics.fromJson(map['client']),
+    );
+  }
+
+  final int sampleCount;
+  final List<MobileApiEndpointMetrics> endpoints;
+  final MobileWriteRecoveryMetrics writeRecovery;
+  final MobileNotificationMetrics notifications;
+  final MobileAiMetrics ai;
+  final MobileClientTelemetryMetrics client;
+
+  bool get hasData {
+    return sampleCount > 0 ||
+        endpoints.isNotEmpty ||
+        writeRecovery.hasData ||
+        notifications.hasData ||
+        ai.hasData ||
+        client.hasData;
+  }
+
+  int get maxP95LatencyMs {
+    var maxLatencyMs = 0;
+    for (final endpoint in endpoints) {
+      if (endpoint.p95LatencyMs > maxLatencyMs) {
+        maxLatencyMs = endpoint.p95LatencyMs;
+      }
+    }
+    return maxLatencyMs;
+  }
+
+  double get maxErrorRate {
+    var maxRate = 0.0;
+    for (final endpoint in endpoints) {
+      if (endpoint.errorRate > maxRate) {
+        maxRate = endpoint.errorRate;
+      }
+    }
+    return maxRate;
+  }
+
+  int get appStartCount => client.eventCount('APP_START');
+
+  int get screenViewCount => client.eventCount('SCREEN_VIEW');
+
+  int get apiErrorCount => client.eventCount('API_ERROR');
+
+  int get writeRecoveryEventCount => client.eventCount('WRITE_RECOVERY');
+}
+
+class MobileApiEndpointMetrics {
+  const MobileApiEndpointMetrics({
+    required this.endpoint,
+    required this.requestCount,
+    required this.successRate,
+    required this.p95LatencyMs,
+    required this.errorCodes,
+  });
+
+  factory MobileApiEndpointMetrics.fromJson(Object? json) {
+    final map = _map(json, 'mobile api endpoint metrics');
+    return MobileApiEndpointMetrics(
+      endpoint: map['endpoint']?.toString() ?? '',
+      requestCount: _int(map['requestCount']),
+      successRate: _double(map['successRate']),
+      p95LatencyMs: _int(map['p95LatencyMs']),
+      errorCodes: _countMap(map['errorCodes']),
+    );
+  }
+
+  final String endpoint;
+  final int requestCount;
+  final double successRate;
+  final int p95LatencyMs;
+  final Map<String, int> errorCodes;
+
+  double get errorRate {
+    final rate = 1 - successRate;
+    if (rate < 0) {
+      return 0;
+    }
+    if (rate > 1) {
+      return 1;
+    }
+    return rate;
+  }
+}
+
+class MobileWriteRecoveryMetrics {
+  const MobileWriteRecoveryMetrics({
+    this.duplicatePreventions = const {},
+    this.imageLifecycle = const {},
+  });
+
+  factory MobileWriteRecoveryMetrics.fromJson(Object? json) {
+    if (json == null) {
+      return const MobileWriteRecoveryMetrics();
+    }
+    final map = _map(json, 'mobile write recovery metrics');
+    return MobileWriteRecoveryMetrics(
+      duplicatePreventions: _countMap(map['duplicatePreventions']),
+      imageLifecycle: _countMap(map['imageLifecycle']),
+    );
+  }
+
+  final Map<String, int> duplicatePreventions;
+  final Map<String, int> imageLifecycle;
+
+  bool get hasData {
+    return duplicatePreventions.isNotEmpty || imageLifecycle.isNotEmpty;
+  }
+
+  int get totalCount {
+    return _sumCounts(duplicatePreventions) + _sumCounts(imageLifecycle);
+  }
+}
+
+class MobileNotificationMetrics {
+  const MobileNotificationMetrics({this.pushDelivery = const {}});
+
+  factory MobileNotificationMetrics.fromJson(Object? json) {
+    if (json == null) {
+      return const MobileNotificationMetrics();
+    }
+    final map = _map(json, 'mobile notification metrics');
+    return MobileNotificationMetrics(
+      pushDelivery: _countMap(map['pushDelivery']),
+    );
+  }
+
+  final Map<String, int> pushDelivery;
+
+  bool get hasData => pushDelivery.isNotEmpty;
+
+  int get totalCount => _sumCounts(pushDelivery);
+}
+
+class MobileAiMetrics {
+  const MobileAiMetrics({
+    this.model = const {},
+    this.contentModeration = const {},
+    this.consultationSafety = const {},
+  });
+
+  factory MobileAiMetrics.fromJson(Object? json) {
+    if (json == null) {
+      return const MobileAiMetrics();
+    }
+    final map = _map(json, 'mobile ai metrics');
+    return MobileAiMetrics(
+      model: _countMap(map['model']),
+      contentModeration: _countMap(map['contentModeration']),
+      consultationSafety: _countMap(map['consultationSafety']),
+    );
+  }
+
+  final Map<String, int> model;
+  final Map<String, int> contentModeration;
+  final Map<String, int> consultationSafety;
+
+  bool get hasData {
+    return model.isNotEmpty ||
+        contentModeration.isNotEmpty ||
+        consultationSafety.isNotEmpty;
+  }
+
+  int get totalCount {
+    return _sumCounts(model) +
+        _sumCounts(contentModeration) +
+        _sumCounts(consultationSafety);
+  }
+}
+
+class MobileClientTelemetryMetrics {
+  const MobileClientTelemetryMetrics({
+    this.events = const {},
+    this.routes = const {},
+    this.platforms = const {},
+    this.appVersions = const {},
+    this.networkStatus = const {},
+    this.p95DurationMs = const {},
+    this.dropped = const {},
+  });
+
+  factory MobileClientTelemetryMetrics.fromJson(Object? json) {
+    if (json == null) {
+      return const MobileClientTelemetryMetrics();
+    }
+    final map = _map(json, 'mobile client telemetry metrics');
+    return MobileClientTelemetryMetrics(
+      events: _countMap(map['events']),
+      routes: _countMap(map['routes']),
+      platforms: _countMap(map['platforms']),
+      appVersions: _countMap(map['appVersions']),
+      networkStatus: _countMap(map['networkStatus']),
+      p95DurationMs: _countMap(map['p95DurationMs']),
+      dropped: _countMap(map['dropped']),
+    );
+  }
+
+  final Map<String, int> events;
+  final Map<String, int> routes;
+  final Map<String, int> platforms;
+  final Map<String, int> appVersions;
+  final Map<String, int> networkStatus;
+  final Map<String, int> p95DurationMs;
+  final Map<String, int> dropped;
+
+  bool get hasData {
+    return events.isNotEmpty ||
+        routes.isNotEmpty ||
+        platforms.isNotEmpty ||
+        appVersions.isNotEmpty ||
+        networkStatus.isNotEmpty ||
+        p95DurationMs.isNotEmpty ||
+        dropped.isNotEmpty;
+  }
+
+  int eventCount(String eventType) {
+    return events[eventType] ?? 0;
+  }
+
+  int get totalEventCount => _sumCounts(events);
+}
+
 class AdminMemberPage {
   const AdminMemberPage({
     required this.content,
@@ -434,4 +680,33 @@ int _int(Object? value) {
     return value.toInt();
   }
   return int.tryParse(value?.toString() ?? '') ?? 0;
+}
+
+double _double(Object? value) {
+  if (value is double) {
+    return value;
+  }
+  if (value is num) {
+    return value.toDouble();
+  }
+  return double.tryParse(value?.toString() ?? '') ?? 0;
+}
+
+Map<String, int> _countMap(Object? json) {
+  if (json == null) {
+    return const {};
+  }
+  if (json is! Map) {
+    throw const FormatException('Expected count map.');
+  }
+
+  final entries = json.entries
+      .map((entry) => MapEntry(entry.key.toString(), _int(entry.value)))
+      .toList()
+    ..sort((left, right) => left.key.compareTo(right.key));
+  return Map.unmodifiable(Map.fromEntries(entries));
+}
+
+int _sumCounts(Map<String, int> values) {
+  return values.values.fold(0, (total, value) => total + value);
 }
