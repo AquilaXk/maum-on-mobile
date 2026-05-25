@@ -49,6 +49,8 @@ class SecurityConfig(
                         "/api/v1/auth/oidc/**",
                     )
                     .permitAll()
+                    .requestMatchers("/api/v1/observability/**")
+                    .hasRole("ADMIN")
                     .requestMatchers("/api/v1/admin/**")
                     .hasRole("ADMIN")
                     .anyRequest()
