@@ -14,6 +14,7 @@ class ConsultationState {
     this.isSending = false,
     this.isStreaming = false,
     this.errorMessage,
+    this.safetyNotice,
   });
 
   final List<ConsultationMessage> messages;
@@ -22,6 +23,7 @@ class ConsultationState {
   final bool isSending;
   final bool isStreaming;
   final String? errorMessage;
+  final ConsultationSafetyResult? safetyNotice;
 
   bool get canSubmit {
     return connectionState == ConsultationConnectionState.connected &&
@@ -39,6 +41,8 @@ class ConsultationState {
     bool? isStreaming,
     String? errorMessage,
     bool clearErrorMessage = false,
+    ConsultationSafetyResult? safetyNotice,
+    bool clearSafetyNotice = false,
   }) {
     return ConsultationState(
       messages: messages ?? this.messages,
@@ -48,6 +52,8 @@ class ConsultationState {
       isStreaming: isStreaming ?? this.isStreaming,
       errorMessage:
           clearErrorMessage ? null : errorMessage ?? this.errorMessage,
+      safetyNotice:
+          clearSafetyNotice ? null : safetyNotice ?? this.safetyNotice,
     );
   }
 }
@@ -147,7 +153,13 @@ class ConsultationController extends ChangeNotifier {
   }
 
   void updateDraft(String draft) {
-    _setState(_state.copyWith(draft: draft, clearErrorMessage: true));
+    _setState(
+      _state.copyWith(
+        draft: draft,
+        clearErrorMessage: true,
+        clearSafetyNotice: true,
+      ),
+    );
   }
 
   Future<void> submitMessage() async {
@@ -186,8 +198,23 @@ class ConsultationController extends ChangeNotifier {
     );
 
     try {
-      await _repository.sendMessage(content);
-      _setState(_state.copyWith(isSending: false));
+      final result = await _repository.sendMessage(content);
+      final safety = result.safety;
+      if (safety != null && safety.blocksConversation) {
+        _replaceActiveAssistantWithSystem(safety.message);
+        _activeAssistantMessageId = null;
+        _setState(
+          _state.copyWith(
+            isSending: false,
+            isStreaming: false,
+            safetyNotice: safety,
+            clearErrorMessage: true,
+          ),
+        );
+        return;
+      }
+
+      _setState(_state.copyWith(isSending: false, clearSafetyNotice: true));
     } on Object catch (error) {
       _replaceActiveAssistantWithSystem('전송 실패: ${_messageFromError(error)}');
       _activeAssistantMessageId = null;
@@ -195,6 +222,26 @@ class ConsultationController extends ChangeNotifier {
         _state.copyWith(
           isSending: false,
           isStreaming: false,
+          errorMessage: _messageFromError(error),
+        ),
+      );
+    }
+  }
+
+  Future<void> deleteSensitiveMessages() async {
+    try {
+      await _repository.deleteSensitiveMessages();
+      final messages = await _repository.loadRecentMessages();
+      _setState(
+        _state.copyWith(
+          messages: messages.isEmpty ? _initialMessages() : messages,
+          clearErrorMessage: true,
+          clearSafetyNotice: true,
+        ),
+      );
+    } on Object catch (error) {
+      _setState(
+        _state.copyWith(
           errorMessage: _messageFromError(error),
         ),
       );
@@ -310,6 +357,7 @@ class ConsultationController extends ChangeNotifier {
           ..._state.messages,
           _createMessage(ConsultationMessageRole.system, content),
         ],
+        clearSafetyNotice: true,
       ),
     );
   }
@@ -418,6 +466,17 @@ class ConsultationController extends ChangeNotifier {
       content: content,
       createdAt: DateTime.now(),
     );
+  }
+
+  List<ConsultationMessage> _initialMessages() {
+    return [
+      ConsultationMessage(
+        id: 'system-0',
+        role: ConsultationMessageRole.system,
+        content: '상담을 시작하려면 메시지를 입력해 주세요.',
+        createdAt: DateTime.fromMillisecondsSinceEpoch(0),
+      ),
+    ];
   }
 
   String _messageFromError(Object error) {

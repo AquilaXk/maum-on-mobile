@@ -5,6 +5,8 @@ import com.maumonmobile.application.port.out.ConsultationAiRequest
 import com.maumonmobile.application.port.out.ConsultationAiResponder
 import com.maumonmobile.application.port.out.ConsultationAiResponse
 import com.maumonmobile.application.port.out.ConsultationAiUnavailableException
+import com.maumonmobile.application.port.out.ConsultationSafetyAuditRepository
+import com.maumonmobile.domain.consultation.ConsultationRiskSeverity
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
@@ -16,6 +18,7 @@ import org.springframework.http.MediaType
 import org.springframework.mock.web.MockHttpServletResponse
 import org.springframework.test.context.ActiveProfiles
 import org.springframework.test.web.servlet.MockMvc
+import org.springframework.test.web.servlet.delete
 import org.springframework.test.web.servlet.get
 import org.springframework.test.web.servlet.post
 
@@ -24,6 +27,7 @@ import org.springframework.test.web.servlet.post
 @ActiveProfiles("test")
 class ConsultationControllerTest @Autowired constructor(
     private val mockMvc: MockMvc,
+    private val consultationSafetyAuditRepository: ConsultationSafetyAuditRepository,
 ) {
 
     @Test
@@ -46,7 +50,8 @@ class ConsultationControllerTest @Autowired constructor(
             .andExpect {
                 status { isOk() }
                 jsonPath("$.success") { value(true) }
-                jsonPath("$.data") { value(true) }
+                jsonPath("$.data.accepted") { value(true) }
+                jsonPath("$.data.safety.actionPolicy") { value("ALLOW") }
             }
     }
 
@@ -71,7 +76,109 @@ class ConsultationControllerTest @Autowired constructor(
                 status { isOk() }
                 jsonPath("$.data.messages[0].role") { value("USER") }
                 jsonPath("$.data.messages[0].content") { value("오늘 마음이 복잡해요.") }
+                jsonPath("$.data.messages[0].sensitive") { value(false) }
                 jsonPath("$.data.messages[1].role") { value("ASSISTANT") }
+                jsonPath("$.data.messages[1].content") { value("함께 살펴볼게요.") }
+            }
+    }
+
+    @Test
+    fun crisisInputReturnsSafetyGuidanceAndStoresSensitiveAuditTrail() {
+        val member = signupAndLogin("consultation-crisis@example.com", "위기이")
+
+        mockMvc.post("/api/v1/consultations/chat") {
+            header("Authorization", "Bearer ${member.accessToken}")
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"message":"죽고 싶고 자해할 것 같아요."}"""
+        }
+            .andExpect {
+                status { isOk() }
+                jsonPath("$.data.accepted") { value(false) }
+                jsonPath("$.data.safety.category") { value("SELF_HARM") }
+                jsonPath("$.data.safety.severity") { value("CRITICAL") }
+                jsonPath("$.data.safety.actionPolicy") { value("BLOCK_AND_ESCALATE") }
+                jsonPath("$.data.safety.message") { isNotEmpty() }
+            }
+
+        mockMvc.get("/api/v1/consultations/recent") {
+            header("Authorization", "Bearer ${member.accessToken}")
+        }
+            .andExpect {
+                status { isOk() }
+                jsonPath("$.data.messages[0].role") { value("USER") }
+                jsonPath("$.data.messages[0].sensitive") { value(true) }
+                jsonPath("$.data.messages[1].role") { value("SYSTEM") }
+                jsonPath("$.data.messages[1].sensitive") { value(true) }
+                jsonPath("$.data.messages[1].content") { value(org.hamcrest.Matchers.containsString("119")) }
+            }
+
+        assertThatCriticalAuditExists(member.memberId.toLong())
+    }
+
+    @Test
+    fun repeatedCriticalSignalsReturnRateLimitedPolicy() {
+        val member = signupAndLogin("consultation-rate@example.com", "반복이")
+
+        repeat(2) {
+            mockMvc.post("/api/v1/consultations/chat") {
+                header("Authorization", "Bearer ${member.accessToken}")
+                contentType = MediaType.APPLICATION_JSON
+                content = """{"message":"자해 생각이 계속 들어요."}"""
+            }
+                .andExpect {
+                    status { isOk() }
+                    jsonPath("$.data.safety.actionPolicy") { value("BLOCK_AND_ESCALATE") }
+                }
+        }
+
+        mockMvc.post("/api/v1/consultations/chat") {
+            header("Authorization", "Bearer ${member.accessToken}")
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"message":"자해 생각이 계속 들어요."}"""
+        }
+            .andExpect {
+                status { isOk() }
+                jsonPath("$.data.accepted") { value(false) }
+                jsonPath("$.data.safety.actionPolicy") { value("RATE_LIMITED") }
+            }
+    }
+
+    @Test
+    fun sensitiveConsultationHistoryCanBeDeletedWithoutDeletingNormalHistory() {
+        val member = signupAndLogin("consultation-sensitive-delete@example.com", "삭제이")
+
+        mockMvc.post("/api/v1/consultations/chat") {
+            header("Authorization", "Bearer ${member.accessToken}")
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"message":"오늘 마음이 복잡해요."}"""
+        }
+            .andExpect {
+                status { isOk() }
+            }
+        mockMvc.post("/api/v1/consultations/chat") {
+            header("Authorization", "Bearer ${member.accessToken}")
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"message":"죽고 싶다는 생각이 들어요."}"""
+        }
+            .andExpect {
+                status { isOk() }
+            }
+
+        mockMvc.delete("/api/v1/consultations/sensitive") {
+            header("Authorization", "Bearer ${member.accessToken}")
+        }
+            .andExpect {
+                status { isOk() }
+                jsonPath("$.data.deletedCount") { value(2) }
+            }
+
+        mockMvc.get("/api/v1/consultations/recent") {
+            header("Authorization", "Bearer ${member.accessToken}")
+        }
+            .andExpect {
+                status { isOk() }
+                jsonPath("$.data.messages.length()") { value(2) }
+                jsonPath("$.data.messages[0].content") { value("오늘 마음이 복잡해요.") }
                 jsonPath("$.data.messages[1].content") { value("함께 살펴볼게요.") }
             }
     }
@@ -127,13 +234,15 @@ class ConsultationControllerTest @Autowired constructor(
     }
 
     private fun signupAndLogin(email: String, nickname: String): TestMember {
-        mockMvc.post("/api/v1/auth/signup") {
+        val signupResult = mockMvc.post("/api/v1/auth/signup") {
             contentType = MediaType.APPLICATION_JSON
             content = """{"email":"$email","password":"pass1234","nickname":"$nickname"}"""
         }
             .andExpect {
                 status { isOk() }
             }
+            .andReturn()
+        val memberId = signupResult.response.readJsonInt("$.data.id")
 
         val loginResult = mockMvc.post("/api/v1/auth/login") {
             contentType = MediaType.APPLICATION_JSON
@@ -144,7 +253,19 @@ class ConsultationControllerTest @Autowired constructor(
             }
             .andReturn()
 
-        return TestMember(accessToken = loginResult.response.readJsonString("$.data.accessToken"))
+        return TestMember(
+            memberId = memberId,
+            accessToken = loginResult.response.readJsonString("$.data.accessToken"),
+        )
+    }
+
+    private fun assertThatCriticalAuditExists(memberId: Long) {
+        val count = consultationSafetyAuditRepository.countSince(
+            memberId = memberId,
+            severity = ConsultationRiskSeverity.CRITICAL,
+            since = "1970-01-01T00:00:00Z",
+        )
+        org.assertj.core.api.Assertions.assertThat(count).isGreaterThanOrEqualTo(1)
     }
 
     @TestConfiguration(proxyBeanMethods = false)
@@ -163,9 +284,14 @@ class ConsultationControllerTest @Autowired constructor(
 }
 
 private data class TestMember(
+    val memberId: Int,
     val accessToken: String,
 )
 
 private fun MockHttpServletResponse.readJsonString(path: String): String {
     return JsonPath.read<String>(contentAsString, path)
+}
+
+private fun MockHttpServletResponse.readJsonInt(path: String): Int {
+    return JsonPath.read<Int>(contentAsString, path)
 }

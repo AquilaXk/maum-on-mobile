@@ -102,6 +102,12 @@ class _ConsultationScreenState extends State<ConsultationScreen>
                     message: state.errorMessage!,
                     tone: AppNoticeTone.error,
                   ),
+                if (state.safetyNotice != null)
+                  _SafetyNotice(
+                    safety: state.safetyNotice!,
+                    onDeleteSensitive:
+                        widget.controller.deleteSensitiveMessages,
+                  ),
                 Expanded(
                   child: ListView.builder(
                     key: const ValueKey('consultation-message-list'),
@@ -124,6 +130,67 @@ class _ConsultationScreenState extends State<ConsultationScreen>
           ),
         );
       },
+    );
+  }
+}
+
+class _SafetyNotice extends StatelessWidget {
+  const _SafetyNotice({
+    required this.safety,
+    required this.onDeleteSensitive,
+  });
+
+  final ConsultationSafetyResult safety;
+  final Future<void> Function() onDeleteSensitive;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      key: const ValueKey('consultation-safety-notice'),
+      padding: const EdgeInsets.fromLTRB(
+        AppSpacing.md,
+        0,
+        AppSpacing.md,
+        AppSpacing.sm,
+      ),
+      child: AppSectionCard(
+        title: '즉시 도움 요청',
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(safety.message),
+            const SizedBox(height: AppSpacing.sm),
+            Wrap(
+              spacing: AppSpacing.xs,
+              runSpacing: AppSpacing.xs,
+              children: const [
+                ActionChip(
+                  avatar: Icon(Icons.local_hospital_outlined),
+                  label: Text('119'),
+                  onPressed: null,
+                ),
+                ActionChip(
+                  avatar: Icon(Icons.local_police_outlined),
+                  label: Text('112'),
+                  onPressed: null,
+                ),
+                ActionChip(
+                  avatar: Icon(Icons.support_agent_outlined),
+                  label: Text('1388'),
+                  onPressed: null,
+                ),
+              ],
+            ),
+            const SizedBox(height: AppSpacing.sm),
+            OutlinedButton.icon(
+              key: const ValueKey('consultation-delete-sensitive-button'),
+              onPressed: () => onDeleteSensitive(),
+              icon: const Icon(Icons.delete_outline),
+              label: const Text('민감 기록 삭제'),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

@@ -10,9 +10,11 @@ import '../domain/consultation_models.dart';
 abstract interface class ConsultationRepository {
   Stream<ConsultationStreamEvent> connect();
 
-  Future<void> sendMessage(String message);
+  Future<ConsultationSendResult> sendMessage(String message);
 
   Future<List<ConsultationMessage>> loadRecentMessages();
+
+  Future<int> deleteSensitiveMessages();
 }
 
 abstract interface class ConsultationStreamClient {
@@ -35,10 +37,11 @@ class ApiConsultationRepository implements ConsultationRepository {
   }
 
   @override
-  Future<void> sendMessage(String message) {
-    return _apiClient.postVoid(
+  Future<ConsultationSendResult> sendMessage(String message) {
+    return _apiClient.post<ConsultationSendResult>(
       '/api/v1/consultations/chat',
       body: {'message': message},
+      parser: ConsultationSendResult.fromJson,
     );
   }
 
@@ -57,6 +60,26 @@ class ApiConsultationRepository implements ConsultationRepository {
         return messages
             .map(ConsultationMessage.fromJson)
             .toList(growable: false);
+      },
+    );
+  }
+
+  @override
+  Future<int> deleteSensitiveMessages() {
+    return _apiClient.delete<int>(
+      '/api/v1/consultations/sensitive',
+      parser: (json) {
+        if (json is! Map) {
+          throw const FormatException('Expected sensitive delete result.');
+        }
+        final deletedCount = json['deletedCount'];
+        if (deletedCount is int) {
+          return deletedCount;
+        }
+        if (deletedCount is num) {
+          return deletedCount.toInt();
+        }
+        return int.tryParse(deletedCount?.toString() ?? '') ?? 0;
       },
     );
   }
