@@ -312,6 +312,257 @@ class AppSectionCard extends StatelessWidget {
   }
 }
 
+class AppListRow extends StatelessWidget {
+  const AppListRow({
+    required this.title,
+    this.subtitle,
+    this.statusLabel,
+    this.statusTone = AppStatusTone.neutral,
+    this.leadingIcon,
+    this.trailingIcon = Icons.chevron_right,
+    this.selected = false,
+    this.onTap,
+    this.semanticLabel,
+    this.rowKey,
+    super.key,
+  });
+
+  final String title;
+  final String? subtitle;
+  final String? statusLabel;
+  final AppStatusTone statusTone;
+  final IconData? leadingIcon;
+  final IconData? trailingIcon;
+  final bool selected;
+  final VoidCallback? onTap;
+  final String? semanticLabel;
+  final Key? rowKey;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final status = statusLabel;
+
+    return Semantics(
+      key: rowKey,
+      container: true,
+      button: onTap != null,
+      selected: selected,
+      label: semanticLabel,
+      child: ExcludeSemantics(
+        excluding: semanticLabel != null,
+        child: Card(
+          margin: EdgeInsets.zero,
+          color: selected ? colorScheme.primaryContainer : null,
+          child: InkWell(
+            borderRadius: AppRadii.card,
+            onTap: onTap,
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(minHeight: 64),
+              child: Padding(
+                padding: const EdgeInsets.all(AppSpacing.md),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    if (leadingIcon != null) ...[
+                      DecoratedBox(
+                        decoration: BoxDecoration(
+                          color: selected
+                              ? colorScheme.primary.withValues(alpha: 0.16)
+                              : colorScheme.surfaceContainerHighest,
+                          borderRadius: AppRadii.chip,
+                        ),
+                        child: Padding(
+                          padding: const EdgeInsets.all(AppSpacing.xs),
+                          child: Icon(
+                            leadingIcon,
+                            size: 22,
+                            color: selected
+                                ? colorScheme.onPrimaryContainer
+                                : colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: AppSpacing.md),
+                    ],
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Text(
+                            _softBreak(title),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: theme.textTheme.titleSmall?.copyWith(
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                          if (subtitle != null) ...[
+                            const SizedBox(height: AppSpacing.xxs),
+                            Text(
+                              _softBreak(subtitle!),
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: colorScheme.onSurfaceVariant,
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                    if (status != null) ...[
+                      const SizedBox(width: AppSpacing.xs),
+                      ConstrainedBox(
+                        constraints: const BoxConstraints(maxWidth: 112),
+                        child: AppStatusPill(
+                          label: status,
+                          tone: statusTone,
+                        ),
+                      ),
+                    ],
+                    if (trailingIcon != null) ...[
+                      const SizedBox(width: AppSpacing.xs),
+                      Icon(
+                        trailingIcon,
+                        size: 20,
+                        color: colorScheme.onSurfaceVariant,
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class AppDetailRow extends StatelessWidget {
+  const AppDetailRow({
+    required this.label,
+    required this.value,
+    this.semanticLabel,
+    this.rowKey,
+    super.key,
+  });
+
+  final String label;
+  final String value;
+  final String? semanticLabel;
+  final Key? rowKey;
+
+  @override
+  Widget build(BuildContext context) {
+    final displayValue = value.isEmpty ? '-' : value;
+
+    return Semantics(
+      key: rowKey,
+      container: true,
+      label: semanticLabel ?? '$label, $displayValue',
+      child: ExcludeSemantics(
+        child: Padding(
+          padding: const EdgeInsets.only(bottom: AppSpacing.xs),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(label, style: Theme.of(context).textTheme.labelLarge),
+              const SizedBox(height: AppSpacing.xxs),
+              Text(
+                _softBreak(displayValue),
+                softWrap: true,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class AppConfirmActionButton extends StatelessWidget {
+  const AppConfirmActionButton({
+    required this.icon,
+    required this.label,
+    required this.confirmTitle,
+    required this.confirmMessage,
+    required this.confirmButtonLabel,
+    required this.onConfirmed,
+    this.cancelButtonLabel = '취소',
+    this.enabled = true,
+    this.buttonKey,
+    this.confirmButtonKey,
+    this.cancelButtonKey,
+    this.semanticLabel,
+    super.key,
+  });
+
+  final Widget icon;
+  final String label;
+  final String confirmTitle;
+  final String confirmMessage;
+  final String confirmButtonLabel;
+  final Future<void> Function() onConfirmed;
+  final String cancelButtonLabel;
+  final bool enabled;
+  final Key? buttonKey;
+  final Key? confirmButtonKey;
+  final Key? cancelButtonKey;
+  final String? semanticLabel;
+
+  @override
+  Widget build(BuildContext context) {
+    final button = FilledButton.icon(
+      key: buttonKey,
+      onPressed: enabled ? () => _confirm(context) : null,
+      icon: icon,
+      label: Text(label),
+    );
+
+    if (semanticLabel == null) {
+      return button;
+    }
+
+    return Semantics(
+      button: true,
+      label: semanticLabel,
+      child: ExcludeSemantics(child: button),
+    );
+  }
+
+  Future<void> _confirm(BuildContext context) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: Text(confirmTitle),
+          content: Text(confirmMessage),
+          actions: [
+            TextButton(
+              key: cancelButtonKey,
+              onPressed: () => Navigator.of(context).pop(false),
+              child: Text(cancelButtonLabel),
+            ),
+            FilledButton(
+              key: confirmButtonKey,
+              onPressed: () => Navigator.of(context).pop(true),
+              child: Text(confirmButtonLabel),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirmed == true && context.mounted) {
+      await onConfirmed();
+    }
+  }
+}
+
 class AppStatusPill extends StatelessWidget {
   const AppStatusPill({
     required this.label,
@@ -349,6 +600,12 @@ class AppStatusPill extends StatelessWidget {
       ),
     );
   }
+}
+
+String _softBreak(String value) {
+  return value.replaceAllMapped(RegExp(r'([@._/\-])'), (match) {
+    return '${match.group(0) ?? ''}\u{200B}';
+  });
 }
 
 _ToneColors _noticeColors(ColorScheme colorScheme, AppNoticeTone tone) {

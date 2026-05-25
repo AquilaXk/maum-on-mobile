@@ -128,7 +128,7 @@ class _ReportQueue extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Text('신고 queue', style: Theme.of(context).textTheme.titleMedium),
+        Text('신고 대기열', style: Theme.of(context).textTheme.titleMedium),
         const SizedBox(height: AppSpacing.xs),
         for (final report in state.reports) ...[
           _ReportQueueTile(
@@ -156,19 +156,21 @@ class _ReportQueueTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      margin: EdgeInsets.zero,
-      child: ListTile(
-        key: ValueKey('operations-report-${report.id}'),
-        selected: selected,
-        onTap: onTap,
-        leading: Icon(report.isOpen ? Icons.inbox_outlined : Icons.task_alt),
-        title: Text(report.targetTitle.isEmpty ? '대상 없음' : report.targetTitle),
-        subtitle: Text(
-          '${report.targetType.label} · ${report.reporter.nickname} · ${report.status}',
-        ),
-        trailing: const Icon(Icons.chevron_right),
-      ),
+    final title = report.targetTitle.isEmpty ? '대상 없음' : report.targetTitle;
+    final statusLabel = _reportStatusLabel(report.status);
+
+    return AppListRow(
+      rowKey: ValueKey('operations-report-${report.id}'),
+      title: title,
+      subtitle:
+          '${report.targetType.label} · 신고자 ${report.reporter.nickname} · ${report.createdAt}',
+      statusLabel: statusLabel,
+      statusTone: _reportStatusTone(report.status),
+      leadingIcon: report.isOpen ? Icons.inbox_outlined : Icons.task_alt,
+      selected: selected,
+      onTap: onTap,
+      semanticLabel:
+          '신고 항목: ${report.targetType.label}, $title, 신고자 ${report.reporter.nickname}, 상태 $statusLabel',
     );
   }
 }
@@ -204,19 +206,33 @@ class _ReportDetail extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          _DetailLine(label: '상태', value: report.status),
-          _DetailLine(label: '신고자', value: _memberLabel(report.reporter)),
-          _DetailLine(
+          Wrap(
+            spacing: AppSpacing.xs,
+            runSpacing: AppSpacing.xs,
+            children: [
+              AppStatusPill(
+                label: _reportStatusLabel(report.status),
+                tone: _reportStatusTone(report.status),
+              ),
+              AppStatusPill(label: report.target.type.label),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.md),
+          AppDetailRow(
+            label: '신고자',
+            value: _memberLabel(report.reporter),
+          ),
+          AppDetailRow(
             label: '대상 회원',
             value: report.targetOwner == null
                 ? '-'
                 : _memberLabel(report.targetOwner!),
           ),
-          _DetailLine(label: '대상', value: report.target.title),
+          AppDetailRow(label: '대상', value: report.target.title),
           if (report.target.preview.isNotEmpty)
-            _DetailLine(label: '내용', value: report.target.preview),
+            AppDetailRow(label: '내용', value: report.target.preview),
           if (report.content != null)
-            _DetailLine(label: '신고 설명', value: report.content!),
+            AppDetailRow(label: '신고 설명', value: report.content!),
           const SizedBox(height: AppSpacing.md),
           KeyedSubtree(
             key: const ValueKey('operations-action-field'),
@@ -258,11 +274,19 @@ class _ReportDetail extends StatelessWidget {
             ),
           ),
           const SizedBox(height: AppSpacing.md),
-          FilledButton.icon(
-            key: const ValueKey('operations-submit-button'),
-            onPressed: state.canSubmitAction ? onSubmit : null,
+          AppConfirmActionButton(
+            buttonKey: const ValueKey('operations-submit-button'),
+            confirmButtonKey:
+                const ValueKey('operations-confirm-submit-button'),
+            enabled: state.canSubmitAction,
             icon: const Icon(Icons.gavel_outlined),
-            label: Text(state.isSubmitting ? '저장 중' : '조치 저장'),
+            label: state.isSubmitting ? '저장 중' : '조치 저장',
+            confirmTitle: '조치 저장 확인',
+            confirmMessage:
+                '${state.selectedAction.label} 조치를 저장합니다. 사유와 상태가 운영 기록에 남습니다.',
+            confirmButtonLabel: '저장',
+            semanticLabel: '운영 조치 저장',
+            onConfirmed: onSubmit,
           ),
           if (report.handledBy != null || report.actionReason != null) ...[
             const SizedBox(height: AppSpacing.md),
@@ -282,27 +306,29 @@ class _ReportDetail extends StatelessWidget {
   }
 }
 
-class _DetailLine extends StatelessWidget {
-  const _DetailLine({
-    required this.label,
-    required this.value,
-  });
+String _reportStatusLabel(String status) {
+  return switch (status) {
+    'RECEIVED' => '접수',
+    'RESOLVED' => '처리 완료',
+    'REJECTED' => '반려',
+    'HIDDEN' => '숨김',
+    'DELETED' => '삭제',
+    'RESTRICTED' => '제한',
+    _ => status.isEmpty ? '-' : status,
+  };
+}
 
-  final String label;
-  final String value;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: AppSpacing.xs),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(label, style: Theme.of(context).textTheme.labelLarge),
-          const SizedBox(height: AppSpacing.xxs),
-          Text(value.isEmpty ? '-' : value),
-        ],
-      ),
-    );
+AppStatusTone _reportStatusTone(String status) {
+  switch (status) {
+    case 'RESOLVED':
+      return AppStatusTone.success;
+    case 'RECEIVED':
+      return AppStatusTone.warning;
+    case 'HIDDEN':
+    case 'DELETED':
+    case 'RESTRICTED':
+      return AppStatusTone.danger;
+    default:
+      return AppStatusTone.neutral;
   }
 }
