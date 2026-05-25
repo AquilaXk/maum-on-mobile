@@ -450,132 +450,136 @@ class _ReportForm extends StatelessWidget {
   Widget build(BuildContext context) {
     final validationMessage = state.validationMessage;
 
-    return ListView(
+    return SingleChildScrollView(
       key: const ValueKey('report-form'),
       padding: const EdgeInsets.all(AppSpacing.lg),
-      children: [
-        Text(
-          '신고 대상',
-          style: Theme.of(context).textTheme.titleMedium,
-        ),
-        const SizedBox(height: AppSpacing.sm),
-        Row(
-          children: [
-            SizedBox(
-              width: 132,
-              child: DropdownButtonFormField<ReportTargetType>(
-                key: ValueKey(
-                  'report-target-type-field-${selectedTargetType.name}',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(
+            '신고 대상',
+            style: Theme.of(context).textTheme.titleMedium,
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          Row(
+            children: [
+              SizedBox(
+                width: 132,
+                child: DropdownButtonFormField<ReportTargetType>(
+                  key: ValueKey(
+                    'report-target-type-field-${selectedTargetType.name}',
+                  ),
+                  initialValue: selectedTargetType,
+                  decoration: const InputDecoration(
+                    labelText: '유형',
+                    border: OutlineInputBorder(),
+                  ),
+                  items: [
+                    for (final type in ReportTargetType.values)
+                      DropdownMenuItem(
+                        value: type,
+                        child: Text(type.label),
+                      ),
+                  ],
+                  onChanged: state.isSubmitted ? null : onTargetTypeChanged,
                 ),
-                initialValue: selectedTargetType,
-                decoration: const InputDecoration(
-                  labelText: '유형',
-                  border: OutlineInputBorder(),
-                ),
-                items: [
-                  for (final type in ReportTargetType.values)
-                    DropdownMenuItem(
-                      value: type,
-                      child: Text(type.label),
-                    ),
-                ],
-                onChanged: state.isSubmitted ? null : onTargetTypeChanged,
               ),
-            ),
-            const SizedBox(width: AppSpacing.sm),
-            Expanded(
-              child: TextField(
-                key: const ValueKey('report-target-id-field'),
-                controller: targetIdController,
-                enabled: !state.isSubmitted,
-                keyboardType: TextInputType.number,
-                decoration: const InputDecoration(
-                  labelText: '대상 번호',
-                  border: OutlineInputBorder(),
+              const SizedBox(width: AppSpacing.sm),
+              Expanded(
+                child: TextField(
+                  key: const ValueKey('report-target-id-field'),
+                  controller: targetIdController,
+                  enabled: !state.isSubmitted,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(
+                    labelText: '대상 번호',
+                    border: OutlineInputBorder(),
+                  ),
+                  onChanged: onTargetIdChanged,
                 ),
-                onChanged: onTargetIdChanged,
               ),
+            ],
+          ),
+          if (state.target != null) ...[
+            const SizedBox(height: AppSpacing.xs),
+            _InlineNotice(
+              message:
+                  '${state.target!.type.label} #${state.target!.id} · ${state.target!.label}',
             ),
           ],
-        ),
-        if (state.target != null) ...[
-          const SizedBox(height: AppSpacing.xs),
-          _InlineNotice(
-            message:
-                '${state.target!.type.label} #${state.target!.id} · ${state.target!.label}',
+          const SizedBox(height: AppSpacing.xl),
+          Text(
+            '신고 사유',
+            style: Theme.of(context).textTheme.titleMedium,
           ),
-        ],
-        const SizedBox(height: AppSpacing.xl),
-        Text(
-          '신고 사유',
-          style: Theme.of(context).textTheme.titleMedium,
-        ),
-        const SizedBox(height: AppSpacing.sm),
-        Wrap(
-          spacing: AppSpacing.xs,
-          runSpacing: AppSpacing.xs,
-          children: [
-            for (final reason in ReportReasonCode.values)
-              ChoiceChip(
-                key: ValueKey('report-reason-${reason.name}'),
-                label: Text(reason.label),
-                selected: state.reason == reason,
-                onSelected:
-                    state.isSubmitted ? null : (_) => onReasonSelected(reason),
-              ),
+          const SizedBox(height: AppSpacing.sm),
+          Wrap(
+            spacing: AppSpacing.xs,
+            runSpacing: AppSpacing.xs,
+            children: [
+              for (final reason in ReportReasonCode.values)
+                ChoiceChip(
+                  key: ValueKey('report-reason-${reason.name}'),
+                  label: Text(reason.label),
+                  selected: state.reason == reason,
+                  onSelected: state.isSubmitted
+                      ? null
+                      : (_) => onReasonSelected(reason),
+                ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.md),
+          AppStateView.risk(
+            title: '신고 전 확인',
+            message: state.reason.hint,
+            semanticLabel: '신고 사유 안내',
+          ),
+          const SizedBox(height: AppSpacing.md),
+          TextField(
+            key: const ValueKey('report-content-field'),
+            controller: contentController,
+            enabled: !state.isSubmitted,
+            minLines: 4,
+            maxLines: 6,
+            maxLength: ReportState.contentMaxLength,
+            decoration: InputDecoration(
+              labelText: state.reason.requiresDescription ? '상세 사유' : '추가 설명',
+              helperText: state.reason.requiresDescription
+                  ? '기타 사유는 5자 이상 입력해 주세요.'
+                  : '필요한 경우에만 입력해 주세요.',
+              border: const OutlineInputBorder(),
+            ),
+            onChanged: onContentChanged,
+          ),
+          if (validationMessage != null) ...[
+            const SizedBox(height: AppSpacing.xs),
+            _InlineNotice(message: validationMessage, isError: true),
           ],
-        ),
-        const SizedBox(height: AppSpacing.md),
-        AppStateView.risk(
-          title: '신고 전 확인',
-          message: state.reason.hint,
-          semanticLabel: '신고 사유 안내',
-        ),
-        const SizedBox(height: AppSpacing.md),
-        TextField(
-          key: const ValueKey('report-content-field'),
-          controller: contentController,
-          enabled: !state.isSubmitted,
-          minLines: 4,
-          maxLines: 6,
-          maxLength: ReportState.contentMaxLength,
-          decoration: InputDecoration(
-            labelText: state.reason.requiresDescription ? '상세 사유' : '추가 설명',
-            helperText: state.reason.requiresDescription
-                ? '기타 사유는 5자 이상 입력해 주세요.'
-                : '필요한 경우에만 입력해 주세요.',
-            border: const OutlineInputBorder(),
+          if (state.errorMessage != null) ...[
+            const SizedBox(height: AppSpacing.xs),
+            _InlineNotice(message: state.errorMessage!, isError: true),
+          ],
+          if (state.noticeMessage != null) ...[
+            const SizedBox(height: AppSpacing.xs),
+            _InlineNotice(message: state.noticeMessage!),
+          ],
+          const SizedBox(height: AppSpacing.md),
+          FilledButton.icon(
+            key: const ValueKey('report-submit-button'),
+            onPressed: state.canSubmit ? () => onSubmit() : null,
+            icon: state.isSubmitting
+                ? const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Icons.shield_outlined),
+            label: Text(
+              state.isSubmitted ? '이미 접수된 신고입니다.' : '신고 접수',
+            ),
           ),
-          onChanged: onContentChanged,
-        ),
-        if (validationMessage != null) ...[
-          const SizedBox(height: AppSpacing.xs),
-          _InlineNotice(message: validationMessage, isError: true),
         ],
-        if (state.errorMessage != null) ...[
-          const SizedBox(height: AppSpacing.xs),
-          _InlineNotice(message: state.errorMessage!, isError: true),
-        ],
-        if (state.noticeMessage != null) ...[
-          const SizedBox(height: AppSpacing.xs),
-          _InlineNotice(message: state.noticeMessage!),
-        ],
-        const SizedBox(height: AppSpacing.md),
-        FilledButton.icon(
-          key: const ValueKey('report-submit-button'),
-          onPressed: state.canSubmit ? () => onSubmit() : null,
-          icon: state.isSubmitting
-              ? const SizedBox(
-                  width: 18,
-                  height: 18,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                )
-              : const Icon(Icons.shield_outlined),
-          label: Text(
-            state.isSubmitted ? '이미 접수된 신고입니다.' : '신고 접수',
-          ),
-        ),
-      ],
+      ),
     );
   }
 }
