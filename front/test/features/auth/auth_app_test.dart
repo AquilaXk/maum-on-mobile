@@ -173,7 +173,7 @@ void main() {
     );
     await tester.pump();
     expect(find.text('실시간 상담'), findsOneWidget);
-    expect(find.text('연결됨'), findsOneWidget);
+    expect(find.text('상담 연결됨'), findsOneWidget);
     await _returnHome(tester);
 
     await _tapVisibleText(tester, '알림/신고');
@@ -350,7 +350,7 @@ void main() {
     await tester.pump();
 
     expect(find.text('실시간 상담'), findsOneWidget);
-    expect(find.text('연결됨'), findsOneWidget);
+    expect(find.text('상담 연결됨'), findsOneWidget);
     expect(consultationRepository.connectCount, 1);
   });
 
@@ -578,7 +578,8 @@ void main() {
     expect(authRepository.logoutCount, 1);
   });
 
-  testWidgets('clears session and push state when operations permission changes',
+  testWidgets(
+      'clears session and push state when operations permission changes',
       (tester) async {
     final authRepository = _FakeAuthRepository(
       restoredSession: _session(role: 'ADMIN'),

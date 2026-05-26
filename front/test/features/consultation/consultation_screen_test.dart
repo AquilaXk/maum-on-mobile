@@ -25,7 +25,7 @@ void main() {
     await tester.pump();
 
     expect(repository.connectCount, 1);
-    expect(find.text('연결됨'), findsOneWidget);
+    expect(find.text('상담 연결됨'), findsOneWidget);
 
     await tester.enterText(
       find.byKey(const ValueKey('consultation-message-field')),
@@ -34,6 +34,13 @@ void main() {
     await tester.pump();
     await tester.tap(find.byKey(const ValueKey('consultation-send-button')));
     await tester.pump();
+
+    expect(find.text('답변 작성 중'), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('consultation-typing-indicator')),
+      findsOneWidget,
+    );
+
     repository
       ..emit(const ConsultationStreamEvent.chat('오늘은 '))
       ..emit(const ConsultationStreamEvent.chat('천천히 쉬어도 괜찮아요.'))
@@ -60,7 +67,7 @@ void main() {
     repository.emitError(Exception('closed'));
     await tester.pump();
 
-    expect(find.text('연결 불안정'), findsOneWidget);
+    expect(find.text('재연결 필요'), findsOneWidget);
 
     await tester
         .tap(find.byKey(const ValueKey('consultation-reconnect-button')));
@@ -104,9 +111,35 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('consultation-send-button')));
     await tester.pumpAndSettle();
 
-    expect(find.byKey(const ValueKey('consultation-safety-notice')), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('consultation-safety-notice')),
+      findsOneWidget,
+    );
     expect(find.text('즉시 도움 요청'), findsOneWidget);
-    expect(find.text('119'), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('consultation-emergency-119-button')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey('consultation-emergency-112-button')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey('consultation-emergency-1388-button')),
+      findsOneWidget,
+    );
+
+    final messageField = tester.widget<TextField>(
+      find.byKey(const ValueKey('consultation-message-field')),
+    );
+    expect(messageField.enabled, isFalse);
+
+    await tester.tap(
+      find.byKey(const ValueKey('consultation-emergency-119-button')),
+    );
+    await tester.pump();
+
+    expect(find.text('기기 전화 앱에서 119에 연락해 주세요.'), findsOneWidget);
 
     repository.recentMessagesAfterDelete = const [];
     await tester.tap(
@@ -115,7 +148,8 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(repository.deleteSensitiveCount, 1);
-    expect(find.byKey(const ValueKey('consultation-safety-notice')), findsNothing);
+    expect(
+        find.byKey(const ValueKey('consultation-safety-notice')), findsNothing);
   });
 }
 

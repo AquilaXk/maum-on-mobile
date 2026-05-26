@@ -88,7 +88,8 @@ void main() {
         ),
         isEmpty,
       );
-      expect(controller.state.messages.last.role, ConsultationMessageRole.system);
+      expect(
+          controller.state.messages.last.role, ConsultationMessageRole.system);
       expect(
         controller.state.messages.last.content,
         '지금은 답변을 만들지 못했습니다. 잠시 후 다시 시도해 주세요.',
@@ -118,7 +119,8 @@ void main() {
       expect(controller.state.isStreaming, isFalse);
       expect(controller.state.safetyNotice?.actionPolicy,
           ConsultationActionPolicy.blockAndEscalate);
-      expect(controller.state.messages.last.role, ConsultationMessageRole.system);
+      expect(
+          controller.state.messages.last.role, ConsultationMessageRole.system);
       expect(controller.state.messages.last.content, contains('119'));
 
       repository.recentMessagesAfterDelete = [
@@ -134,6 +136,37 @@ void main() {
       expect(repository.deleteSensitiveCount, 1);
       expect(controller.state.safetyNotice, isNull);
       expect(controller.state.messages.single.id, 'remote-safe');
+    });
+
+    test('blocks new input until sensitive safety history is cleared',
+        () async {
+      final repository = _FakeConsultationRepository(
+        sendResult: const ConsultationSendResult(
+          accepted: false,
+          safety: ConsultationSafetyResult(
+            category: ConsultationRiskCategory.selfHarm,
+            severity: ConsultationRiskSeverity.critical,
+            actionPolicy: ConsultationActionPolicy.blockAndEscalate,
+            message: '지금 안전이 가장 중요합니다. 119에 도움을 요청해 주세요.',
+          ),
+        ),
+      );
+      final controller = ConsultationController(repository: repository);
+
+      await controller.connect();
+      repository.emit(const ConsultationStreamEvent.connect('connected'));
+      controller.updateDraft('죽고 싶어요');
+      await controller.submitMessage();
+
+      expect(controller.state.inputBlockedBySafety, isTrue);
+      expect(controller.state.canSubmit, isFalse);
+
+      controller.updateDraft('다시 보낼게요');
+      await controller.submitMessage();
+
+      expect(controller.state.draft, isEmpty);
+      expect(controller.state.safetyNotice, isNotNull);
+      expect(repository.sentMessages, ['죽고 싶어요']);
     });
 
     test('restores normal draft but clears blocked sensitive draft', () async {
@@ -175,7 +208,8 @@ void main() {
         draftRepository: draftRepository,
       );
       await blockedController.connect();
-      blockedRepository.emit(const ConsultationStreamEvent.connect('connected'));
+      blockedRepository
+          .emit(const ConsultationStreamEvent.connect('connected'));
       blockedController.updateDraft('죽고 싶어요');
       await blockedController.submitMessage();
 

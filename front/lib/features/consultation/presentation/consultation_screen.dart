@@ -94,6 +94,7 @@ class _ConsultationScreenState extends State<ConsultationScreen>
               children: [
                 _ConsultationHeader(
                   connectionState: state.connectionState,
+                  isStreaming: state.isStreaming,
                   onBack: widget.onBack,
                   onReconnect: widget.controller.reconnect,
                 ),
@@ -112,6 +113,8 @@ class _ConsultationScreenState extends State<ConsultationScreen>
                   child: ListView.builder(
                     key: const ValueKey('consultation-message-list'),
                     controller: _scrollController,
+                    keyboardDismissBehavior:
+                        ScrollViewKeyboardDismissBehavior.onDrag,
                     padding: const EdgeInsets.all(16),
                     itemCount: state.messages.length,
                     itemBuilder: (context, index) {
@@ -159,38 +162,89 @@ class _SafetyNotice extends StatelessWidget {
           AppStateView.risk(
             title: '즉시 도움 요청',
             message: safety.message,
-            semanticLabel: '상담 위험 상황 도움 안내',
+            semanticLabel: '상담 위험 상황 도움 안내. ${safety.message}',
           ),
           const SizedBox(height: AppSpacing.sm),
-          const Wrap(
+          Wrap(
             spacing: AppSpacing.xs,
             runSpacing: AppSpacing.xs,
             children: [
-              ActionChip(
-                avatar: Icon(Icons.local_hospital_outlined),
-                label: Text('119'),
-                onPressed: null,
+              _EmergencyActionButton(
+                key: const ValueKey('consultation-emergency-119-button'),
+                icon: Icons.local_hospital_outlined,
+                label: '119',
+                semanticLabel: '119 긴급 구조 요청',
+                onPressed: () => _showEmergencyContact(context, '119'),
               ),
-              ActionChip(
-                avatar: Icon(Icons.local_police_outlined),
-                label: Text('112'),
-                onPressed: null,
+              _EmergencyActionButton(
+                key: const ValueKey('consultation-emergency-112-button'),
+                icon: Icons.local_police_outlined,
+                label: '112',
+                semanticLabel: '112 경찰 긴급 신고',
+                onPressed: () => _showEmergencyContact(context, '112'),
               ),
-              ActionChip(
-                avatar: Icon(Icons.support_agent_outlined),
-                label: Text('1388'),
-                onPressed: null,
+              _EmergencyActionButton(
+                key: const ValueKey('consultation-emergency-1388-button'),
+                icon: Icons.support_agent_outlined,
+                label: '1388',
+                semanticLabel: '1388 청소년 상담 연결',
+                onPressed: () => _showEmergencyContact(context, '1388'),
               ),
             ],
           ),
           const SizedBox(height: AppSpacing.sm),
-          OutlinedButton.icon(
-            key: const ValueKey('consultation-delete-sensitive-button'),
-            onPressed: () => onDeleteSensitive(),
-            icon: const Icon(Icons.delete_outline),
-            label: const Text('민감 기록 삭제'),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: Semantics(
+              button: true,
+              label: '민감한 상담 기록 삭제',
+              child: TextButton.icon(
+                key: const ValueKey(
+                  'consultation-delete-sensitive-button',
+                ),
+                onPressed: () => onDeleteSensitive(),
+                icon: const Icon(Icons.delete_outline),
+                label: const Text('민감 기록 삭제'),
+              ),
+            ),
           ),
         ],
+      ),
+    );
+  }
+
+  void _showEmergencyContact(BuildContext context, String number) {
+    ScaffoldMessenger.of(context)
+      ..clearSnackBars()
+      ..showSnackBar(
+        SnackBar(content: Text('기기 전화 앱에서 $number에 연락해 주세요.')),
+      );
+  }
+}
+
+class _EmergencyActionButton extends StatelessWidget {
+  const _EmergencyActionButton({
+    required this.icon,
+    required this.label,
+    required this.semanticLabel,
+    required this.onPressed,
+    super.key,
+  });
+
+  final IconData icon;
+  final String label;
+  final String semanticLabel;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      button: true,
+      label: semanticLabel,
+      child: FilledButton.tonalIcon(
+        onPressed: onPressed,
+        icon: Icon(icon),
+        label: Text(label),
       ),
     );
   }
@@ -199,21 +253,24 @@ class _SafetyNotice extends StatelessWidget {
 class _ConsultationHeader extends StatelessWidget {
   const _ConsultationHeader({
     required this.connectionState,
+    required this.isStreaming,
     required this.onBack,
     required this.onReconnect,
   });
 
   final ConsultationConnectionState connectionState;
+  final bool isStreaming;
   final VoidCallback onBack;
   final Future<void> Function() onReconnect;
 
   @override
   Widget build(BuildContext context) {
     final statusText = switch (connectionState) {
-      ConsultationConnectionState.idle => '연결 대기',
-      ConsultationConnectionState.connecting => '연결 중',
-      ConsultationConnectionState.connected => '연결됨',
-      ConsultationConnectionState.error => '연결 불안정',
+      ConsultationConnectionState.idle => '상담 연결 대기',
+      ConsultationConnectionState.connecting => '자동 연결 중',
+      ConsultationConnectionState.connected when isStreaming => '답변 작성 중',
+      ConsultationConnectionState.connected => '상담 연결됨',
+      ConsultationConnectionState.error => '재연결 필요',
     };
 
     return Padding(
@@ -231,7 +288,7 @@ class _ConsultationHeader extends StatelessWidget {
           if (connectionState == ConsultationConnectionState.error)
             IconButton.filledTonal(
               key: const ValueKey('consultation-reconnect-button'),
-              tooltip: '다시 연결',
+              tooltip: '상담 다시 연결',
               onPressed: () => onReconnect(),
               icon: const Icon(Icons.refresh),
             ),
@@ -250,6 +307,9 @@ class _MessageBubble extends StatelessWidget {
   Widget build(BuildContext context) {
     final isUser = message.role == ConsultationMessageRole.user;
     final isSystem = message.role == ConsultationMessageRole.system;
+    final isPendingAssistant =
+        message.role == ConsultationMessageRole.assistant &&
+            message.content.isEmpty;
     final colorScheme = Theme.of(context).colorScheme;
 
     return Align(
@@ -272,16 +332,43 @@ class _MessageBubble extends StatelessWidget {
                 horizontal: AppSpacing.md,
                 vertical: AppSpacing.sm,
               ),
-              child: Text(
-                message.content.isEmpty ? '응답 작성 중입니다.' : message.content,
-                style: TextStyle(
-                  color: isUser
-                      ? colorScheme.onPrimary
-                      : isSystem
-                          ? colorScheme.onErrorContainer
-                          : colorScheme.onSurface,
-                ),
-              ),
+              child: isPendingAssistant
+                  ? Semantics(
+                      container: true,
+                      liveRegion: true,
+                      label: '상담사가 답변을 작성 중입니다.',
+                      child: ExcludeSemantics(
+                        child: Row(
+                          key: const ValueKey('consultation-typing-indicator'),
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            SizedBox(
+                              width: 16,
+                              height: 16,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: colorScheme.onSurface,
+                              ),
+                            ),
+                            const SizedBox(width: AppSpacing.xs),
+                            Text(
+                              '응답 작성 중입니다.',
+                              style: TextStyle(color: colorScheme.onSurface),
+                            ),
+                          ],
+                        ),
+                      ),
+                    )
+                  : Text(
+                      message.content,
+                      style: TextStyle(
+                        color: isUser
+                            ? colorScheme.onPrimary
+                            : isSystem
+                                ? colorScheme.onErrorContainer
+                                : colorScheme.onSurface,
+                      ),
+                    ),
             ),
           ),
         ),
@@ -305,50 +392,58 @@ class _Composer extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final helperText = state.isStreaming
-        ? '답변을 작성 중입니다.'
-        : '${state.draft.length}/${ConsultationController.maxMessageLength}';
+    final inputBlocked = state.inputBlockedBySafety;
+    final helperText = inputBlocked
+        ? '안전 안내 확인 후 다시 이용할 수 있습니다.'
+        : state.isStreaming
+            ? '답변을 작성 중입니다.'
+            : '${state.draft.length}/${ConsultationController.maxMessageLength}';
 
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surface,
-        border: Border(top: BorderSide(color: Theme.of(context).dividerColor)),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(AppSpacing.md),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.end,
-          children: [
-            Expanded(
-              child: TextField(
-                key: const ValueKey('consultation-message-field'),
-                controller: controller,
-                minLines: 1,
-                maxLines: 4,
-                maxLength: ConsultationController.maxMessageLength,
-                decoration: InputDecoration(
-                  labelText: '고민을 입력해 주세요',
-                  helperText: helperText,
-                  border: const OutlineInputBorder(),
-                  counterText: '',
+    return SafeArea(
+      top: false,
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: Theme.of(context).colorScheme.surface,
+          border:
+              Border(top: BorderSide(color: Theme.of(context).dividerColor)),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(AppSpacing.md),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Expanded(
+                child: TextField(
+                  key: const ValueKey('consultation-message-field'),
+                  controller: controller,
+                  enabled: !inputBlocked && !state.isSending,
+                  minLines: 1,
+                  maxLines: 4,
+                  maxLength: ConsultationController.maxMessageLength,
+                  decoration: InputDecoration(
+                    labelText: '고민을 입력해 주세요',
+                    helperText: helperText,
+                    border: const OutlineInputBorder(),
+                    counterText: '',
+                  ),
+                  onChanged: inputBlocked ? null : onChanged,
                 ),
-                onChanged: onChanged,
               ),
-            ),
-            const SizedBox(width: AppSpacing.xs),
-            IconButton.filled(
-              key: const ValueKey('consultation-send-button'),
-              tooltip: '전송',
-              onPressed: state.canSubmit ? () => onSubmitted() : null,
-              icon: state.isSending
-                  ? const SizedBox(
-                      width: 18,
-                      height: 18,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : const Icon(Icons.send),
-            ),
-          ],
+              const SizedBox(width: AppSpacing.xs),
+              IconButton.filled(
+                key: const ValueKey('consultation-send-button'),
+                tooltip: inputBlocked ? '안전 안내 확인 필요' : '전송',
+                onPressed: state.canSubmit ? () => onSubmitted() : null,
+                icon: state.isSending
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.send),
+              ),
+            ],
+          ),
         ),
       ),
     );
