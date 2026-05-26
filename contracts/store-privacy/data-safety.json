@@ -1,0 +1,104 @@
+{
+  "version": 1,
+  "storeLinks": {
+    "privacyPolicyUrl": "https://maum-on.app/privacy",
+    "termsUrl": "https://maum-on.app/terms",
+    "supportEmail": "support@maum-on.app",
+    "accountDeletionPath": "settings.member_withdrawal",
+    "dataExportPath": "settings.data_export"
+  },
+  "dataCategories": [
+    {
+      "id": "account_info",
+      "label": "계정 정보",
+      "collected": true,
+      "shared": false,
+      "deleteAvailable": true,
+      "purposes": ["app_functionality", "account_management"],
+      "googlePlayDataTypes": ["Personal info: Email address", "Personal info: User IDs"],
+      "appStoreDataTypes": [
+        "NSPrivacyCollectedDataTypeEmailAddress",
+        "NSPrivacyCollectedDataTypeUserID"
+      ],
+      "retention": "회원 탈퇴 시 로그인 세션과 기기 알림 토큰은 즉시 폐기되고 이메일과 표시 이름은 탈퇴 회원 식별자로 대체됩니다."
+    },
+    {
+      "id": "user_generated_content",
+      "label": "사용자 생성 콘텐츠",
+      "collected": true,
+      "shared": false,
+      "deleteAvailable": true,
+      "purposes": ["app_functionality", "user_communication"],
+      "googlePlayDataTypes": ["User content: Other user-generated content"],
+      "appStoreDataTypes": ["NSPrivacyCollectedDataTypeOtherUserContent"],
+      "retention": "일기, 스토리, 편지, 댓글은 사용자가 삭제하거나 탈퇴하면 사용자 화면과 내보내기 대상에서 제외됩니다."
+    },
+    {
+      "id": "photos_or_videos",
+      "label": "사진 및 동영상",
+      "collected": true,
+      "shared": false,
+      "deleteAvailable": true,
+      "purposes": ["app_functionality"],
+      "googlePlayDataTypes": ["Photos and videos: Photos"],
+      "appStoreDataTypes": ["NSPrivacyCollectedDataTypePhotosorVideos"],
+      "retention": "일기 첨부 이미지는 사용자가 기록을 삭제하거나 첨부를 제거하면 서비스 화면에서 제거됩니다."
+    },
+    {
+      "id": "sensitive_info",
+      "label": "민감 정보",
+      "collected": true,
+      "shared": false,
+      "deleteAvailable": true,
+      "purposes": ["app_functionality"],
+      "googlePlayDataTypes": ["Personal info: Other info"],
+      "appStoreDataTypes": ["NSPrivacyCollectedDataTypeSensitiveInfo"],
+      "retention": "상담 메시지와 감정 기록은 민감 기록 삭제 또는 회원 탈퇴 후 사용자 화면과 내보내기 대상에서 제외됩니다."
+    },
+    {
+      "id": "push_token",
+      "label": "기기 알림 토큰",
+      "collected": true,
+      "shared": false,
+      "deleteAvailable": true,
+      "purposes": ["app_functionality"],
+      "googlePlayDataTypes": ["Device or other IDs"],
+      "appStoreDataTypes": ["NSPrivacyCollectedDataTypeUserID"],
+      "retention": "로그아웃 또는 회원 탈퇴 시 기기 알림 토큰은 폐기됩니다."
+    },
+    {
+      "id": "performance_data",
+      "label": "성능 및 진단 데이터",
+      "collected": true,
+      "shared": false,
+      "deleteAvailable": false,
+      "purposes": ["analytics", "app_functionality"],
+      "googlePlayDataTypes": ["App activity: App interactions", "Diagnostics: Performance data"],
+      "appStoreDataTypes": ["NSPrivacyCollectedDataTypePerformanceData"],
+      "retention": "서비스 안정성 기록은 장애 분석과 운영 대응 기간 동안 제한적으로 보존될 수 있습니다."
+    }
+  ],
+  "permissions": [
+    {
+      "id": "camera",
+      "label": "카메라",
+      "androidPermissions": ["android.permission.CAMERA"],
+      "iosUsageDescriptionKeys": ["NSCameraUsageDescription"],
+      "userFacingNotice": "일기 이미지 첨부를 위해 촬영 권한을 요청합니다."
+    },
+    {
+      "id": "photos",
+      "label": "사진",
+      "androidPermissions": ["android.permission.READ_MEDIA_IMAGES"],
+      "iosUsageDescriptionKeys": ["NSPhotoLibraryUsageDescription"],
+      "userFacingNotice": "일기 이미지 첨부를 위해 사진 접근 권한을 요청합니다."
+    },
+    {
+      "id": "push_notifications",
+      "label": "푸시 알림",
+      "androidPermissions": ["android.permission.POST_NOTIFICATIONS"],
+      "iosUsageDescriptionKeys": [],
+      "userFacingNotice": "편지, 상담, 신고 처리 결과 안내를 위해 알림 권한을 요청합니다."
+    }
+  ]
+}

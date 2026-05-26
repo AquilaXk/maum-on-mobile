@@ -270,6 +270,18 @@ test("path classifier enables backend, frontend, and repository checks for share
   assert.equal(outputs.javascript, "false");
 });
 
+test("path classifier enables frontend and repository checks for store privacy contracts", async () => {
+  const outputs = await classifyChangedFiles(["contracts/store-privacy/data-safety.json"]);
+
+  assert.equal(outputs.docs_only, "false");
+  assert.equal(outputs.backend, "false");
+  assert.equal(outputs.frontend, "true");
+  assert.equal(outputs.repository, "true");
+  assert.equal(outputs.android, "false");
+  assert.equal(outputs.ios, "false");
+  assert.equal(outputs.javascript, "false");
+});
+
 test("path classifier enables root JavaScript checks for root package changes", async () => {
   const outputs = await classifyChangedFiles(["package.json", "src/app.ts"]);
 

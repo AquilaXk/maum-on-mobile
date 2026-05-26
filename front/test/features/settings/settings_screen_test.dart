@@ -48,9 +48,11 @@ void main() {
       find.byKey(const ValueKey('settings-request-data-export')),
     );
     await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const ValueKey('settings-request-data-export')));
+    await tester
+        .tap(find.byKey(const ValueKey('settings-request-data-export')));
     await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const ValueKey('settings-download-data-export')));
+    await tester
+        .tap(find.byKey(const ValueKey('settings-download-data-export')));
     await tester.pump();
 
     expect(repository.nicknameUpdates, ['새 닉네임']);
@@ -104,6 +106,36 @@ void main() {
 
     expect(repository.withdrawPasswords, ['old-password']);
     expect(cleaned, isTrue);
+  });
+
+  testWidgets('exposes privacy disclosures and deletion guidance',
+      (tester) async {
+    final repository = _FakeSettingsRepository();
+    final controller = SettingsController(repository: repository);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: SettingsScreen(
+          controller: controller,
+          onBack: () {},
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.ensureVisible(
+      find.byKey(const ValueKey('settings-privacy-policy-link')),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const ValueKey('settings-privacy-policy-link')),
+        findsOneWidget);
+    expect(find.byKey(const ValueKey('settings-terms-link')), findsOneWidget);
+    expect(find.byKey(const ValueKey('settings-support-link')), findsOneWidget);
+    expect(find.textContaining('계정 삭제'), findsOneWidget);
+    expect(find.textContaining('내 데이터'), findsWidgets);
+    expect(find.byKey(const ValueKey('settings-request-withdraw')),
+        findsOneWidget);
   });
 }
 

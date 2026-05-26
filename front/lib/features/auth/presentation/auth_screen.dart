@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../application/auth_controller.dart';
 import '../deeplink/external_login.dart';
+import '../../legal/presentation/legal_disclosure_links.dart';
 
 enum AuthFormMode {
   login,
@@ -14,11 +15,13 @@ class AuthScreen extends StatefulWidget {
   const AuthScreen({
     required this.controller,
     this.externalLoginController,
+    this.onOpenExternalUri,
     super.key,
   });
 
   final AuthController controller;
   final ExternalLoginController? externalLoginController;
+  final Future<bool> Function(Uri uri)? onOpenExternalUri;
 
   @override
   State<AuthScreen> createState() => _AuthScreenState();
@@ -106,6 +109,11 @@ class _AuthScreenState extends State<AuthScreen> {
                   ),
                   const SizedBox(height: 12),
                   ..._secondaryActions(state, externalLoginState),
+                  const SizedBox(height: 16),
+                  LegalDisclosureLinks(
+                    keyPrefix: 'auth',
+                    onOpenExternalUri: widget.onOpenExternalUri,
+                  ),
                 ],
               ),
             ),

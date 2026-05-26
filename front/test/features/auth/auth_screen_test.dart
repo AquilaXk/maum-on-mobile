@@ -106,6 +106,28 @@ void main() {
       findsOneWidget,
     );
   });
+
+  testWidgets('exposes privacy, terms, support, and deletion guidance',
+      (tester) async {
+    final repository = _FakeAuthRepository();
+    await tester.pumpWidget(
+      _AuthScreenHarness(repository: repository),
+    );
+
+    expect(
+        find.byKey(const ValueKey('auth-privacy-policy-link')), findsOneWidget);
+    expect(find.byKey(const ValueKey('auth-terms-link')), findsOneWidget);
+    expect(find.byKey(const ValueKey('auth-support-link')), findsOneWidget);
+    expect(find.textContaining('회원 탈퇴'), findsOneWidget);
+
+    await tester.tap(find.text('새 계정 만들기'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('필수 약관 및 개인정보 처리에 동의합니다.'), findsOneWidget);
+    expect(
+        find.byKey(const ValueKey('auth-privacy-policy-link')), findsOneWidget);
+    expect(find.byKey(const ValueKey('auth-terms-link')), findsOneWidget);
+  });
 }
 
 class _AuthScreenHarness extends StatelessWidget {
