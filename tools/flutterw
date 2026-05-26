@@ -1,0 +1,44 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
+flutter_bin=""
+
+candidates=()
+
+if [[ -n "${FLUTTER_BIN:-}" ]]; then
+  candidates+=("${FLUTTER_BIN}")
+fi
+
+if [[ -n "${FLUTTER_HOME:-}" ]]; then
+  candidates+=("${FLUTTER_HOME}/bin/flutter")
+fi
+
+candidates+=("${repo_root}/.codex/toolchains/flutter/bin/flutter")
+
+if command -v flutter >/dev/null 2>&1; then
+  candidates+=("$(command -v flutter)")
+fi
+
+for candidate in "${candidates[@]}"; do
+  if [[ -x "${candidate}" ]]; then
+    flutter_bin="${candidate}"
+    break
+  fi
+done
+
+if [[ -z "${flutter_bin}" ]]; then
+  cat >&2 <<'EOF'
+flutter sdk not found.
+
+Set one of these before retrying:
+- FLUTTER_BIN=/absolute/path/to/flutter
+- FLUTTER_HOME=/absolute/path/to/flutter-sdk
+
+Or install the repository-local SDK at:
+- .codex/toolchains/flutter/bin/flutter
+EOF
+  exit 127
+fi
+
+exec "${flutter_bin}" "$@"
