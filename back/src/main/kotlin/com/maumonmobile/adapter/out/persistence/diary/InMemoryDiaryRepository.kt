@@ -2,6 +2,9 @@ package com.maumonmobile.adapter.out.persistence.diary
 
 import com.maumonmobile.application.port.out.DiaryRepository
 import com.maumonmobile.domain.diary.Diary
+import com.maumonmobile.domain.diary.DiaryContentBlock
+import com.maumonmobile.domain.diary.DiaryContentBlockDraft
+import com.maumonmobile.domain.diary.DiaryContentBlockType
 import com.maumonmobile.domain.diary.DiaryDraft
 import org.springframework.context.annotation.Profile
 import org.springframework.stereotype.Repository
@@ -31,6 +34,7 @@ class InMemoryDiaryRepository : DiaryRepository {
             isPrivate = draft.isPrivate,
             createDate = now,
             modifyDate = now,
+            contentBlocks = draft.contentBlocks.blocksForPersistence(imageUrl),
         )
 
         diariesById[id] = diary
@@ -47,6 +51,7 @@ class InMemoryDiaryRepository : DiaryRepository {
             imageUrl = imageUrl,
             isPrivate = draft.isPrivate,
             modifyDate = Instant.now().toString(),
+            contentBlocks = draft.contentBlocks.blocksForPersistence(imageUrl),
         )
 
         diariesById[updatedDiary.id] = updatedDiary
@@ -79,5 +84,24 @@ class InMemoryDiaryRepository : DiaryRepository {
 
     override fun delete(id: Long) {
         diariesById.remove(id)
+    }
+
+    private fun List<DiaryContentBlockDraft>.blocksForPersistence(imageUrl: String?): List<DiaryContentBlock> {
+        val savedBlocks = map(DiaryContentBlockDraft::toSavedBlock)
+        if (imageUrl == null || savedBlocks.any { block -> block.type == DiaryContentBlockType.IMAGE }) {
+            return savedBlocks
+        }
+
+        return savedBlocks + DiaryContentBlock(
+            id = "image-${savedBlocks.size}",
+            type = DiaryContentBlockType.IMAGE,
+            displayOrder = savedBlocks.size,
+            text = null,
+            imageUrl = imageUrl,
+            filename = null,
+            byteSize = null,
+            source = null,
+            contentType = null,
+        )
     }
 }

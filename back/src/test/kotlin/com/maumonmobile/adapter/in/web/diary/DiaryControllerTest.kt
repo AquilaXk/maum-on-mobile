@@ -1,6 +1,10 @@
 package com.maumonmobile.adapter.`in`.web.diary
 
 import com.jayway.jsonpath.JsonPath
+import com.maumonmobile.application.port.out.ImageAssetRepository
+import com.maumonmobile.domain.image.ImageAssetStatus
+import com.maumonmobile.domain.image.ImageTargetType
+import org.assertj.core.api.Assertions.assertThat
 import org.hamcrest.Matchers.blankOrNullString
 import org.hamcrest.Matchers.greaterThan
 import org.hamcrest.Matchers.hasItem
@@ -26,6 +30,7 @@ import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
 @ActiveProfiles("test")
 class DiaryControllerTest @Autowired constructor(
     private val mockMvc: MockMvc,
+    private val imageAssetRepository: ImageAssetRepository,
 ) {
 
     @Test
@@ -160,7 +165,110 @@ class DiaryControllerTest @Autowired constructor(
             .andExpect {
                 status { isOk() }
                 jsonPath("$.data.imageUrl") { value(imageUrl) }
+                jsonPath("$.data.contentBlocks[0].type") { value("text") }
+                jsonPath("$.data.contentBlocks[0].text") { value("본문") }
+                jsonPath("$.data.contentBlocks[1].type") { value("image") }
+                jsonPath("$.data.contentBlocks[1].imageUrl") { value(imageUrl) }
             }
+    }
+
+    @Test
+    fun createsDiaryWithOrderedContentBlocksAndMultipleImages() {
+        val accessToken = signupAndLogin("diary-content-blocks@example.com")
+        val firstImageUrl = uploadImage(accessToken)
+        val secondImageUrl = uploadImage(accessToken)
+
+        val createResult = mockMvc.perform(
+            multipart("/api/v1/diaries")
+                .file(
+                    jsonPart(
+                        "data",
+                        """
+                        {
+                          "title":"블록 기록",
+                          "content":"첫 문단\n\n둘째 문단",
+                          "categoryName":"일상",
+                          "imageUrl":"$firstImageUrl",
+                          "isPrivate":false,
+                          "contentBlocks":[
+                            {"id":"text-a","type":"text","text":"첫 문단"},
+                            {"id":"image-a","type":"image","imageUrl":"$firstImageUrl","uploadStatus":"uploaded","filename":"first.png","byteSize":3,"source":"gallery","contentType":"image/png"},
+                            {"id":"text-b","type":"text","text":"둘째 문단"},
+                            {"id":"image-b","type":"image","imageUrl":"$secondImageUrl","uploadStatus":"uploaded"}
+                          ]
+                        }
+                        """.trimIndent(),
+                    ),
+                )
+                .header("Authorization", "Bearer $accessToken"),
+        )
+            .andExpect(status().isOk)
+            .andReturn()
+
+        val diaryId = createResult.response.readJsonInt("$.data")
+
+        mockMvc.get("/api/v1/diaries/$diaryId") {
+            header("Authorization", "Bearer $accessToken")
+        }
+            .andExpect {
+                status { isOk() }
+                jsonPath("$.data.content") { value("첫 문단\n\n둘째 문단") }
+                jsonPath("$.data.imageUrl") { value(firstImageUrl) }
+                jsonPath("$.data.contentBlocks[0].id") { value("text-a") }
+                jsonPath("$.data.contentBlocks[0].type") { value("text") }
+                jsonPath("$.data.contentBlocks[0].text") { value("첫 문단") }
+                jsonPath("$.data.contentBlocks[1].id") { value("image-a") }
+                jsonPath("$.data.contentBlocks[1].type") { value("image") }
+                jsonPath("$.data.contentBlocks[1].imageUrl") { value(firstImageUrl) }
+                jsonPath("$.data.contentBlocks[1].filename") { value("first.png") }
+                jsonPath("$.data.contentBlocks[1].byteSize") { value(3) }
+                jsonPath("$.data.contentBlocks[1].source") { value("gallery") }
+                jsonPath("$.data.contentBlocks[1].contentType") { value("image/png") }
+                jsonPath("$.data.contentBlocks[2].id") { value("text-b") }
+                jsonPath("$.data.contentBlocks[2].text") { value("둘째 문단") }
+                jsonPath("$.data.contentBlocks[3].id") { value("image-b") }
+                jsonPath("$.data.contentBlocks[3].imageUrl") { value(secondImageUrl) }
+            }
+
+        val firstAsset = imageAssetRepository.findByUrl(firstImageUrl)
+        val secondAsset = imageAssetRepository.findByUrl(secondImageUrl)
+        assertThat(firstAsset?.status).isEqualTo(ImageAssetStatus.ATTACHED)
+        assertThat(firstAsset?.targetType).isEqualTo(ImageTargetType.DIARY)
+        assertThat(firstAsset?.targetId).isEqualTo(diaryId.toLong())
+        assertThat(secondAsset?.status).isEqualTo(ImageAssetStatus.ATTACHED)
+        assertThat(secondAsset?.targetType).isEqualTo(ImageTargetType.DIARY)
+        assertThat(secondAsset?.targetId).isEqualTo(diaryId.toLong())
+    }
+
+    @Test
+    fun rejectsContentBlockImageOwnedByAnotherMember() {
+        val ownerToken = signupAndLogin("block-image-owner@example.com", "소유자")
+        val otherToken = signupAndLogin("block-image-other@example.com", "다른이")
+        val ownerImageUrl = uploadImage(ownerToken)
+
+        mockMvc.perform(
+            multipart("/api/v1/diaries")
+                .file(
+                    jsonPart(
+                        "data",
+                        """
+                        {
+                          "title":"타인 이미지",
+                          "content":"본문",
+                          "categoryName":"일상",
+                          "isPrivate":true,
+                          "contentBlocks":[
+                            {"id":"text-a","type":"text","text":"본문"},
+                            {"id":"image-a","type":"image","imageUrl":"$ownerImageUrl"}
+                          ]
+                        }
+                        """.trimIndent(),
+                    ),
+                )
+                .header("Authorization", "Bearer $otherToken"),
+        )
+            .andExpect(status().isBadRequest)
+            .andExpect(jsonPath("$.error.code").value("INVALID_REQUEST"))
     }
 
     @Test
@@ -253,6 +361,83 @@ class DiaryControllerTest @Autowired constructor(
             .andExpect {
                 status { isBadRequest() }
                 jsonPath("$.error.code") { value("INVALID_REQUEST") }
+            }
+    }
+
+    @Test
+    fun updateReleasesRemovedContentBlockImages() {
+        val accessToken = signupAndLogin("remove-block-image@example.com")
+        val firstImageUrl = uploadImage(accessToken)
+        val secondImageUrl = uploadImage(accessToken)
+
+        val createResult = mockMvc.perform(
+            multipart("/api/v1/diaries")
+                .file(
+                    jsonPart(
+                        "data",
+                        """
+                        {
+                          "title":"이미지 블록",
+                          "content":"본문",
+                          "categoryName":"일상",
+                          "isPrivate":true,
+                          "contentBlocks":[
+                            {"id":"text-a","type":"text","text":"본문"},
+                            {"id":"image-a","type":"image","imageUrl":"$firstImageUrl"},
+                            {"id":"image-b","type":"image","imageUrl":"$secondImageUrl"}
+                          ]
+                        }
+                        """.trimIndent(),
+                    ),
+                )
+                .header("Authorization", "Bearer $accessToken"),
+        )
+            .andExpect(status().isOk)
+            .andReturn()
+
+        val diaryId = createResult.response.readJsonInt("$.data")
+
+        mockMvc.perform(
+            multipart("/api/v1/diaries/$diaryId")
+                .file(
+                    jsonPart(
+                        "data",
+                        """
+                        {
+                          "title":"이미지 블록",
+                          "content":"본문",
+                          "categoryName":"일상",
+                          "isPrivate":true,
+                          "contentBlocks":[
+                            {"id":"text-a","type":"text","text":"본문"},
+                            {"id":"image-b","type":"image","imageUrl":"$secondImageUrl"}
+                          ]
+                        }
+                        """.trimIndent(),
+                    ),
+                )
+                .header("Authorization", "Bearer $accessToken")
+                .with { request ->
+                    request.method = "PUT"
+                    request
+                },
+        )
+            .andExpect(status().isOk)
+
+        assertThat(imageAssetRepository.findByUrl(firstImageUrl)?.status)
+            .isEqualTo(ImageAssetStatus.CANCELLED)
+        val remainingAsset = imageAssetRepository.findByUrl(secondImageUrl)
+        assertThat(remainingAsset?.status).isEqualTo(ImageAssetStatus.ATTACHED)
+        assertThat(remainingAsset?.targetId).isEqualTo(diaryId.toLong())
+
+        mockMvc.get("/api/v1/diaries/$diaryId") {
+            header("Authorization", "Bearer $accessToken")
+        }
+            .andExpect {
+                status { isOk() }
+                jsonPath("$.data.imageUrl") { value(secondImageUrl) }
+                jsonPath("$.data.contentBlocks[0].type") { value("text") }
+                jsonPath("$.data.contentBlocks[1].imageUrl") { value(secondImageUrl) }
             }
     }
 
