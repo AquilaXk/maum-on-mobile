@@ -243,6 +243,18 @@ class _OperationsViewSelector extends StatelessWidget {
           onSelected: () => onSelected(OperationsView.dashboard),
         ),
         _ViewChip(
+          key: const ValueKey('operations-view-reports'),
+          label: '신고',
+          selected: selected == OperationsView.reports,
+          onSelected: () => onSelected(OperationsView.reports),
+        ),
+        _ViewChip(
+          key: const ValueKey('operations-view-letters'),
+          label: '편지',
+          selected: selected == OperationsView.letters,
+          onSelected: () => onSelected(OperationsView.letters),
+        ),
+        _ViewChip(
           key: const ValueKey('operations-view-members'),
           label: '회원',
           selected: selected == OperationsView.members,
@@ -259,18 +271,6 @@ class _OperationsViewSelector extends StatelessWidget {
           label: '시스템',
           selected: selected == OperationsView.system,
           onSelected: () => onSelected(OperationsView.system),
-        ),
-        _ViewChip(
-          key: const ValueKey('operations-view-letters'),
-          label: '편지',
-          selected: selected == OperationsView.letters,
-          onSelected: () => onSelected(OperationsView.letters),
-        ),
-        _ViewChip(
-          key: const ValueKey('operations-view-reports'),
-          label: '신고',
-          selected: selected == OperationsView.reports,
-          onSelected: () => onSelected(OperationsView.reports),
         ),
       ],
     );
@@ -298,6 +298,36 @@ class _ViewChip extends StatelessWidget {
     );
   }
 }
+
+class _CompactActionWrap extends StatelessWidget {
+  const _CompactActionWrap({
+    required this.children,
+  });
+
+  final List<Widget> children;
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final fullWidth = constraints.maxWidth < _compactActionBreakpoint;
+        return Wrap(
+          spacing: AppSpacing.xs,
+          runSpacing: AppSpacing.xs,
+          children: [
+            for (final child in children)
+              if (fullWidth)
+                SizedBox(width: constraints.maxWidth, child: child)
+              else
+                child,
+          ],
+        );
+      },
+    );
+  }
+}
+
+const double _compactActionBreakpoint = 420;
 
 class _DashboardView extends StatelessWidget {
   const _DashboardView({
@@ -372,33 +402,68 @@ class _DashboardView extends StatelessWidget {
           ],
         ),
         const SizedBox(height: AppSpacing.md),
-        Wrap(
-          spacing: AppSpacing.xs,
-          runSpacing: AppSpacing.xs,
-          children: [
-            FilledButton.icon(
-              onPressed: onOpenObservability,
-              icon: const Icon(Icons.monitor_heart_outlined),
-              label: const Text('모바일 관측'),
-            ),
-            FilledButton.icon(
-              onPressed: onOpenMembers,
-              icon: const Icon(Icons.group_outlined),
-              label: const Text('회원 관리'),
-            ),
-            OutlinedButton.icon(
-              onPressed: onOpenLetters,
-              icon: const Icon(Icons.mail_outline),
-              label: const Text('편지 검수'),
-            ),
-            OutlinedButton.icon(
-              onPressed: onOpenReports,
-              icon: const Icon(Icons.report_gmailerrorred_outlined),
-              label: const Text('신고 검수'),
-            ),
-          ],
+        _OperationsPriorityPanel(
+          dashboard: dashboard,
+          onOpenReports: onOpenReports,
+          onOpenLetters: onOpenLetters,
+          onOpenMembers: onOpenMembers,
+          onOpenObservability: onOpenObservability,
         ),
       ],
+    );
+  }
+}
+
+class _OperationsPriorityPanel extends StatelessWidget {
+  const _OperationsPriorityPanel({
+    required this.dashboard,
+    required this.onOpenReports,
+    required this.onOpenLetters,
+    required this.onOpenMembers,
+    required this.onOpenObservability,
+  });
+
+  final OperationsDashboard dashboard;
+  final VoidCallback onOpenReports;
+  final VoidCallback onOpenLetters;
+  final VoidCallback onOpenMembers;
+  final VoidCallback onOpenObservability;
+
+  @override
+  Widget build(BuildContext context) {
+    return AppSectionCard(
+      title: '우선 확인',
+      subtitle: _dashboardPriorityMessage(dashboard),
+      child: _CompactActionWrap(
+        children: [
+          FilledButton.icon(
+            key: const ValueKey('operations-priority-reports-button'),
+            onPressed: onOpenReports,
+            icon: const Icon(Icons.report_gmailerrorred_outlined),
+            label: Text(
+              dashboard.openReportCount > 0 ? '신고 먼저 확인' : '신고 검수',
+            ),
+          ),
+          FilledButton.icon(
+            key: const ValueKey('operations-priority-letters-button'),
+            onPressed: onOpenLetters,
+            icon: const Icon(Icons.mail_outline),
+            label: const Text('편지 검수'),
+          ),
+          OutlinedButton.icon(
+            key: const ValueKey('operations-priority-members-button'),
+            onPressed: onOpenMembers,
+            icon: const Icon(Icons.group_outlined),
+            label: const Text('회원 검색'),
+          ),
+          OutlinedButton.icon(
+            key: const ValueKey('operations-priority-observability-button'),
+            onPressed: onOpenObservability,
+            icon: const Icon(Icons.monitor_heart_outlined),
+            label: const Text('모바일 관측'),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -602,9 +667,7 @@ class _SystemActionPanel extends StatelessWidget {
 
     return AppSectionCard(
       title: '시스템 작업',
-      child: Wrap(
-        spacing: AppSpacing.xs,
-        runSpacing: AppSpacing.xs,
+      child: _CompactActionWrap(
         children: [
           if (status?.canOpenObservabilityTool ?? false)
             FilledButton.icon(
@@ -1360,9 +1423,7 @@ class _LetterDetail extends StatelessWidget {
           const SizedBox(height: AppSpacing.xs),
           _LetterReceiverCandidates(state: state, controller: controller),
           const SizedBox(height: AppSpacing.md),
-          Wrap(
-            spacing: AppSpacing.xs,
-            runSpacing: AppSpacing.xs,
+          _CompactActionWrap(
             children: [
               AppConfirmActionButton(
                 buttonKey: const ValueKey('operations-letter-note-button'),
@@ -1715,9 +1776,7 @@ class _MemberDetail extends StatelessWidget {
             ),
           ),
           const SizedBox(height: AppSpacing.md),
-          Wrap(
-            spacing: AppSpacing.xs,
-            runSpacing: AppSpacing.xs,
+          _CompactActionWrap(
             children: [
               AppConfirmActionButton(
                 buttonKey: const ValueKey('operations-member-block-button'),
@@ -2024,19 +2083,23 @@ class _ReportDetail extends StatelessWidget {
             ),
           ),
           const SizedBox(height: AppSpacing.md),
-          AppConfirmActionButton(
-            buttonKey: const ValueKey('operations-submit-button'),
-            confirmButtonKey:
-                const ValueKey('operations-confirm-submit-button'),
-            enabled: state.canSubmitAction,
-            icon: const Icon(Icons.gavel_outlined),
-            label: state.isSubmitting ? '저장 중' : '조치 저장',
-            confirmTitle: '조치 저장 확인',
-            confirmMessage:
-                '${state.selectedAction.label} 조치를 저장합니다. 사유와 상태가 운영 기록에 남습니다.',
-            confirmButtonLabel: '저장',
-            semanticLabel: '운영 조치 저장',
-            onConfirmed: onSubmit,
+          _CompactActionWrap(
+            children: [
+              AppConfirmActionButton(
+                buttonKey: const ValueKey('operations-submit-button'),
+                confirmButtonKey:
+                    const ValueKey('operations-confirm-submit-button'),
+                enabled: state.canSubmitAction,
+                icon: const Icon(Icons.gavel_outlined),
+                label: state.isSubmitting ? '저장 중' : '조치 저장',
+                confirmTitle: '조치 저장 확인',
+                confirmMessage:
+                    '${state.selectedAction.label} 조치를 저장합니다. 사유와 상태가 운영 기록에 남습니다.',
+                confirmButtonLabel: '저장',
+                semanticLabel: '운영 조치 저장',
+                onConfirmed: onSubmit,
+              ),
+            ],
           ),
           if (report.handledBy != null || report.actionReason != null) ...[
             const SizedBox(height: AppSpacing.md),
@@ -2061,6 +2124,22 @@ String _adminMemberLabel(AdminReportMember? member) {
     return '미배정';
   }
   return '${member.nickname} · ${member.email} · ${member.status}';
+}
+
+String _dashboardPriorityMessage(OperationsDashboard dashboard) {
+  if (dashboard.openReportCount > 0) {
+    return '미처리 신고 ${dashboard.openReportCount}건을 먼저 확인합니다.';
+  }
+
+  if (dashboard.receivableMemberCount == 0) {
+    return '편지 수신 가능 회원이 없어 회원 상태 확인이 필요합니다.';
+  }
+
+  if (dashboard.todayLetterCount > 0) {
+    return '오늘 편지 ${dashboard.todayLetterCount}건과 회원 상태를 함께 확인합니다.';
+  }
+
+  return '신고, 편지, 회원, 관측 순서로 운영 상태를 점검합니다.';
 }
 
 Future<bool> _launchExternalUri(Uri uri) {
