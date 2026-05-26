@@ -1,0 +1,323 @@
+{
+  "version": 1,
+  "platforms": {
+    "android": {
+      "store": "google-play",
+      "smokeBuildCommands": [
+        "tools/ci/run-mobile-release-preflight.sh --platform android",
+        "../tools/flutterw build apk --debug"
+      ],
+      "requiredResultFields": [
+        "deviceModel",
+        "osVersion",
+        "buildNumber",
+        "networkProfile",
+        "tester"
+      ],
+      "deviceProfiles": [
+        {
+          "id": "android-physical-primary",
+          "deviceType": "physical",
+          "formFactor": "phone",
+          "osRange": "Android 15+",
+          "networkProfiles": ["wifi", "slow-3g"],
+          "required": true
+        }
+      ]
+    },
+    "ios": {
+      "store": "app-store",
+      "smokeBuildCommands": [
+        "tools/ci/run-mobile-release-preflight.sh --platform ios",
+        "../tools/flutterw build ios --simulator --no-codesign"
+      ],
+      "requiredResultFields": [
+        "deviceModel",
+        "osVersion",
+        "buildNumber",
+        "networkProfile",
+        "tester"
+      ],
+      "deviceProfiles": [
+        {
+          "id": "ios-physical-primary",
+          "deviceType": "physical",
+          "formFactor": "phone",
+          "osRange": "current App Store supported iOS",
+          "networkProfiles": ["wifi", "slow-3g"],
+          "required": true
+        }
+      ]
+    }
+  },
+  "report": {
+    "requiredFields": [
+      "platform",
+      "deviceProfile",
+      "scenario",
+      "status",
+      "evidence",
+      "notes"
+    ],
+    "allowedStatuses": ["pending", "pass", "fail", "blocked", "not_applicable"],
+    "artifactNamePattern": "release-device-matrix-<platform>"
+  },
+  "scenarios": [
+    {
+      "id": "permissions.notifications.allow-deny",
+      "name": "알림 권한 허용/거부",
+      "area": "permissions",
+      "priority": "P0",
+      "platforms": ["android", "ios"],
+      "mode": "hybrid",
+      "passCriteria": "권한 허용 시 토큰 등록 상태가 표시되고, 거부 시 설정 열기 경로가 제공된다.",
+      "resultFields": ["status", "evidence", "notes"],
+      "evidenceRequired": ["권한 허용 화면", "권한 거부 후 설정 CTA"],
+      "automation": {
+        "commands": ["../tools/flutterw test test/features/notification/notification_controller_test.dart"],
+        "evidence": [
+          {
+            "path": "tools/ci/mobile-quality-gate-scenarios.json",
+            "patterns": ["push.registration", "PushNotificationState.registered"]
+          }
+        ]
+      }
+    },
+    {
+      "id": "permissions.photos.allow-deny",
+      "name": "사진 권한 허용/거부",
+      "area": "permissions",
+      "priority": "P0",
+      "platforms": ["android", "ios"],
+      "mode": "hybrid",
+      "passCriteria": "사진 선택 허용 시 이미지가 첨부되고, 거부 시 설정 이동 안내가 노출된다.",
+      "resultFields": ["status", "evidence", "notes"],
+      "evidenceRequired": ["사진 선택 성공", "권한 거부 안내"],
+      "automation": {
+        "commands": ["../tools/flutterw test test/features/diary/diary_screen_test.dart"],
+        "evidence": [
+          {
+            "path": "front/test/features/diary/diary_screen_test.dart",
+            "patterns": [
+              "picks a gallery image and submits a diary",
+              "shows permission settings action when image access is denied"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "permissions.camera.allow-deny",
+      "name": "카메라 권한 허용/거부",
+      "area": "permissions",
+      "priority": "P0",
+      "platforms": ["android", "ios"],
+      "mode": "hybrid",
+      "passCriteria": "카메라 실행 요청이 올바른 source로 전달되고 거부 시 사용자가 복구할 수 있다.",
+      "resultFields": ["status", "evidence", "notes"],
+      "evidenceRequired": ["카메라 실행", "권한 거부 복구 경로"],
+      "automation": {
+        "commands": ["../tools/flutterw test test/features/diary/diary_screen_test.dart"],
+        "evidence": [
+          {
+            "path": "front/test/features/diary/diary_screen_test.dart",
+            "patterns": ["camera action requests the camera source"]
+          }
+        ]
+      }
+    },
+    {
+      "id": "push.foreground-background-cold-start",
+      "name": "푸시 수신과 탭 라우팅",
+      "area": "push",
+      "priority": "P0",
+      "platforms": ["android", "ios"],
+      "mode": "hybrid",
+      "passCriteria": "포그라운드, 백그라운드, 종료 상태에서 푸시 탭이 목표 화면으로 이동한다.",
+      "resultFields": ["status", "evidence", "notes"],
+      "evidenceRequired": ["포그라운드 수신", "백그라운드 탭", "콜드스타트 탭"],
+      "automation": {
+        "commands": ["../tools/flutterw test test/features/notification/notification_tap_launch_queue_test.dart"],
+        "evidence": [
+          {
+            "path": "tools/ci/mobile-deeplink-push-coldstart.json",
+            "patterns": ["coldStart", "background", "foreground"]
+          }
+        ]
+      }
+    },
+    {
+      "id": "deeplink.external-login-cold-start",
+      "name": "외부 로그인 딥링크 콜드스타트",
+      "area": "deeplink",
+      "priority": "P0",
+      "platforms": ["android", "ios"],
+      "mode": "hybrid",
+      "passCriteria": "앱 종료 상태에서 로그인 콜백이 중복 처리 없이 세션 교환으로 이어진다.",
+      "resultFields": ["status", "evidence", "notes"],
+      "evidenceRequired": ["딥링크 URL", "세션 교환 성공 또는 안전한 오류"],
+      "automation": {
+        "commands": ["../tools/flutterw test test/features/auth/deeplink/external_login_controller_test.dart"],
+        "evidence": [
+          {
+            "path": "front/test/features/auth/deeplink/external_login_controller_test.dart",
+            "patterns": ["code callback exchanges provider code", "state mismatch callback"]
+          }
+        ]
+      }
+    },
+    {
+      "id": "media.camera-capture",
+      "name": "카메라 촬영 첨부",
+      "area": "media",
+      "priority": "P0",
+      "platforms": ["android", "ios"],
+      "mode": "manual",
+      "passCriteria": "실기기 카메라로 촬영한 이미지가 작성 화면에 첨부되고 제출 후 유지된다.",
+      "resultFields": ["status", "evidence", "notes"],
+      "evidenceRequired": ["촬영 전 권한", "촬영 이미지 미리보기", "저장 후 상세 화면"]
+    },
+    {
+      "id": "media.photo-library-pick",
+      "name": "사진 보관함 선택",
+      "area": "media",
+      "priority": "P0",
+      "platforms": ["android", "ios"],
+      "mode": "hybrid",
+      "passCriteria": "사진 선택 후 첨부 블록이 생성되고 제출 성공 후 이미지가 표시된다.",
+      "resultFields": ["status", "evidence", "notes"],
+      "evidenceRequired": ["사진 선택 화면", "첨부 미리보기", "제출 결과"],
+      "automation": {
+        "commands": ["../tools/flutterw test test/features/diary/diary_screen_test.dart"],
+        "evidence": [
+          {
+            "path": "front/test/features/diary/diary_screen_test.dart",
+            "patterns": ["picks a gallery image and submits a diary"]
+          }
+        ]
+      }
+    },
+    {
+      "id": "auth.logout",
+      "name": "로그아웃",
+      "area": "account",
+      "priority": "P0",
+      "platforms": ["android", "ios"],
+      "mode": "hybrid",
+      "passCriteria": "로그아웃 후 로컬 세션과 푸시 상태가 정리되고 로그인 화면으로 돌아간다.",
+      "resultFields": ["status", "evidence", "notes"],
+      "evidenceRequired": ["로그아웃 전 설정", "로그아웃 후 로그인 화면"],
+      "automation": {
+        "commands": ["../tools/flutterw test test/features/auth/auth_app_test.dart"],
+        "evidence": [
+          {
+            "path": "front/test/features/auth/auth_app_test.dart",
+            "patterns": ["unregisters the push token on logout", "login-email-field"]
+          }
+        ]
+      }
+    },
+    {
+      "id": "auth.account-deletion",
+      "name": "계정 삭제",
+      "area": "account",
+      "priority": "P0",
+      "platforms": ["android", "ios"],
+      "mode": "hybrid",
+      "passCriteria": "설정의 회원 탈퇴가 확인 절차를 거쳐 세션을 정리하고 재로그인 상태로 이동한다.",
+      "resultFields": ["status", "evidence", "notes"],
+      "evidenceRequired": ["회원 탈퇴 안내", "확인 다이얼로그", "세션 정리"],
+      "automation": {
+        "commands": ["../tools/flutterw test test/features/settings/settings_screen_test.dart"],
+        "evidence": [
+          {
+            "path": "front/test/features/settings/settings_screen_test.dart",
+            "patterns": ["confirms withdrawal and clears session", "settings-confirm-withdraw"]
+          }
+        ]
+      }
+    },
+    {
+      "id": "lifecycle.background-return",
+      "name": "백그라운드 복귀",
+      "area": "lifecycle",
+      "priority": "P0",
+      "platforms": ["android", "ios"],
+      "mode": "hybrid",
+      "passCriteria": "백그라운드 전환 후 복귀 시 알림/상담 연결이 중복 없이 회복된다.",
+      "resultFields": ["status", "evidence", "notes"],
+      "evidenceRequired": ["백그라운드 진입", "복귀 후 화면", "중복 이벤트 없음"],
+      "automation": {
+        "commands": ["../tools/flutterw test test/features/notification/notification_controller_test.dart test/features/consultation/consultation_controller_test.dart"],
+        "evidence": [
+          {
+            "path": "tools/ci/mobile-quality-gate-scenarios.json",
+            "patterns": ["realtime.lifecycle", "handleLifecycleState(AppLifecycleState.resumed)"]
+          }
+        ]
+      }
+    },
+    {
+      "id": "accessibility.large-text",
+      "name": "큰 글씨",
+      "area": "accessibility",
+      "priority": "P0",
+      "platforms": ["android", "ios"],
+      "mode": "hybrid",
+      "passCriteria": "큰 글씨 설정에서도 주요 CTA와 상태 메시지가 잘리지 않는다.",
+      "resultFields": ["status", "evidence", "notes"],
+      "evidenceRequired": ["큰 글씨 설정", "주요 화면 스크린샷"],
+      "automation": {
+        "commands": ["../tools/flutterw test test/quality/mobile_quality_gate_test.dart"],
+        "evidence": [
+          {
+            "path": "front/test/quality/mobile_quality_gate_test.dart",
+            "patterns": ["small-screen-large-text", "greaterThanOrEqualTo(48)"]
+          }
+        ]
+      }
+    },
+    {
+      "id": "accessibility.screen-reader",
+      "name": "스크린 리더",
+      "area": "accessibility",
+      "priority": "P1",
+      "platforms": ["android", "ios"],
+      "mode": "manual",
+      "passCriteria": "주요 탭, 작성 CTA, 위험 작업 확인 버튼의 라벨과 순서가 이해 가능하다.",
+      "resultFields": ["status", "evidence", "notes"],
+      "evidenceRequired": ["TalkBack 또는 VoiceOver 녹화", "탭 순서 메모"]
+    },
+    {
+      "id": "layout.rotation",
+      "name": "회전",
+      "area": "layout",
+      "priority": "P1",
+      "platforms": ["android", "ios"],
+      "mode": "hybrid",
+      "passCriteria": "세로/가로 전환 후 입력값과 스크롤 위치가 손상되지 않는다.",
+      "resultFields": ["status", "evidence", "notes"],
+      "evidenceRequired": ["세로 화면", "가로 화면", "복귀 후 상태"],
+      "automation": {
+        "commands": ["../tools/flutterw test test/quality/mobile_quality_gate_test.dart"],
+        "evidence": [
+          {
+            "path": "tools/ci/mobile-quality-gate-scenarios.json",
+            "patterns": ["rotated-landscape", "layout.accessibility"]
+          }
+        ]
+      }
+    },
+    {
+      "id": "network.slow-connection",
+      "name": "저속 네트워크",
+      "area": "network",
+      "priority": "P1",
+      "platforms": ["android", "ios"],
+      "mode": "manual",
+      "passCriteria": "저속 네트워크에서 로딩, 재시도, 중복 제출 방지가 사용자에게 명확하다.",
+      "resultFields": ["status", "evidence", "notes"],
+      "evidenceRequired": ["네트워크 제한 설정", "로딩 상태", "재시도 상태"]
+    }
+  ]
+}
