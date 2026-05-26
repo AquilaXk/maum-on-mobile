@@ -7,6 +7,10 @@ import com.maumonmobile.application.port.`in`.LoginCommand
 import com.maumonmobile.application.port.`in`.LogoutCommand
 import com.maumonmobile.application.port.`in`.OidcAuthorizeCommand
 import com.maumonmobile.application.port.`in`.OidcCallbackCommand
+import com.maumonmobile.application.port.`in`.PasswordResetConfirmCommand
+import com.maumonmobile.application.port.`in`.PasswordResetConfirmResult
+import com.maumonmobile.application.port.`in`.PasswordResetRequestCommand
+import com.maumonmobile.application.port.`in`.PasswordResetRequestResult
 import com.maumonmobile.application.port.`in`.RefreshCommand
 import com.maumonmobile.application.port.`in`.SignupCommand
 import com.maumonmobile.global.security.AuthenticatedUser
@@ -73,6 +77,31 @@ class AuthController(
         @Valid @RequestBody request: RefreshRequest,
     ): ApiResponse<AuthSessionResult> {
         return ApiResponse.success(authUseCase.refresh(RefreshCommand(request.refreshToken)))
+    }
+
+    @PostMapping("/password-reset/request")
+    fun requestPasswordReset(
+        @Valid @RequestBody request: PasswordResetRequest,
+    ): ApiResponse<PasswordResetRequestResult> {
+        return ApiResponse.success(
+            authUseCase.requestPasswordReset(
+                PasswordResetRequestCommand(email = request.email),
+            ),
+        )
+    }
+
+    @PostMapping("/password-reset/confirm")
+    fun confirmPasswordReset(
+        @Valid @RequestBody request: PasswordResetConfirmRequest,
+    ): ApiResponse<PasswordResetConfirmResult> {
+        return ApiResponse.success(
+            authUseCase.confirmPasswordReset(
+                PasswordResetConfirmCommand(
+                    token = request.token,
+                    newPassword = request.newPassword,
+                ),
+            ),
+        )
     }
 
     @GetMapping("/oidc/authorize/{provider}")
@@ -157,6 +186,20 @@ data class RefreshRequest(
 
 data class LogoutRequest(
     val refreshToken: String? = null,
+)
+
+data class PasswordResetRequest(
+    @field:NotBlank
+    @field:Email
+    val email: String,
+)
+
+data class PasswordResetConfirmRequest(
+    @field:NotBlank
+    val token: String,
+    @field:NotBlank
+    @field:Size(min = 8)
+    val newPassword: String,
 )
 
 private fun Authentication.authenticatedUser(): AuthenticatedUser {
