@@ -56,5 +56,5 @@ test("mobile notification routing UX contract defines permission and connection 
     "disconnected",
     "unstable",
   ]);
-  assert.equal(contract.platforms.join(","), "android,ios");
+  assert.deepEqual([...contract.platforms].sort(), ["android", "ios"]);
 });
