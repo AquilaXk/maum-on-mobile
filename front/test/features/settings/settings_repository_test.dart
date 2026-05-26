@@ -124,7 +124,7 @@ void main() {
       final partialPolicy = MemberRetentionPolicy.fromJson({
         'exportExpiryHours': 48,
       });
-      final expiredExport = MemberDataExportJob(
+      const expiredExport = MemberDataExportJob(
         id: 4,
         status: MemberDataExportStatus.completed,
         requestedAt: '2026-05-26T00:00:00Z',
