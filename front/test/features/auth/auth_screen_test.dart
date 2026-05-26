@@ -158,6 +158,11 @@ class _FakeAuthRepository implements AuthRepository {
   }
 
   @override
+  Future<AuthSession> exchangeOidcSession(OidcSessionRequest request) {
+    throw UnimplementedError();
+  }
+
+  @override
   Future<void> saveSession(AuthSession session) {
     throw UnimplementedError();
   }

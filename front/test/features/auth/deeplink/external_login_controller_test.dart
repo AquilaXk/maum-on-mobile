@@ -20,10 +20,11 @@ void main() {
 
       await controller.start(provider: 'kakao');
 
-      expect(launcher.launchedUris.single.path, '/api/v1/auth/oidc/authorize/kakao');
+      expect(launcher.launchedUris.single.path,
+          '/api/v1/auth/oidc/authorize/kakao');
       expect(
         launcher.launchedUris.single.queryParameters['redirect_uri'],
-        'maumon://auth/callback',
+        'maumon://auth/callback?provider=kakao',
       );
       expect(controller.state.isStarting, isFalse);
       expect(controller.state.errorMessage, isNull);
@@ -48,7 +49,7 @@ void main() {
       expect(controller.state.errorMessage, '외부 로그인을 시작할 수 없습니다.');
     });
 
-    test('success callback stores returned tokens and authenticates the app',
+    test('code callback exchanges provider code and authenticates the app',
         () async {
       final repository = _FakeAuthRepository(restoredSession: _session());
       final authController = AuthController(
@@ -64,27 +65,22 @@ void main() {
 
       final handled = await controller.handleIncomingUri(
         Uri.parse(
-          'maumon://auth/callback?status=success'
-          '&access_token=external-access'
-          '&refresh_token=external-refresh'
-          '&token_type=Bearer'
-          '&expires_in=3600'
-          '&member_id=7'
-          '&email=me%40example.com'
-          '&nickname=%EB%A7%88%EC%9D%8C%EC%9D%B4'
-          '&role=USER'
-          '&member_status=ACTIVE',
+          'maumon://auth/callback?provider=kakao'
+          '&code=provider-code'
+          '&state=provider-state',
         ),
       );
 
       expect(handled, isTrue);
       expect(authController.state.isAuthenticated, isTrue);
-      expect(repository.savedExternalSessions.single.accessToken, 'external-access');
-      expect(repository.savedExternalSessions.single.refreshToken, 'external-refresh');
+      expect(repository.oidcSessionRequests.single.provider, 'kakao');
+      expect(repository.oidcSessionRequests.single.code, 'provider-code');
+      expect(repository.oidcSessionRequests.single.state, 'provider-state');
       expect(controller.state.errorMessage, isNull);
     });
 
-    test('success callback without member status defaults to active', () async {
+    test('code callback uses the started provider when callback omits provider',
+        () async {
       final repository = _FakeAuthRepository(restoredSession: _session());
       final authController = AuthController(
         authRepository: repository,
@@ -97,33 +93,20 @@ void main() {
         ),
       );
 
+      await controller.start(provider: 'kakao');
       final handled = await controller.handleIncomingUri(
         Uri.parse(
-          'maumon://auth/callback?status=success'
-          '&access_token=external-access'
-          '&refresh_token=external-refresh'
-          '&member_id=7'
-          '&email=me%40example.com'
-          '&nickname=%EB%A7%88%EC%9D%8C%EC%9D%B4',
+          'maumon://auth/callback?code=provider-code&state=provider-state',
         ),
       );
 
       expect(handled, isTrue);
       expect(authController.state.isAuthenticated, isTrue);
-      expect(
-        repository.savedExternalSessions.single.accessToken,
-        'external-access',
-      );
-      expect(
-        repository.savedExternalSessions.single.refreshToken,
-        'external-refresh',
-      );
-      expect(repository.savedExternalSessions.single.member.status, 'ACTIVE');
+      expect(repository.oidcSessionRequests.single.provider, 'kakao');
       expect(controller.state.errorMessage, isNull);
     });
 
-    test('success callback without tokens falls back to session restore',
-        () async {
+    test('code callback without provider shows a retry message', () async {
       final authController = AuthController(
         authRepository: _FakeAuthRepository(restoredSession: _session()),
       );
@@ -140,11 +123,40 @@ void main() {
       );
 
       expect(handled, isTrue);
-      expect(authController.state.isAuthenticated, isTrue);
-      expect(controller.state.errorMessage, isNull);
+      expect(authController.state.isAuthenticated, isFalse);
+      expect(controller.state.errorMessage, '로그인 제공자를 확인할 수 없습니다. 다시 시도해 주세요.');
     });
 
-    test('cancel callback stays unauthenticated with a screen message', () async {
+    test('raw token callback is rejected to keep tokens out of deeplink',
+        () async {
+      final repository = _FakeAuthRepository(restoredSession: _session());
+      final authController = AuthController(
+        authRepository: repository,
+      );
+      final controller = ExternalLoginController(
+        authController: authController,
+        launcher: _RecordingExternalLoginLauncher(),
+        config: ExternalLoginConfig(
+          apiBaseUrl: Uri.parse('https://api.example.test'),
+        ),
+      );
+
+      final handled = await controller.handleIncomingUri(
+        Uri.parse(
+          'maumon://auth/callback?status=success'
+          '&access_token=external-access'
+          '&refresh_token=external-refresh',
+        ),
+      );
+
+      expect(handled, isTrue);
+      expect(authController.state.isAuthenticated, isFalse);
+      expect(repository.savedExternalSessions, isEmpty);
+      expect(controller.state.errorMessage, '외부 로그인 결과를 확인할 수 없습니다.');
+    });
+
+    test('cancel callback stays unauthenticated with a screen message',
+        () async {
       final authController = AuthController(
         authRepository: _FakeAuthRepository(restoredSession: _session()),
       );
@@ -177,7 +189,8 @@ void main() {
       );
 
       final handled = await controller.handleIncomingUri(
-        Uri.parse('maumon://auth/callback?error=state_mismatch&state=secret-state'),
+        Uri.parse(
+            'maumon://auth/callback?error=state_mismatch&state=secret-state'),
       );
 
       expect(handled, isTrue);
@@ -242,6 +255,7 @@ class _FakeAuthRepository implements AuthRepository {
 
   final AuthSession restoredSession;
   final List<AuthSession> savedExternalSessions = [];
+  final List<OidcSessionRequest> oidcSessionRequests = [];
 
   @override
   Future<AuthMember> signup(SignupRequest request) {
@@ -269,6 +283,12 @@ class _FakeAuthRepository implements AuthRepository {
   @override
   Future<AuthSession> refreshSession() {
     throw UnimplementedError();
+  }
+
+  @override
+  Future<AuthSession> exchangeOidcSession(OidcSessionRequest request) async {
+    oidcSessionRequests.add(request);
+    return restoredSession;
   }
 
   @override

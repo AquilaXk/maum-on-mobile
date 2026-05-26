@@ -128,6 +128,25 @@ class PasswordResetConfirmRequest {
   }
 }
 
+class OidcSessionRequest {
+  const OidcSessionRequest({
+    required this.provider,
+    required this.code,
+    required this.state,
+  });
+
+  final String provider;
+  final String code;
+  final String state;
+
+  Map<String, Object?> toJson() {
+    return {
+      'code': code,
+      'state': state,
+    };
+  }
+}
+
 int _readInt(Map<String, Object?> map, String key) {
   final value = map[key];
 

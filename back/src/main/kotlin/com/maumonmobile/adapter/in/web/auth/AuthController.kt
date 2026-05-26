@@ -5,6 +5,7 @@ import com.maumonmobile.application.port.`in`.AuthSessionResult
 import com.maumonmobile.application.port.`in`.AuthUseCase
 import com.maumonmobile.application.port.`in`.LoginCommand
 import com.maumonmobile.application.port.`in`.LogoutCommand
+import com.maumonmobile.application.port.`in`.OidcAppCallbackCommand
 import com.maumonmobile.application.port.`in`.OidcAuthorizeCommand
 import com.maumonmobile.application.port.`in`.OidcCallbackCommand
 import com.maumonmobile.application.port.`in`.PasswordResetConfirmCommand
@@ -119,6 +120,22 @@ class AuthController(
         return redirect(result.authorizationUri)
     }
 
+    @PostMapping("/oidc/session/{provider}")
+    fun completeOidcAppCallback(
+        @PathVariable provider: String,
+        @Valid @RequestBody request: OidcAppCallbackRequest,
+    ): ApiResponse<AuthSessionResult> {
+        return ApiResponse.success(
+            authUseCase.completeOidcAppCallback(
+                OidcAppCallbackCommand(
+                    provider = provider,
+                    state = request.state,
+                    code = request.code,
+                ),
+            ),
+        )
+    }
+
     @GetMapping("/oidc/callback/{provider}")
     fun completeOidcCallback(
         @PathVariable provider: String,
@@ -200,6 +217,13 @@ data class PasswordResetConfirmRequest(
     @field:NotBlank
     @field:Size(min = 8)
     val newPassword: String,
+)
+
+data class OidcAppCallbackRequest(
+    @field:NotBlank
+    val state: String,
+    @field:NotBlank
+    val code: String,
 )
 
 private fun Authentication.authenticatedUser(): AuthenticatedUser {

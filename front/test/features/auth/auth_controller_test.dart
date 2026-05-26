@@ -21,7 +21,8 @@ void main() {
       expect(controller.state.errorMessage, isNull);
     });
 
-    test('login failure keeps unauthenticated state with screen-ready error', () async {
+    test('login failure keeps unauthenticated state with screen-ready error',
+        () async {
       final controller = AuthController(
         authRepository: _FakeAuthRepository(
           loginError: const ApiClientException(
@@ -223,6 +224,11 @@ class _FakeAuthRepository implements AuthRepository {
 
   @override
   Future<AuthSession> refreshSession() {
+    throw UnimplementedError();
+  }
+
+  @override
+  Future<AuthSession> exchangeOidcSession(OidcSessionRequest request) {
     throw UnimplementedError();
   }
 

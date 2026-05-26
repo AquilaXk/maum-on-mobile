@@ -308,7 +308,7 @@ class AuthControllerTest @Autowired constructor(
     @Test
     fun oidcAuthorizeStoresStateAndRedirectsToProvider() {
         val result = mockMvc.get("/api/v1/auth/oidc/authorize/kakao") {
-            param("redirect_uri", "maumon://auth/callback")
+            param("redirect_uri", "maumon://auth/callback?provider=kakao")
         }
             .andExpect {
                 status { is3xxRedirection() }
@@ -322,10 +322,11 @@ class AuthControllerTest @Autowired constructor(
         assertThat(location.path).isEqualTo("/kakao/authorize")
         assertThat(query["response_type"]).isEqualTo("code")
         assertThat(query["client_id"]).isEqualTo("maum-on-mobile")
-        assertThat(query["redirect_uri"]).isEqualTo("http://localhost/api/v1/auth/oidc/callback/kakao")
+        assertThat(query["redirect_uri"]).isEqualTo("maumon://auth/callback?provider=kakao")
         assertThat(query["state"]).hasSizeGreaterThanOrEqualTo(24)
         assertThat(query["nonce"]).hasSizeGreaterThanOrEqualTo(24)
         assertThat(query["code_challenge"]).hasSizeGreaterThanOrEqualTo(24)
+        assertThat(query["code_challenge_method"]).isEqualTo("S256")
     }
 
     @Test
@@ -340,36 +341,30 @@ class AuthControllerTest @Autowired constructor(
     }
 
     @Test
-    fun oidcCallbackIssuesSessionDeeplinkAndRejectsStateReuse() {
+    fun oidcAppCallbackExchangesCodeForJsonSessionAndRejectsStateReuse() {
         val authorizeLocation = mockMvc.get("/api/v1/auth/oidc/authorize/kakao") {
-            param("redirect_uri", "maumon://auth/callback")
+            param("redirect_uri", "maumon://auth/callback?provider=kakao")
         }
             .andReturn()
             .response
             .getHeader("Location")!!
         val state = URI(authorizeLocation).queryParameters().getValue("state")
 
-        val callbackResult = mockMvc.get("/api/v1/auth/oidc/callback/kakao") {
-            param("code", "social-code")
-            param("state", state)
+        val callbackResult = mockMvc.post("/api/v1/auth/oidc/session/kakao") {
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"code":"social-code","state":"$state"}"""
         }
             .andExpect {
-                status { is3xxRedirection() }
+                status { isOk() }
+                jsonPath("$.success") { value(true) }
+                jsonPath("$.data.accessToken") { value(not(blankOrNullString())) }
+                jsonPath("$.data.refreshToken") { value(not(blankOrNullString())) }
+                jsonPath("$.data.tokenType") { value("Bearer") }
+                jsonPath("$.data.member.email") { value("kakao-verified-social-code@social.maumon.local") }
             }
             .andReturn()
 
-        val appCallback = URI(callbackResult.response.getHeader("Location")!!)
-        val callbackQuery = appCallback.queryParameters()
-
-        assertThat(appCallback.scheme).isEqualTo("maumon")
-        assertThat(appCallback.host).isEqualTo("auth")
-        assertThat(appCallback.path).isEqualTo("/callback")
-        assertThat(callbackQuery["status"]).isEqualTo("success")
-        assertThat(callbackQuery["access_token"]).isNotBlank()
-        assertThat(callbackQuery["refresh_token"]).isNotBlank()
-        assertThat(callbackQuery["email"]).isEqualTo("kakao-verified-social-code@social.maumon.local")
-
-        val accessToken = callbackQuery.getValue("access_token")
+        val accessToken = callbackResult.response.readJsonString("$.data.accessToken")
         mockMvc.get("/api/v1/auth/me") {
             header("Authorization", "Bearer $accessToken")
         }
@@ -378,23 +373,42 @@ class AuthControllerTest @Autowired constructor(
                 jsonPath("$.data.email") { value("kakao-verified-social-code@social.maumon.local") }
             }
 
-        val reused = mockMvc.get("/api/v1/auth/oidc/callback/kakao") {
-            param("code", "social-code")
-            param("state", state)
+        mockMvc.post("/api/v1/auth/oidc/session/kakao") {
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"code":"social-code","state":"$state"}"""
         }
             .andExpect {
-                status { is3xxRedirection() }
+                status { isUnauthorized() }
+                jsonPath("$.success") { value(false) }
+                jsonPath("$.error.code") { value("UNAUTHORIZED") }
             }
-            .andReturn()
-
-        assertThat(URI(reused.response.getHeader("Location")!!).queryParameters()["error"])
-            .isEqualTo("state_mismatch")
     }
 
     @Test
-    fun oidcCallbackRejectsCodesThatProviderCannotVerify() {
+    fun oidcAppCallbackRejectsCodesThatProviderCannotVerify() {
         val authorizeLocation = mockMvc.get("/api/v1/auth/oidc/authorize/kakao") {
-            param("redirect_uri", "maumon://auth/callback")
+            param("redirect_uri", "maumon://auth/callback?provider=kakao")
+        }
+            .andReturn()
+            .response
+            .getHeader("Location")!!
+        val state = URI(authorizeLocation).queryParameters().getValue("state")
+
+        mockMvc.post("/api/v1/auth/oidc/session/kakao") {
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"code":"invalid-code","state":"$state"}"""
+        }
+            .andExpect {
+                status { isUnauthorized() }
+                jsonPath("$.success") { value(false) }
+                jsonPath("$.error.code") { value("UNAUTHORIZED") }
+            }
+    }
+
+    @Test
+    fun oidcServerCallbackDoesNotExposeMobileSessionTokensInDeeplink() {
+        val authorizeLocation = mockMvc.get("/api/v1/auth/oidc/authorize/kakao") {
+            param("redirect_uri", "maumon://auth/callback?provider=kakao")
         }
             .andReturn()
             .response
@@ -402,7 +416,7 @@ class AuthControllerTest @Autowired constructor(
         val state = URI(authorizeLocation).queryParameters().getValue("state")
 
         val callbackResult = mockMvc.get("/api/v1/auth/oidc/callback/kakao") {
-            param("code", "invalid-code")
+            param("code", "social-code")
             param("state", state)
         }
             .andExpect {
@@ -414,12 +428,13 @@ class AuthControllerTest @Autowired constructor(
 
         assertThat(callbackQuery["error"]).isEqualTo("invalid_request")
         assertThat(callbackQuery["access_token"]).isNull()
+        assertThat(callbackQuery["refresh_token"]).isNull()
     }
 
     @Test
     fun oidcCallbackReturnsProviderErrorsToAppDeeplink() {
         val authorizeLocation = mockMvc.get("/api/v1/auth/oidc/authorize/google") {
-            param("redirect_uri", "maumon://auth/callback")
+            param("redirect_uri", "maumon://auth/callback?provider=google")
         }
             .andReturn()
             .response
@@ -453,6 +468,8 @@ class AuthControllerTest @Autowired constructor(
                 }
                 assertThat(command.expectedNonce).isNotBlank()
                 assertThat(command.codeVerifier).isNotBlank()
+                assertThat(command.redirectUri)
+                    .isEqualTo("maumon://auth/callback?provider=${command.provider}")
                 return AuthOidcIdentity(
                     issuer = "https://login.maumon.local/${command.provider}",
                     subject = "verified-${command.code}",

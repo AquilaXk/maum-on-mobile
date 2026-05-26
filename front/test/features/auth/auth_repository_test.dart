@@ -130,6 +130,44 @@ void main() {
       expect(transport.requests.single.body, {'refreshToken': 'old-refresh'});
     });
 
+    test('exchangeOidcSession sends provider code and stores returned tokens',
+        () async {
+      final transport = _FakeApiTransport([
+        ApiTransportResponse.ok(_tokenEnvelope(
+          accessToken: 'oidc-access',
+          refreshToken: 'oidc-refresh',
+        )),
+      ]);
+      final tokenStore = MemoryAuthTokenStore();
+      final repository = ApiAuthRepository(
+        apiClient: ApiClient(transport: transport, tokenStore: tokenStore),
+        tokenStore: tokenStore,
+      );
+
+      final session = await repository.exchangeOidcSession(
+        const OidcSessionRequest(
+          provider: 'kakao',
+          code: 'provider-code',
+          state: 'provider-state',
+        ),
+      );
+
+      expect(session.accessToken, 'oidc-access');
+      expect(await tokenStore.readAccessToken(), 'oidc-access');
+      expect(await tokenStore.readRefreshToken(), 'oidc-refresh');
+      expect(transport.requests.single.method, ApiMethod.post);
+      expect(
+        transport.requests.single.path,
+        '/api/v1/auth/oidc/session/kakao',
+      );
+      expect(transport.requests.single.requiresAuth, isFalse);
+      expect(transport.requests.single.retryOnUnauthorized, isFalse);
+      expect(transport.requests.single.body, {
+        'code': 'provider-code',
+        'state': 'provider-state',
+      });
+    });
+
     test('requestPasswordReset sends email without authentication', () async {
       final transport = _FakeApiTransport([
         ApiTransportResponse.ok({'success': true}),

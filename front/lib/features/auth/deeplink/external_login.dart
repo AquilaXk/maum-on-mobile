@@ -5,7 +5,6 @@ import 'package:flutter/foundation.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../application/auth_controller.dart';
-import '../domain/auth_models.dart';
 
 class ExternalLoginConfig {
   const ExternalLoginConfig({
@@ -28,6 +27,14 @@ class ExternalLoginConfig {
     );
   }
 
+  Uri callbackUri({required String provider}) {
+    return redirectUri.replace(
+      queryParameters: {
+        'provider': provider,
+      },
+    );
+  }
+
   Uri authorizeUri({required String provider}) {
     final encodedProvider = Uri.encodeComponent(provider);
     final endpoint = apiBaseUrl.resolve(
@@ -36,7 +43,7 @@ class ExternalLoginConfig {
 
     return endpoint.replace(
       queryParameters: {
-        'redirect_uri': redirectUri.toString(),
+        'redirect_uri': callbackUri(provider: provider).toString(),
       },
     );
   }
@@ -87,7 +94,8 @@ abstract interface class ExternalLoginDeepLinkSource {
   Stream<Uri> get uriStream;
 }
 
-class AppLinksExternalLoginDeepLinkSource implements ExternalLoginDeepLinkSource {
+class AppLinksExternalLoginDeepLinkSource
+    implements ExternalLoginDeepLinkSource {
   AppLinksExternalLoginDeepLinkSource({
     AppLinks? appLinks,
   }) : _appLinks = appLinks ?? AppLinks();
@@ -117,17 +125,20 @@ class ExternalLoginController extends ChangeNotifier {
   final ExternalLoginConfig _config;
 
   ExternalLoginState _state = const ExternalLoginState();
+  String? _pendingProvider;
 
   ExternalLoginState get state => _state;
 
   Future<void> start({required String provider}) async {
+    final normalizedProvider = provider.trim();
     _setState(
       _state.copyWith(isStarting: true, clearErrorMessage: true),
     );
 
     final launched = await _launcher.launch(
-      _config.authorizeUri(provider: provider),
+      _config.authorizeUri(provider: normalizedProvider),
     );
+    _pendingProvider = launched ? normalizedProvider : null;
 
     _setState(
       _state.copyWith(
@@ -161,32 +172,8 @@ class ExternalLoginController extends ChangeNotifier {
       return true;
     }
 
-    if (status == 'success' || _hasCodeAndState(query)) {
-      final session = _sessionFromCallback(query);
-      if (session != null) {
-        try {
-          await _authController.completeExternalLogin(session);
-          _setState(const ExternalLoginState());
-        } on Object {
-          _setState(
-            const ExternalLoginState(
-              errorMessage: '로그인 세션을 저장하지 못했습니다. 다시 시도해 주세요.',
-            ),
-          );
-        }
-        return true;
-      }
-
-      _setState(const ExternalLoginState());
-      await _authController.restoreSession();
-
-      if (!_authController.state.isAuthenticated) {
-        _setState(
-          const ExternalLoginState(
-            errorMessage: '로그인 세션을 확인하지 못했습니다. 다시 시도해 주세요.',
-          ),
-        );
-      }
+    if (_hasCodeAndState(query)) {
+      await _exchangeCode(query);
       return true;
     }
 
@@ -196,54 +183,48 @@ class ExternalLoginController extends ChangeNotifier {
     return true;
   }
 
+  Future<void> _exchangeCode(Map<String, String> query) async {
+    final provider = _callbackProvider(query);
+    if (provider == null) {
+      _setState(
+        const ExternalLoginState(
+          errorMessage: '로그인 제공자를 확인할 수 없습니다. 다시 시도해 주세요.',
+        ),
+      );
+      return;
+    }
+
+    try {
+      await _authController.completeExternalLoginCallback(
+        provider: provider,
+        code: query['code']!,
+        state: query['state']!,
+      );
+      _pendingProvider = null;
+      _setState(const ExternalLoginState());
+    } on Object {
+      _setState(
+        const ExternalLoginState(
+          errorMessage: '로그인 세션을 확인하지 못했습니다. 다시 시도해 주세요.',
+        ),
+      );
+    }
+  }
+
+  String? _callbackProvider(Map<String, String> query) {
+    final provider = query['provider']?.trim();
+    if (provider != null && provider.isNotEmpty) {
+      return provider;
+    }
+
+    return _pendingProvider;
+  }
+
   bool _hasCodeAndState(Map<String, String> query) {
     final code = query['code'];
     final state = query['state'];
 
     return code != null && code.isNotEmpty && state != null && state.isNotEmpty;
-  }
-
-  AuthSession? _sessionFromCallback(Map<String, String> query) {
-    final accessToken = query['access_token'] ?? query['accessToken'];
-    if (accessToken == null || accessToken.isEmpty) {
-      return null;
-    }
-
-    final memberId = int.tryParse(query['member_id'] ?? query['memberId'] ?? '');
-    final email = query['email'];
-    final nickname = query['nickname'];
-    if (memberId == null || email == null || email.isEmpty || nickname == null) {
-      return null;
-    }
-
-    return AuthSession(
-      accessToken: accessToken,
-      refreshToken: query['refresh_token'] ?? query['refreshToken'],
-      tokenType: query['token_type'] ?? query['tokenType'] ?? 'Bearer',
-      expiresInSeconds: int.tryParse(
-            query['expires_in'] ?? query['expiresInSeconds'] ?? '',
-          ) ??
-          0,
-      member: AuthMember(
-        id: memberId,
-        email: email,
-        nickname: nickname,
-        role: query['role'] ?? 'USER',
-        status: _memberStatusFromCallback(
-          query['member_status'] ?? query['memberStatus'],
-        ),
-      ),
-    );
-  }
-
-  String _memberStatusFromCallback(String? value) {
-    switch (value) {
-      case 'ACTIVE':
-      case 'WITHDRAWN':
-        return value!;
-      default:
-        return 'ACTIVE';
-    }
   }
 
   String _messageFromError(Map<String, String> query) {
