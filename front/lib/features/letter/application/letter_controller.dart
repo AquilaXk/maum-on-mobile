@@ -392,15 +392,26 @@ class LetterController extends ChangeNotifier {
 
     try {
       final detail = await _letterRepository.fetchLetter(id);
-      final replyDraft = await _draftRepository?.read(_replyDraftKey(id));
       _writingNotifiedLetterId = null;
       _setState(
         _state.copyWith(
           selectedLetter: detail,
+          replyContent: detail.replyContent ?? '',
+          isLoading: false,
+          clearErrorMessage: true,
+        ),
+      );
+      // 상세는 먼저 보여주고, 답장 임시저장은 늦게 도착해도 같은 편지에만 반영한다.
+      final replyDraft = await _draftRepository?.read(_replyDraftKey(id));
+      if (_state.mode != LetterViewMode.detail ||
+          _state.selectedLetter?.id != id) {
+        return;
+      }
+      _setState(
+        _state.copyWith(
           replyContent: replyDraft?.fields['content'] ??
               detail.replyContent ??
               '',
-          isLoading: false,
           clearErrorMessage: true,
         ),
       );
