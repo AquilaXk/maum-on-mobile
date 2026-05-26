@@ -29,6 +29,8 @@ class StoryState {
     this.storyContent = '',
     this.storyCategory = StoryCategory.worry,
     this.commentDraft = '',
+    this.activeReplyCommentId,
+    this.replyDrafts = const {},
     this.editingCommentId,
     this.editingCommentContent = '',
     this.isListLoading = false,
@@ -54,6 +56,8 @@ class StoryState {
   final String storyContent;
   final StoryCategory storyCategory;
   final String commentDraft;
+  final int? activeReplyCommentId;
+  final Map<int, String> replyDrafts;
   final int? editingCommentId;
   final String editingCommentContent;
   final bool isListLoading;
@@ -77,6 +81,11 @@ class StoryState {
   }
 
   bool get canSubmitComment => commentDraft.trim().isNotEmpty && !isSubmitting;
+
+  bool canSubmitReply(int parentCommentId) {
+    return replyDrafts[parentCommentId]?.trim().isNotEmpty == true &&
+        !isSubmitting;
+  }
 
   bool get canSubmitCommentEdit =>
       editingCommentContent.trim().isNotEmpty &&
@@ -109,6 +118,9 @@ class StoryState {
     String? storyContent,
     StoryCategory? storyCategory,
     String? commentDraft,
+    int? activeReplyCommentId,
+    bool clearActiveReplyCommentId = false,
+    Map<int, String>? replyDrafts,
     int? editingCommentId,
     bool clearEditingCommentId = false,
     String? editingCommentContent,
@@ -140,6 +152,10 @@ class StoryState {
       storyContent: storyContent ?? this.storyContent,
       storyCategory: storyCategory ?? this.storyCategory,
       commentDraft: commentDraft ?? this.commentDraft,
+      activeReplyCommentId: clearActiveReplyCommentId
+          ? null
+          : activeReplyCommentId ?? this.activeReplyCommentId,
+      replyDrafts: replyDrafts ?? this.replyDrafts,
       editingCommentId: clearEditingCommentId
           ? null
           : editingCommentId ?? this.editingCommentId,
@@ -317,6 +333,8 @@ class StoryController extends ChangeNotifier {
           comments: commentsPage.items,
           isDetailLoading: false,
           commentDraft: commentDraft,
+          clearActiveReplyCommentId: true,
+          replyDrafts: const {},
           clearEditingCommentId: true,
           editingCommentContent: '',
           clearErrorMessage: true,
@@ -334,6 +352,8 @@ class StoryController extends ChangeNotifier {
         mode: StoryViewMode.list,
         clearSelectedStory: true,
         comments: const [],
+        clearActiveReplyCommentId: true,
+        replyDrafts: const {},
         clearEditingStoryId: true,
         clearEditingCommentId: true,
         clearErrorMessage: true,
@@ -526,6 +546,48 @@ class StoryController extends ChangeNotifier {
     _saveCommentDraft();
   }
 
+  void startReply(StoryComment comment) {
+    final currentDraft = _state.replyDrafts[comment.id];
+    final shouldPrefillMention =
+        comment.authorId != _currentMemberId && (currentDraft ?? '').isEmpty;
+    final nextDrafts = Map<int, String>.of(_state.replyDrafts);
+    if (shouldPrefillMention) {
+      nextDrafts[comment.id] = '@${comment.authorNickname} ';
+    }
+
+    _setState(
+      _state.copyWith(
+        activeReplyCommentId: comment.id,
+        replyDrafts: nextDrafts,
+        clearErrorMessage: true,
+        clearNoticeMessage: true,
+      ),
+    );
+  }
+
+  void cancelReply(int parentCommentId) {
+    final nextDrafts = Map<int, String>.of(_state.replyDrafts)
+      ..remove(parentCommentId);
+    _setState(
+      _state.copyWith(
+        clearActiveReplyCommentId: true,
+        replyDrafts: nextDrafts,
+        clearErrorMessage: true,
+      ),
+    );
+  }
+
+  void updateReplyDraft(int parentCommentId, String content) {
+    final nextDrafts = Map<int, String>.of(_state.replyDrafts)
+      ..[parentCommentId] = content;
+    _setState(
+      _state.copyWith(
+        replyDrafts: nextDrafts,
+        clearErrorMessage: true,
+      ),
+    );
+  }
+
   Future<void> submitComment({int? parentCommentId}) async {
     final story = _state.selectedStory;
     if (story == null || !_state.canSubmitComment) {
@@ -560,6 +622,47 @@ class StoryController extends ChangeNotifier {
       );
     } on Object catch (error) {
       await _markCommentDraftFailed(error);
+      _handleError(error);
+      _setState(_state.copyWith(isSubmitting: false));
+    }
+  }
+
+  Future<void> submitReply(int parentCommentId) async {
+    final story = _state.selectedStory;
+    final content = _state.replyDrafts[parentCommentId]?.trim() ?? '';
+    if (story == null || content.isEmpty || _state.isSubmitting) {
+      return;
+    }
+
+    _setState(_state.copyWith(isSubmitting: true, clearErrorMessage: true));
+
+    try {
+      if (!await _ensureModerationAllowed(
+        targetType: ContentModerationTarget.comment,
+        text: content,
+      )) {
+        return;
+      }
+
+      await _storyRepository.createComment(
+        postId: story.id,
+        authorId: _currentMemberId,
+        content: content,
+        parentCommentId: parentCommentId,
+      );
+      final commentsPage = await _storyRepository.fetchComments(story.id);
+      final nextDrafts = Map<int, String>.of(_state.replyDrafts)
+        ..remove(parentCommentId);
+      _setState(
+        _state.copyWith(
+          comments: commentsPage.items,
+          replyDrafts: nextDrafts,
+          clearActiveReplyCommentId: true,
+          isSubmitting: false,
+          noticeMessage: '답글이 등록되었습니다.',
+        ),
+      );
+    } on Object catch (error) {
       _handleError(error);
       _setState(_state.copyWith(isSubmitting: false));
     }

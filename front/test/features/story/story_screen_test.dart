@@ -283,6 +283,110 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('submits a reply with mention prefill from the comment tile',
+      (tester) async {
+    final parentComment = _comment(
+      id: 60,
+      content: '저도 비슷했어요.',
+      authorId: 10,
+      nickname: '마음친구',
+    );
+    final repository = _FakeStoryRepository(
+      details: [
+        _detail(id: 12, title: '답글 글', content: '본문', authorId: 99),
+      ],
+      commentPages: [
+        _commentPage([parentComment]),
+        _commentPage([parentComment]),
+      ],
+    );
+    final controller = StoryController(
+      storyRepository: repository,
+      currentMemberId: 7,
+    );
+    await controller.openStoryById(12);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: StoryScreen(controller: controller, onBack: () {}),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final replyButton = find.byKey(
+      const ValueKey('story-comment-reply-button-60'),
+    );
+    await tester.ensureVisible(replyButton);
+    await tester.tap(replyButton);
+    await tester.pump();
+
+    expect(find.byKey(const ValueKey('story-reply-field-60')), findsOneWidget);
+    expect(find.text('@마음친구 '), findsOneWidget);
+
+    await tester.enterText(
+      find.byKey(const ValueKey('story-reply-field-60')),
+      '@마음친구 고마워요',
+    );
+    await tester.pump();
+    final submitReplyButton = find.byKey(
+      const ValueKey('story-reply-submit-button-60'),
+    );
+    await tester.ensureVisible(submitReplyButton);
+    await tester.tap(submitReplyButton);
+    await tester.pumpAndSettle();
+
+    expect(repository.createdComments.single.parentCommentId, 60);
+    expect(repository.createdComments.single.content, '@마음친구 고마워요');
+  });
+
+  testWidgets('highlights mention tokens inside comments and replies',
+      (tester) async {
+    final reply = _comment(
+      id: 71,
+      content: '@마음친구 고마워요',
+      authorId: 11,
+      nickname: '답글이',
+    );
+    final controller = StoryController(
+      storyRepository: _FakeStoryRepository(
+        details: [
+          _detail(id: 13, title: '멘션 글', content: '본문', authorId: 99),
+        ],
+        commentPages: [
+          _commentPage([
+            _comment(
+              id: 70,
+              content: '부모 댓글',
+              replies: [reply],
+            ),
+          ]),
+        ],
+      ),
+      currentMemberId: 7,
+    );
+    await controller.openStoryById(13);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: StoryScreen(controller: controller, onBack: () {}),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final text = tester.widget<Text>(
+      find.descendant(
+        of: find.byKey(const ValueKey('story-comment-content-71')),
+        matching: find.byType(Text),
+      ),
+    );
+    final rootSpan = text.textSpan! as TextSpan;
+    final mentionSpan = rootSpan.children!.cast<TextSpan>().firstWhere(
+          (span) => span.text == '@마음친구',
+        );
+
+    expect(mentionSpan.style?.fontWeight, FontWeight.w800);
+  });
+
   testWidgets('long story and comments stay scrollable on a small screen',
       (tester) async {
     tester.view.physicalSize = const Size(390, 844);
@@ -385,15 +489,18 @@ StoryComment _comment({
   required int id,
   required String content,
   int authorId = 10,
+  String nickname = '댓글이',
+  List<StoryComment> replies = const [],
 }) {
   return StoryComment(
     id: id,
     content: content,
     authorId: authorId,
-    authorNickname: '댓글이',
+    authorNickname: nickname,
     postId: 1,
     createDate: '2026-05-24T10:00:00',
     modifyDate: '2026-05-24T10:00:00',
+    replies: replies,
   );
 }
 
@@ -410,6 +517,12 @@ class _FakeStoryRepository implements StoryRepository {
   final List<PageResponse<StoryComment>> commentPages;
   final int createdStoryId;
   final List<StoryDraft> createdDrafts = [];
+  final List<({
+    int postId,
+    int authorId,
+    String content,
+    int? parentCommentId,
+  })> createdComments = [];
 
   @override
   Future<PageResponse<StorySummary>> fetchStories({
@@ -459,7 +572,14 @@ class _FakeStoryRepository implements StoryRepository {
     required int authorId,
     required String content,
     int? parentCommentId,
-  }) async {}
+  }) async {
+    createdComments.add((
+      postId: postId,
+      authorId: authorId,
+      content: content,
+      parentCommentId: parentCommentId,
+    ));
+  }
 
   @override
   Future<void> updateComment(int commentId, String content) async {}

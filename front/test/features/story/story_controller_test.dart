@@ -298,6 +298,47 @@ void main() {
       expect(selectedTarget?.targetId, 22);
     });
 
+    test('creates replies with mention drafts while preserving other drafts',
+        () async {
+      final firstComment = _comment(
+        id: 31,
+        authorId: 10,
+        content: '첫 댓글',
+        nickname: '마음친구',
+      );
+      final secondComment = _comment(
+        id: 32,
+        authorId: 11,
+        content: '두 번째 댓글',
+        nickname: '다른친구',
+      );
+      final repository = _FakeStoryRepository(
+        details: [_detail(id: 8, title: '댓글 글', authorId: 7)],
+        commentPages: [
+          _commentPage([firstComment, secondComment]),
+          _commentPage([firstComment, secondComment]),
+        ],
+      );
+      final controller = StoryController(
+        storyRepository: repository,
+        currentMemberId: 7,
+      );
+
+      await controller.openStoryById(8);
+      controller.startReply(firstComment);
+      controller.updateReplyDraft(firstComment.id, '@마음친구 고마워요');
+      controller.startReply(secondComment);
+      controller.updateReplyDraft(secondComment.id, '다른 답글 초안');
+      controller.startReply(firstComment);
+      await controller.submitReply(firstComment.id);
+
+      expect(repository.createdComments.single.parentCommentId, firstComment.id);
+      expect(repository.createdComments.single.content, '@마음친구 고마워요');
+      expect(controller.state.replyDrafts[firstComment.id], isNull);
+      expect(controller.state.replyDrafts[secondComment.id], '다른 답글 초안');
+      expect(controller.state.activeReplyCommentId, isNull);
+    });
+
     test('invokes unauthorized callback on expired auth', () async {
       var unauthorizedCount = 0;
       final controller = StoryController(
@@ -380,15 +421,18 @@ StoryComment _comment({
   required int id,
   required int authorId,
   required String content,
+  String nickname = '댓글이',
+  List<StoryComment> replies = const [],
 }) {
   return StoryComment(
     id: id,
     content: content,
     authorId: authorId,
-    authorNickname: '댓글이',
+    authorNickname: nickname,
     postId: 8,
     createDate: '2026-05-24T10:00:00',
     modifyDate: '2026-05-24T10:00:00',
+    replies: replies,
   );
 }
 
@@ -413,7 +457,12 @@ class _FakeStoryRepository implements StoryRepository {
   final List<({int id, StoryDraft draft})> updatedDrafts = [];
   final List<int> deletedStoryIds = [];
   final List<({int id, StoryResolutionStatus status})> statusUpdates = [];
-  final List<({int postId, int authorId, String content})> createdComments = [];
+  final List<({
+    int postId,
+    int authorId,
+    String content,
+    int? parentCommentId,
+  })> createdComments = [];
   final List<({int id, String content})> updatedComments = [];
   final List<int> deletedCommentIds = [];
 
@@ -485,6 +534,7 @@ class _FakeStoryRepository implements StoryRepository {
       postId: postId,
       authorId: authorId,
       content: content,
+      parentCommentId: parentCommentId,
     ));
   }
 
