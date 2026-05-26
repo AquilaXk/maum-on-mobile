@@ -27,6 +27,7 @@ class DiaryScreen extends StatefulWidget {
 class _DiaryScreenState extends State<DiaryScreen> {
   late final TextEditingController _titleController;
   late final TextEditingController _contentController;
+  final Map<String, TextEditingController> _textBlockControllers = {};
   bool _canOpenImageSettings = false;
 
   @override
@@ -48,12 +49,35 @@ class _DiaryScreenState extends State<DiaryScreen> {
     widget.controller.removeListener(_syncTextControllers);
     _titleController.dispose();
     _contentController.dispose();
+    for (final controller in _textBlockControllers.values) {
+      controller.dispose();
+    }
     super.dispose();
   }
 
   void _syncTextControllers() {
     _syncTextController(_titleController, widget.controller.state.title);
-    _syncTextController(_contentController, widget.controller.state.content);
+    final textBlocks = widget.controller.state.contentBlocks
+        .where((block) => block.isText)
+        .toList(growable: false);
+    final primaryTextBlock = textBlocks.isEmpty ? null : textBlocks.first;
+    _syncTextController(_contentController, primaryTextBlock?.text ?? '');
+
+    final activeBlockIds = <String>{};
+    for (final block in textBlocks) {
+      if (block.id == primaryTextBlock?.id) {
+        continue;
+      }
+      activeBlockIds.add(block.id);
+      _syncTextController(_textControllerForBlock(block), block.text);
+    }
+
+    final staleBlockIds = _textBlockControllers.keys
+        .where((blockId) => !activeBlockIds.contains(blockId))
+        .toList(growable: false);
+    for (final blockId in staleBlockIds) {
+      _textBlockControllers.remove(blockId)?.dispose();
+    }
   }
 
   void _syncTextController(TextEditingController controller, String value) {
@@ -67,7 +91,17 @@ class _DiaryScreenState extends State<DiaryScreen> {
     );
   }
 
-  Future<void> _pickImage(DiaryImageSource source) async {
+  TextEditingController _textControllerForBlock(DiaryContentBlock block) {
+    return _textBlockControllers.putIfAbsent(
+      block.id,
+      () => TextEditingController(text: block.text),
+    );
+  }
+
+  Future<void> _pickImage(
+    DiaryImageSource source, {
+    String? replaceBlockId,
+  }) async {
     setState(() {
       _canOpenImageSettings = false;
     });
@@ -83,7 +117,11 @@ class _DiaryScreenState extends State<DiaryScreen> {
           widget.controller.showImageAttachmentFailure('이미지를 읽지 못했습니다.');
           return;
         }
-        widget.controller.attachImage(attachment);
+        if (replaceBlockId == null) {
+          widget.controller.attachImage(attachment);
+        } else {
+          widget.controller.replaceImageBlock(replaceBlockId, attachment);
+        }
         return;
       case DiaryImagePickStatus.cancelled:
         return;
@@ -203,11 +241,17 @@ class _DiaryScreenState extends State<DiaryScreen> {
               state: state,
               titleController: _titleController,
               contentController: _contentController,
+              textBlockControllerFor: _textControllerForBlock,
               onTitleChanged: widget.controller.updateTitle,
               onContentChanged: widget.controller.updateContent,
+              onTextBlockChanged: widget.controller.updateTextBlock,
+              onAddTextBlockAfter: widget.controller.addTextBlockAfter,
+              onMoveBlock: widget.controller.moveContentBlock,
               onCategoryChanged: widget.controller.updateCategory,
               onPrivacyChanged: widget.controller.updatePrivacy,
               onPickImage: _pickImage,
+              onReplaceImage: (blockId, source) =>
+                  _pickImage(source, replaceBlockId: blockId),
               canOpenImageSettings: _canOpenImageSettings,
               onOpenImageSettings: _openImageSettings,
               onClearImage: () {
@@ -216,6 +260,13 @@ class _DiaryScreenState extends State<DiaryScreen> {
                 });
                 unawaited(widget.controller.clearImage());
               },
+              onRemoveImageBlock: (blockId) {
+                setState(() {
+                  _canOpenImageSettings = false;
+                });
+                unawaited(widget.controller.removeImageBlock(blockId));
+              },
+              onRetryImageBlock: widget.controller.retryImageBlockUpload,
               onReset: widget.controller.resetForm,
               onSubmit: widget.controller.submit,
             ),
@@ -363,8 +414,7 @@ class _SelectedEntriesSection extends StatelessWidget {
                     Text(entry.title,
                         style: Theme.of(context).textTheme.titleMedium),
                     const SizedBox(height: AppSpacing.xs),
-                    Text(entry.content,
-                        maxLines: 3, overflow: TextOverflow.ellipsis),
+                    _DiaryEntryContentPreview(entry: entry),
                     const SizedBox(height: AppSpacing.xs),
                     Wrap(
                       spacing: AppSpacing.xs,
@@ -454,11 +504,7 @@ class _PublicEntriesSection extends StatelessWidget {
                     const SizedBox(height: AppSpacing.xs),
                     Text(entry.title, style: theme.textTheme.titleMedium),
                     const SizedBox(height: AppSpacing.xs),
-                    Text(
-                      entry.content,
-                      maxLines: 3,
-                      overflow: TextOverflow.ellipsis,
-                    ),
+                    _DiaryEntryContentPreview(entry: entry),
                   ],
                 ),
               ),
@@ -491,19 +537,57 @@ class _PublicEntriesSection extends StatelessWidget {
   }
 }
 
+class _DiaryEntryContentPreview extends StatelessWidget {
+  const _DiaryEntryContentPreview({required this.entry});
+
+  final DiaryEntry entry;
+
+  @override
+  Widget build(BuildContext context) {
+    final blocks = entry.readableContentBlocks;
+    final text = plainDiaryContentFromBlocks(blocks);
+    final imageCount = blocks.where((block) => block.isImage).length;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (text.isNotEmpty)
+          Text(text, maxLines: 3, overflow: TextOverflow.ellipsis),
+        if (imageCount > 0) ...[
+          if (text.isNotEmpty) const SizedBox(height: AppSpacing.xs),
+          Wrap(
+            spacing: AppSpacing.xs,
+            runSpacing: AppSpacing.xs,
+            children: [
+              Chip(label: Text('이미지 $imageCount장')),
+            ],
+          ),
+        ],
+      ],
+    );
+  }
+}
+
 class _DiaryForm extends StatelessWidget {
   const _DiaryForm({
     required this.state,
     required this.titleController,
     required this.contentController,
+    required this.textBlockControllerFor,
     required this.onTitleChanged,
     required this.onContentChanged,
+    required this.onTextBlockChanged,
+    required this.onAddTextBlockAfter,
+    required this.onMoveBlock,
     required this.onCategoryChanged,
     required this.onPrivacyChanged,
     required this.onPickImage,
+    required this.onReplaceImage,
     required this.canOpenImageSettings,
     required this.onOpenImageSettings,
     required this.onClearImage,
+    required this.onRemoveImageBlock,
+    required this.onRetryImageBlock,
     required this.onReset,
     required this.onSubmit,
   });
@@ -511,14 +595,22 @@ class _DiaryForm extends StatelessWidget {
   final DiaryState state;
   final TextEditingController titleController;
   final TextEditingController contentController;
+  final TextEditingController Function(DiaryContentBlock block)
+      textBlockControllerFor;
   final ValueChanged<String> onTitleChanged;
   final ValueChanged<String> onContentChanged;
+  final void Function(String blockId, String text) onTextBlockChanged;
+  final ValueChanged<String> onAddTextBlockAfter;
+  final void Function(String blockId, int delta) onMoveBlock;
   final ValueChanged<DiaryCategory> onCategoryChanged;
   final ValueChanged<bool> onPrivacyChanged;
-  final ValueChanged<DiaryImageSource> onPickImage;
+  final void Function(DiaryImageSource source) onPickImage;
+  final void Function(String blockId, DiaryImageSource source) onReplaceImage;
   final bool canOpenImageSettings;
   final Future<void> Function() onOpenImageSettings;
   final VoidCallback onClearImage;
+  final ValueChanged<String> onRemoveImageBlock;
+  final ValueChanged<String> onRetryImageBlock;
   final VoidCallback onReset;
   final Future<void> Function() onSubmit;
 
@@ -552,16 +644,23 @@ class _DiaryForm extends StatelessWidget {
             ),
           ),
           const SizedBox(height: AppSpacing.sm),
-          TextField(
-            key: const ValueKey('diary-content-field'),
-            controller: contentController,
-            onChanged: onContentChanged,
-            minLines: 5,
-            maxLines: 8,
-            decoration: const InputDecoration(
-              labelText: '본문',
-              border: OutlineInputBorder(),
-            ),
+          _ContentBlocksEditor(
+            blocks: state.contentBlocks,
+            primaryTextController: contentController,
+            textBlockControllerFor: textBlockControllerFor,
+            isUploadingImage: state.isUploadingImage,
+            uploadProgress: state.imageUploadProgress,
+            canOpenImageSettings: canOpenImageSettings,
+            onPrimaryTextChanged: onContentChanged,
+            onTextBlockChanged: onTextBlockChanged,
+            onAddTextBlockAfter: onAddTextBlockAfter,
+            onMoveBlock: onMoveBlock,
+            onPickImage: onPickImage,
+            onReplaceImage: onReplaceImage,
+            onOpenImageSettings: onOpenImageSettings,
+            onClearImage: onClearImage,
+            onRemoveImageBlock: onRemoveImageBlock,
+            onRetryImageBlock: onRetryImageBlock,
           ),
           const SizedBox(height: AppSpacing.sm),
           DropdownButtonFormField<DiaryCategory>(
@@ -590,16 +689,6 @@ class _DiaryForm extends StatelessWidget {
             value: state.isPrivate,
             onChanged: onPrivacyChanged,
           ),
-          _ImagePreview(
-            selectedImage: state.selectedImage,
-            imageUrl: state.imageUrl,
-            isUploadingImage: state.isUploadingImage,
-            uploadProgress: state.imageUploadProgress,
-            onPickImage: onPickImage,
-            canOpenImageSettings: canOpenImageSettings,
-            onOpenImageSettings: onOpenImageSettings,
-            onClearImage: onClearImage,
-          ),
           const SizedBox(height: AppSpacing.md),
           FilledButton(
             key: const ValueKey('diary-submit-button'),
@@ -618,34 +707,90 @@ class _DiaryForm extends StatelessWidget {
   }
 }
 
-class _ImagePreview extends StatelessWidget {
-  const _ImagePreview({
-    required this.selectedImage,
-    required this.imageUrl,
+class _ContentBlocksEditor extends StatelessWidget {
+  const _ContentBlocksEditor({
+    required this.blocks,
+    required this.primaryTextController,
+    required this.textBlockControllerFor,
     required this.isUploadingImage,
     required this.uploadProgress,
-    required this.onPickImage,
     required this.canOpenImageSettings,
+    required this.onPrimaryTextChanged,
+    required this.onTextBlockChanged,
+    required this.onAddTextBlockAfter,
+    required this.onMoveBlock,
+    required this.onPickImage,
+    required this.onReplaceImage,
     required this.onOpenImageSettings,
     required this.onClearImage,
+    required this.onRemoveImageBlock,
+    required this.onRetryImageBlock,
   });
 
-  final DiaryImageAttachment? selectedImage;
-  final String? imageUrl;
+  final List<DiaryContentBlock> blocks;
+  final TextEditingController primaryTextController;
+  final TextEditingController Function(DiaryContentBlock block)
+      textBlockControllerFor;
   final bool isUploadingImage;
   final double? uploadProgress;
-  final ValueChanged<DiaryImageSource> onPickImage;
   final bool canOpenImageSettings;
+  final ValueChanged<String> onPrimaryTextChanged;
+  final void Function(String blockId, String text) onTextBlockChanged;
+  final ValueChanged<String> onAddTextBlockAfter;
+  final void Function(String blockId, int delta) onMoveBlock;
+  final void Function(DiaryImageSource source) onPickImage;
+  final void Function(String blockId, DiaryImageSource source) onReplaceImage;
   final Future<void> Function() onOpenImageSettings;
   final VoidCallback onClearImage;
+  final ValueChanged<String> onRemoveImageBlock;
+  final ValueChanged<String> onRetryImageBlock;
 
   @override
   Widget build(BuildContext context) {
-    final image = selectedImage;
+    final textBlocks = blocks.where((block) => block.isText).toList();
+    final primaryTextBlock = textBlocks.isEmpty ? null : textBlocks.first;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        for (var index = 0; index < blocks.length; index += 1) ...[
+          if (blocks[index].isText)
+            _TextBlockField(
+              key: ValueKey('diary-text-block-widget-${blocks[index].id}'),
+              block: blocks[index],
+              controller: blocks[index].id == primaryTextBlock?.id
+                  ? primaryTextController
+                  : textBlockControllerFor(blocks[index]),
+              isPrimary: blocks[index].id == primaryTextBlock?.id,
+              canMoveUp: index > 0,
+              canMoveDown: index < blocks.length - 1,
+              onChanged: blocks[index].id == primaryTextBlock?.id
+                  ? onPrimaryTextChanged
+                  : (text) => onTextBlockChanged(blocks[index].id, text),
+              onAddTextBlockAfter: () => onAddTextBlockAfter(blocks[index].id),
+              onMoveUp: () => onMoveBlock(blocks[index].id, -1),
+              onMoveDown: () => onMoveBlock(blocks[index].id, 1),
+            )
+          else
+            _ImageBlockPanel(
+              key: ValueKey('diary-image-block-widget-${blocks[index].id}'),
+              block: blocks[index],
+              isUploadingImage: isUploadingImage,
+              uploadProgress: uploadProgress,
+              canMoveUp: index > 0,
+              canMoveDown: index < blocks.length - 1,
+              onMoveUp: () => onMoveBlock(blocks[index].id, -1),
+              onMoveDown: () => onMoveBlock(blocks[index].id, 1),
+              onReplaceImage: (source) => onReplaceImage(
+                blocks[index].id,
+                source,
+              ),
+              onAddTextBlockAfter: () => onAddTextBlockAfter(blocks[index].id),
+              onRetryImageBlock: () => onRetryImageBlock(blocks[index].id),
+              onRemoveImageBlock: () => onRemoveImageBlock(blocks[index].id),
+            ),
+          const SizedBox(height: AppSpacing.sm),
+        ],
         Wrap(
           spacing: AppSpacing.xs,
           runSpacing: AppSpacing.xs,
@@ -666,6 +811,14 @@ class _ImagePreview extends StatelessWidget {
               icon: const Icon(Icons.photo_library_outlined),
               label: const Text('앨범'),
             ),
+            OutlinedButton.icon(
+              key: const ValueKey('diary-clear-images-button'),
+              onPressed: blocks.any((block) => block.isImage)
+                  ? onClearImage
+                  : null,
+              icon: const Icon(Icons.hide_image_outlined),
+              label: const Text('이미지 모두 제거'),
+            ),
           ],
         ),
         if (canOpenImageSettings) ...[
@@ -680,55 +833,269 @@ class _ImagePreview extends StatelessWidget {
             ),
           ),
         ],
-        if (image != null) ...[
-          const SizedBox(height: AppSpacing.xs),
-          Wrap(
-            spacing: AppSpacing.xs,
-            runSpacing: AppSpacing.xs,
-            children: [
-              Chip(label: Text(image.source.label)),
-              Chip(label: Text(_formatByteSize(image.byteSize))),
-              if (image.wasCompressed) const Chip(label: Text('압축됨')),
-            ],
-          ),
-        ],
-        if (isUploadingImage) ...[
-          const SizedBox(height: AppSpacing.xs),
-          LinearProgressIndicator(value: uploadProgress),
-        ],
-        if (image != null) ...[
-          const SizedBox(height: AppSpacing.xs),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(8),
-            child: Image.memory(
-              Uint8List.fromList(image.bytes),
-              height: 140,
-              fit: BoxFit.cover,
-              errorBuilder: (context, error, stackTrace) {
-                return Container(
-                  height: 80,
-                  alignment: Alignment.center,
-                  color: Theme.of(context).colorScheme.surfaceContainerHighest,
-                  child: Text(image.filename),
-                );
-              },
-            ),
-          ),
-          TextButton.icon(
-            onPressed: onClearImage,
-            icon: const Icon(Icons.close),
-            label: const Text('이미지 제거'),
-          ),
-        ] else if (imageUrl != null) ...[
-          const SizedBox(height: AppSpacing.xs),
-          const AppNotice(message: '기존 이미지가 유지됩니다.'),
-          TextButton.icon(
-            onPressed: onClearImage,
-            icon: const Icon(Icons.close),
-            label: const Text('이미지 제거'),
-          ),
-        ],
       ],
+    );
+  }
+}
+
+class _TextBlockField extends StatelessWidget {
+  const _TextBlockField({
+    required this.block,
+    required this.controller,
+    required this.isPrimary,
+    required this.canMoveUp,
+    required this.canMoveDown,
+    required this.onChanged,
+    required this.onAddTextBlockAfter,
+    required this.onMoveUp,
+    required this.onMoveDown,
+    super.key,
+  });
+
+  final DiaryContentBlock block;
+  final TextEditingController controller;
+  final bool isPrimary;
+  final bool canMoveUp;
+  final bool canMoveDown;
+  final ValueChanged<String> onChanged;
+  final VoidCallback onAddTextBlockAfter;
+  final VoidCallback onMoveUp;
+  final VoidCallback onMoveDown;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        TextField(
+          key: isPrimary
+              ? const ValueKey('diary-content-field')
+              : ValueKey('diary-text-block-${block.id}'),
+          controller: controller,
+          onChanged: onChanged,
+          minLines: isPrimary ? 5 : 3,
+          maxLines: isPrimary ? 8 : 6,
+          decoration: InputDecoration(
+            labelText: isPrimary ? '본문' : '추가 본문',
+            border: const OutlineInputBorder(),
+          ),
+        ),
+        const SizedBox(height: AppSpacing.xs),
+        _BlockToolbar(
+          canMoveUp: canMoveUp,
+          canMoveDown: canMoveDown,
+          onMoveUp: onMoveUp,
+          onMoveDown: onMoveDown,
+          trailing: TextButton.icon(
+            key: ValueKey('diary-add-text-after-${block.id}'),
+            onPressed: onAddTextBlockAfter,
+            icon: const Icon(Icons.add),
+            label: const Text('본문 추가'),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _ImageBlockPanel extends StatelessWidget {
+  const _ImageBlockPanel({
+    required this.block,
+    required this.isUploadingImage,
+    required this.uploadProgress,
+    required this.canMoveUp,
+    required this.canMoveDown,
+    required this.onMoveUp,
+    required this.onMoveDown,
+    required this.onReplaceImage,
+    required this.onAddTextBlockAfter,
+    required this.onRetryImageBlock,
+    required this.onRemoveImageBlock,
+    super.key,
+  });
+
+  final DiaryContentBlock block;
+  final bool isUploadingImage;
+  final double? uploadProgress;
+  final bool canMoveUp;
+  final bool canMoveDown;
+  final VoidCallback onMoveUp;
+  final VoidCallback onMoveDown;
+  final ValueChanged<DiaryImageSource> onReplaceImage;
+  final VoidCallback onAddTextBlockAfter;
+  final VoidCallback onRetryImageBlock;
+  final VoidCallback onRemoveImageBlock;
+
+  @override
+  Widget build(BuildContext context) {
+    final image = block.image;
+    final byteSize = block.displayByteSize;
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        border: Border.all(color: colorScheme.outlineVariant),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Wrap(
+              spacing: AppSpacing.xs,
+              runSpacing: AppSpacing.xs,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              children: [
+                Chip(label: Text(block.uploadStatus.label)),
+                if (block.displaySource != null)
+                  Chip(label: Text(block.displaySource!.label)),
+                if (byteSize != null)
+                  Chip(label: Text(_formatByteSize(byteSize))),
+                if (image?.wasCompressed == true)
+                  const Chip(label: Text('압축됨')),
+              ],
+            ),
+            if (isUploadingImage &&
+                block.uploadStatus ==
+                    DiaryImageBlockUploadStatus.uploading) ...[
+              const SizedBox(height: AppSpacing.xs),
+              LinearProgressIndicator(value: uploadProgress),
+            ],
+            const SizedBox(height: AppSpacing.xs),
+            if (image != null)
+              ClipRRect(
+                borderRadius: BorderRadius.circular(8),
+                child: Image.memory(
+                  Uint8List.fromList(image.bytes),
+                  key: ValueKey('diary-image-preview-${block.id}'),
+                  height: 140,
+                  fit: BoxFit.cover,
+                  errorBuilder: (context, error, stackTrace) {
+                    return _ImageFallbackLabel(filename: image.filename);
+                  },
+                ),
+              )
+            else if (block.imageUrl != null)
+              const AppNotice(message: '기존 이미지가 유지됩니다.')
+            else
+              _ImageFallbackLabel(filename: block.displayFilename),
+            if (block.errorMessage != null) ...[
+              const SizedBox(height: AppSpacing.xs),
+              AppNotice(
+                message: block.errorMessage!,
+                tone: AppNoticeTone.error,
+              ),
+            ],
+            const SizedBox(height: AppSpacing.xs),
+            _BlockToolbar(
+              canMoveUp: canMoveUp,
+              canMoveDown: canMoveDown,
+              onMoveUp: onMoveUp,
+              onMoveDown: onMoveDown,
+              trailing: Wrap(
+                spacing: AppSpacing.xs,
+                runSpacing: AppSpacing.xs,
+                children: [
+                  IconButton(
+                    key: ValueKey('diary-replace-gallery-${block.id}'),
+                    tooltip: '앨범 이미지로 교체',
+                    onPressed: isUploadingImage
+                        ? null
+                        : () => onReplaceImage(DiaryImageSource.gallery),
+                    icon: const Icon(Icons.photo_library_outlined),
+                  ),
+                  IconButton(
+                    key: ValueKey('diary-replace-camera-${block.id}'),
+                    tooltip: '촬영 이미지로 교체',
+                    onPressed: isUploadingImage
+                        ? null
+                        : () => onReplaceImage(DiaryImageSource.camera),
+                    icon: const Icon(Icons.photo_camera_outlined),
+                  ),
+                  if (block.uploadStatus ==
+                      DiaryImageBlockUploadStatus.failed)
+                    IconButton(
+                      key: ValueKey('diary-retry-image-${block.id}'),
+                      tooltip: '이미지 업로드 다시 시도',
+                      onPressed: block.image == null ? null : onRetryImageBlock,
+                      icon: const Icon(Icons.refresh),
+                    ),
+                  IconButton(
+                    key: ValueKey('diary-remove-image-${block.id}'),
+                    tooltip: '이미지 제거',
+                    onPressed: isUploadingImage ? null : onRemoveImageBlock,
+                    icon: const Icon(Icons.close),
+                  ),
+                  TextButton.icon(
+                    key: ValueKey('diary-add-text-after-${block.id}'),
+                    onPressed: onAddTextBlockAfter,
+                    icon: const Icon(Icons.add),
+                    label: const Text('본문 추가'),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _BlockToolbar extends StatelessWidget {
+  const _BlockToolbar({
+    required this.canMoveUp,
+    required this.canMoveDown,
+    required this.onMoveUp,
+    required this.onMoveDown,
+    required this.trailing,
+  });
+
+  final bool canMoveUp;
+  final bool canMoveDown;
+  final VoidCallback onMoveUp;
+  final VoidCallback onMoveDown;
+  final Widget trailing;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        IconButton(
+          tooltip: '위로 이동',
+          onPressed: canMoveUp ? onMoveUp : null,
+          icon: const Icon(Icons.arrow_upward),
+        ),
+        IconButton(
+          tooltip: '아래로 이동',
+          onPressed: canMoveDown ? onMoveDown : null,
+          icon: const Icon(Icons.arrow_downward),
+        ),
+        const SizedBox(width: AppSpacing.xs),
+        Expanded(
+          child: Align(
+            alignment: AlignmentDirectional.centerEnd,
+            child: trailing,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _ImageFallbackLabel extends StatelessWidget {
+  const _ImageFallbackLabel({required this.filename});
+
+  final String filename;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 80,
+      alignment: Alignment.center,
+      color: Theme.of(context).colorScheme.surfaceContainerHighest,
+      child: Text(filename, overflow: TextOverflow.ellipsis),
     );
   }
 }

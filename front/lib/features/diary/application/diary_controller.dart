@@ -33,6 +33,9 @@ class DiaryState {
     this.isPrivate = true,
     this.imageUrl,
     this.selectedImage,
+    this.contentBlocks = const [
+      DiaryContentBlock(id: 'text-0', type: DiaryContentBlockType.text),
+    ],
     this.errorMessage,
     this.publicErrorMessage,
     this.noticeMessage,
@@ -58,6 +61,7 @@ class DiaryState {
   final bool isPrivate;
   final String? imageUrl;
   final DiaryImageAttachment? selectedImage;
+  final List<DiaryContentBlock> contentBlocks;
   final String? errorMessage;
   final String? publicErrorMessage;
   final String? noticeMessage;
@@ -84,9 +88,19 @@ class DiaryState {
 
   bool get isEditing => editingDiaryId != null;
 
+  List<DiaryContentBlock> get imageBlocks {
+    return contentBlocks
+        .where((block) => block.isImage)
+        .toList(growable: false);
+  }
+
+  bool get hasUploadableImage {
+    return imageBlocks.any((block) => block.image != null);
+  }
+
   bool get canSubmit =>
       title.trim().isNotEmpty &&
-      content.trim().isNotEmpty &&
+      plainDiaryContentFromBlocks(contentBlocks).trim().isNotEmpty &&
       !isSubmitting &&
       !isUploadingImage;
 
@@ -129,6 +143,7 @@ class DiaryState {
     bool clearImageUrl = false,
     DiaryImageAttachment? selectedImage,
     bool clearSelectedImage = false,
+    List<DiaryContentBlock>? contentBlocks,
     String? errorMessage,
     bool clearErrorMessage = false,
     String? publicErrorMessage,
@@ -161,6 +176,7 @@ class DiaryState {
       imageUrl: clearImageUrl ? null : imageUrl ?? this.imageUrl,
       selectedImage:
           clearSelectedImage ? null : selectedImage ?? this.selectedImage,
+      contentBlocks: contentBlocks ?? this.contentBlocks,
       errorMessage:
           clearErrorMessage ? null : errorMessage ?? this.errorMessage,
       publicErrorMessage: clearPublicErrorMessage
@@ -201,7 +217,8 @@ class DiaryController extends ChangeNotifier {
 
   DiaryState _state;
   bool _isDisposed = false;
-  String? _temporaryUploadedImageUrl;
+  int _nextBlockOrdinal = 1;
+  final Set<String> _temporaryUploadedImageUrls = {};
 
   DiaryState get state => _state;
 
@@ -216,15 +233,24 @@ class DiaryController extends ChangeNotifier {
       return;
     }
 
+    final content = entry.fields['content'] ?? '';
+    final imageUrl = entry.fields['imageUrl']?.isEmpty == true
+        ? null
+        : entry.fields['imageUrl'];
+    final contentBlocks = decodeDiaryContentBlocks(
+      entry.fields['contentBlocks'],
+      fallbackContent: content,
+      fallbackImageUrl: imageUrl,
+    );
+    _bumpNextBlockOrdinal(contentBlocks);
     _setState(
       _state.copyWith(
         title: entry.fields['title'] ?? '',
-        content: entry.fields['content'] ?? '',
+        content: plainDiaryContentFromBlocks(contentBlocks),
         category: _categoryFromDraft(entry.fields['category']),
         isPrivate: entry.fields['isPrivate'] != 'false',
-        imageUrl: entry.fields['imageUrl']?.isEmpty == true
-            ? null
-            : entry.fields['imageUrl'],
+        imageUrl: primaryDiaryImageUrlFromBlocks(contentBlocks),
+        contentBlocks: contentBlocks,
         noticeMessage: '임시 저장된 기록을 복원했습니다.',
         clearErrorMessage: true,
       ),
@@ -297,7 +323,32 @@ class DiaryController extends ChangeNotifier {
   }
 
   void updateContent(String content) {
-    _setState(_state.copyWith(content: content, clearErrorMessage: true));
+    final contentBlocks = _updatePrimaryTextBlock(_state.contentBlocks, content);
+    _setState(
+      _state.copyWith(
+        content: plainDiaryContentFromBlocks(contentBlocks),
+        contentBlocks: contentBlocks,
+        clearErrorMessage: true,
+      ),
+    );
+    _saveDraft();
+  }
+
+  void updateTextBlock(String blockId, String text) {
+    final contentBlocks = _state.contentBlocks
+        .map(
+          (block) => block.id == blockId && block.isText
+              ? block.copyWith(text: text)
+              : block,
+        )
+        .toList(growable: false);
+    _setState(
+      _state.copyWith(
+        content: plainDiaryContentFromBlocks(contentBlocks),
+        contentBlocks: ensureDiaryTextBlock(contentBlocks),
+        clearErrorMessage: true,
+      ),
+    );
     _saveDraft();
   }
 
@@ -311,12 +362,35 @@ class DiaryController extends ChangeNotifier {
     _saveDraft();
   }
 
+  void addTextBlockAfter(String blockId) {
+    final next = DiaryContentBlock.text(id: _nextBlockId('text'));
+    final blocks = [..._state.contentBlocks];
+    final index = blocks.indexWhere((block) => block.id == blockId);
+    blocks.insert(index < 0 ? blocks.length : index + 1, next);
+    _setState(
+      _state.copyWith(
+        contentBlocks: ensureDiaryTextBlock(blocks),
+        noticeMessage: '본문 블록을 추가했습니다.',
+        clearErrorMessage: true,
+      ),
+    );
+    _saveDraft();
+  }
+
   void attachImage(DiaryImageAttachment image) {
-    final temporaryUrl = _takeTemporaryUploadedImageUrlIfCurrent();
+    final imageBlock = DiaryContentBlock.image(
+      id: _nextBlockId('image'),
+      image: image,
+    );
+    final contentBlocks = ensureDiaryTextBlock([
+      ..._state.contentBlocks,
+      imageBlock,
+    ]);
     _setState(
       _state.copyWith(
         selectedImage: image,
         clearImageUrl: true,
+        contentBlocks: contentBlocks,
         clearErrorMessage: true,
         noticeMessage: image.wasCompressed
             ? '이미지 용량을 줄여 첨부했습니다.'
@@ -324,9 +398,120 @@ class DiaryController extends ChangeNotifier {
       ),
     );
     _saveDraft();
+  }
+
+  void replaceImageBlock(String blockId, DiaryImageAttachment image) {
+    final block = _findBlockById(blockId);
+    if (block == null || !block.isImage) {
+      return;
+    }
+    final temporaryUrl = _temporaryUploadedImageUrlIfTracked(block.imageUrl);
+    final contentBlocks = _state.contentBlocks
+        .map(
+          (candidate) => candidate.id == blockId
+              ? DiaryContentBlock.image(
+                  id: candidate.id,
+                  image: image,
+                  uploadStatus: DiaryImageBlockUploadStatus.pending,
+                )
+              : candidate,
+        )
+        .toList(growable: false);
+    final primaryImageUrl = primaryDiaryImageUrlFromBlocks(contentBlocks);
+    _setState(
+      _state.copyWith(
+        selectedImage: image,
+        imageUrl: primaryImageUrl,
+        clearImageUrl: primaryImageUrl == null,
+        contentBlocks: ensureDiaryTextBlock(contentBlocks),
+        clearErrorMessage: true,
+        noticeMessage: image.wasCompressed
+            ? '이미지 용량을 줄여 교체했습니다.'
+            : '이미지를 교체했습니다.',
+      ),
+    );
+    _saveDraft();
     if (temporaryUrl != null) {
       unawaited(_deleteTemporaryImage(temporaryUrl));
     }
+  }
+
+  void retryImageBlockUpload(String blockId) {
+    final contentBlocks = _state.contentBlocks
+        .map(
+          (block) => block.id == blockId && block.isImage
+              ? block.copyWith(
+                  uploadStatus: DiaryImageBlockUploadStatus.pending,
+                  clearUploadProgress: true,
+                  clearErrorMessage: true,
+                )
+              : block,
+        )
+        .toList(growable: false);
+    _setState(
+      _state.copyWith(
+        contentBlocks: ensureDiaryTextBlock(contentBlocks),
+        noticeMessage: '저장하면 이미지 업로드를 다시 시도합니다.',
+        clearErrorMessage: true,
+      ),
+    );
+    _saveDraft();
+  }
+
+  Future<void> removeImageBlock(String blockId) async {
+    final block = _findBlockById(blockId);
+    if (block == null || !block.isImage) {
+      return;
+    }
+    final temporaryUrl = _temporaryUploadedImageUrlIfTracked(block.imageUrl);
+    final contentBlocks = _state.contentBlocks
+        .where((candidate) => candidate.id != blockId)
+        .toList(growable: false);
+    final primaryImageUrl = primaryDiaryImageUrlFromBlocks(contentBlocks);
+    final selectedImage = _firstSelectedImage(contentBlocks);
+    _setState(
+      _state.copyWith(
+        contentBlocks: ensureDiaryTextBlock(contentBlocks),
+        imageUrl: primaryImageUrl,
+        selectedImage: selectedImage,
+        clearImageUrl: primaryImageUrl == null,
+        clearSelectedImage: selectedImage == null,
+        clearErrorMessage: true,
+      ),
+    );
+    _saveDraft();
+    if (temporaryUrl != null) {
+      await _deleteTemporaryImage(temporaryUrl);
+    }
+  }
+
+  void moveContentBlock(String blockId, int delta) {
+    if (delta == 0 || _state.contentBlocks.length < 2) {
+      return;
+    }
+
+    final blocks = [..._state.contentBlocks];
+    final index = blocks.indexWhere((block) => block.id == blockId);
+    if (index < 0) {
+      return;
+    }
+
+    final nextIndex = (index + delta).clamp(0, blocks.length - 1).toInt();
+    if (nextIndex == index) {
+      return;
+    }
+
+    final block = blocks.removeAt(index);
+    blocks.insert(nextIndex, block);
+    final contentBlocks = ensureDiaryTextBlock(blocks);
+    _setState(
+      _state.copyWith(
+        content: plainDiaryContentFromBlocks(contentBlocks),
+        contentBlocks: contentBlocks,
+        clearErrorMessage: true,
+      ),
+    );
+    _saveDraft();
   }
 
   void showImageAttachmentFailure(String message) {
@@ -339,36 +524,49 @@ class DiaryController extends ChangeNotifier {
   }
 
   Future<void> clearImage() async {
-    final temporaryUrl = _takeTemporaryUploadedImageUrlIfCurrent();
-    _setState(_state.copyWith(clearSelectedImage: true, clearImageUrl: true));
+    final temporaryUrls = _takeTemporaryUploadedImageUrlsIfCurrent();
+    final contentBlocks = _state.contentBlocks
+        .where((block) => !block.isImage)
+        .toList(growable: false);
+    _setState(
+      _state.copyWith(
+        clearSelectedImage: true,
+        clearImageUrl: true,
+        contentBlocks: ensureDiaryTextBlock(contentBlocks),
+      ),
+    );
     _saveDraft();
-    if (temporaryUrl != null) {
+    for (final temporaryUrl in temporaryUrls) {
       await _deleteTemporaryImage(temporaryUrl);
     }
   }
 
   void startEditing(DiaryEntry entry) {
-    final temporaryUrl = _takeTemporaryUploadedImageUrlIfCurrent();
+    final temporaryUrls = _takeTemporaryUploadedImageUrlsIfCurrent();
+    final contentBlocks = ensureDiaryTextBlock(entry.readableContentBlocks);
+    _bumpNextBlockOrdinal(contentBlocks);
     _setState(
       _state.copyWith(
         editingDiaryId: entry.id,
         title: entry.title,
-        content: entry.content,
+        content: plainDiaryContentFromBlocks(contentBlocks),
         category: entry.category,
         isPrivate: entry.isPrivate,
-        imageUrl: entry.imageUrl,
+        imageUrl: primaryDiaryImageUrlFromBlocks(contentBlocks),
+        contentBlocks: contentBlocks,
         clearSelectedImage: true,
         noticeMessage: '수정 모드로 전환되었습니다.',
         clearErrorMessage: true,
       ),
     );
-    if (temporaryUrl != null) {
+    for (final temporaryUrl in temporaryUrls) {
       unawaited(_deleteTemporaryImage(temporaryUrl));
     }
   }
 
   void resetForm() {
-    final temporaryUrl = _takeTemporaryUploadedImageUrlIfCurrent();
+    final temporaryUrls = _takeTemporaryUploadedImageUrlsIfCurrent();
+    _nextBlockOrdinal = 1;
     _setState(
       _state.copyWith(
         clearEditingDiaryId: true,
@@ -378,12 +576,15 @@ class DiaryController extends ChangeNotifier {
         isPrivate: true,
         clearImageUrl: true,
         clearSelectedImage: true,
+        contentBlocks: const [
+          DiaryContentBlock(id: 'text-0', type: DiaryContentBlockType.text),
+        ],
         clearErrorMessage: true,
         clearNoticeMessage: true,
       ),
     );
     unawaited(_draftRepository?.delete(_draftKey));
-    if (temporaryUrl != null) {
+    for (final temporaryUrl in temporaryUrls) {
       unawaited(_deleteTemporaryImage(temporaryUrl));
     }
   }
@@ -394,7 +595,8 @@ class DiaryController extends ChangeNotifier {
     }
 
     final title = _state.title.trim();
-    final content = _state.content.trim();
+    final contentBlocks = ensureDiaryTextBlock(_state.contentBlocks);
+    final content = plainDiaryContentFromBlocks(contentBlocks).trim();
     if (title.isEmpty || content.isEmpty) {
       _setState(
         _state.copyWith(
@@ -422,13 +624,15 @@ class DiaryController extends ChangeNotifier {
         return;
       }
 
-      final uploadedImageUrl = await _uploadSelectedImageIfNeeded();
+      final uploadedBlocks = await _uploadImageBlocksIfNeeded();
+      final uploadedImageUrl = primaryDiaryImageUrlFromBlocks(uploadedBlocks);
       final draft = DiaryDraft(
         title: title,
         content: content,
         category: _state.category,
         isPrivate: _state.isPrivate,
         imageUrl: uploadedImageUrl,
+        contentBlocks: uploadedBlocks,
       );
 
       if (editingId == null) {
@@ -453,7 +657,7 @@ class DiaryController extends ChangeNotifier {
       await _markDraftFailed(error);
       _handleError(
         error,
-        nextAction: _state.selectedImage == null
+        nextAction: !_state.hasUploadableImage
             ? '잠시 후 다시 저장해 주세요.'
             : '선택한 이미지는 유지됩니다. 다시 저장해 주세요.',
       );
@@ -467,31 +671,106 @@ class DiaryController extends ChangeNotifier {
     }
   }
 
-  Future<String?> _uploadSelectedImageIfNeeded() async {
-    final selectedImage = _state.selectedImage;
-    if (selectedImage == null) {
-      return _state.imageUrl;
+  Future<List<DiaryContentBlock>> _uploadImageBlocksIfNeeded() async {
+    var blocks = ensureDiaryTextBlock(_state.contentBlocks);
+    final uploadIndexes = <int>[
+      for (var index = 0; index < blocks.length; index += 1)
+        if (blocks[index].isImage && blocks[index].image != null) index,
+    ];
+    if (uploadIndexes.isEmpty) {
+      return blocks;
     }
 
-    _setState(
-      _state.copyWith(
-        isUploadingImage: true,
-        imageUploadProgress: 0.0,
-        clearErrorMessage: true,
-      ),
-    );
+    for (var order = 0; order < uploadIndexes.length; order += 1) {
+      final index = uploadIndexes[order];
+      final block = blocks[index];
+      final image = block.image;
+      if (image == null) {
+        continue;
+      }
 
-    final uploadedImage = await _imageRepository.uploadImage(selectedImage);
-    _temporaryUploadedImageUrl = uploadedImage.imageUrl;
+      blocks = _replaceBlockAt(
+        blocks,
+        index,
+        block.copyWith(
+          uploadStatus: DiaryImageBlockUploadStatus.uploading,
+          uploadProgress: order / uploadIndexes.length,
+          clearErrorMessage: true,
+        ),
+      );
+      _setState(
+        _state.copyWith(
+          contentBlocks: blocks,
+          isUploadingImage: true,
+          imageUploadProgress: order / uploadIndexes.length,
+          clearErrorMessage: true,
+        ),
+      );
+
+      try {
+        final uploadedImage = await _imageRepository.uploadImage(image);
+        _temporaryUploadedImageUrls.add(uploadedImage.imageUrl);
+        blocks = _replaceBlockAt(
+          blocks,
+          index,
+          block.copyWith(
+            imageUrl: uploadedImage.imageUrl,
+            clearImage: true,
+            uploadStatus: DiaryImageBlockUploadStatus.uploaded,
+            uploadProgress: 1.0,
+            clearErrorMessage: true,
+            filename: image.filename,
+            byteSize: image.byteSize,
+            source: image.source,
+            contentType: image.contentType,
+          ),
+        );
+        final primaryImageUrl = primaryDiaryImageUrlFromBlocks(blocks);
+        final selectedImage = _firstSelectedImage(blocks);
+        _setState(
+          _state.copyWith(
+            imageUrl: primaryImageUrl,
+            selectedImage: selectedImage,
+            clearSelectedImage: selectedImage == null,
+            contentBlocks: blocks,
+            isUploadingImage: order < uploadIndexes.length - 1,
+            imageUploadProgress: (order + 1) / uploadIndexes.length,
+          ),
+        );
+      } on Object catch (error) {
+        blocks = _replaceBlockAt(
+          blocks,
+          index,
+          block.copyWith(
+            uploadStatus: DiaryImageBlockUploadStatus.failed,
+            clearUploadProgress: true,
+            errorMessage: _messageFromError(error, '이미지 업로드에 실패했습니다.'),
+          ),
+        );
+        _setState(
+          _state.copyWith(
+            contentBlocks: blocks,
+            isUploadingImage: false,
+            clearImageUploadProgress: true,
+          ),
+        );
+        rethrow;
+      }
+    }
+
+    final primaryImageUrl = primaryDiaryImageUrlFromBlocks(blocks);
+    final selectedImage = _firstSelectedImage(blocks);
     _setState(
       _state.copyWith(
-        imageUrl: uploadedImage.imageUrl,
-        clearSelectedImage: true,
+        imageUrl: primaryImageUrl,
+        selectedImage: selectedImage,
+        clearSelectedImage: selectedImage == null,
+        contentBlocks: blocks,
         isUploadingImage: false,
         imageUploadProgress: 1.0,
       ),
     );
-    return uploadedImage.imageUrl;
+    return blocks;
   }
 
   Future<bool> _ensureModerationAllowed(String text) async {
@@ -603,7 +882,8 @@ class DiaryController extends ChangeNotifier {
   }
 
   void _resetFormSilently() {
-    _temporaryUploadedImageUrl = null;
+    _temporaryUploadedImageUrls.clear();
+    _nextBlockOrdinal = 1;
     _state = _state.copyWith(
       clearEditingDiaryId: true,
       title: '',
@@ -612,6 +892,9 @@ class DiaryController extends ChangeNotifier {
       isPrivate: true,
       clearImageUrl: true,
       clearSelectedImage: true,
+      contentBlocks: const [
+        DiaryContentBlock(id: 'text-0', type: DiaryContentBlockType.text),
+      ],
       isUploadingImage: false,
       clearImageUploadProgress: true,
     );
@@ -641,10 +924,11 @@ class DiaryController extends ChangeNotifier {
     final selectedImage = _state.selectedImage;
     return {
       'title': _state.title,
-      'content': _state.content,
+      'content': plainDiaryContentFromBlocks(_state.contentBlocks),
+      'contentBlocks': encodeDiaryContentBlocks(_state.contentBlocks),
       'category': _state.category.name,
       'isPrivate': _state.isPrivate.toString(),
-      'imageUrl': _state.imageUrl ?? '',
+      'imageUrl': primaryDiaryImageUrlFromBlocks(_state.contentBlocks) ?? '',
       'imageFilename': selectedImage?.filename ?? '',
       'imageByteLength': selectedImage?.bytes.length.toString() ?? '',
       'imageSource': selectedImage?.source.name ?? '',
@@ -667,12 +951,51 @@ class DiaryController extends ChangeNotifier {
     }
   }
 
-  String? _takeTemporaryUploadedImageUrlIfCurrent() {
-    final temporaryUrl = _state.imageUrl == _temporaryUploadedImageUrl
-        ? _temporaryUploadedImageUrl
-        : null;
-    _temporaryUploadedImageUrl = null;
-    return temporaryUrl;
+  DiaryContentBlock? _findBlockById(String blockId) {
+    for (final block in _state.contentBlocks) {
+      if (block.id == blockId) {
+        return block;
+      }
+    }
+
+    return null;
+  }
+
+  List<String> _takeTemporaryUploadedImageUrlsIfCurrent() {
+    final currentUrls = _state.contentBlocks
+        .where((block) => block.isImage)
+        .map((block) => block.imageUrl)
+        .whereType<String>()
+        .toSet();
+    final temporaryUrls = _temporaryUploadedImageUrls
+        .where((url) => currentUrls.contains(url))
+        .toList(growable: false);
+    _temporaryUploadedImageUrls.removeAll(temporaryUrls);
+    return temporaryUrls;
+  }
+
+  String? _temporaryUploadedImageUrlIfTracked(String? imageUrl) {
+    if (imageUrl == null || !_temporaryUploadedImageUrls.remove(imageUrl)) {
+      return null;
+    }
+
+    return imageUrl;
+  }
+
+  String _nextBlockId(String prefix) {
+    final id = '$prefix-$_nextBlockOrdinal';
+    _nextBlockOrdinal += 1;
+    return id;
+  }
+
+  void _bumpNextBlockOrdinal(List<DiaryContentBlock> blocks) {
+    for (final block in blocks) {
+      final segments = block.id.split('-');
+      final ordinal = int.tryParse(segments.last);
+      if (ordinal != null && ordinal >= _nextBlockOrdinal) {
+        _nextBlockOrdinal = ordinal + 1;
+      }
+    }
   }
 
   void _handleError(
@@ -740,6 +1063,47 @@ class DiaryController extends ChangeNotifier {
     _isDisposed = true;
     super.dispose();
   }
+}
+
+List<DiaryContentBlock> _updatePrimaryTextBlock(
+  List<DiaryContentBlock> blocks,
+  String content,
+) {
+  final normalized = ensureDiaryTextBlock(blocks);
+  var didUpdate = false;
+  final next = <DiaryContentBlock>[];
+  for (final block in normalized) {
+    if (!didUpdate && block.isText) {
+      next.add(block.copyWith(text: content));
+      didUpdate = true;
+    } else {
+      next.add(block);
+    }
+  }
+
+  return ensureDiaryTextBlock(next);
+}
+
+List<DiaryContentBlock> _replaceBlockAt(
+  List<DiaryContentBlock> blocks,
+  int index,
+  DiaryContentBlock block,
+) {
+  return [
+    for (var current = 0; current < blocks.length; current += 1)
+      current == index ? block : blocks[current],
+  ];
+}
+
+DiaryImageAttachment? _firstSelectedImage(List<DiaryContentBlock> blocks) {
+  for (final block in blocks) {
+    final image = block.image;
+    if (block.isImage && image != null) {
+      return image;
+    }
+  }
+
+  return null;
 }
 
 String _errorMessageWithAction(String message, String? nextAction) {

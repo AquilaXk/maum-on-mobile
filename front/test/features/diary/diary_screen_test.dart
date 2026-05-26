@@ -99,6 +99,71 @@ void main() {
     expect(repository.createdDrafts.single.imageUrl, '/images/uploads/mind.png');
   });
 
+  testWidgets('adds multiple image and text blocks from the editor',
+      (tester) async {
+    final controller = DiaryController(
+      diaryRepository: _FakeDiaryRepository(pages: [_page([])]),
+      imageRepository: _FakeDiaryImageRepository(),
+      now: DateTime(2026, 5, 20),
+    );
+    await controller.load();
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: DiaryScreen(
+          controller: controller,
+          imagePicker: _FakeDiaryImagePicker(
+            attachments: [
+              const DiaryImageAttachment(filename: 'first.png', bytes: [1]),
+              const DiaryImageAttachment(filename: 'second.png', bytes: [2]),
+            ],
+          ),
+          onBack: () {},
+        ),
+      ),
+    );
+
+    await tester.enterText(
+      find.byKey(const ValueKey('diary-content-field')),
+      '첫 문단',
+    );
+    await tester
+        .ensureVisible(find.byKey(const ValueKey('diary-image-gallery-button')));
+    await tester.tap(find.byKey(const ValueKey('diary-image-gallery-button')));
+    await tester.pump();
+
+    final firstImageId = controller.state.imageBlocks.single.id;
+    await tester.ensureVisible(
+      find.byKey(ValueKey('diary-add-text-after-$firstImageId')),
+    );
+    await tester.tap(find.byKey(ValueKey('diary-add-text-after-$firstImageId')));
+    await tester.pump();
+
+    final extraTextBlock = controller.state.contentBlocks
+        .where((block) => block.isText)
+        .last;
+    await tester.enterText(
+      find.byKey(ValueKey('diary-text-block-${extraTextBlock.id}')),
+      '뒤 문단',
+    );
+    await tester
+        .ensureVisible(find.byKey(const ValueKey('diary-image-gallery-button')));
+    await tester.tap(find.byKey(const ValueKey('diary-image-gallery-button')));
+    await tester.pump();
+
+    expect(controller.state.imageBlocks, hasLength(2));
+    expect(controller.state.content, '첫 문단\n\n뒤 문단');
+    expect(
+      controller.state.contentBlocks.map((block) => block.type),
+      [
+        DiaryContentBlockType.text,
+        DiaryContentBlockType.image,
+        DiaryContentBlockType.text,
+        DiaryContentBlockType.image,
+      ],
+    );
+  });
+
   testWidgets('camera action requests the camera source', (tester) async {
     final picker = _FakeDiaryImagePicker(
       attachment: const DiaryImageAttachment(filename: 'camera.jpg', bytes: [1]),
@@ -453,13 +518,18 @@ class _FakeDiaryRepository implements DiaryRepository {
 }
 
 class _FakeDiaryImagePicker implements DiaryImagePicker {
-  _FakeDiaryImagePicker({this.attachment, DiaryImagePickResult? result})
-      : result = result ??
+  _FakeDiaryImagePicker({
+    this.attachment,
+    List<DiaryImageAttachment>? attachments,
+    DiaryImagePickResult? result,
+  })  : attachments = attachments ?? const [],
+        result = result ??
             (attachment == null
                 ? const DiaryImagePickResult.cancelled()
                 : DiaryImagePickResult.picked(attachment));
 
   final DiaryImageAttachment? attachment;
+  final List<DiaryImageAttachment> attachments;
   final DiaryImagePickResult result;
   final List<DiaryImageSource> requestedSources = [];
   int openSettingsCount = 0;
@@ -467,6 +537,9 @@ class _FakeDiaryImagePicker implements DiaryImagePicker {
   @override
   Future<DiaryImagePickResult> pickImage(DiaryImageSource source) async {
     requestedSources.add(source);
+    if (attachments.isNotEmpty) {
+      return DiaryImagePickResult.picked(attachments.removeAt(0));
+    }
     return result;
   }
 
