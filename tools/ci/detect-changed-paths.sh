@@ -46,6 +46,11 @@ while IFS= read -r file; do
       frontend=true
       repository=true
       ;;
+    contracts/store-review/**)
+      frontend=true
+      ios=true
+      repository=true
+      ;;
     .github/pull_request_template.md)
       ;;
     .github/**|.gitignore|.coderabbit.yaml)

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:maum_on_mobile_front/features/auth/application/auth_controller.dart';
 import 'package:maum_on_mobile_front/features/auth/data/auth_repository.dart';
+import 'package:maum_on_mobile_front/features/auth/deeplink/external_login.dart';
 import 'package:maum_on_mobile_front/features/auth/domain/auth_models.dart';
 import 'package:maum_on_mobile_front/features/auth/presentation/auth_screen.dart';
 
@@ -118,7 +119,10 @@ void main() {
         find.byKey(const ValueKey('auth-privacy-policy-link')), findsOneWidget);
     expect(find.byKey(const ValueKey('auth-terms-link')), findsOneWidget);
     expect(find.byKey(const ValueKey('auth-support-link')), findsOneWidget);
-    expect(find.textContaining('회원 탈퇴'), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('auth-account-deletion-guidance')),
+      findsOneWidget,
+    );
 
     await tester.tap(find.text('새 계정 만들기'));
     await tester.pumpAndSettle();
@@ -128,23 +132,101 @@ void main() {
         find.byKey(const ValueKey('auth-privacy-policy-link')), findsOneWidget);
     expect(find.byKey(const ValueKey('auth-terms-link')), findsOneWidget);
   });
+
+  testWidgets('hides third-party login on iOS review builds', (tester) async {
+    final repository = _FakeAuthRepository();
+    final authController = AuthController(authRepository: repository);
+
+    await tester.pumpWidget(
+      _AuthScreenHarness(
+        repository: repository,
+        controller: authController,
+        platform: TargetPlatform.iOS,
+        externalLoginController: ExternalLoginController(
+          authController: authController,
+          launcher: _FakeExternalLoginLauncher(),
+          config: ExternalLoginConfig(
+            apiBaseUrl: Uri.parse('https://api.example.com'),
+          ),
+        ),
+      ),
+    );
+
+    expect(find.byKey(const ValueKey('login-email-field')), findsOneWidget);
+    expect(find.byKey(const ValueKey('login-password-field')), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('external-login-kakao-button')),
+      findsNothing,
+    );
+    expect(
+      find.byKey(const ValueKey('ios-review-email-login-guidance')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey('auth-account-deletion-guidance')),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('keeps Kakao login available outside iOS review builds',
+      (tester) async {
+    final repository = _FakeAuthRepository();
+    final authController = AuthController(authRepository: repository);
+
+    await tester.pumpWidget(
+      _AuthScreenHarness(
+        repository: repository,
+        controller: authController,
+        platform: TargetPlatform.android,
+        externalLoginController: ExternalLoginController(
+          authController: authController,
+          launcher: _FakeExternalLoginLauncher(),
+          config: ExternalLoginConfig(
+            apiBaseUrl: Uri.parse('https://api.example.com'),
+          ),
+        ),
+      ),
+    );
+
+    expect(
+      find.byKey(const ValueKey('external-login-kakao-button')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey('ios-review-email-login-guidance')),
+      findsNothing,
+    );
+  });
 }
 
 class _AuthScreenHarness extends StatelessWidget {
   const _AuthScreenHarness({
     required this.repository,
+    this.controller,
+    this.externalLoginController,
+    this.platform,
   });
 
   final _FakeAuthRepository repository;
+  final AuthController? controller;
+  final ExternalLoginController? externalLoginController;
+  final TargetPlatform? platform;
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+      theme: ThemeData(platform: platform),
       home: AuthScreen(
-        controller: AuthController(authRepository: repository),
+        controller: controller ?? AuthController(authRepository: repository),
+        externalLoginController: externalLoginController,
       ),
     );
   }
+}
+
+class _FakeExternalLoginLauncher implements ExternalLoginLauncher {
+  @override
+  Future<bool> launch(Uri uri) async => true;
 }
 
 class _FakeAuthRepository implements AuthRepository {

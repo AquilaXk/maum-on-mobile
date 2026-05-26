@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../application/auth_controller.dart';
 import '../deeplink/external_login.dart';
+import '../domain/login_provider_policy.dart';
 import '../../legal/presentation/legal_disclosure_links.dart';
 
 enum AuthFormMode {
@@ -53,6 +54,7 @@ class _AuthScreenState extends State<AuthScreen> {
     final theme = Theme.of(context);
     final state = widget.controller.state;
     final externalLoginState = widget.externalLoginController?.state;
+    final platform = theme.platform;
 
     return Scaffold(
       body: SafeArea(
@@ -108,7 +110,7 @@ class _AuthScreenState extends State<AuthScreen> {
                     ),
                   ),
                   const SizedBox(height: 12),
-                  ..._secondaryActions(state, externalLoginState),
+                  ..._secondaryActions(state, externalLoginState, platform),
                   const SizedBox(height: 16),
                   LegalDisclosureLinks(
                     keyPrefix: 'auth',
@@ -326,6 +328,7 @@ class _AuthScreenState extends State<AuthScreen> {
   List<Widget> _secondaryActions(
     AuthState state,
     ExternalLoginState? externalLoginState,
+    TargetPlatform platform,
   ) {
     final actions = <Widget>[];
 
@@ -348,23 +351,32 @@ class _AuthScreenState extends State<AuthScreen> {
             child: const Text('새 계정 만들기'),
           ),
         );
-        if (widget.externalLoginController != null) {
+        if (LoginProviderPolicy.showsReviewEmailGuidance(platform)) {
           actions.add(const SizedBox(height: 8));
           actions.add(
-            OutlinedButton(
-              key: const ValueKey('external-login-kakao-button'),
-              onPressed: externalLoginState?.isStarting == true
-                  ? null
-                  : () => widget.externalLoginController!.start(
-                        provider: 'kakao',
-                      ),
-              child: Text(
-                externalLoginState?.isStarting == true
-                    ? '외부 로그인 준비 중'
-                    : '카카오로 계속하기',
-              ),
-            ),
+            const _IosReviewEmailLoginGuidance(),
           );
+        }
+        final providers = LoginProviderPolicy.providersFor(platform);
+        if (widget.externalLoginController != null && providers.isNotEmpty) {
+          actions.add(const SizedBox(height: 8));
+          for (final provider in providers) {
+            actions.add(
+              OutlinedButton(
+                key: ValueKey(provider.buttonKey),
+                onPressed: externalLoginState?.isStarting == true
+                    ? null
+                    : () => widget.externalLoginController!.start(
+                          provider: provider.providerId,
+                        ),
+                child: Text(
+                  externalLoginState?.isStarting == true
+                      ? '외부 로그인 준비 중'
+                      : provider.label,
+                ),
+              ),
+            );
+          }
         }
         break;
       case AuthFormMode.signup:
@@ -561,6 +573,22 @@ class _MessagePanel extends StatelessWidget {
             fontWeight: FontWeight.w700,
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _IosReviewEmailLoginGuidance extends StatelessWidget {
+  const _IosReviewEmailLoginGuidance();
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Text(
+      'iOS에서는 이메일과 비밀번호로 로그인할 수 있으며, 계정 삭제는 로그인 후 설정의 회원 탈퇴에서 진행할 수 있습니다.',
+      key: const ValueKey('ios-review-email-login-guidance'),
+      style: theme.textTheme.bodySmall?.copyWith(
+        color: theme.colorScheme.onSurfaceVariant,
       ),
     );
   }

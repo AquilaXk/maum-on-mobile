@@ -1,0 +1,51 @@
+{
+  "version": 1,
+  "platform": "ios",
+  "submissionPolicy": {
+    "emailLoginRequired": true,
+    "externalProviderHandling": "disabled_until_sign_in_with_apple_is_available",
+    "signInWithApple": {
+      "requiredWhenThirdPartyProviderEnabled": true,
+      "currentStatus": "not_enabled",
+      "releaseGate": "iOS must not display third-party social login until Sign in with Apple is available."
+    }
+  },
+  "loginOptions": [
+    {
+      "id": "email",
+      "platforms": ["android", "ios"],
+      "reviewState": "primary",
+      "testKeys": ["login-email-field", "login-password-field"]
+    },
+    {
+      "id": "kakao",
+      "platforms": ["android"],
+      "iosReviewState": "hidden",
+      "testKeys": ["external-login-kakao-button"]
+    }
+  ],
+  "reviewAccount": {
+    "storage": "app_store_connect_review_notes",
+    "credentialsCommitted": false,
+    "secretNames": [
+      "MAUMON_REVIEW_ACCOUNT_EMAIL",
+      "MAUMON_REVIEW_ACCOUNT_PASSWORD"
+    ],
+    "requiredFields": ["email", "password", "role", "testDataScope"],
+    "testDataScope": [
+      "auth.login",
+      "settings.member_withdrawal",
+      "settings.data_export"
+    ]
+  },
+  "fallbacks": {
+    "externalLoginFailure": "email_password_login",
+    "accountDeletionPath": "settings.member_withdrawal"
+  },
+  "qualityGate": {
+    "commands": [
+      "flutter test test/features/auth/auth_screen_test.dart",
+      "node --test tools/ci/ios-login-review-readiness-contract.test.mjs"
+    ]
+  }
+}
