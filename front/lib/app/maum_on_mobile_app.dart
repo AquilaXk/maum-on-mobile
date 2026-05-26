@@ -266,6 +266,12 @@ class _MaumOnMobileAppState extends State<MaumOnMobileApp> {
     required String status,
     required String routeTitle,
   }) {
+    final unreadNotificationCount =
+        _notificationController?.state.unreadCount ?? 0;
+    final hasLiveNotificationConnection =
+        _notificationController?.state.connectionState ==
+            NotificationConnectionState.connected;
+
     return switch (_route) {
       AuthenticatedRoute.diary => DiaryScreen(
           controller: _diaryControllerFor(memberId),
@@ -310,6 +316,8 @@ class _MaumOnMobileAppState extends State<MaumOnMobileApp> {
                 AuthenticatedRoute.notifications,
               ),
               onOpenSettings: () => _openRoute(AuthenticatedRoute.settings),
+              unreadNotificationCount: unreadNotificationCount,
+              hasLiveNotificationConnection: hasLiveNotificationConnection,
               onLogout: () {
                 _logout();
               },
@@ -340,6 +348,8 @@ class _MaumOnMobileAppState extends State<MaumOnMobileApp> {
             AuthenticatedRoute.notifications,
           ),
           onOpenSettings: () => _openRoute(AuthenticatedRoute.settings),
+          unreadNotificationCount: unreadNotificationCount,
+          hasLiveNotificationConnection: hasLiveNotificationConnection,
           isAdmin: role == 'ADMIN',
           onOpenOperations: role == 'ADMIN'
               ? () => _openRoute(AuthenticatedRoute.operations)
@@ -956,10 +966,13 @@ class _MaumOnMobileAppState extends State<MaumOnMobileApp> {
     _pendingOperationsReportId = null;
     _pendingNotificationNotice = null;
     _route = switch (payload.destination) {
+      NotificationTapDestination.diary => AuthenticatedRoute.diary,
+      NotificationTapDestination.story => AuthenticatedRoute.story,
       NotificationTapDestination.letter => _letterRouteFor(payload),
       NotificationTapDestination.consultation =>
         AuthenticatedRoute.consultation,
       NotificationTapDestination.operations => _operationsRouteFor(payload),
+      NotificationTapDestination.settings => AuthenticatedRoute.settings,
       NotificationTapDestination.notifications =>
         AuthenticatedRoute.notifications,
     };

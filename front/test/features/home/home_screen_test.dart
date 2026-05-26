@@ -36,6 +36,8 @@ void main() {
     expect(find.text('오늘 올라온 고민'), findsOneWidget);
     expect(find.text('전달된 비밀 편지'), findsOneWidget);
     expect(find.text('오늘의 기록'), findsOneWidget);
+    expect(find.text('알림/신고'), findsOneWidget);
+    expect(find.text('읽지 않은 알림 없음 · 알림 센터'), findsOneWidget);
     expect(find.text('지금 마음을 천천히 살펴보세요.'), findsOneWidget);
     expect(find.text('최근 인기'), findsOneWidget);
     expect(find.text('오늘 너무 지쳐요'), findsWidgets);
@@ -126,17 +128,21 @@ void main() {
           onOpenConsultation: () => consultationTaps += 1,
           onOpenNotifications: () => notificationTaps += 1,
           onOpenSettings: () => settingsTaps += 1,
+          unreadNotificationCount: 2,
+          hasLiveNotificationConnection: true,
           onLogout: () {},
         ),
       ),
     );
 
-    await tester.tap(find.byKey(const ValueKey('home-action-diary')));
-    await tester.tap(find.byKey(const ValueKey('home-action-letter')));
-    await tester.tap(find.byKey(const ValueKey('home-action-story')));
-    await tester.tap(find.byKey(const ValueKey('home-action-consultation')));
-    await tester.tap(find.byKey(const ValueKey('home-action-notifications')));
-    await tester.tap(find.byKey(const ValueKey('home-action-settings')));
+    expect(find.text('읽지 않은 알림 2개 · 실시간 연결됨'), findsOneWidget);
+
+    await _tapVisibleKey(tester, const ValueKey('home-action-diary'));
+    await _tapVisibleKey(tester, const ValueKey('home-action-letter'));
+    await _tapVisibleKey(tester, const ValueKey('home-action-story'));
+    await _tapVisibleKey(tester, const ValueKey('home-action-consultation'));
+    await _tapVisibleKey(tester, const ValueKey('home-action-notifications'));
+    await _tapVisibleKey(tester, const ValueKey('home-action-settings'));
 
     expect(diaryTaps, 1);
     expect(letterTaps, 1);
@@ -196,10 +202,18 @@ void main() {
       ),
     );
 
-    await tester.tap(find.byKey(const ValueKey('home-operations-button')));
+    await _tapVisibleKey(tester, const ValueKey('home-operations-button'));
 
     expect(operationsTaps, 1);
   });
+}
+
+Future<void> _tapVisibleKey(WidgetTester tester, Key key) async {
+  final finder = find.byKey(key);
+  await tester.ensureVisible(finder);
+  await tester.pumpAndSettle();
+  await tester.tap(finder);
+  await tester.pumpAndSettle();
 }
 
 class _FakeHomeRepository implements HomeRepository {

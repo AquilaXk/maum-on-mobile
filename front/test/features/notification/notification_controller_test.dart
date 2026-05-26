@@ -33,6 +33,18 @@ void main() {
       NotificationTapDestination.consultation,
     );
     expect(
+      NotificationTapPayload.fromJson({'routeKey': 'diary'}).destination,
+      NotificationTapDestination.diary,
+    );
+    expect(
+      NotificationTapPayload.fromJson({'routeKey': 'story'}).destination,
+      NotificationTapDestination.story,
+    );
+    expect(
+      NotificationTapPayload.fromJson({'routeKey': 'settings'}).destination,
+      NotificationTapDestination.settings,
+    );
+    expect(
       NotificationTapPayload.fromJson({'route': 'notifications'}).destination,
       NotificationTapDestination.notifications,
     );
