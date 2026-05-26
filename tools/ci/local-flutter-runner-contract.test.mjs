@@ -36,7 +36,10 @@ test("repository exposes a CocoaPods wrapper for bundled iOS dependencies", () =
   const script = read("tools/pod");
   assert.match(script, /POD_BIN/, "Wrapper must accept an explicit CocoaPods binary override");
   assert.match(script, /front\/ios/, "Wrapper must use the iOS bundle directory");
+  assert.match(script, /BUNDLE_GEMFILE/, "Wrapper must pin Bundler to the iOS Gemfile");
+  assert.match(script, /BUNDLE_PATH/, "Wrapper must point Bundler at the installed vendor bundle");
   assert.match(script, /BUNDLE_USER_HOME/, "Wrapper must keep Bundler state inside the ignored iOS bundle directory");
+  assert.match(script, /mkdir -p/, "Wrapper must create local Bundler state directories before use");
   assert.match(script, /bundle "_\$\{bundler_version\}_" check/, "Wrapper must use the Bundler version in Gemfile.lock");
   assert.match(script, /bundle "_\$\{bundler_version\}_" exec pod/, "Wrapper must prefer bundled CocoaPods");
   assert.match(script, /RUBYOPT="-rlogger/, "Wrapper must preload logger for macOS system Ruby");

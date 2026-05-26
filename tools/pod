@@ -12,14 +12,22 @@ fi
 
 if [[ -f "${ios_dir}/Gemfile" ]] && command -v bundle >/dev/null 2>&1; then
   cd "${ios_dir}"
+  export BUNDLE_GEMFILE="${BUNDLE_GEMFILE:-${ios_dir}/Gemfile}"
+  export BUNDLE_PATH="${BUNDLE_PATH:-${ios_dir}/vendor/bundle}"
   export BUNDLE_USER_HOME="${BUNDLE_USER_HOME:-${ios_dir}/.bundle/home}"
   export BUNDLE_USER_CACHE="${BUNDLE_USER_CACHE:-${ios_dir}/.bundle/cache}"
   export BUNDLE_USER_CONFIG="${BUNDLE_USER_CONFIG:-${ios_dir}/.bundle/config}"
-  if bundle "_${bundler_version}_" check >/dev/null 2>&1; then
+  mkdir -p "${BUNDLE_USER_HOME}" "${BUNDLE_USER_CACHE}" "$(dirname "${BUNDLE_USER_CONFIG}")"
+
+  bundle_check_output="$(mktemp "${TMPDIR:-/tmp}/maumon-pod-bundle-check.XXXXXX")"
+  if bundle "_${bundler_version}_" check >"${bundle_check_output}" 2>&1; then
+    rm -f "${bundle_check_output}"
     export RUBYOPT="-rlogger${RUBYOPT:+ ${RUBYOPT}}"
     exec bundle "_${bundler_version}_" exec pod "$@"
   fi
 
+  cat "${bundle_check_output}" >&2
+  rm -f "${bundle_check_output}"
   cat >&2 <<'EOF'
 CocoaPods bundle is not installed.
 
