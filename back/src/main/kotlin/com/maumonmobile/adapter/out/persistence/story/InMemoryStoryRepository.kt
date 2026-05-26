@@ -167,6 +167,28 @@ class InMemoryStoryRepository : StoryRepository {
             .forEach(commentsById::remove)
     }
 
+    override fun anonymizeMember(memberId: Long, nickname: String, email: String): Int {
+        var updatedCount = 0
+        postsById.entries.forEach { entry ->
+            val post = entry.value
+            if (post.authorId == memberId) {
+                postsById[entry.key] = post.copy(authorNickname = nickname)
+                updatedCount += 1
+            }
+        }
+        commentsById.entries.forEach { entry ->
+            val comment = entry.value
+            if (comment.authorId == memberId) {
+                commentsById[entry.key] = comment.copy(
+                    authorNickname = nickname,
+                    authorEmail = email,
+                )
+                updatedCount += 1
+            }
+        }
+        return updatedCount
+    }
+
     private fun String.isBetween(startInclusive: String, endExclusive: String): Boolean {
         return this >= startInclusive && this < endExclusive
     }

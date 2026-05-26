@@ -23,6 +23,7 @@ void main() {
       expect(settings.nickname, '마음이');
       expect(settings.randomReceiveAllowed, isTrue);
       expect(settings.socialAccount, isFalse);
+      expect(settings.retentionPolicy.exportExpiryHours, 24);
     });
 
     test('sends profile, email, password, random setting, and withdrawal',
@@ -77,6 +78,46 @@ void main() {
       expect(transport.requests[4].method, ApiMethod.delete);
       expect(transport.requests[4].body, {'currentPassword': 'old-password'});
     });
+
+    test('requests, checks, and downloads member data export', () async {
+      final transport = _FakeApiTransport([
+        ApiTransportResponse.ok({
+          'resultCode': '200-1',
+          'data': _exportJob(),
+        }),
+        ApiTransportResponse.ok({
+          'resultCode': '200-1',
+          'data': _exportJob(),
+        }),
+        ApiTransportResponse.ok({
+          'resultCode': '200-1',
+          'data': {
+            'filename': 'maum-on-data-export-3.json',
+            'contentType': 'application/json',
+            'content': '{"account":{}}',
+            'expiresAt': '2026-05-27T00:00:00Z',
+          },
+        }),
+      ]);
+      final repository = _repository(transport);
+
+      final requested = await repository.requestDataExport();
+      final status = await repository.fetchDataExportStatus(requested.id);
+      final file = await repository.downloadDataExport(status.id);
+
+      expect(requested.status, MemberDataExportStatus.completed);
+      expect(file.filename, 'maum-on-data-export-3.json');
+      expect(transport.requests.map((request) => request.path), [
+        '/api/v1/members/me/data-exports',
+        '/api/v1/members/me/data-exports/3',
+        '/api/v1/members/me/data-exports/3/download',
+      ]);
+      expect(transport.requests.map((request) => request.method), [
+        ApiMethod.post,
+        ApiMethod.get,
+        ApiMethod.get,
+      ]);
+    });
   });
 }
 
@@ -101,6 +142,23 @@ Map<String, Object?> _settingsJson({
     'nickname': nickname,
     'randomReceiveAllowed': randomReceiveAllowed,
     'socialAccount': socialAccount,
+    'retentionPolicy': {
+      'immediateDeletionItems': ['세션 폐기'],
+      'anonymizedRetentionItems': ['비식별 보존'],
+      'legalRetentionItems': ['운영 보존'],
+      'exportExpiryHours': 24,
+    },
+  };
+}
+
+Map<String, Object?> _exportJob() {
+  return {
+    'id': 3,
+    'status': 'COMPLETED',
+    'requestedAt': '2026-05-26T00:00:00Z',
+    'completedAt': '2026-05-26T00:00:00Z',
+    'expiresAt': '2026-05-27T00:00:00Z',
+    'downloadUrl': '/api/v1/members/me/data-exports/3/download',
   };
 }
 

@@ -49,4 +49,16 @@ class InMemoryLetterRepository : LetterRepository {
             .count { letter -> letter.createdDate >= startInclusive && letter.createdDate < endExclusive }
             .toLong()
     }
+
+    override fun anonymizeMember(memberId: Long, nickname: String): Int {
+        var updatedCount = 0
+        lettersById.entries.forEach { entry ->
+            val letter = entry.value
+            if (letter.senderId == memberId) {
+                lettersById[entry.key] = letter.copy(senderNickname = nickname)
+                updatedCount += 1
+            }
+        }
+        return updatedCount
+    }
 }

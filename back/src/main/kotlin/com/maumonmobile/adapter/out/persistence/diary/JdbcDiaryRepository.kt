@@ -161,6 +161,19 @@ class JdbcDiaryRepository(
         )
     }
 
+    override fun anonymizeMember(memberId: Long, nickname: String): Int {
+        return jdbc.update(
+            """
+                update diaries
+                   set nickname = :nickname
+                 where member_id = :memberId
+            """.trimIndent(),
+            params()
+                .withValue("memberId", memberId)
+                .withValue("nickname", nickname),
+        )
+    }
+
     private fun DiaryDraft.imageUrlFor(id: Long?): String? {
         return imageFilename?.let { filename -> "/images/diaries/${id ?: 0}/$filename" }
             ?: imageUrl

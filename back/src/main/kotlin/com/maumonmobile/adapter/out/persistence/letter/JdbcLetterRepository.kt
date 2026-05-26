@@ -131,6 +131,19 @@ class JdbcLetterRepository(
         ) ?: 0L
     }
 
+    override fun anonymizeMember(memberId: Long, nickname: String): Int {
+        return jdbc.update(
+            """
+                update letters
+                   set sender_nickname = :nickname
+                 where sender_id = :memberId
+            """.trimIndent(),
+            params()
+                .withValue("memberId", memberId)
+                .withValue("nickname", nickname),
+        )
+    }
+
     private fun rejectedMemberIdsByLetterIds(letterIds: List<Long>): Map<Long, Set<Long>> {
         if (letterIds.isEmpty()) {
             return emptyMap()

@@ -12,6 +12,12 @@ abstract interface class SettingsRepository {
 
   Future<MemberSettings> toggleRandomSetting();
 
+  Future<MemberDataExportJob> requestDataExport();
+
+  Future<MemberDataExportJob> fetchDataExportStatus(int exportId);
+
+  Future<MemberDataExportFile> downloadDataExport(int exportId);
+
   Future<void> withdraw({String? currentPassword});
 }
 
@@ -62,6 +68,30 @@ class ApiSettingsRepository implements SettingsRepository {
     return _apiClient.patch<MemberSettings>(
       '/api/v1/members/me/random-setting',
       parser: MemberSettings.fromJson,
+    );
+  }
+
+  @override
+  Future<MemberDataExportJob> requestDataExport() {
+    return _apiClient.post<MemberDataExportJob>(
+      '/api/v1/members/me/data-exports',
+      parser: MemberDataExportJob.fromJson,
+    );
+  }
+
+  @override
+  Future<MemberDataExportJob> fetchDataExportStatus(int exportId) {
+    return _apiClient.get<MemberDataExportJob>(
+      '/api/v1/members/me/data-exports/$exportId',
+      parser: MemberDataExportJob.fromJson,
+    );
+  }
+
+  @override
+  Future<MemberDataExportFile> downloadDataExport(int exportId) {
+    return _apiClient.get<MemberDataExportFile>(
+      '/api/v1/members/me/data-exports/$exportId/download',
+      parser: MemberDataExportFile.fromJson,
     );
   }
 

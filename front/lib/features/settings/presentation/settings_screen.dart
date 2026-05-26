@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../../../shared/ui/app_design_system.dart';
 import '../application/settings_controller.dart';
+import '../domain/settings_models.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({
@@ -190,6 +191,20 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                 isSubmitting: state.isSubmitting,
                                 onChanged: (_) =>
                                     widget.controller.toggleRandomSetting(),
+                              ),
+                              const SizedBox(height: AppSpacing.lg),
+                              _DataExportSection(
+                                state: state,
+                                onRequest:
+                                    widget.controller.requestDataExport,
+                                onRefresh:
+                                    widget.controller.refreshDataExport,
+                                onDownload:
+                                    widget.controller.downloadDataExport,
+                              ),
+                              const SizedBox(height: AppSpacing.lg),
+                              _RetentionPolicySection(
+                                policy: settings.retentionPolicy,
                               ),
                               const SizedBox(height: AppSpacing.lg),
                               _WithdrawalSection(
@@ -471,6 +486,8 @@ class _WithdrawalSection extends StatelessWidget {
     return _SettingsSection(
       title: '회원 탈퇴',
       children: [
+        const Text('탈퇴 전 데이터 내보내기와 보존 정책을 확인해 주세요.'),
+        const SizedBox(height: AppSpacing.md),
         if (!state.isWithdrawConfirmVisible)
           Align(
             alignment: Alignment.centerLeft,
@@ -481,7 +498,7 @@ class _WithdrawalSection extends StatelessWidget {
             ),
           )
         else ...[
-          const Text('탈퇴하면 계정과 세션이 정리됩니다.'),
+          const Text('탈퇴하면 계정과 세션이 정리되고 일부 운영 기록은 보존될 수 있습니다.'),
           if (!state.isSocialAccount) ...[
             const SizedBox(height: AppSpacing.md),
             TextField(
@@ -510,6 +527,131 @@ class _WithdrawalSection extends StatelessWidget {
             ],
           ),
         ],
+      ],
+    );
+  }
+}
+
+class _DataExportSection extends StatelessWidget {
+  const _DataExportSection({
+    required this.state,
+    required this.onRequest,
+    required this.onRefresh,
+    required this.onDownload,
+  });
+
+  final SettingsState state;
+  final Future<void> Function() onRequest;
+  final Future<void> Function() onRefresh;
+  final Future<void> Function() onDownload;
+
+  @override
+  Widget build(BuildContext context) {
+    final export = state.dataExport;
+    final downloadedExport = state.downloadedExport;
+    return _SettingsSection(
+      title: '내 데이터',
+      children: [
+        if (export == null)
+          const Text('기록, 이야기, 편지, 상담 요약, 계정 정보를 JSON 파일로 받을 수 있습니다.')
+        else ...[
+          Text('상태: ${_exportStatusLabel(export.status)}'),
+          if (export.expiresAt != null) ...[
+            const SizedBox(height: AppSpacing.xxs),
+            Text('만료: ${export.expiresAt}'),
+          ],
+          if (export.failureReason != null) ...[
+            const SizedBox(height: AppSpacing.xxs),
+            Text(export.failureReason!),
+          ],
+        ],
+        if (downloadedExport != null) ...[
+          const SizedBox(height: AppSpacing.md),
+          AppNotice(
+            message:
+                '${downloadedExport.filename} · ${downloadedExport.content.length}자',
+          ),
+        ],
+        const SizedBox(height: AppSpacing.md),
+        Wrap(
+          spacing: AppSpacing.xs,
+          runSpacing: AppSpacing.xs,
+          alignment: WrapAlignment.end,
+          children: [
+            if (export == null ||
+                export.status == MemberDataExportStatus.failed ||
+                export.status == MemberDataExportStatus.expired)
+              FilledButton(
+                key: const ValueKey('settings-request-data-export'),
+                onPressed:
+                    state.canRequestDataExport ? () => onRequest() : null,
+                child: Text(
+                  export == null ? '내보내기 요청' : '다시 요청',
+                ),
+              )
+            else ...[
+              OutlinedButton(
+                key: const ValueKey('settings-refresh-data-export'),
+                onPressed: state.isExporting ? null : () => onRefresh(),
+                child: const Text('상태 갱신'),
+              ),
+              FilledButton(
+                key: const ValueKey('settings-download-data-export'),
+                onPressed:
+                    state.canDownloadDataExport ? () => onDownload() : null,
+                child: const Text('파일 받기'),
+              ),
+            ],
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+class _RetentionPolicySection extends StatelessWidget {
+  const _RetentionPolicySection({required this.policy});
+
+  final MemberRetentionPolicy policy;
+
+  @override
+  Widget build(BuildContext context) {
+    return _SettingsSection(
+      title: '탈퇴 보존 정책',
+      children: [
+        _PolicyList(title: '즉시 처리', items: policy.immediateDeletionItems),
+        const SizedBox(height: AppSpacing.md),
+        _PolicyList(title: '비식별 보존', items: policy.anonymizedRetentionItems),
+        const SizedBox(height: AppSpacing.md),
+        _PolicyList(title: '운영 보존', items: policy.legalRetentionItems),
+      ],
+    );
+  }
+}
+
+class _PolicyList extends StatelessWidget {
+  const _PolicyList({
+    required this.title,
+    required this.items,
+  });
+
+  final String title;
+  final List<String> items;
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(title, style: textTheme.titleSmall),
+        const SizedBox(height: AppSpacing.xxs),
+        ...items.map(
+          (item) => Padding(
+            padding: const EdgeInsets.only(bottom: AppSpacing.xxs),
+            child: Text('- $item'),
+          ),
+        ),
       ],
     );
   }
@@ -551,5 +693,18 @@ class _InlineNotice extends StatelessWidget {
       message: message,
       tone: isError ? AppNoticeTone.error : AppNoticeTone.success,
     );
+  }
+}
+
+String _exportStatusLabel(MemberDataExportStatus status) {
+  switch (status) {
+    case MemberDataExportStatus.pending:
+      return '준비 중';
+    case MemberDataExportStatus.completed:
+      return '준비 완료';
+    case MemberDataExportStatus.failed:
+      return '실패';
+    case MemberDataExportStatus.expired:
+      return '만료';
   }
 }

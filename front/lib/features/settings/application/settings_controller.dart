@@ -15,8 +15,11 @@ class SettingsState {
     this.isLoading = false,
     this.hasLoaded = false,
     this.isSubmitting = false,
+    this.isExporting = false,
     this.isWithdrawConfirmVisible = false,
     this.isWithdrawn = false,
+    this.dataExport,
+    this.downloadedExport,
     this.errorMessage,
     this.noticeMessage,
   });
@@ -30,8 +33,11 @@ class SettingsState {
   final bool isLoading;
   final bool hasLoaded;
   final bool isSubmitting;
+  final bool isExporting;
   final bool isWithdrawConfirmVisible;
   final bool isWithdrawn;
+  final MemberDataExportJob? dataExport;
+  final MemberDataExportFile? downloadedExport;
   final String? errorMessage;
   final String? noticeMessage;
 
@@ -68,6 +74,23 @@ class SettingsState {
         (isSocialAccount || withdrawPasswordDraft.trim().isNotEmpty);
   }
 
+  bool get canRequestDataExport {
+    final export = dataExport;
+    return settings != null &&
+        !isSubmitting &&
+        !isExporting &&
+        (export == null ||
+            export.status == MemberDataExportStatus.failed ||
+            export.status == MemberDataExportStatus.expired);
+  }
+
+  bool get canDownloadDataExport {
+    return settings != null &&
+        !isSubmitting &&
+        !isExporting &&
+        (dataExport?.canDownload ?? false);
+  }
+
   SettingsState copyWith({
     MemberSettings? settings,
     String? nicknameDraft,
@@ -78,10 +101,15 @@ class SettingsState {
     bool? isLoading,
     bool? hasLoaded,
     bool? isSubmitting,
+    bool? isExporting,
     bool? isWithdrawConfirmVisible,
     bool? isWithdrawn,
+    MemberDataExportJob? dataExport,
+    MemberDataExportFile? downloadedExport,
     String? errorMessage,
     String? noticeMessage,
+    bool clearDataExport = false,
+    bool clearDownloadedExport = false,
     bool clearErrorMessage = false,
     bool clearNoticeMessage = false,
   }) {
@@ -97,9 +125,14 @@ class SettingsState {
       isLoading: isLoading ?? this.isLoading,
       hasLoaded: hasLoaded ?? this.hasLoaded,
       isSubmitting: isSubmitting ?? this.isSubmitting,
+      isExporting: isExporting ?? this.isExporting,
       isWithdrawConfirmVisible:
           isWithdrawConfirmVisible ?? this.isWithdrawConfirmVisible,
       isWithdrawn: isWithdrawn ?? this.isWithdrawn,
+      dataExport: clearDataExport ? null : dataExport ?? this.dataExport,
+      downloadedExport: clearDownloadedExport
+          ? null
+          : downloadedExport ?? this.downloadedExport,
       errorMessage:
           clearErrorMessage ? null : errorMessage ?? this.errorMessage,
       noticeMessage:
@@ -145,6 +178,9 @@ class SettingsController extends ChangeNotifier {
           currentPasswordDraft: '',
           newPasswordDraft: '',
           withdrawPasswordDraft: '',
+          dataExport: settings.latestDataExport,
+          clearDataExport: settings.latestDataExport == null,
+          clearDownloadedExport: true,
           isLoading: false,
           hasLoaded: true,
           clearErrorMessage: true,
@@ -271,6 +307,64 @@ class SettingsController extends ChangeNotifier {
     );
   }
 
+  Future<void> requestDataExport() async {
+    if (!_state.canRequestDataExport) {
+      return;
+    }
+
+    await _submitExportChange(
+      () => _repository.requestDataExport(),
+      noticeMessage: '내보내기 파일이 준비되었습니다.',
+    );
+  }
+
+  Future<void> refreshDataExport() async {
+    final export = _state.dataExport;
+    if (export == null || _state.isExporting) {
+      return;
+    }
+
+    await _submitExportChange(
+      () => _repository.fetchDataExportStatus(export.id),
+      noticeMessage: '내보내기 상태를 갱신했습니다.',
+      clearDownloadedExport: false,
+    );
+  }
+
+  Future<void> downloadDataExport() async {
+    final export = _state.dataExport;
+    if (export == null || !_state.canDownloadDataExport) {
+      return;
+    }
+
+    _setState(
+      _state.copyWith(
+        isExporting: true,
+        clearErrorMessage: true,
+        clearNoticeMessage: true,
+      ),
+    );
+
+    try {
+      final file = await _repository.downloadDataExport(export.id);
+      _setState(
+        _state.copyWith(
+          isExporting: false,
+          downloadedExport: file,
+          noticeMessage: '${file.filename} 파일을 받았습니다.',
+        ),
+      );
+    } on Object catch (error) {
+      _handleError(error);
+      _setState(
+        _state.copyWith(
+          isExporting: false,
+          errorMessage: _messageFromError(error),
+        ),
+      );
+    }
+  }
+
   void requestWithdrawal() {
     _setState(
       _state.copyWith(
@@ -362,6 +456,40 @@ class SettingsController extends ChangeNotifier {
       _setState(
         _state.copyWith(
           isSubmitting: false,
+          errorMessage: _messageFromError(error),
+        ),
+      );
+    }
+  }
+
+  Future<void> _submitExportChange(
+    Future<MemberDataExportJob> Function() submit, {
+    required String noticeMessage,
+    bool clearDownloadedExport = true,
+  }) async {
+    _setState(
+      _state.copyWith(
+        isExporting: true,
+        clearErrorMessage: true,
+        clearNoticeMessage: true,
+        clearDownloadedExport: clearDownloadedExport,
+      ),
+    );
+
+    try {
+      final export = await submit();
+      _setState(
+        _state.copyWith(
+          dataExport: export,
+          isExporting: false,
+          noticeMessage: noticeMessage,
+        ),
+      );
+    } on Object catch (error) {
+      _handleError(error);
+      _setState(
+        _state.copyWith(
+          isExporting: false,
           errorMessage: _messageFromError(error),
         ),
       );

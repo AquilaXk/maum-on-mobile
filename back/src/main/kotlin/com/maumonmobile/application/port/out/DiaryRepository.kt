@@ -19,4 +19,6 @@ interface DiaryRepository {
     fun countCreatedBetween(startInclusive: String, endExclusive: String): Long
 
     fun delete(id: Long)
+
+    fun anonymizeMember(memberId: Long, nickname: String): Int
 }

@@ -47,4 +47,6 @@ interface StoryRepository {
     fun deleteComment(id: Long)
 
     fun deleteCommentsByPostId(postId: Long)
+
+    fun anonymizeMember(memberId: Long, nickname: String, email: String): Int
 }

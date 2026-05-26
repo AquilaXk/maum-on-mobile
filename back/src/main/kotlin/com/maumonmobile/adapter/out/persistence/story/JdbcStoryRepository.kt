@@ -277,6 +277,32 @@ class JdbcStoryRepository(
         )
     }
 
+    override fun anonymizeMember(memberId: Long, nickname: String, email: String): Int {
+        val posts = jdbc.update(
+            """
+                update story_posts
+                   set author_nickname = :nickname
+                 where author_id = :memberId
+            """.trimIndent(),
+            params()
+                .withValue("memberId", memberId)
+                .withValue("nickname", nickname),
+        )
+        val comments = jdbc.update(
+            """
+                update story_comments
+                   set author_nickname = :nickname,
+                       author_email = :email
+                 where author_id = :memberId
+            """.trimIndent(),
+            params()
+                .withValue("memberId", memberId)
+                .withValue("nickname", nickname)
+                .withValue("email", email),
+        )
+        return posts + comments
+    }
+
     private companion object {
         private val postRowMapper = RowMapper { rs, _ ->
             StoryPost(
