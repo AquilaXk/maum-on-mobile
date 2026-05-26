@@ -41,8 +41,8 @@ test("repository exposes a CocoaPods wrapper for bundled iOS dependencies", () =
   assert.match(script, /BUNDLE_USER_HOME/, "Wrapper must keep Bundler state inside the ignored iOS bundle directory");
   assert.match(script, /mkdir -p/, "Wrapper must create local Bundler state directories before use");
   assert.match(script, /bundle "_\$\{bundler_version\}_" check/, "Wrapper must use the Bundler version in Gemfile.lock");
-  assert.match(script, /bundle "_\$\{bundler_version\}_" exec pod/, "Wrapper must prefer bundled CocoaPods");
-  assert.match(script, /RUBYOPT="-rlogger/, "Wrapper must preload logger for macOS system Ruby");
+  assert.match(script, /bundle "_\$\{bundler_version\}_" info cocoapods --path/, "Wrapper must resolve the bundled CocoaPods executable");
+  assert.match(script, /bundle "_\$\{bundler_version\}_" exec ruby -rlogger/, "Wrapper must preload logger before running CocoaPods");
   assert.match(script, /gem install bundler -v 2\.4\.22/, "Wrapper must point users at the Bundler version in Gemfile.lock");
   assert.match(script, /CocoaPods bundle is not installed/, "Wrapper must explain missing bundled dependencies");
 });

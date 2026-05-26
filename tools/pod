@@ -22,8 +22,8 @@ if [[ -f "${ios_dir}/Gemfile" ]] && command -v bundle >/dev/null 2>&1; then
   bundle_check_output="$(mktemp "${TMPDIR:-/tmp}/maumon-pod-bundle-check.XXXXXX")"
   if bundle "_${bundler_version}_" check >"${bundle_check_output}" 2>&1; then
     rm -f "${bundle_check_output}"
-    export RUBYOPT="-rlogger${RUBYOPT:+ ${RUBYOPT}}"
-    exec bundle "_${bundler_version}_" exec pod "$@"
+    cocoapods_bin="$(bundle "_${bundler_version}_" info cocoapods --path)/bin/pod"
+    exec bundle "_${bundler_version}_" exec ruby -rlogger "${cocoapods_bin}" "$@"
   fi
 
   cat "${bundle_check_output}" >&2
