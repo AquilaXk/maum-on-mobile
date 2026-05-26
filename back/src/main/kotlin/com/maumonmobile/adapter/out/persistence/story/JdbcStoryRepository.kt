@@ -11,6 +11,7 @@ import org.springframework.context.annotation.Profile
 import org.springframework.jdbc.core.RowMapper
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate
 import org.springframework.stereotype.Repository
+import org.springframework.transaction.annotation.Transactional
 import java.time.Instant
 
 @Repository
@@ -120,6 +121,19 @@ class JdbcStoryRepository(
         return jdbc.query(
             "select * from story_posts order by create_date desc, id desc",
             emptyMap<String, Any>(),
+            postRowMapper,
+        )
+    }
+
+    override fun findPostsByAuthorId(authorId: Long): List<StoryPost> {
+        return jdbc.query(
+            """
+                select *
+                  from story_posts
+                 where author_id = :authorId
+                 order by create_date desc, id desc
+            """.trimIndent(),
+            params().withValue("authorId", authorId),
             postRowMapper,
         )
     }
@@ -263,6 +277,19 @@ class JdbcStoryRepository(
         )
     }
 
+    override fun findCommentsByAuthorId(authorId: Long): List<StoryComment> {
+        return jdbc.query(
+            """
+                select *
+                  from story_comments
+                 where author_id = :authorId
+                 order by create_date desc, id desc
+            """.trimIndent(),
+            params().withValue("authorId", authorId),
+            commentRowMapper,
+        )
+    }
+
     override fun deleteComment(id: Long) {
         jdbc.update(
             "delete from story_comments where id = :id",
@@ -277,12 +304,14 @@ class JdbcStoryRepository(
         )
     }
 
+    @Transactional
     override fun anonymizeMember(memberId: Long, nickname: String, email: String): Int {
         val posts = jdbc.update(
             """
                 update story_posts
                    set author_nickname = :nickname
                  where author_id = :memberId
+                   and author_nickname <> :nickname
             """.trimIndent(),
             params()
                 .withValue("memberId", memberId)
@@ -294,6 +323,7 @@ class JdbcStoryRepository(
                    set author_nickname = :nickname,
                        author_email = :email
                  where author_id = :memberId
+                   and (author_nickname <> :nickname or author_email <> :email)
             """.trimIndent(),
             params()
                 .withValue("memberId", memberId)

@@ -102,7 +102,16 @@ class MemberDataExportJob {
   final String? downloadUrl;
   final String? failureReason;
 
-  bool get canDownload => status == MemberDataExportStatus.completed;
+  bool get canDownload {
+    if (status != MemberDataExportStatus.completed) {
+      return false;
+    }
+    final expires = DateTime.tryParse(expiresAt ?? '');
+    if (expires == null) {
+      return true;
+    }
+    return DateTime.now().toUtc().isBefore(expires.toUtc());
+  }
 }
 
 class MemberDataExportFile {
@@ -156,12 +165,20 @@ class MemberRetentionPolicy {
     }
 
     final map = _stringKeyedMap(json);
+    const defaults = MemberRetentionPolicy();
     return MemberRetentionPolicy(
-      immediateDeletionItems: _readStringList(map['immediateDeletionItems']),
-      anonymizedRetentionItems:
-          _readStringList(map['anonymizedRetentionItems']),
-      legalRetentionItems: _readStringList(map['legalRetentionItems']),
-      exportExpiryHours: _readInt(map, 'exportExpiryHours'),
+      immediateDeletionItems: map.containsKey('immediateDeletionItems')
+          ? _readStringList(map['immediateDeletionItems'])
+          : defaults.immediateDeletionItems,
+      anonymizedRetentionItems: map.containsKey('anonymizedRetentionItems')
+          ? _readStringList(map['anonymizedRetentionItems'])
+          : defaults.anonymizedRetentionItems,
+      legalRetentionItems: map.containsKey('legalRetentionItems')
+          ? _readStringList(map['legalRetentionItems'])
+          : defaults.legalRetentionItems,
+      exportExpiryHours: map.containsKey('exportExpiryHours')
+          ? _readInt(map, 'exportExpiryHours')
+          : defaults.exportExpiryHours,
     );
   }
 

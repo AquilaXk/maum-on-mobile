@@ -202,6 +202,14 @@ class MemberSettingsControllerTest @Autowired constructor(
             parentCommentId = null,
             content = "댓글 본문",
         )
+        storyRepository.saveComment(
+            postId = post.id,
+            authorId = other.memberId.toLong(),
+            authorNickname = "다른이",
+            authorEmail = "export-other@example.com",
+            parentCommentId = null,
+            content = "타인 댓글",
+        )
         letterRepository.save(
             senderId = member.memberId.toLong(),
             senderNickname = "내보내기",
@@ -247,12 +255,17 @@ class MemberSettingsControllerTest @Autowired constructor(
             .andReturn()
 
         val content = downloadResult.response.readJsonString("$.data.content")
-        assertThat(content).contains("\"email\" : \"e***@example.com\"")
-        assertThat(content).contains("오늘 기록")
-        assertThat(content).contains("이야기 제목")
-        assertThat(content).contains("편지 제목")
-        assertThat(content).contains("[민감 상담 내용 숨김]")
+        assertThat(JsonPath.read<String>(content, "$.account.email")).isEqualTo("e***@example.com")
+        assertThat(JsonPath.read<String>(content, "$.diaries[0].title")).isEqualTo("오늘 기록")
+        assertThat(JsonPath.read<String>(content, "$.stories.posts[0].title")).isEqualTo("이야기 제목")
+        assertThat(JsonPath.read<List<String>>(content, "$.stories.posts[0].comments[*].content"))
+            .containsExactly("댓글 본문")
+        assertThat(JsonPath.read<String>(content, "$.letters[0].title")).isEqualTo("편지 제목")
+        assertThat(JsonPath.read<String>(content, "$.consultationSummary.messages[0].content"))
+            .isEqualTo("[민감 상담 내용 숨김]")
         assertThat(content).doesNotContain("민감 상담 원문")
+        assertThat(content).doesNotContain("타인 댓글")
+        assertThat(content).doesNotContain("export-other@example.com")
 
         val savedJob = memberDataExportRepository.findById(exportId)!!
         memberDataExportRepository.save(savedJob.copy(expiresAt = Instant.EPOCH.toString()))

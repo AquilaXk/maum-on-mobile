@@ -137,7 +137,7 @@ class _FakeSettingsRepository implements SettingsRepository {
       status: MemberDataExportStatus.completed,
       requestedAt: '2026-05-26T00:00:00Z',
       completedAt: '2026-05-26T00:00:00Z',
-      expiresAt: '2026-05-27T00:00:00Z',
+      expiresAt: '2999-05-27T00:00:00Z',
       downloadUrl: '/api/v1/members/me/data-exports/1/download',
     );
   }
@@ -150,7 +150,7 @@ class _FakeSettingsRepository implements SettingsRepository {
       status: MemberDataExportStatus.completed,
       requestedAt: '2026-05-26T00:00:00Z',
       completedAt: '2026-05-26T00:00:00Z',
-      expiresAt: '2026-05-27T00:00:00Z',
+      expiresAt: '2999-05-27T00:00:00Z',
       downloadUrl: '/api/v1/members/me/data-exports/$exportId/download',
     );
   }
@@ -162,7 +162,7 @@ class _FakeSettingsRepository implements SettingsRepository {
       filename: 'maum-on-data-export-$exportId.json',
       contentType: 'application/json',
       content: '{"account":{}}',
-      expiresAt: '2026-05-27T00:00:00Z',
+      expiresAt: '2999-05-27T00:00:00Z',
     );
   }
 

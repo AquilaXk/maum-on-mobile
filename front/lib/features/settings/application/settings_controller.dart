@@ -314,7 +314,7 @@ class SettingsController extends ChangeNotifier {
 
     await _submitExportChange(
       () => _repository.requestDataExport(),
-      noticeMessage: '내보내기 파일이 준비되었습니다.',
+      noticeMessage: '내보내기 요청을 접수했습니다.',
     );
   }
 

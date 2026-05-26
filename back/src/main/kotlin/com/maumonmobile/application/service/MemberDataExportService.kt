@@ -1,7 +1,5 @@
 package com.maumonmobile.application.service
 
-import com.fasterxml.jackson.databind.ObjectMapper
-import com.fasterxml.jackson.databind.json.JsonMapper
 import com.maumonmobile.application.port.`in`.MemberDataExportFileResult
 import com.maumonmobile.application.port.`in`.MemberDataExportJobResult
 import com.maumonmobile.application.port.`in`.MemberDataExportUseCase
@@ -26,6 +24,7 @@ import com.maumonmobile.global.web.ApiException
 import com.maumonmobile.global.web.ErrorCode
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
+import tools.jackson.databind.ObjectMapper
 import java.time.Clock
 import java.time.Duration
 import java.time.Instant
@@ -39,8 +38,8 @@ class MemberDataExportService(
     private val consultationRepository: ConsultationRepository,
     private val memberDataExportRepository: MemberDataExportRepository,
     private val clock: Clock,
+    private val objectMapper: ObjectMapper,
 ) : MemberDataExportUseCase {
-    private val objectMapper: ObjectMapper = JsonMapper.builder().findAndAddModules().build()
 
     @Transactional
     override fun request(user: AuthenticatedUser): MemberDataExportJobResult {
@@ -108,13 +107,13 @@ class MemberDataExportService(
     }
 
     private fun buildExportContent(member: AuthMember, generatedAt: Instant, expiresAt: Instant): String {
-        val posts = storyRepository.findPosts()
-        val commentsByPost = posts.associate { post ->
-            post.id to storyRepository.findCommentsByPostId(post.id)
-        }
-        val ownComments = commentsByPost.values.flatten()
-            .filter { comment -> comment.authorId == member.id }
+        val posts = storyRepository.findPostsByAuthorId(member.id)
+        val postIds = posts.map(StoryPost::id).toSet()
+        val ownComments = storyRepository.findCommentsByAuthorId(member.id)
             .sortedWith(compareBy<StoryComment> { comment -> comment.createDate }.thenBy { comment -> comment.id })
+        val ownCommentsByPost = ownComments
+            .filter { comment -> comment.postId in postIds }
+            .groupBy(StoryComment::postId)
 
         val payload = mapOf(
             "generatedAt" to generatedAt.toString(),
@@ -146,11 +145,10 @@ class MemberDataExportService(
                 "posts" to posts
                     .filter { post -> post.authorId == member.id }
                     .sortedWith(compareBy<StoryPost> { post -> post.createDate }.thenBy { post -> post.id })
-                    .map { post -> post.toExportMap(commentsByPost[post.id].orEmpty()) },
+                    .map { post -> post.toExportMap(ownCommentsByPost[post.id].orEmpty()) },
                 "comments" to ownComments.map { comment -> comment.toExportMap() },
             ),
-            "letters" to letterRepository.findAll()
-                .filter { letter -> letter.senderId == member.id || letter.receiverId == member.id }
+            "letters" to letterRepository.findByMemberId(member.id)
                 .sortedWith(compareBy<Letter> { letter -> letter.createdDate }.thenBy { letter -> letter.id })
                 .map { letter -> letter.toExportMap(member.id) },
             "consultationSummary" to consultationRepository.findByMemberId(member.id).toConsultationSummary(),

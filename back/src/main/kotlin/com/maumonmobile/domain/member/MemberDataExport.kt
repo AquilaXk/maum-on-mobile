@@ -19,7 +19,7 @@ data class MemberDataExportJob(
         }
 
         val expiry = runCatching { Instant.parse(expiresAt) }.getOrNull()
-            ?: return status
+            ?: return MemberDataExportStatus.EXPIRED
         return if (!expiry.isAfter(now)) MemberDataExportStatus.EXPIRED else status
     }
 }

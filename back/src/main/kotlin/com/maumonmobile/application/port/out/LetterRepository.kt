@@ -12,6 +12,8 @@ interface LetterRepository {
 
     fun findAll(): List<Letter>
 
+    fun findByMemberId(memberId: Long): List<Letter>
+
     fun countCreatedBetween(startInclusive: String, endExclusive: String): Long
 
     fun anonymizeMember(memberId: Long, nickname: String): Int

@@ -95,7 +95,7 @@ void main() {
             'filename': 'maum-on-data-export-3.json',
             'contentType': 'application/json',
             'content': '{"account":{}}',
-            'expiresAt': '2026-05-27T00:00:00Z',
+            'expiresAt': '2999-05-27T00:00:00Z',
           },
         }),
       ]);
@@ -117,6 +117,38 @@ void main() {
         ApiMethod.get,
         ApiMethod.get,
       ]);
+    });
+
+    test('keeps model defaults and disables expired data export download', () {
+      const defaults = MemberRetentionPolicy();
+      final partialPolicy = MemberRetentionPolicy.fromJson({
+        'exportExpiryHours': 48,
+      });
+      final expiredExport = MemberDataExportJob(
+        id: 4,
+        status: MemberDataExportStatus.completed,
+        requestedAt: '2026-05-26T00:00:00Z',
+        completedAt: '2026-05-26T00:00:00Z',
+        expiresAt: '2000-01-01T00:00:00Z',
+      );
+      const pendingExport = MemberDataExportJob(
+        id: 5,
+        status: MemberDataExportStatus.pending,
+        requestedAt: '2026-05-26T00:00:00Z',
+      );
+
+      expect(
+        partialPolicy.immediateDeletionItems,
+        defaults.immediateDeletionItems,
+      );
+      expect(
+        partialPolicy.anonymizedRetentionItems,
+        defaults.anonymizedRetentionItems,
+      );
+      expect(partialPolicy.legalRetentionItems, defaults.legalRetentionItems);
+      expect(partialPolicy.exportExpiryHours, 48);
+      expect(expiredExport.canDownload, isFalse);
+      expect(pendingExport.canDownload, isFalse);
     });
   });
 }
@@ -157,7 +189,7 @@ Map<String, Object?> _exportJob() {
     'status': 'COMPLETED',
     'requestedAt': '2026-05-26T00:00:00Z',
     'completedAt': '2026-05-26T00:00:00Z',
-    'expiresAt': '2026-05-27T00:00:00Z',
+    'expiresAt': '2999-05-27T00:00:00Z',
     'downloadUrl': '/api/v1/members/me/data-exports/3/download',
   };
 }
