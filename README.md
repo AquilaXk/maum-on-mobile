@@ -34,6 +34,7 @@ Run Flutter commands through the repository wrapper:
 Run repository contract tests from the repository root:
 
 - `node --test tools/ci/*.test.mjs`: run repository and Flutter scaffold contract tests.
+- `node --test tools/ci/mobile-usability-release-criteria-contract.test.mjs`: validate the mobile usability release checklist contract.
 
 ## Backend Architecture
 
