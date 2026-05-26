@@ -71,6 +71,10 @@ data class AdminDashboardResult(
     val todayLetterCount: Int,
     val todayDiaryCount: Int,
     val receivableMemberCount: Int,
+    val blockedMemberCount: Int,
+    val adminMemberCount: Int,
+    val unassignedLetterCount: Int,
+    val todayAdminActionCount: Int,
 )
 
 data class AdminMemberPage(

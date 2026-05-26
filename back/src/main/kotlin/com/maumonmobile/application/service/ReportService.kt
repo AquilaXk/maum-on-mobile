@@ -1,5 +1,6 @@
 package com.maumonmobile.application.service
 
+import com.maumonmobile.application.port.`in`.AdminAuditEventResult
 import com.maumonmobile.application.port.`in`.AdminReportDetail
 import com.maumonmobile.application.port.`in`.AdminReportMember
 import com.maumonmobile.application.port.`in`.AdminReportSummary
@@ -8,19 +9,22 @@ import com.maumonmobile.application.port.`in`.ReportCreateCommand
 import com.maumonmobile.application.port.`in`.ReportStatusResult
 import com.maumonmobile.application.port.`in`.ReportStatusUpdateCommand
 import com.maumonmobile.application.port.`in`.ReportUseCase
+import com.maumonmobile.application.port.out.AdminAuditRepository
 import com.maumonmobile.application.port.out.AuthMemberRepository
 import com.maumonmobile.application.port.out.LetterRepository
 import com.maumonmobile.application.port.out.NotificationDeliveryPort
 import com.maumonmobile.application.port.out.ReportRepository
 import com.maumonmobile.application.port.out.StoryRepository
+import com.maumonmobile.domain.admin.AdminAuditEvent
+import com.maumonmobile.domain.admin.AdminAuditEventDraft
 import com.maumonmobile.domain.auth.AuthMember
+import com.maumonmobile.domain.auth.AuthMemberRole
+import com.maumonmobile.domain.auth.AuthMemberStatus
 import com.maumonmobile.domain.moderation.ContentModerationTarget
 import com.maumonmobile.domain.report.Report
 import com.maumonmobile.domain.report.ReportDraft
 import com.maumonmobile.domain.report.ReportReason
 import com.maumonmobile.domain.report.ReportTargetType
-import com.maumonmobile.domain.auth.AuthMemberRole
-import com.maumonmobile.domain.auth.AuthMemberStatus
 import com.maumonmobile.global.security.AuthenticatedUser
 import com.maumonmobile.global.web.ApiException
 import com.maumonmobile.global.web.ErrorCode
@@ -30,6 +34,7 @@ import java.time.Instant
 @Service
 class ReportService(
     private val authMemberRepository: AuthMemberRepository,
+    private val adminAuditRepository: AdminAuditRepository,
     private val reportRepository: ReportRepository,
     private val storyRepository: StoryRepository,
     private val letterRepository: LetterRepository,
@@ -82,9 +87,22 @@ class ReportService(
         return report.id
     }
 
-    override fun listForAdmin(user: AuthenticatedUser): List<AdminReportSummary> {
+    override fun listForAdmin(
+        user: AuthenticatedUser,
+        status: String?,
+        targetType: String?,
+        sort: String?,
+    ): List<AdminReportSummary> {
         ensureAdmin(user)
-        return reportRepository.findAll().map { report -> report.toSummary() }
+        val expectedStatus = status?.takeIf(String::isNotBlank)?.toReportStatusFilter()
+        val expectedTargetType = targetType?.takeIf(String::isNotBlank)?.toReportTargetType()
+        val reportSort = sort.toAdminReportSort()
+
+        return reportRepository.findAll()
+            .filter { report -> expectedStatus == null || report.status == expectedStatus }
+            .filter { report -> expectedTargetType == null || report.targetType == expectedTargetType }
+            .sortedForAdmin(reportSort)
+            .map { report -> report.toSummary() }
     }
 
     override fun getForAdmin(user: AuthenticatedUser, reportId: Long): AdminReportDetail {
@@ -100,6 +118,8 @@ class ReportService(
         command: ReportStatusUpdateCommand,
     ): ReportStatusResult {
         val admin = ensureAdmin(user)
+        val previousReport = reportRepository.findById(reportId)
+            ?: throw ApiException(ErrorCode.NOT_FOUND, "신고 내역을 찾을 수 없습니다.")
 
         val status = command.status.toReportStatus()
         val actionReason = command.reason?.trim()
@@ -118,6 +138,14 @@ class ReportService(
             handledAt = handledAt,
         )
             ?: throw ApiException(ErrorCode.NOT_FOUND, "신고 내역을 찾을 수 없습니다.")
+        val audit = saveReportAudit(
+            admin = admin,
+            report = previousReport,
+            action = "REPORT_STATUS_CHANGE",
+            previousValue = previousReport.status,
+            newValue = report.status,
+            reason = actionReason,
+        )
         notifyMember(
             memberId = report.reporterId,
             eventName = REPORT_STATUS_EVENT,
@@ -132,6 +160,7 @@ class ReportService(
             actionReason = report.actionReason,
             handledBy = report.handledBy?.let(::memberSummary),
             handledAt = report.handledAt,
+            latestAudit = audit.toResult(),
         )
     }
 
@@ -178,6 +207,7 @@ class ReportService(
             actionReason = actionReason,
             handledBy = handledBy?.let(::memberSummary),
             handledAt = handledAt,
+            actionCount = adminAuditRepository.findByTargetResource(REPORT_RESOURCE_TYPE, id).size,
         )
     }
 
@@ -197,6 +227,32 @@ class ReportService(
             actionReason = actionReason,
             handledBy = handledBy?.let(::memberSummary),
             handledAt = handledAt,
+            auditEvents = adminAuditRepository
+                .findByTargetResource(REPORT_RESOURCE_TYPE, id)
+                .map { event -> event.toResult() },
+        )
+    }
+
+    private fun saveReportAudit(
+        admin: AuthMember,
+        report: Report,
+        action: String,
+        previousValue: String,
+        newValue: String,
+        reason: String,
+    ): AdminAuditEvent {
+        val targetMemberId = resolveTargetOwnerId(report.targetType, report.targetId) ?: report.reporterId
+        return adminAuditRepository.save(
+            AdminAuditEventDraft(
+                targetMemberId = targetMemberId,
+                actorMemberId = admin.id,
+                action = action,
+                previousValue = previousValue,
+                newValue = newValue,
+                reason = reason,
+                targetResourceType = REPORT_RESOURCE_TYPE,
+                targetResourceId = report.id,
+            ),
         )
     }
 
@@ -246,6 +302,21 @@ class ReportService(
         )
     }
 
+    private fun AdminAuditEvent.toResult(): AdminAuditEventResult {
+        return AdminAuditEventResult(
+            id = id,
+            targetMemberId = targetMemberId,
+            actorMemberId = actorMemberId,
+            action = action,
+            previousValue = previousValue,
+            newValue = newValue,
+            reason = reason,
+            createdAt = createdAt,
+            targetResourceType = targetResourceType,
+            targetResourceId = targetResourceId,
+        )
+    }
+
     private fun resolveTargetOwnerId(targetType: ReportTargetType, targetId: Long): Long? {
         return when (targetType) {
             ReportTargetType.POST -> storyRepository.findPostById(targetId)?.authorId
@@ -273,8 +344,14 @@ class ReportService(
     }
 }
 
+private enum class AdminReportSort {
+    OPEN_FIRST,
+    CREATED_DESC,
+}
+
 private fun String?.toReportTargetType(): ReportTargetType {
-    return enumValues<ReportTargetType>().firstOrNull { type -> type.name == this?.trim() }
+    val normalized = this?.trim()?.uppercase()
+    return enumValues<ReportTargetType>().firstOrNull { type -> type.name == normalized }
         ?: throw ApiException(ErrorCode.INVALID_REQUEST, "신고 대상 유형을 확인해 주세요.")
 }
 
@@ -291,6 +368,41 @@ private fun String?.toReportStatus(): String {
     return status
 }
 
+private fun String?.toReportStatusFilter(): String {
+    val status = this?.trim()?.uppercase()
+    if (status == null || status !in ADMIN_REPORT_STATUSES) {
+        throw ApiException(ErrorCode.INVALID_REQUEST, "신고 처리 상태를 확인해 주세요.")
+    }
+    return status
+}
+
+private fun String?.toAdminReportSort(): AdminReportSort {
+    return when (this?.trim()?.uppercase()) {
+        null,
+        "",
+        "OPEN_FIRST",
+        -> AdminReportSort.OPEN_FIRST
+        "CREATED_DESC",
+        "NEWEST",
+        -> AdminReportSort.CREATED_DESC
+        else -> throw ApiException(ErrorCode.INVALID_REQUEST, "신고 정렬 기준을 확인해 주세요.")
+    }
+}
+
+private fun List<Report>.sortedForAdmin(sort: AdminReportSort): List<Report> {
+    val newestFirst = compareByDescending<Report> { report -> report.createdAt }
+        .thenByDescending { report -> report.id }
+    return when (sort) {
+        AdminReportSort.OPEN_FIRST -> sortedWith(
+            compareBy<Report> { report -> report.status != "RECEIVED" }
+                .then(newestFirst),
+        )
+        AdminReportSort.CREATED_DESC -> sortedWith(newestFirst)
+    }
+}
+
 private const val REPORT_STATUS_EVENT = "report_status"
+private const val REPORT_RESOURCE_TYPE = "REPORT"
 private const val ACTION_REASON_MIN_LENGTH = 4
 private val REPORT_STATUSES = setOf("RESOLVED", "REJECTED", "HIDDEN", "DELETED", "RESTRICTED")
+private val ADMIN_REPORT_STATUSES = REPORT_STATUSES + "RECEIVED"

@@ -218,6 +218,12 @@ class NotificationReportControllerTest @Autowired constructor(
                 jsonPath("$.data.actionReason") { value("개인정보 노출로 숨김 처리") }
                 jsonPath("$.data.handledBy") { isNotEmpty() }
                 jsonPath("$.data.handledAt") { isNotEmpty() }
+                jsonPath("$.data.latestAudit.action") { value("REPORT_STATUS_CHANGE") }
+                jsonPath("$.data.latestAudit.previousValue") { value("RECEIVED") }
+                jsonPath("$.data.latestAudit.newValue") { value("HIDDEN") }
+                jsonPath("$.data.latestAudit.reason") { value("개인정보 노출로 숨김 처리") }
+                jsonPath("$.data.latestAudit.targetResourceType") { value("REPORT") }
+                jsonPath("$.data.latestAudit.targetResourceId") { value(reportId) }
             }
 
         mockMvc.get("/api/v1/admin/reports/$reportId") {
@@ -229,6 +235,64 @@ class NotificationReportControllerTest @Autowired constructor(
                 jsonPath("$.data.actionReason") { value("개인정보 노출로 숨김 처리") }
                 jsonPath("$.data.handledBy.nickname") { value("관리자") }
                 jsonPath("$.data.handledAt") { isNotEmpty() }
+                jsonPath("$.data.auditEvents[0].action") { value("REPORT_STATUS_CHANGE") }
+                jsonPath("$.data.auditEvents[0].targetResourceType") { value("REPORT") }
+            }
+    }
+
+    @Test
+    fun adminFiltersReportListByStatusTargetTypeAndOpenFirstSort() {
+        val owner = signupAndLogin("admin-report-filter-owner@example.com", "필터대상")
+        val commenter = signupAndLogin("admin-report-filter-commenter@example.com", "댓글작성자")
+        val reporter = signupAndLogin("admin-report-filter-reporter@example.com", "필터신고자")
+        val adminToken = adminAccessToken()
+        val postId = createPost(owner.accessToken, "필터 게시글")
+        val commentId = createComment(commenter.accessToken, postId, "필터 댓글")
+
+        val postReportId = createReport(
+            accessToken = reporter.accessToken,
+            targetId = postId,
+            targetType = "POST",
+            reason = "SPAM",
+            body = "게시글 신고입니다.",
+        )
+        val commentReportId = createReport(
+            accessToken = owner.accessToken,
+            targetId = commentId,
+            targetType = "COMMENT",
+            reason = "PROFANITY",
+            body = "댓글 신고입니다.",
+        )
+        mockMvc.patch("/api/v1/admin/reports/$postReportId/status") {
+            header("Authorization", "Bearer $adminToken")
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"status":"REJECTED","reason":"필터 정렬 확인"}"""
+        }
+            .andExpect {
+                status { isOk() }
+            }
+
+        mockMvc.get("/api/v1/admin/reports") {
+            header("Authorization", "Bearer $adminToken")
+            param("status", "RECEIVED")
+            param("targetType", "COMMENT")
+            param("sort", "OPEN_FIRST")
+        }
+            .andExpect {
+                status { isOk() }
+                jsonPath("$.data[0].id") { value(commentReportId) }
+                jsonPath("$.data[0].targetType") { value("COMMENT") }
+                jsonPath("$.data[0].status") { value("RECEIVED") }
+                jsonPath("$.data[0].actionCount") { value(0) }
+            }
+
+        mockMvc.get("/api/v1/admin/reports") {
+            header("Authorization", "Bearer $adminToken")
+            param("status", "UNKNOWN")
+        }
+            .andExpect {
+                status { isBadRequest() }
+                jsonPath("$.error.code") { value("INVALID_REQUEST") }
             }
     }
 
@@ -534,6 +598,40 @@ class NotificationReportControllerTest @Autowired constructor(
             }
             .andReturn()
         return postResult.response.readJsonInt("$.data")
+    }
+
+    private fun createComment(accessToken: String, postId: Int, body: String): Int {
+        val commentResult = mockMvc.post("/api/v1/posts/$postId/comments") {
+            header("Authorization", "Bearer $accessToken")
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"content":"$body"}"""
+        }
+            .andExpect {
+                status { isOk() }
+            }
+            .andReturn()
+        return commentResult.response.readJsonInt("$.data")
+    }
+
+    private fun createReport(
+        accessToken: String,
+        targetId: Int,
+        targetType: String,
+        reason: String,
+        body: String,
+    ): Int {
+        val reportResult = mockMvc.post("/api/v1/reports") {
+            header("Authorization", "Bearer $accessToken")
+            contentType = MediaType.APPLICATION_JSON
+            content = """
+                {"targetId":$targetId,"targetType":"$targetType","reason":"$reason","content":"$body"}
+            """.trimIndent()
+        }
+            .andExpect {
+                status { isOk() }
+            }
+            .andReturn()
+        return reportResult.response.readJsonInt("$.data")
     }
 
     private fun assertNotificationsContain(accessToken: String, content: String) {
