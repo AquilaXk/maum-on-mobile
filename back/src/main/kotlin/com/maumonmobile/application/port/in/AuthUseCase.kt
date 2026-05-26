@@ -11,6 +11,10 @@ interface AuthUseCase {
 
     fun refresh(command: RefreshCommand): AuthSessionResult
 
+    fun requestPasswordReset(command: PasswordResetRequestCommand): PasswordResetRequestResult
+
+    fun confirmPasswordReset(command: PasswordResetConfirmCommand): PasswordResetConfirmResult
+
     fun authorizeOidc(command: OidcAuthorizeCommand): OidcAuthorizeResult
 
     fun completeOidcCallback(command: OidcCallbackCommand): OidcCallbackResult
@@ -37,6 +41,24 @@ data class RefreshCommand(
 
 data class LogoutCommand(
     val refreshToken: String?,
+)
+
+data class PasswordResetRequestCommand(
+    val email: String,
+)
+
+data class PasswordResetConfirmCommand(
+    val token: String,
+    val newPassword: String,
+)
+
+data class PasswordResetRequestResult(
+    val accepted: Boolean,
+)
+
+data class PasswordResetConfirmResult(
+    val changed: Boolean,
+    val revokedRefreshTokenCount: Int,
 )
 
 data class OidcAuthorizeCommand(

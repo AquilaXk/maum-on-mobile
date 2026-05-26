@@ -9,6 +9,10 @@ import com.maumonmobile.application.port.`in`.OidcAuthorizeCommand
 import com.maumonmobile.application.port.`in`.OidcAuthorizeResult
 import com.maumonmobile.application.port.`in`.OidcCallbackCommand
 import com.maumonmobile.application.port.`in`.OidcCallbackResult
+import com.maumonmobile.application.port.`in`.PasswordResetConfirmCommand
+import com.maumonmobile.application.port.`in`.PasswordResetConfirmResult
+import com.maumonmobile.application.port.`in`.PasswordResetRequestCommand
+import com.maumonmobile.application.port.`in`.PasswordResetRequestResult
 import com.maumonmobile.application.port.`in`.RefreshCommand
 import com.maumonmobile.application.port.`in`.SignupCommand
 import com.maumonmobile.application.port.out.AuthMemberRepository
@@ -17,13 +21,18 @@ import com.maumonmobile.application.port.out.AuthOidcIdentityProvider
 import com.maumonmobile.application.port.out.AuthOidcStateRepository
 import com.maumonmobile.application.port.out.AuthOidcTokenCommand
 import com.maumonmobile.application.port.out.AuthOidcVerificationException
+import com.maumonmobile.application.port.out.PasswordResetMailCommand
+import com.maumonmobile.application.port.out.PasswordResetMailSender
+import com.maumonmobile.application.port.out.PasswordResetTokenRepository
 import com.maumonmobile.domain.auth.AuthMember
 import com.maumonmobile.domain.auth.AuthMemberStatus
 import com.maumonmobile.domain.auth.AuthOidcState
+import com.maumonmobile.domain.auth.PasswordResetToken
 import com.maumonmobile.global.security.AuthenticatedUser
 import com.maumonmobile.global.security.JwtTokenProvider
 import com.maumonmobile.global.web.ApiException
 import com.maumonmobile.global.web.ErrorCode
+import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.security.crypto.password.PasswordEncoder
 import org.springframework.stereotype.Service
@@ -40,6 +49,8 @@ class AuthService(
     private val authMemberRepository: AuthMemberRepository,
     private val authOidcStateRepository: AuthOidcStateRepository,
     private val authOidcIdentityProvider: AuthOidcIdentityProvider,
+    private val passwordResetTokenRepository: PasswordResetTokenRepository,
+    private val passwordResetMailSender: PasswordResetMailSender,
     private val passwordEncoder: PasswordEncoder,
     private val jwtTokenProvider: JwtTokenProvider,
     @param:Value("\${app.auth.oidc.provider-authorization-base-url:https://login.maumon.local}")
@@ -52,6 +63,12 @@ class AuthService(
     private val oidcStateTtl: Duration,
     @param:Value("\${app.auth.oidc.default-app-redirect-uri:maumon://auth/callback}")
     private val defaultAppRedirectUri: String,
+    @param:Value("\${app.auth.password-reset.ttl:PT15M}")
+    private val passwordResetTtl: Duration,
+    @param:Value("\${app.auth.password-reset.max-active-requests:3}")
+    private val passwordResetMaxActiveRequests: Int,
+    @param:Value("\${app.auth.password-reset.max-failed-attempts:5}")
+    private val passwordResetMaxFailedAttempts: Int,
 ) : AuthUseCase {
 
     override fun signup(command: SignupCommand): AuthMemberResult {
@@ -102,6 +119,102 @@ class AuthService(
 
         authMemberRepository.revokeRefreshToken(command.refreshToken)
         return issueSession(member)
+    }
+
+    override fun requestPasswordReset(command: PasswordResetRequestCommand): PasswordResetRequestResult {
+        val email = command.email.trim().lowercase(Locale.ROOT)
+        if (!email.looksLikeEmail()) {
+            throw ApiException(ErrorCode.VALIDATION_ERROR, "이메일 형식을 확인해 주세요.")
+        }
+
+        val now = Instant.now()
+        val requestKeyHash = sha256(email)
+        if (
+            passwordResetTokenRepository.countActiveByRequestKeyHash(requestKeyHash, now) >=
+            passwordResetMaxActiveRequests
+        ) {
+            throw ApiException(ErrorCode.INVALID_REQUEST, "잠시 뒤 다시 시도해 주세요.")
+        }
+
+        val member = authMemberRepository.findByEmail(email)
+            ?.takeIf { candidate ->
+                candidate.status == AuthMemberStatus.ACTIVE && !candidate.socialAccount
+            }
+        if (member == null) {
+            log.info("Password reset requested for non-resettable account")
+            return PasswordResetRequestResult(accepted = true)
+        }
+
+        val rawToken = randomToken()
+        val expiresAt = now.plus(passwordResetTtl)
+        passwordResetTokenRepository.save(
+            PasswordResetToken(
+                id = 0L,
+                requestKeyHash = requestKeyHash,
+                memberId = member.id,
+                tokenHash = sha256(rawToken),
+                expiresAt = expiresAt,
+                consumedAt = null,
+                failedAttempts = 0,
+                createdAt = now,
+            ),
+        )
+        passwordResetMailSender.send(
+            PasswordResetMailCommand(
+                email = member.email,
+                token = rawToken,
+                expiresAt = expiresAt,
+            ),
+        )
+        log.info("Password reset token issued for member {}", member.id)
+        return PasswordResetRequestResult(accepted = true)
+    }
+
+    override fun confirmPasswordReset(command: PasswordResetConfirmCommand): PasswordResetConfirmResult {
+        val token = command.token.trim()
+        if (token.isEmpty()) {
+            throw invalidPasswordResetToken()
+        }
+        if (command.newPassword.length < 8) {
+            throw ApiException(ErrorCode.VALIDATION_ERROR, "새 비밀번호는 8자 이상이어야 합니다.")
+        }
+
+        val now = Instant.now()
+        val savedToken = passwordResetTokenRepository.findByTokenHash(sha256(token))
+            ?: throw invalidPasswordResetToken()
+
+        if (!savedToken.canBeConfirmed(now, passwordResetMaxFailedAttempts)) {
+            savedToken
+                .takeIf { candidate -> candidate.consumedAt == null }
+                ?.let { candidate -> passwordResetTokenRepository.incrementFailedAttempts(candidate.id) }
+            throw invalidPasswordResetToken()
+        }
+
+        val member = authMemberRepository.findById(savedToken.memberId!!)
+            ?.takeIf { candidate ->
+                candidate.status == AuthMemberStatus.ACTIVE && !candidate.socialAccount
+            }
+            ?: run {
+                passwordResetTokenRepository.incrementFailedAttempts(savedToken.id)
+                throw invalidPasswordResetToken()
+            }
+
+        authMemberRepository.save(
+            member.copy(
+                passwordHash = passwordEncoder.encode(command.newPassword)
+                    ?: throw ApiException(ErrorCode.INTERNAL_SERVER_ERROR),
+            ),
+        )
+        if (!passwordResetTokenRepository.markConsumed(savedToken.id, now)) {
+            throw invalidPasswordResetToken()
+        }
+        val revokedRefreshTokens = authMemberRepository.revokeRefreshTokens(member.id)
+        log.info("Password reset completed for member {}; revoked refresh tokens={}", member.id, revokedRefreshTokens)
+
+        return PasswordResetConfirmResult(
+            changed = true,
+            revokedRefreshTokenCount = revokedRefreshTokens,
+        )
     }
 
     override fun authorizeOidc(command: OidcAuthorizeCommand): OidcAuthorizeResult {
@@ -344,6 +457,16 @@ class AuthService(
         return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes)
     }
 
+    private fun sha256(value: String): String {
+        return MessageDigest.getInstance("SHA-256")
+            .digest(value.toByteArray(Charsets.UTF_8))
+            .joinToString("") { byte -> "%02x".format(byte) }
+    }
+
+    private fun invalidPasswordResetToken(): ApiException {
+        return ApiException(ErrorCode.INVALID_REQUEST, "재설정 토큰이 유효하지 않습니다.")
+    }
+
     private fun findActiveMember(memberId: Long?): AuthMember {
         val member = memberId?.let(authMemberRepository::findById)
             ?: throw ApiException(ErrorCode.UNAUTHORIZED, "다시 로그인해 주세요.")
@@ -373,6 +496,7 @@ class AuthService(
 
     private companion object {
         private val secureRandom = SecureRandom()
+        private val log = LoggerFactory.getLogger(AuthService::class.java)
     }
 }
 
@@ -384,4 +508,10 @@ private fun AuthMember.toResult(): AuthMemberResult {
         role = role.name,
         status = status.name,
     )
+}
+
+private fun String.looksLikeEmail(): Boolean {
+    val atIndex = indexOf('@')
+    val dotIndex = lastIndexOf('.')
+    return atIndex > 0 && dotIndex > atIndex + 1 && dotIndex < length - 1
 }

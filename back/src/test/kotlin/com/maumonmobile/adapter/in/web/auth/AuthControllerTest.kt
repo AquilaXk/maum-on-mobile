@@ -6,6 +6,8 @@ import com.maumonmobile.application.port.out.AuthOidcIdentity
 import com.maumonmobile.application.port.out.AuthOidcIdentityProvider
 import com.maumonmobile.application.port.out.AuthOidcTokenCommand
 import com.maumonmobile.application.port.out.AuthOidcVerificationException
+import com.maumonmobile.application.port.out.PasswordResetMailCommand
+import com.maumonmobile.application.port.out.PasswordResetMailSender
 import com.maumonmobile.domain.auth.AuthMemberStatus
 import org.assertj.core.api.Assertions.assertThat
 import org.hamcrest.Matchers.blankOrNullString
@@ -32,6 +34,7 @@ import java.net.URI
 class AuthControllerTest @Autowired constructor(
     private val mockMvc: MockMvc,
     private val authMemberRepository: AuthMemberRepository,
+    private val passwordResetMailSender: RecordingPasswordResetMailSender,
 ) {
 
     @Test
@@ -165,6 +168,141 @@ class AuthControllerTest @Autowired constructor(
                 jsonPath("$.error.code") { value("UNAUTHORIZED") }
                 jsonPath("$.error.cause") { value("ACCOUNT_BLOCKED") }
             }
+    }
+
+    @Test
+    fun passwordResetDoesNotRevealUnknownEmailAndCanResetExistingPassword() {
+        passwordResetMailSender.clear()
+        val email = "reset-${System.nanoTime()}@example.com"
+        mockMvc.post("/api/v1/auth/signup") {
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"email":"$email","password":"pass1234","nickname":"복구회원"}"""
+        }
+            .andExpect {
+                status { isOk() }
+            }
+
+        val loginResult = mockMvc.post("/api/v1/auth/login") {
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"email":"$email","password":"pass1234"}"""
+        }
+            .andExpect {
+                status { isOk() }
+            }
+            .andReturn()
+        val refreshToken = loginResult.response.readJsonString("$.data.refreshToken")
+
+        mockMvc.post("/api/v1/auth/password-reset/request") {
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"email":"missing-$email"}"""
+        }
+            .andExpect {
+                status { isOk() }
+                jsonPath("$.success") { value(true) }
+                jsonPath("$.data.accepted") { value(true) }
+            }
+        assertThat(passwordResetMailSender.sent).isEmpty()
+
+        mockMvc.post("/api/v1/auth/password-reset/request") {
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"email":"$email"}"""
+        }
+            .andExpect {
+                status { isOk() }
+                jsonPath("$.success") { value(true) }
+                jsonPath("$.data.accepted") { value(true) }
+            }
+        val resetToken = passwordResetMailSender.sent.single().token
+
+        mockMvc.post("/api/v1/auth/password-reset/confirm") {
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"token":"wrong-token","newPassword":"new-password"}"""
+        }
+            .andExpect {
+                status { isBadRequest() }
+                jsonPath("$.success") { value(false) }
+                jsonPath("$.error.code") { value("INVALID_REQUEST") }
+            }
+
+        mockMvc.post("/api/v1/auth/password-reset/confirm") {
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"token":"$resetToken","newPassword":"new-password"}"""
+        }
+            .andExpect {
+                status { isOk() }
+                jsonPath("$.success") { value(true) }
+                jsonPath("$.data.changed") { value(true) }
+                jsonPath("$.data.revokedRefreshTokenCount") { value(1) }
+            }
+
+        mockMvc.post("/api/v1/auth/password-reset/confirm") {
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"token":"$resetToken","newPassword":"another-password"}"""
+        }
+            .andExpect {
+                status { isBadRequest() }
+                jsonPath("$.error.code") { value("INVALID_REQUEST") }
+            }
+
+        mockMvc.post("/api/v1/auth/refresh") {
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"refreshToken":"$refreshToken"}"""
+        }
+            .andExpect {
+                status { isUnauthorized() }
+                jsonPath("$.error.code") { value("UNAUTHORIZED") }
+            }
+
+        mockMvc.post("/api/v1/auth/login") {
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"email":"$email","password":"pass1234"}"""
+        }
+            .andExpect {
+                status { isUnauthorized() }
+            }
+
+        mockMvc.post("/api/v1/auth/login") {
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"email":"$email","password":"new-password"}"""
+        }
+            .andExpect {
+                status { isOk() }
+                jsonPath("$.data.member.email") { value(email) }
+            }
+    }
+
+    @Test
+    fun passwordResetRequestRejectsTooManyActiveTokensForSameEmail() {
+        passwordResetMailSender.clear()
+        val email = "reset-limit-${System.nanoTime()}@example.com"
+        mockMvc.post("/api/v1/auth/signup") {
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"email":"$email","password":"pass1234","nickname":"제한회원"}"""
+        }
+            .andExpect {
+                status { isOk() }
+            }
+
+        repeat(3) {
+            mockMvc.post("/api/v1/auth/password-reset/request") {
+                contentType = MediaType.APPLICATION_JSON
+                content = """{"email":"$email"}"""
+            }
+                .andExpect {
+                    status { isOk() }
+                    jsonPath("$.data.accepted") { value(true) }
+                }
+        }
+
+        mockMvc.post("/api/v1/auth/password-reset/request") {
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"email":"$email"}"""
+        }
+            .andExpect {
+                status { isBadRequest() }
+                jsonPath("$.error.code") { value("INVALID_REQUEST") }
+            }
+        assertThat(passwordResetMailSender.sent).hasSize(3)
     }
 
     @Test
@@ -323,6 +461,24 @@ class AuthControllerTest @Autowired constructor(
                 )
             }
         }
+
+        @Bean
+        @Primary
+        fun passwordResetMailSender(): RecordingPasswordResetMailSender {
+            return RecordingPasswordResetMailSender()
+        }
+    }
+}
+
+class RecordingPasswordResetMailSender : PasswordResetMailSender {
+    val sent = mutableListOf<PasswordResetMailCommand>()
+
+    override fun send(command: PasswordResetMailCommand) {
+        sent += command
+    }
+
+    fun clear() {
+        sent.clear()
     }
 }
 
