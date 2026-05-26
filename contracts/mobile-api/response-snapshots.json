@@ -1,0 +1,697 @@
+{
+  "version": 1,
+  "schema": {
+    "envelopeKeys": [
+      "success",
+      "data",
+      "error"
+    ],
+    "pageKeys": [
+      "content",
+      "page",
+      "size",
+      "totalElements",
+      "totalPages",
+      "last",
+      "hasNext"
+    ],
+    "errorKeys": [
+      "code",
+      "message",
+      "fieldErrors",
+      "retryable",
+      "cause"
+    ],
+    "enumValues": {
+      "storyCategory": [
+        "WORRY",
+        "DAILY",
+        "QUESTION"
+      ],
+      "storyResolutionStatus": [
+        "ONGOING",
+        "RESOLVED"
+      ],
+      "letterStatus": [
+        "SENT",
+        "ACCEPTED",
+        "WRITING",
+        "REPLIED"
+      ],
+      "reportTargetType": [
+        "POST",
+        "LETTER",
+        "COMMENT"
+      ],
+      "reportReason": [
+        "PROFANITY",
+        "SPAM",
+        "INAPPROPRIATE",
+        "PERSONAL_INFO",
+        "OTHER"
+      ],
+      "notificationDevicePlatform": [
+        "ANDROID",
+        "IOS"
+      ],
+      "moderationTarget": [
+        "STORY",
+        "COMMENT",
+        "DIARY",
+        "LETTER",
+        "REPORT"
+      ],
+      "moderationRiskLevel": [
+        "LOW",
+        "HIGH"
+      ],
+      "moderationCategory": [
+        "PROFANITY",
+        "PERSONAL_INFO",
+        "SPAM",
+        "INAPPROPRIATE"
+      ],
+      "errorCode": [
+        "INVALID_REQUEST",
+        "VALIDATION_ERROR",
+        "UNAUTHORIZED",
+        "FORBIDDEN",
+        "NOT_FOUND",
+        "CONFLICT",
+        "EXPIRED",
+        "INTERNAL_SERVER_ERROR"
+      ]
+    }
+  },
+  "snapshots": [
+    {
+      "id": "auth.login.success",
+      "area": "auth",
+      "method": "POST",
+      "path": "/api/v1/auth/login",
+      "contract": "envelope",
+      "parser": "auth.session",
+      "response": {
+        "success": true,
+        "data": {
+          "accessToken": "access-token",
+          "refreshToken": "refresh-token",
+          "tokenType": "Bearer",
+          "expiresInSeconds": 3600,
+          "member": {
+            "id": 1,
+            "email": "user@example.com",
+            "nickname": "마음",
+            "role": "USER",
+            "status": "ACTIVE"
+          }
+        }
+      }
+    },
+    {
+      "id": "common.validation-error",
+      "area": "auth",
+      "method": "POST",
+      "path": "/api/v1/auth/signup",
+      "contract": "error",
+      "parser": "raw",
+      "response": {
+        "success": false,
+        "error": {
+          "code": "VALIDATION_ERROR",
+          "message": "요청 값 검증에 실패했습니다.",
+          "fieldErrors": [
+            {
+              "field": "email",
+              "message": "must not be blank"
+            }
+          ],
+          "retryable": false,
+          "cause": null
+        }
+      }
+    },
+    {
+      "id": "home.stats.success",
+      "area": "home",
+      "method": "GET",
+      "path": "/api/v1/home/stats",
+      "contract": "envelope",
+      "parser": "home.stats",
+      "response": {
+        "success": true,
+        "data": {
+          "todayWorryCount": 18,
+          "todayLetterCount": 42,
+          "todayDiaryCount": 11,
+          "todayMetrics": {
+            "date": "2026-05-26",
+            "worryCount": 18,
+            "letterCount": 42,
+            "diaryCount": 11,
+            "totalActivityCount": 71
+          },
+          "summary": {
+            "recoveryMessage": "오늘은 천천히 마음을 열어보세요.",
+            "primaryActionLabel": "오늘 마음 기록하기",
+            "primaryActionSurface": "diary",
+            "feedMessage": "고민 이야기가 가장 활발합니다."
+          },
+          "categorySummaries": [
+            {
+              "category": "WORRY",
+              "label": "고민",
+              "count": 7
+            }
+          ],
+          "popularStories": [
+            {
+              "id": 5,
+              "title": "많이 읽힌 이야기",
+              "category": "WORRY",
+              "label": "고민",
+              "viewCount": 99,
+              "nickname": "마음이"
+            }
+          ],
+          "continueWritingCandidates": [
+            {
+              "surface": "diary",
+              "label": "기록",
+              "actionLabel": "기록 이어가기",
+              "description": "저장된 기록을 이어서 작성하세요.",
+              "priority": 1
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "diary.list.success",
+      "area": "diary",
+      "method": "GET",
+      "path": "/api/v1/diaries",
+      "contract": "page",
+      "parser": "diary.page",
+      "response": {
+        "success": true,
+        "data": {
+          "content": [
+            {
+              "id": 10,
+              "title": "오늘의 기록",
+              "content": "차분히 정리한 마음",
+              "categoryName": "일상",
+              "nickname": "마음",
+              "imageUrl": "https://cdn.example.com/diary/10.jpg",
+              "isPrivate": false,
+              "createDate": "2026-05-26T08:00:00",
+              "modifyDate": "2026-05-26T09:00:00",
+              "contentBlocks": [
+                {
+                  "id": "text-0",
+                  "type": "text",
+                  "text": "차분히 정리한 마음",
+                  "imageUrl": null,
+                  "filename": null,
+                  "byteSize": null,
+                  "source": null,
+                  "contentType": null
+                },
+                {
+                  "id": "image-0",
+                  "type": "image",
+                  "text": null,
+                  "imageUrl": "https://cdn.example.com/diary/10.jpg",
+                  "filename": "mind.jpg",
+                  "byteSize": 2048,
+                  "source": "gallery",
+                  "contentType": "image/jpeg"
+                }
+              ]
+            }
+          ],
+          "page": 0,
+          "size": 20,
+          "totalElements": 1,
+          "totalPages": 1,
+          "last": true,
+          "hasNext": false
+        }
+      }
+    },
+    {
+      "id": "story.list.success",
+      "area": "story",
+      "method": "GET",
+      "path": "/api/v1/posts",
+      "contract": "page",
+      "parser": "story.page",
+      "response": {
+        "success": true,
+        "data": {
+          "content": [
+            {
+              "id": 21,
+              "title": "잠이 오지 않는 밤",
+              "summary": "밤마다 생각이 많아요.",
+              "nickname": "작성자",
+              "category": "WORRY",
+              "resolutionStatus": "ONGOING",
+              "viewCount": 12,
+              "createDate": "2026-05-26T08:00:00",
+              "modifyDate": "2026-05-26T08:30:00",
+              "thumbnail": null
+            }
+          ],
+          "page": 0,
+          "size": 20,
+          "totalElements": 1,
+          "totalPages": 1,
+          "last": true,
+          "hasNext": false
+        }
+      }
+    },
+    {
+      "id": "story.detail.success",
+      "area": "story",
+      "method": "GET",
+      "path": "/api/v1/posts/{id}",
+      "contract": "envelope",
+      "parser": "story.detail",
+      "response": {
+        "success": true,
+        "data": {
+          "id": 21,
+          "title": "잠이 오지 않는 밤",
+          "content": "밤마다 생각이 많아요.",
+          "summary": "밤마다 생각이 많아요.",
+          "nickname": "작성자",
+          "category": "WORRY",
+          "resolutionStatus": "ONGOING",
+          "viewCount": 13,
+          "createDate": "2026-05-26T08:00:00",
+          "modifyDate": "2026-05-26T08:30:00",
+          "thumbnail": null,
+          "authorId": 1
+        }
+      }
+    },
+    {
+      "id": "story.comments.success",
+      "area": "story",
+      "method": "GET",
+      "path": "/api/v1/posts/{postId}/comments",
+      "contract": "page",
+      "parser": "story.commentsPage",
+      "response": {
+        "success": true,
+        "data": {
+          "content": [
+            {
+              "id": 31,
+              "content": "천천히 쉬어도 괜찮아요.",
+              "authorId": 2,
+              "nickname": "응원자",
+              "email": "reply@example.com",
+              "postId": 21,
+              "createDate": "2026-05-26T08:40:00",
+              "modifyDate": "2026-05-26T08:40:00",
+              "deleted": false,
+              "replies": [
+                {
+                  "id": 32,
+                  "content": "고마워요.",
+                  "authorId": 1,
+                  "nickname": "작성자",
+                  "email": "writer@example.com",
+                  "postId": 21,
+                  "createDate": "2026-05-26T08:50:00",
+                  "modifyDate": "2026-05-26T08:50:00",
+                  "deleted": false,
+                  "replies": []
+                }
+              ]
+            }
+          ],
+          "page": 0,
+          "size": 20,
+          "totalElements": 1,
+          "totalPages": 1,
+          "last": true,
+          "hasNext": false
+        }
+      }
+    },
+    {
+      "id": "letter.list.success",
+      "area": "letter",
+      "method": "GET",
+      "path": "/api/v1/letters/received",
+      "contract": "envelope",
+      "parser": "letter.list",
+      "response": {
+        "success": true,
+        "data": {
+          "letters": [
+            {
+              "id": 41,
+              "title": "괜찮아질 거예요",
+              "content": "오늘도 버틴 마음을 응원합니다.",
+              "senderId": 1,
+              "senderNickname": "보낸이",
+              "receiverId": 2,
+              "receiverNickname": "받는이",
+              "createdDate": "2026-05-26T08:00:00",
+              "status": "ACCEPTED",
+              "replied": false,
+              "availableActions": [
+                "START_REPLY",
+                "SUBMIT_REPLY"
+              ]
+            }
+          ],
+          "totalPages": 1,
+          "totalElements": 1,
+          "currentPage": 0,
+          "isFirst": true,
+          "isLast": true
+        }
+      }
+    },
+    {
+      "id": "letter.detail.success",
+      "area": "letter",
+      "method": "GET",
+      "path": "/api/v1/letters/{id}",
+      "contract": "envelope",
+      "parser": "letter.detail",
+      "response": {
+        "success": true,
+        "data": {
+          "id": 41,
+          "title": "괜찮아질 거예요",
+          "content": "오늘도 버틴 마음을 응원합니다.",
+          "replyContent": "고마워요.",
+          "senderId": 1,
+          "receiverId": 2,
+          "status": "REPLIED",
+          "replied": true,
+          "createdDate": "2026-05-26T08:00:00",
+          "replyCreatedDate": "2026-05-26T09:00:00",
+          "senderNickname": "보낸이",
+          "receiverNickname": "받는이",
+          "availableActions": [
+            "VIEW_REPLY"
+          ]
+        }
+      }
+    },
+    {
+      "id": "consultation.chat.success",
+      "area": "consultation",
+      "method": "POST",
+      "path": "/api/v1/consultations/chat",
+      "contract": "envelope",
+      "parser": "consultation.chat",
+      "response": {
+        "success": true,
+        "data": {
+          "memberId": 1,
+          "chunks": [
+            "함께 ",
+            "살펴볼게요."
+          ],
+          "errorMessage": null,
+          "accepted": false,
+          "safety": {
+            "category": "SELF_HARM",
+            "severity": "CRITICAL",
+            "actionPolicy": "BLOCK_AND_ESCALATE",
+            "message": "즉시 주변 도움을 요청해 주세요."
+          }
+        }
+      }
+    },
+    {
+      "id": "notification.list.success",
+      "area": "notification",
+      "method": "GET",
+      "path": "/api/v1/notifications",
+      "contract": "envelope",
+      "parser": "notification.list",
+      "response": {
+        "success": true,
+        "data": [
+          {
+            "id": 51,
+            "content": "새로운 편지가 도착했습니다.",
+            "type": "new_letter",
+            "targetType": "LETTER",
+            "targetId": 41,
+            "routeKey": "letter",
+            "targetState": {
+              "available": true,
+              "code": "AVAILABLE",
+              "message": "이동할 수 있습니다."
+            },
+            "isRead": false,
+            "createdAt": "2026-05-26T08:00:00",
+            "readAt": null
+          }
+        ]
+      }
+    },
+    {
+      "id": "notification.device-token.success",
+      "area": "notification",
+      "method": "POST",
+      "path": "/api/v1/notifications/device-tokens",
+      "contract": "envelope",
+      "parser": "notification.deviceToken",
+      "response": {
+        "success": true,
+        "data": {
+          "platform": "ANDROID",
+          "enabled": true,
+          "updatedAt": "2026-05-26T08:00:00"
+        }
+      }
+    },
+    {
+      "id": "settings.profile.success",
+      "area": "settings",
+      "method": "GET",
+      "path": "/api/v1/member/settings",
+      "contract": "envelope",
+      "parser": "settings.profile",
+      "response": {
+        "success": true,
+        "data": {
+          "id": 1,
+          "email": "user@example.com",
+          "nickname": "마음",
+          "randomReceiveAllowed": true,
+          "socialAccount": false,
+          "retentionPolicy": {
+            "immediateDeletionItems": [
+              "로그인 세션과 기기 알림 토큰은 탈퇴 즉시 폐기됩니다."
+            ],
+            "anonymizedRetentionItems": [
+              "기록, 이야기, 편지의 작성자 표시는 탈퇴한 회원으로 바뀝니다."
+            ],
+            "legalRetentionItems": [
+              "신고, 운영 조치, 서비스 안정성 기록은 분쟁 대응 기간 동안 보존될 수 있습니다."
+            ],
+            "exportExpiryHours": 24
+          },
+          "latestDataExport": {
+            "id": 61,
+            "status": "COMPLETED",
+            "requestedAt": "2026-05-26T08:00:00",
+            "completedAt": "2026-05-26T08:05:00",
+            "expiresAt": "2026-05-27T08:05:00",
+            "downloadUrl": "https://download.example.com/export/61",
+            "failureReason": null
+          }
+        }
+      }
+    },
+    {
+      "id": "common.permission-changed",
+      "area": "settings",
+      "method": "GET",
+      "path": "/api/v1/member/settings",
+      "contract": "error",
+      "parser": "raw",
+      "response": {
+        "success": false,
+        "error": {
+          "code": "FORBIDDEN",
+          "message": "권한이 변경되어 다시 로그인해 주세요.",
+          "fieldErrors": [],
+          "retryable": false,
+          "cause": "ROLE_CHANGED"
+        }
+      }
+    },
+    {
+      "id": "operations.dashboard.success",
+      "area": "operations",
+      "method": "GET",
+      "path": "/api/v1/admin/operations/dashboard",
+      "contract": "envelope",
+      "parser": "operations.dashboard",
+      "response": {
+        "success": true,
+        "data": {
+          "todayReportCount": 3,
+          "openReportCount": 2,
+          "processedReportCount": 1,
+          "todayLetterCount": 7,
+          "todayDiaryCount": 4,
+          "receivableMemberCount": 20,
+          "blockedMemberCount": 1,
+          "adminMemberCount": 2,
+          "unassignedLetterCount": 0,
+          "todayAdminActionCount": 5
+        }
+      }
+    },
+    {
+      "id": "operations.metrics.success",
+      "area": "operations",
+      "method": "GET",
+      "path": "/api/v1/operations/api-metrics",
+      "contract": "envelope",
+      "parser": "operations.metrics",
+      "response": {
+        "success": true,
+        "data": {
+          "sampleCount": 3,
+          "endpoints": [
+            {
+              "endpoint": "GET /api/v1/posts",
+              "requestCount": 10,
+              "successRate": 0.99,
+              "p95LatencyMs": 120,
+              "errorCodes": {
+                "UNAUTHORIZED": 1
+              }
+            }
+          ],
+          "writeRecovery": {
+            "duplicatePreventions": {
+              "story.create": 1
+            },
+            "imageLifecycle": {
+              "diary.upload": 1
+            }
+          },
+          "notifications": {
+            "pushDelivery": {
+              "success": 2
+            }
+          },
+          "ai": {
+            "model": {
+              "consultation.fallback": 1
+            },
+            "contentModeration": {
+              "blocked": 1
+            },
+            "consultationSafety": {
+              "SELF_HARM.BLOCK_AND_ESCALATE": 1
+            }
+          },
+          "client": {
+            "events": {
+              "APP_START": 1,
+              "SCREEN_VIEW": 2
+            },
+            "routes": {
+              "home": 2
+            },
+            "platforms": {
+              "android": 2,
+              "ios": 1
+            },
+            "appVersions": {
+              "0.1.0": 3
+            },
+            "networkStatus": {
+              "wifi": 3
+            },
+            "p95DurationMs": {
+              "APP_START": 420
+            },
+            "dropped": {}
+          }
+        }
+      }
+    },
+    {
+      "id": "moderation.review.success",
+      "area": "moderation",
+      "method": "POST",
+      "path": "/api/v1/moderation/text",
+      "contract": "envelope",
+      "parser": "moderation.review",
+      "response": {
+        "success": true,
+        "data": {
+          "allowed": false,
+          "riskLevel": "HIGH",
+          "message": "위험도가 높은 표현이 포함되어 수정이 필요합니다.",
+          "categories": [
+            "PROFANITY",
+            "PERSONAL_INFO"
+          ]
+        }
+      }
+    },
+    {
+      "id": "report.admin-list.success",
+      "area": "report",
+      "method": "GET",
+      "path": "/api/v1/admin/reports",
+      "contract": "envelope",
+      "parser": "report.adminList",
+      "response": {
+        "success": true,
+        "data": [
+          {
+            "id": 71,
+            "targetId": 21,
+            "targetType": "POST",
+            "reason": "PROFANITY",
+            "content": "공격적인 표현이 있습니다.",
+            "status": "OPEN",
+            "createdAt": "2026-05-26T08:00:00",
+            "targetTitle": "잠이 오지 않는 밤",
+            "targetPreview": "밤마다 생각이 많아요.",
+            "reporter": {
+              "id": 2,
+              "email": "reporter@example.com",
+              "nickname": "신고자",
+              "role": "USER",
+              "status": "ACTIVE"
+            },
+            "targetOwner": {
+              "id": 1,
+              "email": "writer@example.com",
+              "nickname": "작성자",
+              "role": "USER",
+              "status": "ACTIVE"
+            },
+            "actionReason": null,
+            "handledBy": null,
+            "handledAt": null,
+            "actionCount": 0
+          }
+        ]
+      }
+    }
+  ]
+}
