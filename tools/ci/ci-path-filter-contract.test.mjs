@@ -90,8 +90,9 @@ test("ios job validates a Flutter iOS scaffold under front", async () => {
   assert.match(ios, /\[\[ -f front\/pubspec\.yaml && -d front\/ios \]\]/);
   assert.match(ios, /echo "stack=flutter"/);
   assert.match(ios, /subosito\/flutter-action@[a-f0-9]{40}/);
-  assert.match(ios, /flutter pub get/);
-  assert.match(ios, /flutter build ios --simulator --no-codesign/);
+  assert.match(ios, /bundle install --jobs 4 --retry 3/);
+  assert.match(ios, /\.\.\/tools\/flutterw pub get/);
+  assert.match(ios, /\.\.\/tools\/flutterw build ios --simulator --no-codesign/);
   assert.match(ios, /node tools\/ci\/run-mobile-quality-gate\.mjs --platform ios/);
 });
 

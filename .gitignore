@@ -62,10 +62,17 @@ android/app/build/
 
 # iOS / Xcode
 ios/Pods/
+front/ios/Pods/
+front/ios/.bundle/
+front/ios/vendor/bundle/
 ios/build/
+front/ios/build/
 ios/DerivedData/
+front/ios/DerivedData/
 *.xcworkspace/xcuserdata/
 *.xcodeproj/xcuserdata/
+*.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/
+**/*.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/
 *.xcuserstate
 
 # Flutter, if selected later
