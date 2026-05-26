@@ -3,6 +3,8 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../../../shared/ui/app_design_system.dart';
+import '../../legal/domain/legal_disclosures.dart';
+import '../../legal/presentation/legal_disclosure_links.dart';
 import '../application/settings_controller.dart';
 import '../domain/settings_models.dart';
 
@@ -10,11 +12,13 @@ class SettingsScreen extends StatefulWidget {
   const SettingsScreen({
     required this.controller,
     required this.onBack,
+    this.onOpenExternalUri,
     super.key,
   });
 
   final SettingsController controller;
   final VoidCallback onBack;
+  final Future<bool> Function(Uri uri)? onOpenExternalUri;
 
   @override
   State<SettingsScreen> createState() => _SettingsScreenState();
@@ -195,10 +199,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                               const SizedBox(height: AppSpacing.lg),
                               _DataExportSection(
                                 state: state,
-                                onRequest:
-                                    widget.controller.requestDataExport,
-                                onRefresh:
-                                    widget.controller.refreshDataExport,
+                                onRequest: widget.controller.requestDataExport,
+                                onRefresh: widget.controller.refreshDataExport,
                                 onDownload:
                                     widget.controller.downloadDataExport,
                               ),
@@ -207,17 +209,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                 policy: settings.retentionPolicy,
                               ),
                               const SizedBox(height: AppSpacing.lg),
+                              _PrivacyDisclosureSection(
+                                onOpenExternalUri: widget.onOpenExternalUri,
+                              ),
+                              const SizedBox(height: AppSpacing.lg),
                               _WithdrawalSection(
                                 state: state,
                                 withdrawPasswordController:
                                     _withdrawPasswordController,
-                                onRequest:
-                                    widget.controller.requestWithdrawal,
+                                onRequest: widget.controller.requestWithdrawal,
                                 onCancel: widget.controller.cancelWithdrawal,
                                 onPasswordChanged: widget
                                     .controller.updateWithdrawPasswordDraft,
-                                onConfirm:
-                                    widget.controller.confirmWithdrawal,
+                                onConfirm: widget.controller.confirmWithdrawal,
                               ),
                             ],
                           ],
@@ -231,6 +235,30 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ),
         );
       },
+    );
+  }
+}
+
+class _PrivacyDisclosureSection extends StatelessWidget {
+  const _PrivacyDisclosureSection({this.onOpenExternalUri});
+
+  final Future<bool> Function(Uri uri)? onOpenExternalUri;
+
+  @override
+  Widget build(BuildContext context) {
+    return _SettingsSection(
+      title: '개인정보와 지원',
+      children: [
+        const Text(LegalDisclosures.dataExportGuidance),
+        const SizedBox(height: AppSpacing.xs),
+        const Text('계정 삭제는 아래 회원 탈퇴에서 처리하며, 보존 정책을 먼저 확인해 주세요.'),
+        const SizedBox(height: AppSpacing.md),
+        LegalDisclosureLinks(
+          keyPrefix: 'settings',
+          onOpenExternalUri: onOpenExternalUri,
+          showAccountDeletionGuidance: false,
+        ),
+      ],
     );
   }
 }
@@ -423,8 +451,7 @@ class _PasswordSection extends StatelessWidget {
           alignment: Alignment.centerRight,
           child: FilledButton(
             key: const ValueKey('settings-save-password'),
-            onPressed:
-                isSubmitting || isSocialAccount ? null : () => onSave(),
+            onPressed: isSubmitting || isSocialAccount ? null : () => onSave(),
             child: const Text('비밀번호 저장'),
           ),
         ),
