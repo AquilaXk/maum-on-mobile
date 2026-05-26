@@ -126,6 +126,8 @@ class ExternalLoginController extends ChangeNotifier {
 
   ExternalLoginState _state = const ExternalLoginState();
   String? _pendingProvider;
+  final Set<String> _handledCallbackKeys = <String>{};
+  final Set<String> _handledCallbackCodeStates = <String>{};
 
   ExternalLoginState get state => _state;
 
@@ -184,6 +186,14 @@ class ExternalLoginController extends ChangeNotifier {
   }
 
   Future<void> _exchangeCode(Map<String, String> query) async {
+    final code = query['code']!;
+    final state = query['state']!;
+    final codeStateKey = '$code|$state';
+    if (_handledCallbackCodeStates.contains(codeStateKey)) {
+      _setState(const ExternalLoginState());
+      return;
+    }
+
     final provider = _callbackProvider(query);
     if (provider == null) {
       _setState(
@@ -194,15 +204,24 @@ class ExternalLoginController extends ChangeNotifier {
       return;
     }
 
+    final callbackKey = '$provider|$codeStateKey';
+    if (!_handledCallbackKeys.add(callbackKey)) {
+      _setState(const ExternalLoginState());
+      return;
+    }
+    _handledCallbackCodeStates.add(codeStateKey);
+
     try {
       await _authController.completeExternalLoginCallback(
         provider: provider,
-        code: query['code']!,
-        state: query['state']!,
+        code: code,
+        state: state,
       );
       _pendingProvider = null;
       _setState(const ExternalLoginState());
     } on Object {
+      _handledCallbackKeys.remove(callbackKey);
+      _handledCallbackCodeStates.remove(codeStateKey);
       _setState(
         const ExternalLoginState(
           errorMessage: '로그인 세션을 확인하지 못했습니다. 다시 시도해 주세요.',

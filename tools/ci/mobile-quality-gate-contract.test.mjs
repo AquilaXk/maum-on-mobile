@@ -22,6 +22,7 @@ test("mobile quality gate manifest covers required mobile scenarios", () => {
     "navigation.tabs",
     "write.flows",
     "push.registration",
+    "push.cold-start-routing",
     "realtime.lifecycle",
     "auth.logout",
     "layout.accessibility",
