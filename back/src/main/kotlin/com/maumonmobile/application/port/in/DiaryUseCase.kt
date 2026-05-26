@@ -24,6 +24,18 @@ data class DiarySaveCommand(
     val imageUrl: String?,
     val isPrivate: Boolean,
     val imageFilename: String?,
+    val contentBlocks: List<DiaryContentBlockCommand> = emptyList(),
+)
+
+data class DiaryContentBlockCommand(
+    val id: String?,
+    val type: String?,
+    val text: String?,
+    val imageUrl: String?,
+    val filename: String?,
+    val byteSize: Long?,
+    val source: String?,
+    val contentType: String?,
 )
 
 data class DiaryResult(
@@ -37,6 +49,18 @@ data class DiaryResult(
     val isPrivate: Boolean,
     val createDate: String,
     val modifyDate: String,
+    val contentBlocks: List<DiaryContentBlockResult>,
+)
+
+data class DiaryContentBlockResult(
+    val id: String,
+    val type: String,
+    val text: String?,
+    val imageUrl: String?,
+    val filename: String?,
+    val byteSize: Long?,
+    val source: String?,
+    val contentType: String?,
 )
 
 data class DiaryPageResult(

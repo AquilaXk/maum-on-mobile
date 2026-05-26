@@ -63,6 +63,7 @@ class PersistentRepositoryContextTest @Autowired constructor(
 
         assertThat(tableExists("auth_members")).isTrue()
         assertThat(tableExists("diaries")).isTrue()
+        assertThat(tableExists("diary_content_blocks")).isTrue()
         assertThat(tableExists("auth_oidc_states")).isTrue()
         assertThat(tableExists("image_assets")).isTrue()
         assertThat(tableExists("story_posts")).isTrue()

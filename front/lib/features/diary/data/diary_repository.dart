@@ -104,6 +104,9 @@ class ApiDiaryRepository implements DiaryRepository {
             'categoryName': draft.category.label,
             'isPrivate': draft.isPrivate,
             'imageUrl': draft.imageUrl,
+            'contentBlocks': draft.contentBlocks
+                .map((block) => block.toJson())
+                .toList(growable: false),
           }),
           contentType: 'application/json',
         ),

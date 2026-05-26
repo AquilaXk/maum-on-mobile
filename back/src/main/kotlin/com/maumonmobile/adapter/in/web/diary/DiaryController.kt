@@ -1,6 +1,7 @@
 package com.maumonmobile.adapter.`in`.web.diary
 
 import com.fasterxml.jackson.annotation.JsonProperty
+import com.maumonmobile.application.port.`in`.DiaryContentBlockCommand
 import com.maumonmobile.application.port.`in`.DiaryPageResult
 import com.maumonmobile.application.port.`in`.DiaryResult
 import com.maumonmobile.application.port.`in`.DiarySaveCommand
@@ -116,6 +117,19 @@ data class DiarySaveRequest(
     @param:JsonProperty("isPrivate")
     @get:JsonProperty("isPrivate")
     val isPrivate: Boolean = false,
+    val contentBlocks: List<DiaryContentBlockSaveRequest>? = null,
+)
+
+data class DiaryContentBlockSaveRequest(
+    val id: String? = null,
+    val type: String? = null,
+    val text: String? = null,
+    val imageUrl: String? = null,
+    val uploadStatus: String? = null,
+    val filename: String? = null,
+    val byteSize: Long? = null,
+    val source: String? = null,
+    val contentType: String? = null,
 )
 
 private fun DiarySaveRequest.toCommand(image: MultipartFile?): DiarySaveCommand {
@@ -126,6 +140,18 @@ private fun DiarySaveRequest.toCommand(image: MultipartFile?): DiarySaveCommand 
         imageUrl = imageUrl,
         isPrivate = isPrivate,
         imageFilename = image?.originalFilename,
+        contentBlocks = contentBlocks.orEmpty().map { block ->
+            DiaryContentBlockCommand(
+                id = block.id,
+                type = block.type,
+                text = block.text,
+                imageUrl = block.imageUrl,
+                filename = block.filename,
+                byteSize = block.byteSize,
+                source = block.source,
+                contentType = block.contentType,
+            )
+        },
     )
 }
 

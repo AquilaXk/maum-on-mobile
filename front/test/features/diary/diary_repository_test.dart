@@ -73,6 +73,23 @@ void main() {
           category: DiaryCategory.daily,
           isPrivate: true,
           imageUrl: '/images/uploads/diary.png',
+          contentBlocks: [
+            DiaryContentBlock(
+              id: 'text-a',
+              type: DiaryContentBlockType.text,
+              text: '본문입니다.',
+            ),
+            DiaryContentBlock(
+              id: 'image-a',
+              type: DiaryContentBlockType.image,
+              imageUrl: '/images/uploads/diary.png',
+              uploadStatus: DiaryImageBlockUploadStatus.uploaded,
+              filename: 'diary.png',
+              byteSize: 3,
+              source: DiaryImageSource.gallery,
+              contentType: 'image/png',
+            ),
+          ],
         ),
       );
 
@@ -87,6 +104,13 @@ void main() {
       expect(multipart.textParts.single.value, contains('"categoryName":"일상"'));
       expect(multipart.textParts.single.value,
           contains('"imageUrl":"/images/uploads/diary.png"'));
+      expect(multipart.textParts.single.value,
+          contains('"contentBlocks":[{"id":"text-a","type":"text"'));
+      expect(multipart.textParts.single.value,
+          contains('"id":"image-a","type":"image"'));
+      expect(multipart.textParts.single.value,
+          contains('"uploadStatus":"uploaded"'));
+      expect(multipart.textParts.single.value, contains('"byteSize":3'));
       expect(multipart.files, isEmpty);
     });
 
@@ -104,6 +128,19 @@ void main() {
           category: DiaryCategory.family,
           isPrivate: false,
           imageUrl: '/images/uploads/old.png',
+          contentBlocks: [
+            DiaryContentBlock(
+              id: 'text-a',
+              type: DiaryContentBlockType.text,
+              text: '수정 본문',
+            ),
+            DiaryContentBlock(
+              id: 'image-a',
+              type: DiaryContentBlockType.image,
+              imageUrl: '/images/uploads/old.png',
+              uploadStatus: DiaryImageBlockUploadStatus.uploaded,
+            ),
+          ],
         ),
       );
 
@@ -112,6 +149,8 @@ void main() {
       expect(request.path, '/api/v1/diaries/3');
       expect(request.multipart?.textParts.single.value,
           contains('"imageUrl":"/images/uploads/old.png"'));
+      expect(request.multipart?.textParts.single.value,
+          contains('"contentBlocks":[{"id":"text-a","type":"text"'));
       expect(request.multipart?.files, isEmpty);
     });
 
