@@ -749,7 +749,7 @@ class LetterController extends ChangeNotifier {
       }
       _setState(
         _state.copyWith(
-          errorMessage: error.message,
+          errorMessage: _messageFromError(error),
           clearNoticeMessage: true,
         ),
       );
@@ -766,6 +766,9 @@ class LetterController extends ChangeNotifier {
 
   String _messageFromError(Object error) {
     if (error is ApiClientException) {
+      if (error.code == '404-2') {
+        return '지금은 편지를 받을 수 있는 사용자가 없습니다. 잠시 뒤 다시 보내 주세요.';
+      }
       return error.message;
     }
     return '요청을 처리하지 못했습니다.';

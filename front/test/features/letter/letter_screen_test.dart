@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:maum_on_mobile_front/core/network/api_error.dart';
 import 'package:maum_on_mobile_front/features/letter/application/letter_controller.dart';
 import 'package:maum_on_mobile_front/features/letter/data/letter_repository.dart';
 import 'package:maum_on_mobile_front/features/letter/domain/letter_models.dart';
@@ -31,6 +32,47 @@ void main() {
     expect(find.text('본문'), findsOneWidget);
     expect(find.byKey(const ValueKey('letter-accept-button')), findsOneWidget);
     expect(find.byKey(const ValueKey('letter-reject-button')), findsOneWidget);
+  });
+
+  testWidgets('renders mailbox state guidance and opens receive settings',
+      (tester) async {
+    var settingsOpenCount = 0;
+    final repository = _FakeLetterRepository(
+      statsQueue: [_stats()],
+      receivedPages: [
+        _page([
+          _summary(id: 1, title: '기다리는 편지'),
+          _summary(
+            id: 2,
+            title: '작성 중인 답장',
+            status: LetterStatus.writing,
+          ),
+        ]),
+      ],
+    );
+    final controller = LetterController(letterRepository: repository);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: LetterScreen(
+          controller: controller,
+          onBack: () {},
+          onOpenRandomReceiveSettings: () => settingsOpenCount += 1,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('랜덤 편지 수신'), findsOneWidget);
+    expect(find.text('수신 설정'), findsOneWidget);
+    expect(find.text('수신 대기'), findsOneWidget);
+    expect(find.text('답장 작성 중'), findsOneWidget);
+    expect(find.text('상대방의 답장을 기다리고 있습니다.'), findsOneWidget);
+
+    await tester.tap(find.byKey(const ValueKey('letter-receive-settings')));
+    await tester.pump();
+
+    expect(settingsOpenCount, 1);
   });
 
   testWidgets('submits a new letter and moves to sent mailbox', (tester) async {
@@ -67,7 +109,87 @@ void main() {
 
     expect(repository.createdDrafts.single.title, '새 편지');
     expect(find.text('편지가 전송되었습니다.'), findsOneWidget);
+    expect(find.text('보낸 편지함에서 상태를 확인해 주세요.'), findsOneWidget);
     expect(find.text('보낸 편지함'), findsOneWidget);
+  });
+
+  testWidgets('asks before leaving a compose draft', (tester) async {
+    final controller = LetterController(
+      letterRepository: _FakeLetterRepository(
+        statsQueue: [_stats()],
+        receivedPages: [_page([])],
+      ),
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(home: LetterScreen(controller: controller, onBack: () {})),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('letter-compose-button')));
+    await tester.pumpAndSettle();
+
+    await tester.enterText(
+      find.byKey(const ValueKey('letter-title-field')),
+      '남길 편지',
+    );
+    await tester.tap(find.byKey(const ValueKey('letter-compose-cancel-button')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('작성 중인 편지를 나갈까요?'), findsOneWidget);
+
+    await tester.tap(find.byKey(const ValueKey('letter-compose-keep-button')));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const ValueKey('letter-title-field')), findsOneWidget);
+
+    await tester.tap(find.byKey(const ValueKey('letter-compose-cancel-button')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('letter-compose-leave-button')));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const ValueKey('letter-title-field')), findsNothing);
+    expect(find.text('랜덤 편지 수신'), findsOneWidget);
+  });
+
+  testWidgets('shows receiver guidance when no recipient is available',
+      (tester) async {
+    final controller = LetterController(
+      letterRepository: _FakeLetterRepository(
+        statsQueue: [_stats()],
+        receivedPages: [_page([])],
+        createError: const ApiClientException(
+          kind: ApiErrorKind.server,
+          message: '수신 가능한 회원이 없습니다.',
+          code: '404-2',
+        ),
+      ),
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(home: LetterScreen(controller: controller, onBack: () {})),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('letter-compose-button')));
+    await tester.pumpAndSettle();
+
+    await tester.enterText(
+      find.byKey(const ValueKey('letter-title-field')),
+      '새 편지',
+    );
+    await tester.enterText(
+      find.byKey(const ValueKey('letter-content-field')),
+      '마음 본문',
+    );
+    await tester.pump();
+    await tester
+        .ensureVisible(find.byKey(const ValueKey('letter-submit-button')));
+    await tester.tap(find.byKey(const ValueKey('letter-submit-button')));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.text('지금은 편지를 받을 수 있는 사용자가 없습니다. 잠시 뒤 다시 보내 주세요.'),
+      findsOneWidget,
+    );
   });
 
   testWidgets('opens compose mode immediately when requested', (tester) async {
@@ -279,6 +401,7 @@ class _FakeLetterRepository implements LetterRepository {
     this.sentPages = const [],
     this.details = const [],
     this.createdId = 1,
+    this.createError,
   });
 
   final List<LetterStats> statsQueue;
@@ -286,6 +409,7 @@ class _FakeLetterRepository implements LetterRepository {
   final List<LetterListPage> sentPages;
   final List<LetterDetail> details;
   final int createdId;
+  final Object? createError;
   final List<LetterDraft> createdDrafts = [];
   final List<int> acceptedIds = [];
   final List<({int id, String replyContent})> replies = [];
@@ -293,6 +417,10 @@ class _FakeLetterRepository implements LetterRepository {
   @override
   Future<int> createLetter(LetterDraft draft) async {
     createdDrafts.add(draft);
+    final error = createError;
+    if (error != null) {
+      throw error;
+    }
     return createdId;
   }
 

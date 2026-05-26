@@ -478,6 +478,8 @@ class _MaumOnMobileAppState extends State<MaumOnMobileApp> {
       controller: letterController,
       initiallyCompose: startsInCompose,
       initialLetterId: initialLetterId,
+      onOpenRandomReceiveSettings: () =>
+          _openRoute(AuthenticatedRoute.settings),
       onBack: _returnHome,
     );
   }
