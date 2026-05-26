@@ -371,6 +371,8 @@ class _NotificationCenter extends StatelessWidget {
             _InlineNotice(message: state.noticeMessage!),
             const SizedBox(height: AppSpacing.md),
           ],
+          _NotificationCenterSummary(state: state),
+          const SizedBox(height: AppSpacing.md),
           if (state.isEmpty)
             const AppStateView.empty(
               title: '아직 도착한 알림이 없습니다.',
@@ -386,6 +388,50 @@ class _NotificationCenter extends StatelessWidget {
           ],
         ],
       ),
+    );
+  }
+}
+
+class _NotificationCenterSummary extends StatelessWidget {
+  const _NotificationCenterSummary({required this.state});
+
+  final NotificationState state;
+
+  @override
+  Widget build(BuildContext context) {
+    final directCount = state.notifications
+        .where(
+          (notification) =>
+              notification.destination !=
+              NotificationTapDestination.notifications,
+        )
+        .length;
+
+    return Wrap(
+      spacing: AppSpacing.xs,
+      runSpacing: AppSpacing.xs,
+      children: [
+        AppMetricTile(
+          label: '읽지 않음',
+          value: state.unreadCount.toString(),
+          tone: state.unreadCount > 0
+              ? AppStatusTone.warning
+              : AppStatusTone.success,
+          width: 148,
+        ),
+        AppMetricTile(
+          label: '바로 이동',
+          value: directCount.toString(),
+          tone: directCount > 0 ? AppStatusTone.success : AppStatusTone.neutral,
+          width: 148,
+        ),
+        AppMetricTile(
+          label: '실시간 상태',
+          value: _connectionStatusLabel(state.connectionState),
+          tone: _connectionStatusTone(state.connectionState),
+          width: 148,
+        ),
+      ],
     );
   }
 }
@@ -421,15 +467,30 @@ class _NotificationTile extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Icon(
-                  notification.isRead
-                      ? Icons.notifications_none
-                      : Icons.notifications_active_outlined,
+                  _notificationIcon(notification),
                 ),
                 const SizedBox(width: AppSpacing.sm),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
+                      Wrap(
+                        spacing: AppSpacing.xs,
+                        runSpacing: AppSpacing.xxs,
+                        children: [
+                          AppStatusPill(
+                            label: notification.isRead ? '읽음' : '새 알림',
+                            tone: notification.isRead
+                                ? AppStatusTone.neutral
+                                : AppStatusTone.warning,
+                          ),
+                          AppStatusPill(
+                            label: notification.destinationLabel,
+                            tone: _notificationDestinationTone(notification),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: AppSpacing.xs),
                       Text(
                         notification.content,
                         style: const TextStyle(fontWeight: FontWeight.w700),
@@ -444,6 +505,12 @@ class _NotificationTile extends StatelessWidget {
                     ],
                   ),
                 ),
+                const SizedBox(width: AppSpacing.xs),
+                Icon(
+                  Icons.chevron_right,
+                  size: 20,
+                  color: colorScheme.onSurfaceVariant,
+                ),
               ],
             ),
           ),
@@ -451,6 +518,49 @@ class _NotificationTile extends StatelessWidget {
       ),
     );
   }
+}
+
+String _connectionStatusLabel(NotificationConnectionState state) {
+  return switch (state) {
+    NotificationConnectionState.idle => '대기',
+    NotificationConnectionState.connecting => '연결 중',
+    NotificationConnectionState.connected => '연결됨',
+    NotificationConnectionState.error => '불안정',
+  };
+}
+
+AppStatusTone _connectionStatusTone(NotificationConnectionState state) {
+  return switch (state) {
+    NotificationConnectionState.connected => AppStatusTone.success,
+    NotificationConnectionState.connecting => AppStatusTone.warning,
+    NotificationConnectionState.error => AppStatusTone.danger,
+    NotificationConnectionState.idle => AppStatusTone.neutral,
+  };
+}
+
+IconData _notificationIcon(NotificationItem notification) {
+  if (!notification.isRead) {
+    return Icons.notifications_active_outlined;
+  }
+
+  return switch (notification.destination) {
+    NotificationTapDestination.diary => Icons.edit_note,
+    NotificationTapDestination.story => Icons.forum_outlined,
+    NotificationTapDestination.letter => Icons.mail_outline,
+    NotificationTapDestination.consultation => Icons.chat_bubble_outline,
+    NotificationTapDestination.operations =>
+      Icons.admin_panel_settings_outlined,
+    NotificationTapDestination.settings => Icons.settings_outlined,
+    NotificationTapDestination.notifications => Icons.notifications_none,
+  };
+}
+
+AppStatusTone _notificationDestinationTone(NotificationItem notification) {
+  return switch (notification.destination) {
+    NotificationTapDestination.notifications => AppStatusTone.neutral,
+    NotificationTapDestination.operations => AppStatusTone.warning,
+    _ => AppStatusTone.success,
+  };
 }
 
 class _ReportForm extends StatelessWidget {

@@ -18,6 +18,8 @@ class HomeScreen extends StatefulWidget {
     required this.onOpenSettings,
     required this.onLogout,
     this.isAdmin = false,
+    this.unreadNotificationCount = 0,
+    this.hasLiveNotificationConnection = false,
     this.onOpenOperations,
     super.key,
   });
@@ -33,6 +35,8 @@ class HomeScreen extends StatefulWidget {
   final VoidCallback onOpenSettings;
   final VoidCallback onLogout;
   final bool isAdmin;
+  final int unreadNotificationCount;
+  final bool hasLiveNotificationConnection;
   final VoidCallback? onOpenOperations;
 
   @override
@@ -88,6 +92,13 @@ class _HomeScreenState extends State<HomeScreen> {
           eyebrow: widget.routeTitle,
           title: 'Maum On',
           subtitle: '${widget.nickname}님, 오늘의 마음을 이어가세요.',
+          onRefresh: widget.homeController.load,
+          actions: [
+            _HomeNotificationHeaderButton(
+              unreadCount: widget.unreadNotificationCount,
+              onPressed: widget.onOpenNotifications,
+            ),
+          ],
           maxWidth: AppBreakpoints.compactContentMaxWidth,
           children: [
             _StatsSection(state: state),
@@ -95,6 +106,12 @@ class _HomeScreenState extends State<HomeScreen> {
             _HealingQuote(
               summary: state.stats?.summary,
               onPrimaryAction: _openSurface,
+            ),
+            const SizedBox(height: AppSpacing.lg),
+            _NotificationPriorityEntry(
+              unreadCount: widget.unreadNotificationCount,
+              hasLiveConnection: widget.hasLiveNotificationConnection,
+              onOpenNotifications: widget.onOpenNotifications,
             ),
             const SizedBox(height: AppSpacing.lg),
             _DraftContinuationSection(
@@ -107,7 +124,6 @@ class _HomeScreenState extends State<HomeScreen> {
               onWriteLetter: widget.onWriteLetter,
               onViewStory: widget.onViewStory,
               onOpenConsultation: widget.onOpenConsultation,
-              onOpenNotifications: widget.onOpenNotifications,
               onOpenSettings: widget.onOpenSettings,
               onLogout: widget.onLogout,
               isAdmin: widget.isAdmin,
@@ -149,8 +165,13 @@ class _StatsSection extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        Text('오늘 요약', style: Theme.of(context).textTheme.titleMedium),
+        const SizedBox(height: AppSpacing.xs),
         if (state.statsErrorMessage != null) ...[
-          AppNotice(message: state.statsErrorMessage!, tone: AppNoticeTone.error),
+          AppNotice(
+            message: state.statsErrorMessage!,
+            tone: AppNoticeTone.error,
+          ),
           const SizedBox(height: AppSpacing.xs),
         ],
         Wrap(
@@ -158,12 +179,12 @@ class _StatsSection extends StatelessWidget {
           runSpacing: AppSpacing.xs,
           children: [
             AppMetricTile(
-              label: '오늘 올라온 고민',
+              label: '오늘의 기록',
               value: _formatStatValue(
-                stats?.todayWorryCount,
+                stats?.todayDiaryCount,
                 state.isStatsLoading,
               ),
-              tone: AppStatusTone.success,
+              tone: AppStatusTone.warning,
             ),
             AppMetricTile(
               label: '전달된 비밀 편지',
@@ -173,12 +194,12 @@ class _StatsSection extends StatelessWidget {
               ),
             ),
             AppMetricTile(
-              label: '오늘의 기록',
+              label: '오늘 올라온 고민',
               value: _formatStatValue(
-                stats?.todayDiaryCount,
+                stats?.todayWorryCount,
                 state.isStatsLoading,
               ),
-              tone: AppStatusTone.warning,
+              tone: AppStatusTone.success,
             ),
           ],
         ),
@@ -192,6 +213,58 @@ class _StatsSection extends StatelessWidget {
     }
 
     return (value ?? 0).toString();
+  }
+}
+
+class _HomeNotificationHeaderButton extends StatelessWidget {
+  const _HomeNotificationHeaderButton({
+    required this.unreadCount,
+    required this.onPressed,
+  });
+
+  final int unreadCount;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final badgeText = _formatBadgeCount(unreadCount);
+
+    return IconButton(
+      key: const ValueKey('home-header-notification-button'),
+      tooltip: unreadCount > 0 ? '읽지 않은 알림 $badgeText' : '알림/신고',
+      onPressed: onPressed,
+      icon: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          const Icon(Icons.notifications_none),
+          if (unreadCount > 0)
+            PositionedDirectional(
+              end: -8,
+              top: -8,
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  color: colorScheme.error,
+                  borderRadius: AppRadii.status,
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: AppSpacing.xxs,
+                    vertical: 1,
+                  ),
+                  child: Text(
+                    badgeText,
+                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                          color: colorScheme.onError,
+                          fontWeight: FontWeight.w800,
+                        ),
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
   }
 }
 
@@ -223,6 +296,109 @@ class _HealingQuote extends StatelessWidget {
           label: Text(homeSummary.primaryActionLabel),
         ),
       ],
+    );
+  }
+}
+
+class _NotificationPriorityEntry extends StatelessWidget {
+  const _NotificationPriorityEntry({
+    required this.unreadCount,
+    required this.hasLiveConnection,
+    required this.onOpenNotifications,
+  });
+
+  final int unreadCount;
+  final bool hasLiveConnection;
+  final VoidCallback onOpenNotifications;
+
+  @override
+  Widget build(BuildContext context) {
+    final hasUnread = unreadCount > 0;
+    final liveLabel = hasLiveConnection ? '실시간 연결됨' : '알림 센터';
+    final unreadLabel = hasUnread
+        ? '읽지 않은 알림 ${_formatBadgeCount(unreadCount)}개'
+        : '읽지 않은 알림 없음';
+
+    final statusTone = hasUnread
+        ? AppStatusTone.warning
+        : hasLiveConnection
+            ? AppStatusTone.success
+            : AppStatusTone.neutral;
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return Semantics(
+      label: '알림/신고, $unreadLabel, $liveLabel',
+      button: true,
+      child: Card(
+        margin: EdgeInsets.zero,
+        child: InkWell(
+          key: const ValueKey('home-action-notifications'),
+          borderRadius: AppRadii.card,
+          onTap: onOpenNotifications,
+          child: Padding(
+            padding: const EdgeInsets.all(AppSpacing.md),
+            child: Row(
+              children: [
+                DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: colorScheme.surfaceContainerHighest,
+                    borderRadius: AppRadii.chip,
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.all(AppSpacing.xs),
+                    child: Icon(
+                      hasUnread
+                          ? Icons.notifications_active_outlined
+                          : Icons.notifications_none,
+                      size: 22,
+                      color: colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: AppSpacing.md),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        '알림/신고',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                              fontWeight: FontWeight.w800,
+                            ),
+                      ),
+                      const SizedBox(height: AppSpacing.xxs),
+                      Text(
+                        '$unreadLabel · $liveLabel',
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              color: colorScheme.onSurfaceVariant,
+                            ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: AppSpacing.xs),
+                ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 112),
+                  child: AppStatusPill(
+                    label: hasUnread ? '확인 필요' : liveLabel,
+                    tone: statusTone,
+                  ),
+                ),
+                const SizedBox(width: AppSpacing.xs),
+                Icon(
+                  Icons.chevron_right,
+                  size: 20,
+                  color: colorScheme.onSurfaceVariant,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
     );
   }
 }
@@ -294,7 +470,6 @@ class _ActionGrid extends StatelessWidget {
     required this.onWriteLetter,
     required this.onViewStory,
     required this.onOpenConsultation,
-    required this.onOpenNotifications,
     required this.onOpenSettings,
     required this.onLogout,
     required this.isAdmin,
@@ -305,7 +480,6 @@ class _ActionGrid extends StatelessWidget {
   final VoidCallback onWriteLetter;
   final VoidCallback onViewStory;
   final VoidCallback onOpenConsultation;
-  final VoidCallback onOpenNotifications;
   final VoidCallback onOpenSettings;
   final VoidCallback onLogout;
   final bool isAdmin;
@@ -363,12 +537,6 @@ class _ActionGrid extends StatelessWidget {
           spacing: AppSpacing.xs,
           runSpacing: AppSpacing.xs,
           children: [
-            OutlinedButton.icon(
-              key: const ValueKey('home-action-notifications'),
-              onPressed: onOpenNotifications,
-              icon: const Icon(Icons.notifications_none),
-              label: const Text('알림/신고'),
-            ),
             OutlinedButton.icon(
               key: const ValueKey('home-action-settings'),
               onPressed: onOpenSettings,
@@ -616,4 +784,11 @@ String _formatDraftDate(DateTime updatedAt) {
   }
   final local = updatedAt.toLocal();
   return '${local.month}/${local.day} ${local.hour.toString().padLeft(2, '0')}:${local.minute.toString().padLeft(2, '0')}';
+}
+
+String _formatBadgeCount(int count) {
+  if (count > 99) {
+    return '99+';
+  }
+  return count.toString();
 }

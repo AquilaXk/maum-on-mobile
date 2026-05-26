@@ -149,7 +149,7 @@ void main() {
     );
     await tester.pump();
     expect(find.text('알림/신고'), findsWidgets);
-    expect(find.textContaining('연결됨'), findsOneWidget);
+    expect(find.text('연결됨'), findsOneWidget);
     await _returnHome(tester);
 
     await _tapVisibleText(tester, '설정');
@@ -278,6 +278,8 @@ void main() {
     );
 
     await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('편지 쓰기'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('편지 쓰기'));
     await tester.pumpAndSettle();
 
@@ -347,7 +349,7 @@ void main() {
     await tester.pump();
 
     expect(find.text('알림/신고'), findsWidgets);
-    expect(find.textContaining('연결됨'), findsOneWidget);
+    expect(find.text('연결됨'), findsOneWidget);
     expect(notificationRepository.ticketRequestCount, 1);
   });
 
@@ -639,6 +641,8 @@ void main() {
       ),
     );
 
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('스토리 보기'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('스토리 보기'));
     await tester.pumpAndSettle();

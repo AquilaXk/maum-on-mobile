@@ -46,8 +46,13 @@ void main() {
       await tester.pump();
 
       expect(find.text('알림/신고'), findsOneWidget);
+      expect(find.text('읽지 않음'), findsOneWidget);
+      expect(find.text('바로 이동'), findsOneWidget);
+      expect(find.text('실시간 상태'), findsOneWidget);
       expect(find.text('상대방이 편지를 읽었습니다.'), findsOneWidget);
       expect(find.text('보낸 편지에 답장이 도착했습니다!'), findsWidgets);
+      expect(find.text('새 알림'), findsWidgets);
+      expect(find.text('편지'), findsWidgets);
 
       await tester.tap(find.byKey(const ValueKey('notification-card-1')));
       await tester.pumpAndSettle();
@@ -55,6 +60,7 @@ void main() {
       expect(notificationRepository.markReadIds, [1]);
       expect(openedNotifications.single.isRead, isTrue);
       expect(find.bySemanticsLabel(RegExp('읽은 알림.*편지')), findsOneWidget);
+      expect(find.text('읽음'), findsWidgets);
 
       await tester.tap(find.text('신고'));
       await tester.pumpAndSettle();

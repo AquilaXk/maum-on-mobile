@@ -40,9 +40,12 @@ enum NotificationDevicePlatform {
 
 enum NotificationTapDestination {
   notifications,
+  diary,
+  story,
   letter,
   consultation,
   operations,
+  settings,
 }
 
 class NotificationItem {
@@ -116,9 +119,12 @@ class NotificationItem {
 
   String get destinationLabel {
     return switch (destination) {
+      NotificationTapDestination.diary => '일기',
+      NotificationTapDestination.story => '이야기',
       NotificationTapDestination.letter => '편지',
       NotificationTapDestination.consultation => '상담',
       NotificationTapDestination.operations => '운영',
+      NotificationTapDestination.settings => '설정',
       NotificationTapDestination.notifications => '알림',
     };
   }
@@ -210,6 +216,9 @@ NotificationTapDestination _destinationFromRouteKey(
   final normalizedRoute = routeKey.trim().toLowerCase();
   final normalizedType = fallbackType.trim().toLowerCase();
   return switch (normalizedRoute.isEmpty ? normalizedType : normalizedRoute) {
+    'diary' || 'diaries' || 'daily' => NotificationTapDestination.diary,
+    'story' || 'stories' || 'post' || 'comment' =>
+      NotificationTapDestination.story,
     'letter' ||
     'letters' ||
     'new_letter' ||
@@ -221,6 +230,8 @@ NotificationTapDestination _destinationFromRouteKey(
       NotificationTapDestination.consultation,
     'operations' || 'operations_action' || 'admin' =>
       NotificationTapDestination.operations,
+    'settings' || 'setting' || 'account' || 'profile' =>
+      NotificationTapDestination.settings,
     _ => NotificationTapDestination.notifications,
   };
 }
