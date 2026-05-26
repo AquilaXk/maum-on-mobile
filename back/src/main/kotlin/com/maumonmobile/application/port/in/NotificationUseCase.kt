@@ -24,6 +24,10 @@ interface NotificationUseCase {
 data class NotificationResult(
     val id: Long,
     val content: String,
+    val type: String,
+    val targetType: String?,
+    val targetId: Long?,
+    val routeKey: String,
     val isRead: Boolean,
     val createdAt: String,
     val readAt: String?,

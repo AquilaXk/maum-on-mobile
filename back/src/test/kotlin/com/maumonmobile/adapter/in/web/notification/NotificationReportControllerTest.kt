@@ -339,6 +339,11 @@ class NotificationReportControllerTest @Autowired constructor(
         assertThat(pushCommand.platform).isEqualTo(NotificationDevicePlatform.ANDROID)
         assertThat(pushCommand.body).isEqualTo("작성한 콘텐츠에 신고가 접수되었습니다.")
         assertThat(pushCommand.data).containsKeys("notificationId", "reportId")
+        assertThat(pushCommand.data)
+            .containsEntry("type", "report_status")
+            .containsEntry("targetType", "REPORT")
+            .containsEntry("targetId", pushCommand.data["reportId"])
+            .containsEntry("routeKey", "notifications")
 
         val notificationsResult = mockMvc.get("/api/v1/notifications") {
             header("Authorization", "Bearer ${owner.accessToken}")
@@ -347,6 +352,10 @@ class NotificationReportControllerTest @Autowired constructor(
                 status { isOk() }
                 jsonPath("$.data[0].read") { value(false) }
                 jsonPath("$.data[0].readAt") { doesNotExist() }
+                jsonPath("$.data[0].type") { value("report_status") }
+                jsonPath("$.data[0].targetType") { value("REPORT") }
+                jsonPath("$.data[0].targetId") { value(pushCommand.data["reportId"]!!.toInt()) }
+                jsonPath("$.data[0].routeKey") { value("notifications") }
             }
             .andReturn()
         val notificationId = notificationsResult.response.readJsonInt("$.data[0].id")

@@ -104,6 +104,73 @@ class NotificationDeliveryServiceTest {
     }
 
     @Test
+    fun storesTargetMetadataAndUsesSameRealtimeAndPushPayload() {
+        val sender = ScriptedNotificationPushSender(NotificationPushSendResult.success(providerStatusCode = 200))
+        val eventPublisher = CapturingEventPublisher()
+        val fixture = deliveryFixture(sender = sender, eventPublisher = eventPublisher)
+        fixture.tokenRepository.save(
+            memberId = 5L,
+            platform = NotificationDevicePlatform.ANDROID,
+            token = "android-token-target",
+        )
+
+        val notification = fixture.service.deliver(
+            memberId = 5L,
+            eventName = "new_letter",
+            message = "새 편지가 도착했습니다.",
+            attributes = mapOf("letterId" to 42L, "status" to "SENT"),
+        )
+
+        assertThat(notification.type).isEqualTo("new_letter")
+        assertThat(notification.targetType).isEqualTo("LETTER")
+        assertThat(notification.targetId).isEqualTo(42L)
+        assertThat(notification.routeKey).isEqualTo("letter")
+        assertThat(eventPublisher.events.single())
+            .contains(""""type":"new_letter"""")
+            .contains(""""targetType":"LETTER"""")
+            .contains(""""targetId":42""")
+            .contains(""""routeKey":"letter"""")
+        assertThat(sender.commands.single().data)
+            .containsEntry("type", "new_letter")
+            .containsEntry("targetType", "LETTER")
+            .containsEntry("targetId", "42")
+            .containsEntry("routeKey", "letter")
+    }
+
+    @Test
+    fun fallsBackToNotificationsWhenTargetMetadataIsMissing() {
+        val sender = ScriptedNotificationPushSender(NotificationPushSendResult.success(providerStatusCode = 200))
+        val eventPublisher = CapturingEventPublisher()
+        val fixture = deliveryFixture(sender = sender, eventPublisher = eventPublisher)
+        fixture.tokenRepository.save(
+            memberId = 6L,
+            platform = NotificationDevicePlatform.IOS,
+            token = "ios-token-target-123",
+        )
+
+        val notification = fixture.service.deliver(
+            memberId = 6L,
+            eventName = "unknown_event",
+            message = "일반 알림입니다.",
+        )
+
+        assertThat(notification.type).isEqualTo("fallback")
+        assertThat(notification.targetType).isNull()
+        assertThat(notification.targetId).isNull()
+        assertThat(notification.routeKey).isEqualTo("notifications")
+        assertThat(eventPublisher.events.single())
+            .contains(""""type":"fallback"""")
+            .contains(""""targetType":null""")
+            .contains(""""targetId":null""")
+            .contains(""""routeKey":"notifications"""")
+        assertThat(sender.commands.single().data)
+            .containsEntry("type", "fallback")
+            .containsEntry("targetType", "")
+            .containsEntry("targetId", "")
+            .containsEntry("routeKey", "notifications")
+    }
+
+    @Test
     fun continuesPushDispatchWhenOneTokenCleanupFails() {
         val sender = ScriptedNotificationPushSender(
             NotificationPushSendResult.permanentFailure(providerStatusCode = 410),

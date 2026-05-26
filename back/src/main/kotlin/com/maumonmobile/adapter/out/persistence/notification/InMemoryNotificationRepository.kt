@@ -2,6 +2,7 @@ package com.maumonmobile.adapter.out.persistence.notification
 
 import com.maumonmobile.application.port.out.NotificationRepository
 import com.maumonmobile.domain.notification.Notification
+import com.maumonmobile.domain.notification.NotificationTargetMetadata
 import org.springframework.context.annotation.Profile
 import org.springframework.stereotype.Repository
 import java.time.Instant
@@ -14,11 +15,15 @@ class InMemoryNotificationRepository : NotificationRepository {
     private val sequence = AtomicLong(1L)
     private val notificationsById = ConcurrentHashMap<Long, Notification>()
 
-    override fun save(receiverId: Long, content: String): Notification {
+    override fun save(receiverId: Long, content: String, metadata: NotificationTargetMetadata): Notification {
         val notification = Notification(
             id = sequence.getAndIncrement(),
             receiverId = receiverId,
             content = content,
+            type = metadata.type,
+            targetType = metadata.targetType,
+            targetId = metadata.targetId,
+            routeKey = metadata.routeKey,
             isRead = false,
             createdAt = Instant.now().toString(),
         )

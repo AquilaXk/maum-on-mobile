@@ -5,6 +5,7 @@ import com.maumonmobile.adapter.out.persistence.jdbc.params
 import com.maumonmobile.adapter.out.persistence.jdbc.withValue
 import com.maumonmobile.application.port.out.NotificationRepository
 import com.maumonmobile.domain.notification.Notification
+import com.maumonmobile.domain.notification.NotificationTargetMetadata
 import org.springframework.context.annotation.Profile
 import org.springframework.jdbc.core.RowMapper
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate
@@ -17,15 +18,39 @@ class JdbcNotificationRepository(
     private val jdbc: NamedParameterJdbcTemplate,
 ) : NotificationRepository {
 
-    override fun save(receiverId: Long, content: String): Notification {
+    override fun save(receiverId: Long, content: String, metadata: NotificationTargetMetadata): Notification {
         val id = jdbc.insertAndReturnId(
             """
-                insert into notifications (receiver_id, content, is_read, created_at, read_at)
-                values (:receiverId, :content, :isRead, :createdAt, :readAt)
+                insert into notifications (
+                    receiver_id,
+                    content,
+                    type,
+                    target_type,
+                    target_id,
+                    route_key,
+                    is_read,
+                    created_at,
+                    read_at
+                )
+                values (
+                    :receiverId,
+                    :content,
+                    :type,
+                    :targetType,
+                    :targetId,
+                    :routeKey,
+                    :isRead,
+                    :createdAt,
+                    :readAt
+                )
             """.trimIndent(),
             params()
                 .withValue("receiverId", receiverId)
                 .withValue("content", content)
+                .withValue("type", metadata.type)
+                .withValue("targetType", metadata.targetType)
+                .withValue("targetId", metadata.targetId)
+                .withValue("routeKey", metadata.routeKey)
                 .withValue("isRead", false)
                 .withValue("createdAt", Instant.now().toString())
                 .withValue("readAt", null),
@@ -96,10 +121,19 @@ class JdbcNotificationRepository(
                 id = rs.getLong("id"),
                 receiverId = rs.getLong("receiver_id"),
                 content = rs.getString("content"),
+                type = rs.getString("type"),
+                targetType = rs.getString("target_type"),
+                targetId = rs.getLongOrNull("target_id"),
+                routeKey = rs.getString("route_key"),
                 isRead = rs.getBoolean("is_read"),
                 createdAt = rs.getString("created_at"),
                 readAt = rs.getString("read_at"),
             )
         }
     }
+}
+
+private fun java.sql.ResultSet.getLongOrNull(columnLabel: String): Long? {
+    val value = getLong(columnLabel)
+    return if (wasNull()) null else value
 }

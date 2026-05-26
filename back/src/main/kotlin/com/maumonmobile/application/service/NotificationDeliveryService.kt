@@ -10,6 +10,7 @@ import com.maumonmobile.application.port.out.NotificationPushSender
 import com.maumonmobile.application.port.out.NotificationRepository
 import com.maumonmobile.domain.notification.Notification
 import com.maumonmobile.domain.notification.NotificationDeviceToken
+import com.maumonmobile.domain.notification.NotificationTargetMetadata
 import com.maumonmobile.global.observability.MobileApiMetricsRegistry
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
@@ -32,11 +33,16 @@ class NotificationDeliveryService(
         message: String,
         attributes: Map<String, Any?>,
     ): Notification {
-        val notification = notificationRepository.save(memberId, message)
+        val metadata = targetMetadataFor(eventName, attributes)
+        val notification = notificationRepository.save(memberId, message, metadata)
         val payload = attributes + mapOf(
             "message" to message,
             "notificationId" to notification.id,
             "createdAt" to notification.createdAt,
+            "type" to notification.type,
+            "targetType" to notification.targetType,
+            "targetId" to notification.targetId,
+            "routeKey" to notification.routeKey,
         )
 
         publishRealtime(memberId, eventName, payload)
@@ -152,9 +158,80 @@ class NotificationDeliveryService(
         return UUID.nameUUIDFromBytes(source.toByteArray(StandardCharsets.UTF_8)).toString()
     }
 
+    private fun targetMetadataFor(eventName: String, attributes: Map<String, Any?>): NotificationTargetMetadata {
+        return when (eventName) {
+            NEW_LETTER_EVENT,
+            LETTER_READ_EVENT,
+            WRITING_STATUS_EVENT,
+            REPLY_ARRIVAL_EVENT -> metadataWithRequiredTarget(
+                type = eventName,
+                targetType = LETTER_TARGET_TYPE,
+                targetId = attributes.longValue("letterId"),
+                routeKey = LETTER_ROUTE_KEY,
+            )
+            CONSULTATION_REPLY_EVENT -> NotificationTargetMetadata(
+                type = eventName,
+                targetType = CONSULTATION_TARGET_TYPE,
+                targetId = attributes.longValue("consultationId"),
+                routeKey = CONSULTATION_ROUTE_KEY,
+            )
+            REPORT_STATUS_EVENT -> metadataWithRequiredTarget(
+                type = eventName,
+                targetType = REPORT_TARGET_TYPE,
+                targetId = attributes.longValue("reportId"),
+                routeKey = NOTIFICATIONS_ROUTE_KEY,
+            )
+            OPERATIONS_ACTION_EVENT -> metadataWithRequiredTarget(
+                type = eventName,
+                targetType = REPORT_TARGET_TYPE,
+                targetId = attributes.longValue("reportId"),
+                routeKey = OPERATIONS_ROUTE_KEY,
+            )
+            else -> NotificationTargetMetadata.fallback()
+        }
+    }
+
+    private fun metadataWithRequiredTarget(
+        type: String,
+        targetType: String,
+        targetId: Long?,
+        routeKey: String,
+    ): NotificationTargetMetadata {
+        return targetId?.let { id ->
+            NotificationTargetMetadata(
+                type = type,
+                targetType = targetType,
+                targetId = id,
+                routeKey = routeKey,
+            )
+        } ?: NotificationTargetMetadata.fallback()
+    }
+
     private companion object {
         private const val PUSH_TITLE = "Maum On"
+        private const val NEW_LETTER_EVENT = "new_letter"
+        private const val LETTER_READ_EVENT = "letter_read"
+        private const val WRITING_STATUS_EVENT = "writing_status"
+        private const val REPLY_ARRIVAL_EVENT = "reply_arrival"
+        private const val CONSULTATION_REPLY_EVENT = "consultation_reply"
+        private const val REPORT_STATUS_EVENT = "report_status"
+        private const val OPERATIONS_ACTION_EVENT = "operations_action"
+        private const val LETTER_TARGET_TYPE = "LETTER"
+        private const val CONSULTATION_TARGET_TYPE = "CONSULTATION"
+        private const val REPORT_TARGET_TYPE = "REPORT"
+        private const val LETTER_ROUTE_KEY = "letter"
+        private const val CONSULTATION_ROUTE_KEY = "consultation"
+        private const val NOTIFICATIONS_ROUTE_KEY = "notifications"
+        private const val OPERATIONS_ROUTE_KEY = "operations"
         private val log = LoggerFactory.getLogger(NotificationDeliveryService::class.java)
+    }
+}
+
+private fun Map<String, Any?>.longValue(key: String): Long? {
+    return when (val value = this[key]) {
+        is Number -> value.toLong()
+        is String -> value.trim().toLongOrNull()
+        else -> null
     }
 }
 
