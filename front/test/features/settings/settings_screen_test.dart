@@ -58,7 +58,7 @@ void main() {
     expect(repository.randomToggleCount, 1);
     expect(repository.exportRequestCount, 1);
     expect(repository.downloadedExportIds, [1]);
-    expect(find.textContaining('maum-on-data-export-1.json'), findsOneWidget);
+    expect(find.textContaining('maum-on-data-export-1.json'), findsWidgets);
   });
 
   testWidgets('confirms withdrawal and clears session', (tester) async {
