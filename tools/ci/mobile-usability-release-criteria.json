@@ -1,0 +1,406 @@
+{
+  "version": 1,
+  "platforms": ["android", "ios"],
+  "screens": [
+    {
+      "id": "home",
+      "title": "홈",
+      "priority": "P0",
+      "entryFlow": "로그인 후 첫 진입, 하단 탭의 홈 재진입",
+      "primaryUserGoal": "오늘 상태와 이어 할 작업을 즉시 파악한다.",
+      "states": {
+        "loading": {
+          "priority": "P0",
+          "message": "홈 정보를 불러오는 중입니다.",
+          "primaryAction": "대기"
+        },
+        "empty": {
+          "priority": "P1",
+          "message": "아직 표시할 활동이 없습니다.",
+          "primaryAction": "기록 시작"
+        },
+        "error": {
+          "priority": "P0",
+          "message": "홈 정보를 불러오지 못했습니다.",
+          "primaryAction": "다시 시도"
+        },
+        "permissionDenied": {
+          "priority": "P1",
+          "message": "필요한 권한을 켜면 홈 알림을 받을 수 있습니다.",
+          "primaryAction": "설정 열기"
+        },
+        "sessionExpired": {
+          "priority": "P0",
+          "message": "로그인이 만료되었습니다.",
+          "primaryAction": "다시 로그인"
+        }
+      }
+    },
+    {
+      "id": "diary",
+      "title": "기록",
+      "priority": "P0",
+      "entryFlow": "하단 탭 진입, 홈 CTA 진입, 이미지 첨부 후 복귀",
+      "primaryUserGoal": "감정 기록과 이미지를 안전하게 작성하고 저장한다.",
+      "states": {
+        "loading": {
+          "priority": "P1",
+          "message": "기록을 불러오는 중입니다.",
+          "primaryAction": "대기"
+        },
+        "empty": {
+          "priority": "P0",
+          "message": "첫 기록을 남겨보세요.",
+          "primaryAction": "기록 작성"
+        },
+        "error": {
+          "priority": "P0",
+          "message": "기록을 저장하지 못했습니다.",
+          "primaryAction": "다시 저장"
+        },
+        "permissionDenied": {
+          "priority": "P0",
+          "message": "사진을 첨부하려면 사진 접근 권한이 필요합니다.",
+          "primaryAction": "설정 열기"
+        },
+        "sessionExpired": {
+          "priority": "P0",
+          "message": "로그인이 만료되어 기록을 저장할 수 없습니다.",
+          "primaryAction": "다시 로그인"
+        }
+      }
+    },
+    {
+      "id": "story",
+      "title": "스토리",
+      "priority": "P0",
+      "entryFlow": "하단 탭 진입, 목록에서 상세 진입, 작성 완료 후 목록 복귀",
+      "primaryUserGoal": "스토리를 탐색하고 새 글을 작성한다.",
+      "states": {
+        "loading": {
+          "priority": "P1",
+          "message": "스토리를 불러오는 중입니다.",
+          "primaryAction": "대기"
+        },
+        "empty": {
+          "priority": "P1",
+          "message": "아직 등록된 스토리가 없습니다.",
+          "primaryAction": "스토리 작성"
+        },
+        "error": {
+          "priority": "P0",
+          "message": "스토리를 불러오지 못했습니다.",
+          "primaryAction": "다시 시도"
+        },
+        "permissionDenied": {
+          "priority": "P1",
+          "message": "댓글과 작성 기능을 사용하려면 로그인이 필요합니다.",
+          "primaryAction": "로그인"
+        },
+        "sessionExpired": {
+          "priority": "P0",
+          "message": "로그인이 만료되어 스토리를 작성할 수 없습니다.",
+          "primaryAction": "다시 로그인"
+        }
+      }
+    },
+    {
+      "id": "letter",
+      "title": "편지",
+      "priority": "P0",
+      "entryFlow": "하단 탭 진입, 받은 편지 상세, 보낸 편지 작성 완료",
+      "primaryUserGoal": "편지를 읽고 답장을 작성한다.",
+      "states": {
+        "loading": {
+          "priority": "P1",
+          "message": "편지를 불러오는 중입니다.",
+          "primaryAction": "대기"
+        },
+        "empty": {
+          "priority": "P1",
+          "message": "아직 도착한 편지가 없습니다.",
+          "primaryAction": "편지 쓰기"
+        },
+        "error": {
+          "priority": "P0",
+          "message": "편지를 불러오지 못했습니다.",
+          "primaryAction": "다시 시도"
+        },
+        "permissionDenied": {
+          "priority": "P1",
+          "message": "편지 알림을 받으려면 알림 권한이 필요합니다.",
+          "primaryAction": "설정 열기"
+        },
+        "sessionExpired": {
+          "priority": "P0",
+          "message": "로그인이 만료되어 편지를 확인할 수 없습니다.",
+          "primaryAction": "다시 로그인"
+        }
+      }
+    },
+    {
+      "id": "consultation",
+      "title": "상담",
+      "priority": "P0",
+      "entryFlow": "하단 탭 진입, 상담 메시지 전송, 답변 스트림 수신",
+      "primaryUserGoal": "상담 메시지를 보내고 답변 흐름을 놓치지 않는다.",
+      "states": {
+        "loading": {
+          "priority": "P0",
+          "message": "상담을 연결하는 중입니다.",
+          "primaryAction": "대기"
+        },
+        "empty": {
+          "priority": "P1",
+          "message": "상담을 시작할 수 있습니다.",
+          "primaryAction": "메시지 작성"
+        },
+        "error": {
+          "priority": "P0",
+          "message": "상담 연결이 끊겼습니다.",
+          "primaryAction": "다시 연결"
+        },
+        "permissionDenied": {
+          "priority": "P1",
+          "message": "상담 알림을 받으려면 알림 권한이 필요합니다.",
+          "primaryAction": "설정 열기"
+        },
+        "sessionExpired": {
+          "priority": "P0",
+          "message": "로그인이 만료되어 상담을 계속할 수 없습니다.",
+          "primaryAction": "다시 로그인"
+        }
+      }
+    },
+    {
+      "id": "notifications",
+      "title": "알림",
+      "priority": "P0",
+      "entryFlow": "하단 탭 진입, 푸시 탭 후 상세 화면 이동, 읽음 처리",
+      "primaryUserGoal": "알림의 출처와 이동 대상을 이해하고 놓친 항목을 처리한다.",
+      "states": {
+        "loading": {
+          "priority": "P1",
+          "message": "알림을 불러오는 중입니다.",
+          "primaryAction": "대기"
+        },
+        "empty": {
+          "priority": "P1",
+          "message": "새 알림이 없습니다.",
+          "primaryAction": "새로고침"
+        },
+        "error": {
+          "priority": "P0",
+          "message": "알림을 불러오지 못했습니다.",
+          "primaryAction": "다시 시도"
+        },
+        "permissionDenied": {
+          "priority": "P0",
+          "message": "알림 권한이 꺼져 있습니다.",
+          "primaryAction": "설정 열기"
+        },
+        "sessionExpired": {
+          "priority": "P0",
+          "message": "로그인이 만료되어 알림을 확인할 수 없습니다.",
+          "primaryAction": "다시 로그인"
+        }
+      }
+    },
+    {
+      "id": "settings",
+      "title": "설정",
+      "priority": "P0",
+      "entryFlow": "하단 탭 진입, 계정/알림/개인정보 메뉴 이동",
+      "primaryUserGoal": "계정과 권한 설정을 확인하고 변경한다.",
+      "states": {
+        "loading": {
+          "priority": "P1",
+          "message": "설정을 불러오는 중입니다.",
+          "primaryAction": "대기"
+        },
+        "empty": {
+          "priority": "P2",
+          "message": "변경 가능한 설정이 없습니다.",
+          "primaryAction": "홈으로 이동"
+        },
+        "error": {
+          "priority": "P0",
+          "message": "설정을 불러오지 못했습니다.",
+          "primaryAction": "다시 시도"
+        },
+        "permissionDenied": {
+          "priority": "P1",
+          "message": "시스템 설정에서 권한을 변경할 수 있습니다.",
+          "primaryAction": "설정 열기"
+        },
+        "sessionExpired": {
+          "priority": "P0",
+          "message": "로그인이 만료되어 설정을 변경할 수 없습니다.",
+          "primaryAction": "다시 로그인"
+        }
+      }
+    },
+    {
+      "id": "operations",
+      "title": "운영",
+      "priority": "P1",
+      "entryFlow": "운영 권한 계정 로그인, 신고/콘텐츠/회원 조치 상세 진입",
+      "primaryUserGoal": "운영 조치가 필요한 항목과 처리 결과를 추적한다.",
+      "states": {
+        "loading": {
+          "priority": "P1",
+          "message": "운영 데이터를 불러오는 중입니다.",
+          "primaryAction": "대기"
+        },
+        "empty": {
+          "priority": "P1",
+          "message": "처리할 운영 항목이 없습니다.",
+          "primaryAction": "새로고침"
+        },
+        "error": {
+          "priority": "P0",
+          "message": "운영 데이터를 불러오지 못했습니다.",
+          "primaryAction": "다시 시도"
+        },
+        "permissionDenied": {
+          "priority": "P0",
+          "message": "운영 권한이 변경되어 접근할 수 없습니다.",
+          "primaryAction": "홈으로 이동"
+        },
+        "sessionExpired": {
+          "priority": "P0",
+          "message": "로그인이 만료되어 운영 화면을 사용할 수 없습니다.",
+          "primaryAction": "다시 로그인"
+        }
+      }
+    }
+  ],
+  "viewportMatrix": {
+    "smallPhone": {
+      "size": "320x568",
+      "safeAreaRule": "상단 상태 영역과 하단 제스처 영역에 CTA, 탭, 오류 문구가 겹치지 않는다.",
+      "largeTextRule": "텍스트 확대 200%에서도 제목, 상태 문구, 기본 버튼이 줄바꿈으로 보존된다.",
+      "oneHandRule": "핵심 CTA는 엄지 도달 영역 안에 있거나 하단 고정 영역에서 노출된다."
+    },
+    "largePhone": {
+      "size": "430x932",
+      "safeAreaRule": "목록 마지막 항목과 작성 버튼이 하단 Safe Area 위에서 완전히 보인다.",
+      "largeTextRule": "카드와 리스트 셀의 보조 문구가 말줄임 없이 두 줄 이상 확장된다.",
+      "oneHandRule": "반복 사용 CTA는 화면 하단 절반에 배치한다."
+    },
+    "tabletWidth": {
+      "size": "768x1024",
+      "safeAreaRule": "가로 폭 확장 시 콘텐츠 최대 폭과 탭 위치가 예측 가능하게 유지된다.",
+      "largeTextRule": "넓은 폭에서도 텍스트 줄 길이가 과도하게 늘어나지 않는다.",
+      "oneHandRule": "보조 액션은 기본 액션과 시각적 우선순위를 유지한다."
+    }
+  },
+  "accessibility": {
+    "touchTarget": {
+      "priority": "P0",
+      "rule": "탭 가능한 컨트롤은 최소 48dp 터치 영역을 가진다."
+    },
+    "screenReader": {
+      "priority": "P0",
+      "rule": "아이콘 버튼, 상태 배지, 오류 영역, 탭 항목은 목적이 드러나는 라벨을 가진다."
+    },
+    "largeText": {
+      "priority": "P0",
+      "rule": "텍스트 확대 시 버튼 내부 텍스트가 잘리지 않고 주변 요소와 겹치지 않는다."
+    },
+    "darkMode": {
+      "priority": "P0",
+      "rule": "오류, 성공, 경고, 위험 상태 색상은 다크 모드에서 의미와 대비를 유지한다."
+    }
+  },
+  "automation": {
+    "flutterTests": [
+      {
+        "id": "state-copy-contract",
+        "priority": "P0",
+        "target": "front/test/features/*/*_screen_test.dart",
+        "assertion": "로딩, 빈 상태, 오류, 세션 만료 문구와 기본 CTA가 노출된다."
+      },
+      {
+        "id": "safe-area-contract",
+        "priority": "P0",
+        "target": "front/test/quality/mobile_quality_gate_test.dart",
+        "assertion": "작은 화면, 회전, 텍스트 확대에서 핵심 CTA와 오류 문구가 겹치지 않는다."
+      },
+      {
+        "id": "semantics-contract",
+        "priority": "P0",
+        "target": "front/test/theme/app_design_system_test.dart",
+        "assertion": "아이콘 버튼과 상태 요약은 스크린 리더 라벨을 가진다."
+      },
+      {
+        "id": "dark-mode-contract",
+        "priority": "P1",
+        "target": "front/test/quality/mobile_quality_gate_test.dart",
+        "assertion": "다크 모드에서 기본/오류/위험 색상 조합이 유지된다."
+      }
+    ]
+  },
+  "manualQa": [
+    {
+      "id": "physical-small-phone",
+      "priority": "P0",
+      "platform": "android",
+      "evidence": "소형 Android 실기기에서 한 손 조작, 키보드, 하단 제스처 영역 스크린샷을 남긴다."
+    },
+    {
+      "id": "ios-safe-area",
+      "priority": "P0",
+      "platform": "ios",
+      "evidence": "노치/홈 인디케이터 iPhone에서 주요 탭과 작성 CTA가 Safe Area를 침범하지 않는 화면을 남긴다."
+    },
+    {
+      "id": "screen-reader-flow",
+      "priority": "P0",
+      "platform": "android,ios",
+      "evidence": "TalkBack과 VoiceOver로 홈, 작성, 알림, 설정 기본 흐름의 라벨 순서를 기록한다."
+    },
+    {
+      "id": "permission-denied-recovery",
+      "priority": "P1",
+      "platform": "android,ios",
+      "evidence": "사진, 카메라, 알림 권한 거부 후 설정 복구 경로가 명확한지 화면 캡처를 남긴다."
+    }
+  ],
+  "componentPlan": {
+    "reuse": [
+      {
+        "component": "AppScaffold",
+        "appliesTo": ["home", "diary", "story", "letter", "consultation", "notifications", "settings"],
+        "priority": "P0"
+      },
+      {
+        "component": "AppPrimaryButton",
+        "appliesTo": ["diary", "story", "letter", "consultation", "settings"],
+        "priority": "P0"
+      },
+      {
+        "component": "AppStatusBanner",
+        "appliesTo": ["home", "notifications", "operations"],
+        "priority": "P1"
+      },
+      {
+        "component": "AppSectionCard",
+        "appliesTo": ["home", "settings", "operations"],
+        "priority": "P1"
+      }
+    ],
+    "newComponents": [
+      {
+        "component": "LaunchStatePanel",
+        "reason": "빈 상태, 오류, 권한 거부, 세션 만료 화면의 문구와 CTA 우선순위를 공통화한다.",
+        "priority": "P0"
+      },
+      {
+        "component": "PermissionRecoveryTile",
+        "reason": "사진, 카메라, 알림 권한 거부 후 설정 이동과 설명 문구를 화면별로 일관되게 제공한다.",
+        "priority": "P1"
+      }
+    ]
+  }
+}

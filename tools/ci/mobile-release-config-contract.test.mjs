@@ -92,6 +92,7 @@ test("iOS CocoaPods and privacy manifest stay release ready", () => {
   const podfile = read("front/ios/Podfile");
   const podfileLock = read("front/ios/Podfile.lock");
   const gemfile = read("front/ios/Gemfile");
+  const gemfileLock = read("front/ios/Gemfile.lock");
   const packageResolved = read("front/ios/Runner.xcworkspace/xcshareddata/swiftpm/Package.resolved");
   const workspace = read("front/ios/Runner.xcworkspace/contents.xcworkspacedata");
   const project = read("front/ios/Runner.xcodeproj/project.pbxproj");
@@ -115,6 +116,8 @@ test("iOS CocoaPods and privacy manifest stay release ready", () => {
   assert.match(gemfile, /gem "cocoapods", "~> 1\.16"/);
   assert.match(gemfile, /gem "ffi", "~> 1\.15\.5"/);
   assert.match(gemfile, /gem "logger", "1\.3\.0"/);
+  assert.match(gemfileLock, /BUNDLED WITH\s+2\./);
+  assert.doesNotMatch(gemfileLock, /BUNDLED WITH\s+1\./);
 
   assert.match(packageResolved, /"identity" : "dkimagepickercontroller"/);
   assert.match(packageResolved, /"identity" : "sdwebimage"/);
@@ -155,8 +158,9 @@ test("CI exposes manual Android and iOS release build preflights", () => {
   assert.match(workflow, /node --test tools\/ci\/mobile-release-config-contract\.test\.mjs/);
   assert.match(workflow, /MAUMON_ANDROID_KEYSTORE_BASE64/);
   assert.match(workflow, /flutter build appbundle --release/);
-  assert.match(workflow, /bundle config --local path vendor\/bundle/);
-  assert.match(workflow, /bundle install --jobs 4 --retry 3/);
+  assert.match(workflow, /gem install bundler -v 2\.4\.22 --no-document/);
+  assert.match(workflow, /bundle _2\.4\.22_ config set --local path vendor\/bundle/);
+  assert.match(workflow, /bundle _2\.4\.22_ install --jobs 4 --retry 3/);
   assert.match(workflow, /\.\.\/tools\/flutterw build ios --no-codesign/);
   assert.match(read("tools/ci/run-mobile-release-preflight.sh"), /DEVELOPER_DIR/);
 });

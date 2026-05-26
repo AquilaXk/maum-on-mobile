@@ -20,6 +20,7 @@ Mobile app repository for Maum On, focused on Android and iOS clients.
 Run Flutter commands through the repository wrapper:
 
 - `tools/flutterw --version`: verify the Flutter SDK found by the repository wrapper.
+- `gem install --user-install bundler -v 2.4.22`: install the Bundler version used by the iOS lockfile.
 - `cd front/ios && bundle install`: install the bundled CocoaPods toolchain before local iOS builds.
 - `tools/ci/run-local-mobile-checks.sh`: install Flutter dependencies, analyze the app, and run tests from `front/`.
 - `tools/ci/run-local-mobile-checks.sh --doctor`: check local Flutter, Android SDK, Xcode, and CocoaPods state.
@@ -34,6 +35,7 @@ Run Flutter commands through the repository wrapper:
 Run repository contract tests from the repository root:
 
 - `node --test tools/ci/*.test.mjs`: run repository and Flutter scaffold contract tests.
+- `node --test tools/ci/mobile-usability-release-criteria-contract.test.mjs`: validate the mobile usability release checklist contract.
 
 ## Backend Architecture
 

@@ -145,6 +145,7 @@ check_android() {
 }
 
 check_ios() {
+  local pod_detail
   local pod_output
   local xcode_output
 
@@ -158,9 +159,10 @@ check_ios() {
   fi
 
   if pod_output="$("${pod}" --version 2>&1)"; then
-    record "CocoaPods" "ok" "$(printf '%s\n' "${pod_output}" | head -n 1)"
+    record "CocoaPods" "ok" "$(printf '%s\n' "${pod_output}" | tail -n 1)"
   else
-    record "CocoaPods" "missing" "pod --version failed"
+    pod_detail="$(printf '%s\n' "${pod_output}" | head -n 1)"
+    record "CocoaPods" "missing" "${pod_detail:-pod --version failed}"
   fi
 }
 
