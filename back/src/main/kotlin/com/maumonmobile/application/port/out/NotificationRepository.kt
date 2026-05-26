@@ -10,9 +10,18 @@ interface NotificationRepository {
         metadata: NotificationTargetMetadata = NotificationTargetMetadata.fallback(),
     ): Notification
 
-    fun findByReceiverId(receiverId: Long): List<Notification>
+    fun findByReceiverId(
+        receiverId: Long,
+        condition: NotificationQueryCondition = NotificationQueryCondition(),
+    ): List<Notification>
 
     fun markRead(receiverId: Long, notificationId: Long, readAt: String): Notification?
 
     fun markAllRead(receiverId: Long, readAt: String): Int
 }
+
+data class NotificationQueryCondition(
+    val afterId: Long? = null,
+    val unreadOnly: Boolean = false,
+    val limit: Int? = null,
+)

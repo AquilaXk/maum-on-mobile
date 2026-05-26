@@ -8,9 +8,19 @@ data class HomeStatsResult(
     val todayWorryCount: Long,
     val todayLetterCount: Long,
     val todayDiaryCount: Long,
+    val todayMetrics: HomeTodayMetricsResult,
     val summary: HomeSummaryResult,
     val categorySummaries: List<HomeCategorySummaryResult>,
     val popularStories: List<HomePopularStoryResult>,
+    val continueWritingCandidates: List<HomeContinueWritingCandidateResult>,
+)
+
+data class HomeTodayMetricsResult(
+    val date: String,
+    val worryCount: Long,
+    val letterCount: Long,
+    val diaryCount: Long,
+    val totalActivityCount: Long,
 )
 
 data class HomeSummaryResult(
@@ -33,4 +43,12 @@ data class HomePopularStoryResult(
     val label: String,
     val viewCount: Int,
     val nickname: String,
+)
+
+data class HomeContinueWritingCandidateResult(
+    val surface: String,
+    val label: String,
+    val actionLabel: String,
+    val description: String,
+    val priority: Int,
 )

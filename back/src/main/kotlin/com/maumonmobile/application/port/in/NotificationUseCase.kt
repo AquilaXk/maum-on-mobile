@@ -3,7 +3,10 @@ package com.maumonmobile.application.port.`in`
 import com.maumonmobile.global.security.AuthenticatedUser
 
 interface NotificationUseCase {
-    fun list(user: AuthenticatedUser): List<NotificationResult>
+    fun list(
+        user: AuthenticatedUser,
+        command: NotificationListCommand = NotificationListCommand(),
+    ): List<NotificationResult>
 
     fun markRead(user: AuthenticatedUser, notificationId: Long): NotificationResult
 
@@ -21,6 +24,12 @@ interface NotificationUseCase {
     fun unregisterDeviceToken(user: AuthenticatedUser, command: NotificationDeviceTokenUnregisterCommand): Boolean
 }
 
+data class NotificationListCommand(
+    val afterId: Long? = null,
+    val limit: Int? = null,
+    val unreadOnly: Boolean = false,
+)
+
 data class NotificationResult(
     val id: Long,
     val content: String,
@@ -28,9 +37,16 @@ data class NotificationResult(
     val targetType: String?,
     val targetId: Long?,
     val routeKey: String,
+    val targetState: NotificationTargetStateResult,
     val isRead: Boolean,
     val createdAt: String,
     val readAt: String?,
+)
+
+data class NotificationTargetStateResult(
+    val available: Boolean,
+    val code: String,
+    val message: String,
 )
 
 data class NotificationBulkReadResult(

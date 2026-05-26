@@ -5,6 +5,7 @@ import com.maumonmobile.application.port.`in`.NotificationBulkReadResult
 import com.maumonmobile.application.port.`in`.NotificationDeviceTokenRegisterCommand
 import com.maumonmobile.application.port.`in`.NotificationDeviceTokenResult
 import com.maumonmobile.application.port.`in`.NotificationDeviceTokenUnregisterCommand
+import com.maumonmobile.application.port.`in`.NotificationListCommand
 import com.maumonmobile.application.port.`in`.NotificationResult
 import com.maumonmobile.application.port.`in`.NotificationSubscriptionTicketResult
 import com.maumonmobile.application.port.`in`.NotificationUseCase
@@ -34,8 +35,22 @@ class NotificationController(
 ) {
 
     @GetMapping
-    fun list(authentication: Authentication): ApiResponse<List<NotificationResult>> {
-        return ApiResponse.success(notificationUseCase.list(authentication.authenticatedUser()))
+    fun list(
+        authentication: Authentication,
+        @RequestParam(required = false) afterId: Long?,
+        @RequestParam(required = false) limit: Int?,
+        @RequestParam(defaultValue = "false") unreadOnly: Boolean,
+    ): ApiResponse<List<NotificationResult>> {
+        return ApiResponse.success(
+            notificationUseCase.list(
+                user = authentication.authenticatedUser(),
+                command = NotificationListCommand(
+                    afterId = afterId,
+                    limit = limit,
+                    unreadOnly = unreadOnly,
+                ),
+            ),
+        )
     }
 
     @PostMapping("/{id}/read")

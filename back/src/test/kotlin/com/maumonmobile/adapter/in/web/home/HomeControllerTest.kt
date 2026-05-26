@@ -73,12 +73,20 @@ class HomeControllerTest @Autowired constructor(
                 jsonPath("$.data.todayWorryCount") { value(beforeWorryCount + 1) }
                 jsonPath("$.data.todayLetterCount") { value(beforeLetterCount + 1) }
                 jsonPath("$.data.todayDiaryCount") { value(beforeDiaryCount + 1) }
+                jsonPath("$.data.todayMetrics.worryCount") { value(beforeWorryCount + 1) }
+                jsonPath("$.data.todayMetrics.letterCount") { value(beforeLetterCount + 1) }
+                jsonPath("$.data.todayMetrics.diaryCount") { value(beforeDiaryCount + 1) }
+                jsonPath("$.data.todayMetrics.totalActivityCount") {
+                    value(beforeWorryCount + beforeLetterCount + beforeDiaryCount + 3)
+                }
                 jsonPath("$.data.summary.recoveryMessage") { isNotEmpty() }
                 jsonPath("$.data.summary.primaryActionLabel") { isNotEmpty() }
                 jsonPath("$.data.summary.primaryActionSurface") { isNotEmpty() }
                 jsonPath("$.data.summary.feedMessage") { isNotEmpty() }
                 jsonPath("$.data.categorySummaries[?(@.category == 'WORRY')]") { isNotEmpty() }
                 jsonPath("$.data.popularStories") { isNotEmpty() }
+                jsonPath("$.data.continueWritingCandidates[0].surface") { isNotEmpty() }
+                jsonPath("$.data.continueWritingCandidates[0].priority") { exists() }
             }
     }
 
