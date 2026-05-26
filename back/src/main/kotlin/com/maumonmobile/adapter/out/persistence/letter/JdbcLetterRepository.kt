@@ -19,7 +19,7 @@ class JdbcLetterRepository(
     private val jdbc: NamedParameterJdbcTemplate,
 ) : LetterRepository {
 
-    override fun save(senderId: Long, senderNickname: String, draft: LetterDraft): Letter {
+    override fun save(senderId: Long, senderNickname: String, draft: LetterDraft, receiverId: Long?): Letter {
         val id = jdbc.insertAndReturnId(
             """
                 insert into letters (
@@ -47,7 +47,7 @@ class JdbcLetterRepository(
             params()
                 .withValue("senderId", senderId)
                 .withValue("senderNickname", senderNickname)
-                .withValue("receiverId", null)
+                .withValue("receiverId", receiverId)
                 .withValue("title", draft.title)
                 .withValue("content", draft.content)
                 .withValue("status", "SENT")

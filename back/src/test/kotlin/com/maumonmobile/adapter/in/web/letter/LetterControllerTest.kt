@@ -53,6 +53,9 @@ class LetterControllerTest @Autowired constructor(
             .andExpect {
                 status { isOk() }
                 jsonPath("$.data.letters[0].title") { value("비밀 편지") }
+                jsonPath("$.data.letters[0].senderId") { value(sender.id.toInt()) }
+                jsonPath("$.data.letters[0].receiverId") { value(receiver.id.toInt()) }
+                jsonPath("$.data.letters[0].receiverNickname") { value("받는이") }
                 jsonPath("$.data.letters[0].status") { value("SENT") }
                 jsonPath("$.data.totalElements") { value(1) }
             }
@@ -71,8 +74,24 @@ class LetterControllerTest @Autowired constructor(
         }
             .andExpect {
                 status { isOk() }
+                jsonPath("$.data.letters[0].senderId") { value(sender.id.toInt()) }
+                jsonPath("$.data.letters[0].receiverId") { value(receiver.id.toInt()) }
                 jsonPath("$.data.letters[0].senderNickname") { value("보낸이") }
+                jsonPath("$.data.letters[0].receiverNickname") { value("받는이") }
                 jsonPath("$.data.letters[0].status") { value("SENT") }
+                jsonPath("$.data.letters[0].availableActions[0]") { value("ACCEPT") }
+            }
+
+        mockMvc.get("/api/v1/letters/$letterId") {
+            header("Authorization", "Bearer ${receiver.accessToken}")
+        }
+            .andExpect {
+                status { isOk() }
+                jsonPath("$.data.senderId") { value(sender.id.toInt()) }
+                jsonPath("$.data.receiverId") { value(receiver.id.toInt()) }
+                jsonPath("$.data.senderNickname") { value("보낸이") }
+                jsonPath("$.data.receiverNickname") { value("받는이") }
+                jsonPath("$.data.availableActions[0]") { value("ACCEPT") }
             }
 
         mockMvc.post("/api/v1/letters/$letterId/accept") {
@@ -84,6 +103,22 @@ class LetterControllerTest @Autowired constructor(
             }
 
         mockMvc.post("/api/v1/letters/$letterId/accept") {
+            header("Authorization", "Bearer ${receiver.accessToken}")
+        }
+            .andExpect {
+                status { isOk() }
+                jsonPath("$.success") { value(true) }
+            }
+
+        mockMvc.post("/api/v1/letters/$letterId/accept") {
+            header("Authorization", "Bearer ${receiver.accessToken}")
+        }
+            .andExpect {
+                status { isOk() }
+                jsonPath("$.success") { value(true) }
+            }
+
+        mockMvc.post("/api/v1/letters/$letterId/writing") {
             header("Authorization", "Bearer ${receiver.accessToken}")
         }
             .andExpect {
@@ -115,6 +150,16 @@ class LetterControllerTest @Autowired constructor(
                 jsonPath("$.success") { value(true) }
             }
 
+        mockMvc.post("/api/v1/letters/$letterId/reply") {
+            header("Authorization", "Bearer ${receiver.accessToken}")
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"replyContent":"다시 보낸 답장입니다."}"""
+        }
+            .andExpect {
+                status { isOk() }
+                jsonPath("$.success") { value(true) }
+            }
+
         mockMvc.get("/api/v1/letters/$letterId") {
             header("Authorization", "Bearer ${sender.accessToken}")
         }
@@ -123,6 +168,7 @@ class LetterControllerTest @Autowired constructor(
                 jsonPath("$.data.status") { value("REPLIED") }
                 jsonPath("$.data.replied") { value(true) }
                 jsonPath("$.data.replyContent") { value("답장을 남깁니다.") }
+                jsonPath("$.data.availableActions[0]") { value("VIEW_REPLY") }
             }
 
         val rejectResult = mockMvc.post("/api/v1/letters") {
@@ -204,11 +250,15 @@ class LetterControllerTest @Autowired constructor(
             }
             .andReturn()
 
-        return TestMember(accessToken = loginResult.response.readJsonString("$.data.accessToken"))
+        return TestMember(
+            id = loginResult.response.readJsonLong("$.data.member.id"),
+            accessToken = loginResult.response.readJsonString("$.data.accessToken"),
+        )
     }
 }
 
 private data class TestMember(
+    val id: Long,
     val accessToken: String,
 )
 
@@ -218,4 +268,8 @@ private fun MockHttpServletResponse.readJsonString(path: String): String {
 
 private fun MockHttpServletResponse.readJsonInt(path: String): Int {
     return JsonPath.read<Int>(contentAsString, path)
+}
+
+private fun MockHttpServletResponse.readJsonLong(path: String): Long {
+    return JsonPath.read<Number>(contentAsString, path).toLong()
 }

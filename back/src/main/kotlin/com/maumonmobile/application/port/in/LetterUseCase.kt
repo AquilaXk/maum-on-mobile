@@ -42,10 +42,14 @@ data class LetterSummaryResult(
     val id: Long,
     val title: String,
     val content: String,
+    val senderId: Long,
     val senderNickname: String,
+    val receiverId: Long?,
+    val receiverNickname: String?,
     val createdDate: String,
     val status: String,
     val replied: Boolean,
+    val availableActions: List<String>,
 )
 
 data class LetterResult(
@@ -53,11 +57,15 @@ data class LetterResult(
     val title: String,
     val content: String,
     val replyContent: String?,
+    val senderId: Long,
+    val receiverId: Long?,
     val status: String,
     val replied: Boolean,
     val createdDate: String,
     val replyCreatedDate: String?,
     val senderNickname: String,
+    val receiverNickname: String?,
+    val availableActions: List<String>,
 )
 
 data class LetterStatsResult(
