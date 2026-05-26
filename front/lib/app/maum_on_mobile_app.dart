@@ -152,6 +152,9 @@ class _MaumOnMobileAppState extends State<MaumOnMobileApp> {
   bool _pushTokenUnregisterRequested = false;
   ReportTarget? _pendingReportTarget;
   NotificationTapPayload? _pendingNotificationTap;
+  int? _pendingLetterId;
+  int? _pendingOperationsReportId;
+  String? _pendingNotificationNotice;
   AuthenticatedRoute _route = AuthenticatedRoute.home;
   late final DraftRecoveryRepository _draftRecoveryRepository =
       widget.draftRecoveryRepository ??
@@ -277,7 +280,7 @@ class _MaumOnMobileAppState extends State<MaumOnMobileApp> {
       AuthenticatedRoute.notifications => _buildNotificationRoute(memberId),
       AuthenticatedRoute.operations => role == 'ADMIN'
           ? OperationsScreen(
-              controller: _operationsControllerFor(memberId),
+              controller: _operationsControllerForPendingTarget(memberId),
               onBack: _returnHome,
               adminProfile: OperationsAdminProfile(
                 id: memberId,
@@ -349,6 +352,12 @@ class _MaumOnMobileAppState extends State<MaumOnMobileApp> {
   }
 
   Widget _buildNotificationRoute(int memberId) {
+    final notificationController = _notificationControllerFor(memberId);
+    final pendingNotice = _pendingNotificationNotice;
+    if (pendingNotice != null) {
+      notificationController.showNotice(pendingNotice);
+      _pendingNotificationNotice = null;
+    }
     final reportController = _reportControllerFor(memberId);
     final pendingTarget = _pendingReportTarget;
     if (pendingTarget != null) {
@@ -357,8 +366,9 @@ class _MaumOnMobileAppState extends State<MaumOnMobileApp> {
     }
 
     return NotificationReportScreen(
-      notificationController: _notificationControllerFor(memberId),
+      notificationController: notificationController,
       reportController: reportController,
+      onOpenNotification: _openNotificationItem,
       onBack: _returnHome,
     );
   }
@@ -366,6 +376,9 @@ class _MaumOnMobileAppState extends State<MaumOnMobileApp> {
   void _logout() {
     _disposeAuthenticatedControllers(unregisterPushToken: true);
     _pendingNotificationTap = null;
+    _pendingLetterId = null;
+    _pendingOperationsReportId = null;
+    _pendingNotificationNotice = null;
     _route = AuthenticatedRoute.home;
     _authenticatedSessionKey = null;
     unawaited(_authController.logout());
@@ -388,6 +401,9 @@ class _MaumOnMobileAppState extends State<MaumOnMobileApp> {
     );
     _openLetterComposer = false;
     _pendingReportTarget = null;
+    _pendingLetterId = null;
+    _pendingOperationsReportId = null;
+    _pendingNotificationNotice = null;
     _route = AuthenticatedRoute.home;
     _authenticatedSessionKey = sessionKey;
     _pushTokenUnregisterRequested = false;
@@ -426,6 +442,9 @@ class _MaumOnMobileAppState extends State<MaumOnMobileApp> {
     _disposeAuthenticatedControllers(unregisterPushToken: true);
     _pendingNotificationTap = null;
     _pendingReportTarget = null;
+    _pendingLetterId = null;
+    _pendingOperationsReportId = null;
+    _pendingNotificationNotice = null;
     _openLetterComposer = false;
     _route = AuthenticatedRoute.home;
     _authenticatedSessionKey = null;
@@ -451,11 +470,14 @@ class _MaumOnMobileAppState extends State<MaumOnMobileApp> {
   Widget _buildLetterRoute(int memberId) {
     final letterController = _letterControllerFor(memberId);
     final startsInCompose = _openLetterComposer;
+    final initialLetterId = _pendingLetterId;
     _openLetterComposer = false;
+    _pendingLetterId = null;
 
     return LetterScreen(
       controller: letterController,
       initiallyCompose: startsInCompose,
+      initialLetterId: initialLetterId,
       onBack: _returnHome,
     );
   }
@@ -470,6 +492,9 @@ class _MaumOnMobileAppState extends State<MaumOnMobileApp> {
     setState(() {
       _openLetterComposer = false;
       _pendingReportTarget = null;
+      _pendingLetterId = null;
+      _pendingOperationsReportId = null;
+      _pendingNotificationNotice = null;
       _route = route;
     });
   }
@@ -478,6 +503,9 @@ class _MaumOnMobileAppState extends State<MaumOnMobileApp> {
     setState(() {
       _openLetterComposer = false;
       _pendingReportTarget = null;
+      _pendingLetterId = null;
+      _pendingOperationsReportId = null;
+      _pendingNotificationNotice = null;
       _route = AuthenticatedRoute.home;
     });
   }
@@ -625,6 +653,16 @@ class _MaumOnMobileAppState extends State<MaumOnMobileApp> {
       systemEnvironment: _operationsSystemEnvironment(),
       onUnauthorized: _handleOperationsSessionInvalidated,
     );
+  }
+
+  OperationsController _operationsControllerForPendingTarget(int memberId) {
+    final controller = _operationsControllerFor(memberId);
+    final reportId = _pendingOperationsReportId;
+    if (reportId != null) {
+      _pendingOperationsReportId = null;
+      unawaited(controller.openReportById(reportId));
+    }
+    return controller;
   }
 
   void _disposeOperationsController() {
@@ -912,14 +950,45 @@ class _MaumOnMobileAppState extends State<MaumOnMobileApp> {
   void _applyNotificationTap(NotificationTapPayload payload) {
     _openLetterComposer = false;
     _pendingReportTarget = null;
+    _pendingLetterId = null;
+    _pendingOperationsReportId = null;
+    _pendingNotificationNotice = null;
     _route = switch (payload.destination) {
-      NotificationTapDestination.letter => AuthenticatedRoute.letter,
+      NotificationTapDestination.letter => _letterRouteFor(payload),
       NotificationTapDestination.consultation =>
         AuthenticatedRoute.consultation,
-      NotificationTapDestination.operations => AuthenticatedRoute.operations,
+      NotificationTapDestination.operations => _operationsRouteFor(payload),
       NotificationTapDestination.notifications =>
         AuthenticatedRoute.notifications,
     };
+  }
+
+  AuthenticatedRoute _letterRouteFor(NotificationTapPayload payload) {
+    final letterId = payload.letterId;
+    if (letterId == null || letterId <= 0) {
+      _pendingNotificationNotice = '편지를 바로 열 수 없어 알림 목록에 머뭅니다.';
+      return AuthenticatedRoute.notifications;
+    }
+
+    _pendingLetterId = letterId;
+    return AuthenticatedRoute.letter;
+  }
+
+  AuthenticatedRoute _operationsRouteFor(NotificationTapPayload payload) {
+    final reportId = payload.reportId;
+    if (reportId == null || reportId <= 0) {
+      _pendingNotificationNotice = '운영 항목을 바로 열 수 없어 알림 목록에 머뭅니다.';
+      return AuthenticatedRoute.notifications;
+    }
+
+    _pendingOperationsReportId = reportId;
+    return AuthenticatedRoute.operations;
+  }
+
+  void _openNotificationItem(NotificationItem notification) {
+    setState(() {
+      _applyNotificationTap(notification.tapPayload);
+    });
   }
 
   void _handleStoryReportTarget(StoryReportTarget target) {

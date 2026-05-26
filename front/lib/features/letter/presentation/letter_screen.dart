@@ -9,12 +9,14 @@ class LetterScreen extends StatefulWidget {
     required this.controller,
     required this.onBack,
     this.initiallyCompose = false,
+    this.initialLetterId,
     super.key,
   });
 
   final LetterController controller;
   final VoidCallback onBack;
   final bool initiallyCompose;
+  final int? initialLetterId;
 
   @override
   State<LetterScreen> createState() => _LetterScreenState();
@@ -26,6 +28,10 @@ class _LetterScreenState extends State<LetterScreen> {
     super.initState();
     if (widget.initiallyCompose) {
       widget.controller.startCompose();
+    } else if (widget.initialLetterId != null) {
+      Future<void>.microtask(
+        () => widget.controller.openLetterById(widget.initialLetterId!),
+      );
     }
     _loadIfNeeded();
   }
@@ -40,6 +46,12 @@ class _LetterScreenState extends State<LetterScreen> {
         widget.controller.startCompose();
       }
       _loadIfNeeded();
+    }
+    if (oldWidget.initialLetterId != widget.initialLetterId &&
+        widget.initialLetterId != null) {
+      Future<void>.microtask(
+        () => widget.controller.openLetterById(widget.initialLetterId!),
+      );
     }
   }
 

@@ -212,6 +212,12 @@ class LetterController extends ChangeNotifier {
     if (entry == null || entry.fields.isEmpty) {
       return;
     }
+    // 알림 딥링크처럼 이미 상세 이동이 시작된 경우 임시저장이 화면을 덮어쓰지 않게 한다.
+    if (_state.mode != LetterViewMode.mailbox ||
+        _state.isLoading ||
+        _state.selectedLetter != null) {
+      return;
+    }
 
     _setState(
       _state.copyWith(
@@ -386,15 +392,26 @@ class LetterController extends ChangeNotifier {
 
     try {
       final detail = await _letterRepository.fetchLetter(id);
-      final replyDraft = await _draftRepository?.read(_replyDraftKey(id));
       _writingNotifiedLetterId = null;
       _setState(
         _state.copyWith(
           selectedLetter: detail,
+          replyContent: detail.replyContent ?? '',
+          isLoading: false,
+          clearErrorMessage: true,
+        ),
+      );
+      // 상세는 먼저 보여주고, 답장 임시저장은 늦게 도착해도 같은 편지에만 반영한다.
+      final replyDraft = await _draftRepository?.read(_replyDraftKey(id));
+      if (_state.mode != LetterViewMode.detail ||
+          _state.selectedLetter?.id != id) {
+        return;
+      }
+      _setState(
+        _state.copyWith(
           replyContent: replyDraft?.fields['content'] ??
               detail.replyContent ??
               '',
-          isLoading: false,
           clearErrorMessage: true,
         ),
       );

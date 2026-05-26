@@ -13,12 +13,14 @@ class NotificationReportScreen extends StatefulWidget {
     required this.notificationController,
     required this.reportController,
     required this.onBack,
+    this.onOpenNotification,
     super.key,
   });
 
   final NotificationController notificationController;
   final ReportController reportController;
   final VoidCallback onBack;
+  final ValueChanged<NotificationItem>? onOpenNotification;
 
   @override
   State<NotificationReportScreen> createState() =>
@@ -106,6 +108,16 @@ class _NotificationReportScreenState extends State<NotificationReportScreen>
     );
   }
 
+  Future<void> _openNotification(NotificationItem notification) async {
+    final opened =
+        await widget.notificationController.openNotification(notification);
+    if (!mounted || opened == null) {
+      return;
+    }
+
+    widget.onOpenNotification?.call(opened);
+  }
+
   @override
   Widget build(BuildContext context) {
     return AnimatedBuilder(
@@ -153,8 +165,7 @@ class _NotificationReportScreenState extends State<NotificationReportScreen>
                         _NotificationCenter(
                           state: widget.notificationController.state,
                           onRefresh: widget.notificationController.load,
-                          onMarkRead:
-                              widget.notificationController.markAsRead,
+                          onOpenNotification: _openNotification,
                         ),
                         _ReportForm(
                           state: widget.reportController.state,
@@ -320,12 +331,12 @@ class _NotificationCenter extends StatelessWidget {
   const _NotificationCenter({
     required this.state,
     required this.onRefresh,
-    required this.onMarkRead,
+    required this.onOpenNotification,
   });
 
   final NotificationState state;
   final Future<void> Function({bool silent}) onRefresh;
-  final Future<void> Function(NotificationItem notification) onMarkRead;
+  final Future<void> Function(NotificationItem notification) onOpenNotification;
 
   @override
   Widget build(BuildContext context) {
@@ -369,7 +380,7 @@ class _NotificationCenter extends StatelessWidget {
           for (final notification in state.notifications) ...[
             _NotificationTile(
               notification: notification,
-              onMarkRead: onMarkRead,
+              onOpenNotification: onOpenNotification,
             ),
             const SizedBox(height: AppSpacing.sm),
           ],
@@ -382,54 +393,59 @@ class _NotificationCenter extends StatelessWidget {
 class _NotificationTile extends StatelessWidget {
   const _NotificationTile({
     required this.notification,
-    required this.onMarkRead,
+    required this.onOpenNotification,
   });
 
   final NotificationItem notification;
-  final Future<void> Function(NotificationItem notification) onMarkRead;
+  final Future<void> Function(NotificationItem notification) onOpenNotification;
 
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
 
-    return Material(
-      color: notification.isRead
-          ? colorScheme.surfaceContainerHighest
-          : colorScheme.primaryContainer,
-      borderRadius: AppRadii.card,
-      child: InkWell(
+    return Semantics(
+      label: notification.accessibilityLabel,
+      button: true,
+      child: Material(
+        color: notification.isRead
+            ? colorScheme.surfaceContainerHighest
+            : colorScheme.primaryContainer,
         borderRadius: AppRadii.card,
-        onTap: notification.isRead ? null : () => onMarkRead(notification),
-        child: Padding(
-          padding: const EdgeInsets.all(AppSpacing.md),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Icon(
-                notification.isRead
-                    ? Icons.notifications_none
-                    : Icons.notifications_active_outlined,
-              ),
-              const SizedBox(width: AppSpacing.sm),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      notification.content,
-                      style: const TextStyle(fontWeight: FontWeight.w700),
-                    ),
-                    if (notification.createdAt.isNotEmpty) ...[
-                      const SizedBox(height: AppSpacing.xxs),
-                      Text(
-                        notification.createdAt,
-                        style: Theme.of(context).textTheme.bodySmall,
-                      ),
-                    ],
-                  ],
+        child: InkWell(
+          key: ValueKey('notification-card-${notification.id}'),
+          borderRadius: AppRadii.card,
+          onTap: () => onOpenNotification(notification),
+          child: Padding(
+            padding: const EdgeInsets.all(AppSpacing.md),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(
+                  notification.isRead
+                      ? Icons.notifications_none
+                      : Icons.notifications_active_outlined,
                 ),
-              ),
-            ],
+                const SizedBox(width: AppSpacing.sm),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        notification.content,
+                        style: const TextStyle(fontWeight: FontWeight.w700),
+                      ),
+                      if (notification.createdAt.isNotEmpty) ...[
+                        const SizedBox(height: AppSpacing.xxs),
+                        Text(
+                          notification.createdAt,
+                          style: Theme.of(context).textTheme.bodySmall,
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),

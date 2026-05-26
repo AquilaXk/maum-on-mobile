@@ -411,6 +411,49 @@ void main() {
     expect(find.text('실시간 상담'), findsOneWidget);
   });
 
+  testWidgets('applies initial letter notification tap after session restore',
+      (tester) async {
+    final pushClient = _FakePushNotificationPermissionClient(
+      initialPayload: const NotificationTapPayload(
+        destination: NotificationTapDestination.letter,
+        notificationId: 91,
+        letterId: 3,
+      ),
+    );
+    final letterRepository = _FakeLetterRepository(
+      details: const [
+        LetterDetail(
+          id: 3,
+          title: '알림으로 연 편지',
+          content: '푸시 탭 이동',
+          status: LetterStatus.sent,
+          replied: false,
+          createdDate: '2026-05-24T09:00:00',
+        ),
+      ],
+    );
+
+    await tester.pumpWidget(
+      MaumOnMobileApp(
+        authRepository: _FakeAuthRepository(restoredSession: _session()),
+        homeRepository: const _FakeHomeRepository(),
+        notificationRepository: _FakeNotificationRepository(),
+        pushNotificationPermissionClient: pushClient,
+        diaryRepository: _FakeDiaryRepository(),
+        diaryImagePicker: const _FakeDiaryImagePicker(),
+        storyRepository: _FakeStoryRepository(),
+        letterRepository: letterRepository,
+        listenForDeepLinks: false,
+      ),
+    );
+
+    await tester.pumpAndSettle();
+
+    expect(letterRepository.fetchedLetterIds, [3]);
+    expect(find.text('편지함'), findsOneWidget);
+    expect(find.text('알림으로 연 편지'), findsOneWidget);
+  });
+
   testWidgets('unregisters the push token on logout', (tester) async {
     final authRepository = _FakeAuthRepository(restoredSession: _session());
     final notificationRepository = _FakeNotificationRepository();
@@ -1093,13 +1136,17 @@ class _FakeLetterRepository implements LetterRepository {
         isLast: true,
       ),
     ],
+    List<LetterDetail> details = const [],
   })  : _statsQueue = List<LetterStats>.of(statsQueue),
         _receivedPages = List<LetterListPage>.of(receivedPages),
-        _sentPages = List<LetterListPage>.of(sentPages);
+        _sentPages = List<LetterListPage>.of(sentPages),
+        _details = List<LetterDetail>.of(details);
 
   final List<LetterStats> _statsQueue;
   final List<LetterListPage> _receivedPages;
   final List<LetterListPage> _sentPages;
+  final List<LetterDetail> _details;
+  final List<int> fetchedLetterIds = [];
 
   @override
   Future<int> createLetter(LetterDraft draft) {
@@ -1141,8 +1188,20 @@ class _FakeLetterRepository implements LetterRepository {
   }
 
   @override
-  Future<LetterDetail> fetchLetter(int id) {
-    throw UnimplementedError();
+  Future<LetterDetail> fetchLetter(int id) async {
+    fetchedLetterIds.add(id);
+    if (_details.isEmpty) {
+      return LetterDetail(
+        id: id,
+        title: '편지 #$id',
+        content: '알림으로 연 편지',
+        status: LetterStatus.sent,
+        replied: false,
+        createdDate: '2026-05-24T09:00:00',
+      );
+    }
+
+    return _details.removeAt(0);
   }
 
   @override
