@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../shared/ui/app_design_system.dart';
+import '../../moderation/presentation/content_moderation_feedback_panel.dart';
 import '../application/story_controller.dart';
 import '../domain/story_models.dart';
 
@@ -57,6 +58,22 @@ class _StoryScreenState extends State<StoryScreen> {
     Future<void>.microtask(() => widget.controller.openStoryById(storyId));
   }
 
+  Future<void> _retryModeration(StoryState state) {
+    if (state.mode == StoryViewMode.editor) {
+      return widget.controller.submitStory();
+    }
+    if (state.editingCommentId != null) {
+      return widget.controller.submitCommentEdit();
+    }
+    final replyCommentId = state.activeReplyCommentId;
+    if (replyCommentId != null) {
+      return widget.controller.submitReply(replyCommentId);
+    }
+    return widget.controller.submitComment(
+      parentCommentId: state.activeReplyCommentId,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return AnimatedBuilder(
@@ -80,7 +97,14 @@ class _StoryScreenState extends State<StoryScreen> {
             ),
           ],
           children: [
-            if (state.errorMessage != null) ...[
+            if (state.moderationFeedback != null) ...[
+              ContentModerationFeedbackPanel(
+                feedback: state.moderationFeedback!,
+                onRetry: () => _retryModeration(state),
+                onDismiss: widget.controller.clearModerationFeedback,
+              ),
+              const SizedBox(height: AppSpacing.md),
+            ] else if (state.errorMessage != null) ...[
               AppNotice(
                 message: state.errorMessage!,
                 tone: AppNoticeTone.error,
@@ -382,8 +406,7 @@ class _StoryDetailView extends StatelessWidget {
                   const SizedBox(height: AppSpacing.sm),
                   AppNotice(
                     key: const ValueKey('story-report-target-notice'),
-                    message:
-                        '${state.reportTarget!.label} 신고 대상을 선택했습니다.',
+                    message: '${state.reportTarget!.label} 신고 대상을 선택했습니다.',
                     tone: AppNoticeTone.warning,
                   ),
                 ],
@@ -575,8 +598,8 @@ class _CommentTile extends StatelessWidget {
                     key: ValueKey('story-comment-action-row-${comment.id}'),
                     children: [
                       TextButton.icon(
-                        key:
-                            ValueKey('story-comment-reply-button-${comment.id}'),
+                        key: ValueKey(
+                            'story-comment-reply-button-${comment.id}'),
                         onPressed: state.isSubmitting
                             ? null
                             : () => controller.startReply(comment),
@@ -731,11 +754,10 @@ class _ReplyComposerState extends State<_ReplyComposer> {
                   key: ValueKey(
                     'story-reply-submit-button-${widget.parentCommentId}',
                   ),
-                  onPressed: widget.canSubmit &&
-                          !widget.isSubmitting &&
-                          !_isSubmitting
-                      ? _submit
-                      : null,
+                  onPressed:
+                      widget.canSubmit && !widget.isSubmitting && !_isSubmitting
+                          ? _submit
+                          : null,
                   icon: widget.isSubmitting || _isSubmitting
                       ? const SizedBox.square(
                           dimension: 18,
@@ -789,64 +811,63 @@ class _StoryEditorView extends StatelessWidget {
       key: ValueKey('story-editor-${state.editingStoryId ?? 'new'}'),
       title: state.isEditingStory ? '스토리 수정' : '스토리 작성',
       child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            TextFormField(
-              key: const ValueKey('story-title-field'),
-              initialValue: state.storyTitle,
-              decoration: const InputDecoration(
-                labelText: '제목',
-                border: OutlineInputBorder(),
-              ),
-              onChanged: controller.updateStoryTitle,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          TextFormField(
+            key: const ValueKey('story-title-field'),
+            initialValue: state.storyTitle,
+            decoration: const InputDecoration(
+              labelText: '제목',
+              border: OutlineInputBorder(),
             ),
-            const SizedBox(height: AppSpacing.md),
-            TextFormField(
-              key: const ValueKey('story-content-field'),
-              initialValue: state.storyContent,
-              minLines: 6,
-              maxLines: 12,
-              decoration: const InputDecoration(
-                labelText: '본문',
-                border: OutlineInputBorder(),
-              ),
-              onChanged: controller.updateStoryContent,
+            onChanged: controller.updateStoryTitle,
+          ),
+          const SizedBox(height: AppSpacing.md),
+          TextFormField(
+            key: const ValueKey('story-content-field'),
+            initialValue: state.storyContent,
+            minLines: 6,
+            maxLines: 12,
+            decoration: const InputDecoration(
+              labelText: '본문',
+              border: OutlineInputBorder(),
             ),
-            const SizedBox(height: AppSpacing.md),
-            Wrap(
-              spacing: AppSpacing.xs,
-              runSpacing: AppSpacing.xs,
-              children: [
-                for (final category in StoryCategory.values.where(
-                  (category) => category != StoryCategory.all,
-                ))
-                  ChoiceChip(
-                    key: ValueKey('story-editor-category-${category.name}'),
-                    label: Text(category.label),
-                    selected: state.storyCategory == category,
-                    onSelected: (_) => controller.updateStoryCategory(category),
-                  ),
-              ],
-            ),
-            const SizedBox(height: AppSpacing.lg),
-            Wrap(
-              spacing: AppSpacing.xs,
-              runSpacing: AppSpacing.xs,
-              children: [
-                FilledButton(
-                  key: const ValueKey('story-submit-button'),
-                  onPressed:
-                      state.canSubmitStory ? controller.submitStory : null,
-                  child: Text(state.isEditingStory ? '수정 완료' : '등록'),
+            onChanged: controller.updateStoryContent,
+          ),
+          const SizedBox(height: AppSpacing.md),
+          Wrap(
+            spacing: AppSpacing.xs,
+            runSpacing: AppSpacing.xs,
+            children: [
+              for (final category in StoryCategory.values.where(
+                (category) => category != StoryCategory.all,
+              ))
+                ChoiceChip(
+                  key: ValueKey('story-editor-category-${category.name}'),
+                  label: Text(category.label),
+                  selected: state.storyCategory == category,
+                  onSelected: (_) => controller.updateStoryCategory(category),
                 ),
-                OutlinedButton(
-                  key: const ValueKey('story-editor-cancel-button'),
-                  onPressed: controller.cancelEditor,
-                  child: const Text('취소'),
-                ),
-              ],
-            ),
-          ],
+            ],
+          ),
+          const SizedBox(height: AppSpacing.lg),
+          Wrap(
+            spacing: AppSpacing.xs,
+            runSpacing: AppSpacing.xs,
+            children: [
+              FilledButton(
+                key: const ValueKey('story-submit-button'),
+                onPressed: state.canSubmitStory ? controller.submitStory : null,
+                child: Text(state.isEditingStory ? '수정 완료' : '등록'),
+              ),
+              OutlinedButton(
+                key: const ValueKey('story-editor-cancel-button'),
+                onPressed: controller.cancelEditor,
+                child: const Text('취소'),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }

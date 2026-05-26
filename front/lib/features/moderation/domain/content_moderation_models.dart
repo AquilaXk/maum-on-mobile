@@ -1,3 +1,5 @@
+import '../../../core/network/api_error.dart';
+
 enum ContentModerationTarget {
   story(apiValue: 'STORY'),
   comment(apiValue: 'COMMENT'),
@@ -100,5 +102,114 @@ class ContentModerationResult {
       message: map['message']?.toString() ?? '입력 내용을 확인해 주세요.',
       categories: categories,
     );
+  }
+}
+
+enum ContentModerationFeedbackStatus {
+  policyBlocked,
+  networkError,
+  modelUnavailable,
+}
+
+class ContentModerationFeedback {
+  const ContentModerationFeedback({
+    required this.targetType,
+    required this.status,
+    required this.riskLevel,
+    required this.categories,
+    required this.title,
+    required this.message,
+    required this.guidanceItems,
+    this.primaryActionLabel = '수정 후 다시 검수',
+    this.dismissActionLabel = '취소',
+  });
+
+  factory ContentModerationFeedback.blocked({
+    required ContentModerationTarget targetType,
+    required ContentModerationResult result,
+  }) {
+    return ContentModerationFeedback(
+      targetType: targetType,
+      status: ContentModerationFeedbackStatus.policyBlocked,
+      riskLevel: result.riskLevel,
+      categories: result.categories,
+      title: '${targetType.displayLabel} 표현을 수정해 주세요.',
+      message: '${result.message} 입력 내용은 그대로 유지됩니다. '
+          '아래 안내를 보고 표현을 고친 뒤 다시 검수해 주세요.',
+      guidanceItems: result.categories.guidanceItems(),
+    );
+  }
+
+  factory ContentModerationFeedback.failure({
+    required ContentModerationTarget targetType,
+    required ApiClientException error,
+  }) {
+    final isNetwork = error.kind == ApiErrorKind.network;
+    return ContentModerationFeedback(
+      targetType: targetType,
+      status: isNetwork
+          ? ContentModerationFeedbackStatus.networkError
+          : ContentModerationFeedbackStatus.modelUnavailable,
+      riskLevel: ContentModerationRiskLevel.high,
+      categories: const [],
+      title: isNetwork ? '연결 후 다시 검수해 주세요.' : '검수 결과를 불러오지 못했습니다.',
+      message: isNetwork
+          ? '네트워크 연결을 확인해 주세요. 입력 내용은 그대로 유지됩니다.'
+          : '검수 결과를 확인하지 못했습니다. 입력 내용은 그대로 유지됩니다. 잠시 후 다시 시도해 주세요.',
+      guidanceItems: [
+        if (isNetwork)
+          '네트워크 연결 상태를 확인한 뒤 다시 검수해 주세요.'
+        else
+          '잠시 후 다시 검수해 주세요. 같은 문제가 반복되면 입력 내용은 유지한 채 나중에 다시 시도할 수 있습니다.',
+      ],
+    );
+  }
+
+  final ContentModerationTarget targetType;
+  final ContentModerationFeedbackStatus status;
+  final ContentModerationRiskLevel riskLevel;
+  final List<ContentModerationCategory> categories;
+  final String title;
+  final String message;
+  final List<String> guidanceItems;
+  final String primaryActionLabel;
+  final String dismissActionLabel;
+}
+
+extension ContentModerationTargetLabel on ContentModerationTarget {
+  String get displayLabel {
+    return switch (this) {
+      ContentModerationTarget.story => '스토리',
+      ContentModerationTarget.comment => '댓글',
+      ContentModerationTarget.diary => '기록',
+      ContentModerationTarget.letter => '편지',
+      ContentModerationTarget.report => '신고 내용',
+    };
+  }
+}
+
+extension ContentModerationCategoryGuidance on List<ContentModerationCategory> {
+  List<String> guidanceItems() {
+    final items = map((category) => category.guidanceText)
+        .toSet()
+        .toList(growable: false);
+    if (items.isEmpty) {
+      return const ['상대가 불편하게 느낄 수 있는 표현을 구체적으로 순화해 주세요.'];
+    }
+    return items;
+  }
+}
+
+extension on ContentModerationCategory {
+  String get guidanceText {
+    return switch (this) {
+      ContentModerationCategory.profanity =>
+        '비난, 욕설, 위협으로 읽힐 수 있는 표현을 부드럽게 바꿔 주세요.',
+      ContentModerationCategory.personalInfo =>
+        '전화번호, 이메일, 주소처럼 개인을 특정할 수 있는 표현을 지워 주세요.',
+      ContentModerationCategory.spam => '광고, 반복 홍보, 외부 유도 표현을 줄여 주세요.',
+      ContentModerationCategory.inappropriate =>
+        '상대가 불편하거나 위험하다고 느낄 수 있는 표현을 구체적으로 순화해 주세요.',
+    };
   }
 }

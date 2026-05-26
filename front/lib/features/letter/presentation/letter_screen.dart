@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../shared/ui/app_design_system.dart';
+import '../../moderation/presentation/content_moderation_feedback_panel.dart';
 import '../application/letter_controller.dart';
 import '../domain/letter_models.dart';
 
@@ -63,6 +64,13 @@ class _LetterScreenState extends State<LetterScreen> {
     }
   }
 
+  Future<void> _retryModeration(LetterState state) {
+    if (state.mode == LetterViewMode.compose) {
+      return widget.controller.submitLetter();
+    }
+    return widget.controller.submitReply();
+  }
+
   @override
   Widget build(BuildContext context) {
     return AnimatedBuilder(
@@ -86,7 +94,14 @@ class _LetterScreenState extends State<LetterScreen> {
             ),
           ],
           children: [
-            if (state.errorMessage != null) ...[
+            if (state.moderationFeedback != null) ...[
+              ContentModerationFeedbackPanel(
+                feedback: state.moderationFeedback!,
+                onRetry: () => _retryModeration(state),
+                onDismiss: widget.controller.clearModerationFeedback,
+              ),
+              const SizedBox(height: AppSpacing.md),
+            ] else if (state.errorMessage != null) ...[
               AppNotice(
                 message: state.errorMessage!,
                 tone: AppNoticeTone.error,

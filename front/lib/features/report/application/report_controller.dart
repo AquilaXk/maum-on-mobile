@@ -16,6 +16,7 @@ class ReportState {
     this.submittedReportId,
     this.errorMessage,
     this.noticeMessage,
+    this.moderationFeedback,
   });
 
   final ReportTarget? target;
@@ -26,6 +27,7 @@ class ReportState {
   final int? submittedReportId;
   final String? errorMessage;
   final String? noticeMessage;
+  final ContentModerationFeedback? moderationFeedback;
 
   static const int contentMaxLength = 300;
   static const int otherReasonMinLength = 5;
@@ -65,9 +67,11 @@ class ReportState {
     int? submittedReportId,
     String? errorMessage,
     String? noticeMessage,
+    ContentModerationFeedback? moderationFeedback,
     bool clearTarget = false,
     bool clearErrorMessage = false,
     bool clearNoticeMessage = false,
+    bool clearModerationFeedback = false,
     bool clearSubmittedReportId = false,
   }) {
     return ReportState(
@@ -83,6 +87,9 @@ class ReportState {
           clearErrorMessage ? null : errorMessage ?? this.errorMessage,
       noticeMessage:
           clearNoticeMessage ? null : noticeMessage ?? this.noticeMessage,
+      moderationFeedback: clearModerationFeedback
+          ? null
+          : moderationFeedback ?? this.moderationFeedback,
     );
   }
 }
@@ -113,6 +120,7 @@ class ReportController extends ChangeNotifier {
         clearSubmittedReportId: true,
         clearErrorMessage: true,
         clearNoticeMessage: true,
+        clearModerationFeedback: true,
       ),
     );
   }
@@ -125,6 +133,7 @@ class ReportController extends ChangeNotifier {
         clearSubmittedReportId: true,
         clearErrorMessage: true,
         clearNoticeMessage: true,
+        clearModerationFeedback: true,
       ),
     );
   }
@@ -135,6 +144,7 @@ class ReportController extends ChangeNotifier {
         reason: reason,
         clearErrorMessage: true,
         clearNoticeMessage: true,
+        clearModerationFeedback: true,
       ),
     );
   }
@@ -147,6 +157,16 @@ class ReportController extends ChangeNotifier {
             : content,
         clearErrorMessage: true,
         clearNoticeMessage: true,
+        clearModerationFeedback: true,
+      ),
+    );
+  }
+
+  void clearModerationFeedback() {
+    _setState(
+      _state.copyWith(
+        clearErrorMessage: true,
+        clearModerationFeedback: true,
       ),
     );
   }
@@ -209,6 +229,7 @@ class ReportController extends ChangeNotifier {
         _state.copyWith(
           isSubmitting: false,
           errorMessage: _messageFromError(error),
+          clearModerationFeedback: true,
         ),
       );
     }
@@ -231,21 +252,53 @@ class ReportController extends ChangeNotifier {
       return true;
     }
 
-    final result = await repository.reviewText(
-      targetType: ContentModerationTarget.report,
-      text: text,
-    );
+    final ContentModerationResult result;
+    try {
+      result = await repository.reviewText(
+        targetType: ContentModerationTarget.report,
+        text: text,
+      );
+    } on ApiClientException catch (error) {
+      if (error.sessionInvalidated) {
+        rethrow;
+      }
+      final feedback = ContentModerationFeedback.failure(
+        targetType: ContentModerationTarget.report,
+        error: error,
+      );
+      _setState(
+        _state.copyWith(
+          isSubmitting: false,
+          errorMessage: feedback.message,
+          moderationFeedback: feedback,
+          clearNoticeMessage: true,
+        ),
+      );
+      return false;
+    }
     if (result.allowed) {
       if (result.riskLevel != ContentModerationRiskLevel.low) {
-        _setState(_state.copyWith(noticeMessage: result.message));
+        _setState(
+          _state.copyWith(
+            noticeMessage: result.message,
+            clearModerationFeedback: true,
+          ),
+        );
+      } else if (_state.moderationFeedback != null) {
+        _setState(_state.copyWith(clearModerationFeedback: true));
       }
       return true;
     }
 
+    final feedback = ContentModerationFeedback.blocked(
+      targetType: ContentModerationTarget.report,
+      result: result,
+    );
     _setState(
       _state.copyWith(
         isSubmitting: false,
         errorMessage: result.message,
+        moderationFeedback: feedback,
         clearNoticeMessage: true,
       ),
     );

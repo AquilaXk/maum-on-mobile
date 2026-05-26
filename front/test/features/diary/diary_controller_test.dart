@@ -171,6 +171,49 @@ void main() {
       expect(moderationRepository.requests.single.targetType,
           ContentModerationTarget.diary);
       expect(controller.state.errorMessage, '위험도가 높은 표현이 포함되어 수정이 필요합니다.');
+      expect(controller.state.title, '연락처 기록');
+      expect(controller.state.content, '010-1234-5678');
+      expect(controller.state.moderationFeedback?.status,
+          ContentModerationFeedbackStatus.policyBlocked);
+      expect(controller.state.moderationFeedback?.title, '기록 표현을 수정해 주세요.');
+      expect(
+        controller.state.moderationFeedback?.guidanceItems,
+        contains('전화번호, 이메일, 주소처럼 개인을 특정할 수 있는 표현을 지워 주세요.'),
+      );
+    });
+
+    test('keeps diary draft and skips upload when moderation network fails',
+        () async {
+      final repository = _FakeDiaryRepository(pages: [_page([])]);
+      final imageRepository = _FakeDiaryImageRepository();
+      final moderationRepository = _FakeContentModerationRepository(
+        error: const ApiClientException(
+          kind: ApiErrorKind.network,
+          message: '네트워크 연결을 확인해 주세요.',
+        ),
+      );
+      final controller = DiaryController(
+        diaryRepository: repository,
+        imageRepository: imageRepository,
+        moderationRepository: moderationRepository,
+        now: DateTime(2026, 5, 20),
+      );
+
+      await controller.load();
+      controller.updateTitle('오프라인 기록');
+      controller.updateContent('다시 저장할 내용');
+      controller.attachImage(
+        const DiaryImageAttachment(filename: 'offline.png', bytes: [1]),
+      );
+      await controller.submit();
+
+      expect(repository.createdDrafts, isEmpty);
+      expect(imageRepository.uploadedImages, isEmpty);
+      expect(controller.state.title, '오프라인 기록');
+      expect(controller.state.content, '다시 저장할 내용');
+      expect(controller.state.moderationFeedback?.status,
+          ContentModerationFeedbackStatus.networkError);
+      expect(controller.state.moderationFeedback?.title, '연결 후 다시 검수해 주세요.');
     });
 
     test('updates the editing diary and refreshes the calendar', () async {
@@ -274,10 +317,8 @@ void main() {
       );
       final firstImageId = controller.state.imageBlocks.single.id;
       controller.addTextBlockAfter(firstImageId);
-      final secondTextId = controller.state.contentBlocks
-          .where((block) => block.isText)
-          .last
-          .id;
+      final secondTextId =
+          controller.state.contentBlocks.where((block) => block.isText).last.id;
       controller.updateTextBlock(secondTextId, '둘째 문단');
       controller.attachImage(
         const DiaryImageAttachment(filename: 'second.png', bytes: [2]),
@@ -308,8 +349,7 @@ void main() {
       );
     });
 
-    test('keeps selected image and explains retry on upload failure',
-        () async {
+    test('keeps selected image and explains retry on upload failure', () async {
       final repository = _FakeDiaryRepository(pages: [_page([])]);
       final imageRepository = _FakeDiaryImageRepository(
         uploadError: const ApiClientException(
@@ -340,7 +380,8 @@ void main() {
       );
     });
 
-    test('deletes temporary uploaded image when user clears it after save failure',
+    test(
+        'deletes temporary uploaded image when user clears it after save failure',
         () async {
       final repository = _FakeDiaryRepository(
         pages: [_page([])],
@@ -546,7 +587,8 @@ void main() {
       expect(failed.single.failureMessage, '네트워크 연결을 확인해 주세요.');
     });
 
-    test('restores draft content block order and image failure state', () async {
+    test('restores draft content block order and image failure state',
+        () async {
       final draftRepository = StorageDraftRecoveryRepository(
         storage: MemoryDraftRecoveryStorage(),
       );
@@ -589,8 +631,8 @@ void main() {
       ]);
       expect(controller.state.imageBlocks.single.uploadStatus,
           DiaryImageBlockUploadStatus.failed);
-      expect(controller.state.imageBlocks.single.errorMessage,
-          contains('다시 선택'));
+      expect(
+          controller.state.imageBlocks.single.errorMessage, contains('다시 선택'));
     });
 
     test('invokes unauthorized callback on expired auth', () async {
@@ -757,9 +799,14 @@ class _FakeDiaryRepository implements DiaryRepository {
 }
 
 class _FakeContentModerationRepository implements ContentModerationRepository {
-  _FakeContentModerationRepository({required this.result});
+  _FakeContentModerationRepository({
+    ContentModerationResult? result,
+    List<ContentModerationResult>? results,
+    this.error,
+  }) : results = results ?? [if (result != null) result];
 
-  final ContentModerationResult result;
+  final List<ContentModerationResult> results;
+  final Object? error;
   final List<ContentModerationRequest> requests = [];
 
   @override
@@ -768,6 +815,13 @@ class _FakeContentModerationRepository implements ContentModerationRepository {
     required String text,
   }) async {
     requests.add(ContentModerationRequest(targetType: targetType, text: text));
-    return result;
+    final nextError = error;
+    if (nextError != null) {
+      throw nextError;
+    }
+    if (results.isEmpty) {
+      throw StateError('No moderation result configured.');
+    }
+    return results.length == 1 ? results.single : results.removeAt(0);
   }
 }

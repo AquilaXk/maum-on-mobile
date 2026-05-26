@@ -39,6 +39,7 @@ class DiaryState {
     this.errorMessage,
     this.publicErrorMessage,
     this.noticeMessage,
+    this.moderationFeedback,
   });
 
   final DateTime visibleMonth;
@@ -65,6 +66,7 @@ class DiaryState {
   final String? errorMessage;
   final String? publicErrorMessage;
   final String? noticeMessage;
+  final ContentModerationFeedback? moderationFeedback;
 
   bool get isPublicEmpty =>
       hasLoaded &&
@@ -150,6 +152,8 @@ class DiaryState {
     bool clearPublicErrorMessage = false,
     String? noticeMessage,
     bool clearNoticeMessage = false,
+    ContentModerationFeedback? moderationFeedback,
+    bool clearModerationFeedback = false,
   }) {
     return DiaryState(
       visibleMonth: visibleMonth ?? this.visibleMonth,
@@ -184,6 +188,9 @@ class DiaryState {
           : publicErrorMessage ?? this.publicErrorMessage,
       noticeMessage:
           clearNoticeMessage ? null : noticeMessage ?? this.noticeMessage,
+      moderationFeedback: clearModerationFeedback
+          ? null
+          : moderationFeedback ?? this.moderationFeedback,
     );
   }
 }
@@ -318,17 +325,25 @@ class DiaryController extends ChangeNotifier {
   }
 
   void updateTitle(String title) {
-    _setState(_state.copyWith(title: title, clearErrorMessage: true));
+    _setState(
+      _state.copyWith(
+        title: title,
+        clearErrorMessage: true,
+        clearModerationFeedback: true,
+      ),
+    );
     _saveDraft();
   }
 
   void updateContent(String content) {
-    final contentBlocks = _updatePrimaryTextBlock(_state.contentBlocks, content);
+    final contentBlocks =
+        _updatePrimaryTextBlock(_state.contentBlocks, content);
     _setState(
       _state.copyWith(
         content: plainDiaryContentFromBlocks(contentBlocks),
         contentBlocks: contentBlocks,
         clearErrorMessage: true,
+        clearModerationFeedback: true,
       ),
     );
     _saveDraft();
@@ -347,6 +362,7 @@ class DiaryController extends ChangeNotifier {
         content: plainDiaryContentFromBlocks(contentBlocks),
         contentBlocks: ensureDiaryTextBlock(contentBlocks),
         clearErrorMessage: true,
+        clearModerationFeedback: true,
       ),
     );
     _saveDraft();
@@ -360,6 +376,15 @@ class DiaryController extends ChangeNotifier {
   void updatePrivacy(bool isPrivate) {
     _setState(_state.copyWith(isPrivate: isPrivate));
     _saveDraft();
+  }
+
+  void clearModerationFeedback() {
+    _setState(
+      _state.copyWith(
+        clearErrorMessage: true,
+        clearModerationFeedback: true,
+      ),
+    );
   }
 
   void addTextBlockAfter(String blockId) {
@@ -392,9 +417,9 @@ class DiaryController extends ChangeNotifier {
         clearImageUrl: true,
         contentBlocks: contentBlocks,
         clearErrorMessage: true,
-        noticeMessage: image.wasCompressed
-            ? '이미지 용량을 줄여 첨부했습니다.'
-            : '이미지를 첨부했습니다.',
+        clearModerationFeedback: true,
+        noticeMessage:
+            image.wasCompressed ? '이미지 용량을 줄여 첨부했습니다.' : '이미지를 첨부했습니다.',
       ),
     );
     _saveDraft();
@@ -425,9 +450,9 @@ class DiaryController extends ChangeNotifier {
         clearImageUrl: primaryImageUrl == null,
         contentBlocks: ensureDiaryTextBlock(contentBlocks),
         clearErrorMessage: true,
-        noticeMessage: image.wasCompressed
-            ? '이미지 용량을 줄여 교체했습니다.'
-            : '이미지를 교체했습니다.',
+        clearModerationFeedback: true,
+        noticeMessage:
+            image.wasCompressed ? '이미지 용량을 줄여 교체했습니다.' : '이미지를 교체했습니다.',
       ),
     );
     _saveDraft();
@@ -779,23 +804,57 @@ class DiaryController extends ChangeNotifier {
       return true;
     }
 
-    final result = await repository.reviewText(
-      targetType: ContentModerationTarget.diary,
-      text: text,
-    );
+    final ContentModerationResult result;
+    try {
+      result = await repository.reviewText(
+        targetType: ContentModerationTarget.diary,
+        text: text,
+      );
+    } on ApiClientException catch (error) {
+      if (error.sessionInvalidated) {
+        rethrow;
+      }
+      final feedback = ContentModerationFeedback.failure(
+        targetType: ContentModerationTarget.diary,
+        error: error,
+      );
+      _setState(
+        _state.copyWith(
+          isSubmitting: false,
+          isUploadingImage: false,
+          clearImageUploadProgress: true,
+          errorMessage: feedback.message,
+          moderationFeedback: feedback,
+          clearNoticeMessage: true,
+        ),
+      );
+      return false;
+    }
     if (result.allowed) {
       if (result.riskLevel != ContentModerationRiskLevel.low) {
-        _setState(_state.copyWith(noticeMessage: result.message));
+        _setState(
+          _state.copyWith(
+            noticeMessage: result.message,
+            clearModerationFeedback: true,
+          ),
+        );
+      } else if (_state.moderationFeedback != null) {
+        _setState(_state.copyWith(clearModerationFeedback: true));
       }
       return true;
     }
 
+    final feedback = ContentModerationFeedback.blocked(
+      targetType: ContentModerationTarget.diary,
+      result: result,
+    );
     _setState(
       _state.copyWith(
         isSubmitting: false,
         isUploadingImage: false,
         clearImageUploadProgress: true,
         errorMessage: result.message,
+        moderationFeedback: feedback,
         clearNoticeMessage: true,
       ),
     );
@@ -1012,6 +1071,7 @@ class DiaryController extends ChangeNotifier {
           errorMessage: _errorMessageWithAction(error.message, nextAction),
           clearSelectedImage: clearSelectedImage,
           clearNoticeMessage: true,
+          clearModerationFeedback: true,
         ),
       );
       return;
@@ -1025,6 +1085,7 @@ class DiaryController extends ChangeNotifier {
         ),
         clearSelectedImage: clearSelectedImage,
         clearNoticeMessage: true,
+        clearModerationFeedback: true,
       ),
     );
   }
@@ -1113,7 +1174,6 @@ String _errorMessageWithAction(String message, String? nextAction) {
     return trimmedMessage.isEmpty ? '요청을 처리하지 못했습니다.' : trimmedMessage;
   }
 
-  final base =
-      trimmedMessage.isEmpty ? '요청을 처리하지 못했습니다.' : trimmedMessage;
+  final base = trimmedMessage.isEmpty ? '요청을 처리하지 못했습니다.' : trimmedMessage;
   return '$base $trimmedAction';
 }
