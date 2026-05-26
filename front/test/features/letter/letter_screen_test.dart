@@ -132,6 +132,10 @@ void main() {
       find.byKey(const ValueKey('letter-title-field')),
       '남길 편지',
     );
+    await tester.ensureVisible(
+      find.byKey(const ValueKey('letter-compose-cancel-button')),
+    );
+    await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey('letter-compose-cancel-button')));
     await tester.pumpAndSettle();
 
@@ -142,6 +146,10 @@ void main() {
 
     expect(find.byKey(const ValueKey('letter-title-field')), findsOneWidget);
 
+    await tester.ensureVisible(
+      find.byKey(const ValueKey('letter-compose-cancel-button')),
+    );
+    await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey('letter-compose-cancel-button')));
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey('letter-compose-leave-button')));
