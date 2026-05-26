@@ -1,6 +1,7 @@
 package com.maumonmobile.adapter.`in`.web.admin
 
 import com.maumonmobile.application.port.`in`.AdminDashboardResult
+import com.maumonmobile.application.port.`in`.AdminContentModerationSummaryResult
 import com.maumonmobile.application.port.`in`.AdminLetterActionResult
 import com.maumonmobile.application.port.`in`.AdminLetterDetail
 import com.maumonmobile.application.port.`in`.AdminLetterNoteCommand
@@ -37,6 +38,13 @@ class AdminOperationsController(
     fun dashboard(authentication: Authentication): ApiResponse<AdminDashboardResult> {
         return ApiResponse.success(
             adminOperationsUseCase.dashboard(authentication.authenticatedUser()),
+        )
+    }
+
+    @GetMapping("/moderation/summary")
+    fun contentModerationSummary(authentication: Authentication): ApiResponse<AdminContentModerationSummaryResult> {
+        return ApiResponse.success(
+            adminOperationsUseCase.contentModerationSummary(authentication.authenticatedUser()),
         )
     }
 

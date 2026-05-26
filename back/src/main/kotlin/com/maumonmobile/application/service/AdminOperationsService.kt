@@ -1,6 +1,8 @@
 package com.maumonmobile.application.service
 
 import com.maumonmobile.application.port.`in`.AdminAuditEventResult
+import com.maumonmobile.application.port.`in`.AdminContentModerationAuditResult
+import com.maumonmobile.application.port.`in`.AdminContentModerationSummaryResult
 import com.maumonmobile.application.port.`in`.AdminDashboardResult
 import com.maumonmobile.application.port.`in`.AdminLetterActionResult
 import com.maumonmobile.application.port.`in`.AdminLetterDetail
@@ -24,6 +26,7 @@ import com.maumonmobile.application.port.`in`.AdminSessionRevokeCommand
 import com.maumonmobile.application.port.`in`.AdminSessionRevokeResult
 import com.maumonmobile.application.port.out.AdminAuditRepository
 import com.maumonmobile.application.port.out.AuthMemberRepository
+import com.maumonmobile.application.port.out.ContentModerationAuditRepository
 import com.maumonmobile.application.port.out.DiaryRepository
 import com.maumonmobile.application.port.out.LetterRepository
 import com.maumonmobile.application.port.out.NotificationDeviceTokenRepository
@@ -36,6 +39,9 @@ import com.maumonmobile.domain.auth.AuthMember
 import com.maumonmobile.domain.auth.AuthMemberRole
 import com.maumonmobile.domain.auth.AuthMemberStatus
 import com.maumonmobile.domain.letter.Letter
+import com.maumonmobile.domain.moderation.ContentModerationAuditEvent
+import com.maumonmobile.domain.moderation.ContentModerationModelStatus
+import com.maumonmobile.domain.moderation.ContentModerationRiskLevel
 import com.maumonmobile.domain.report.Report
 import com.maumonmobile.domain.report.ReportTargetType
 import com.maumonmobile.global.security.AuthenticatedUser
@@ -51,6 +57,7 @@ import kotlin.math.ceil
 class AdminOperationsService(
     private val authMemberRepository: AuthMemberRepository,
     private val adminAuditRepository: AdminAuditRepository,
+    private val contentModerationAuditRepository: ContentModerationAuditRepository,
     private val diaryRepository: DiaryRepository,
     private val letterRepository: LetterRepository,
     private val notificationDeviceTokenRepository: NotificationDeviceTokenRepository,
@@ -81,6 +88,31 @@ class AdminOperationsService(
             adminMemberCount = members.count { member -> member.role == AuthMemberRole.ADMIN },
             unassignedLetterCount = letters.count { letter -> letter.receiverId == null && letter.status == "SENT" },
             todayAdminActionCount = adminActions.count { event -> event.createdAt.isOnOrAfter(todayStart) },
+        )
+    }
+
+    override fun contentModerationSummary(user: AuthenticatedUser): AdminContentModerationSummaryResult {
+        ensureAdmin(user)
+        val audits = contentModerationAuditRepository.findAll()
+        val failureCount = audits.count { audit -> audit.modelStatus != ContentModerationModelStatus.SUCCESS }
+        return AdminContentModerationSummaryResult(
+            totalCount = audits.size,
+            blockedCount = audits.count { audit -> !audit.allowed },
+            modelFailureCount = failureCount,
+            failureRate = if (audits.isEmpty()) {
+                0.0
+            } else {
+                failureCount.toDouble() / audits.size.toDouble()
+            },
+            highRiskCategories = audits.highRiskCategoryCounts(),
+            modelStatuses = audits.groupingBy { audit -> audit.modelStatus.name }.eachCount().toSortedMap(),
+            targets = audits.groupingBy { audit -> audit.target.name }.eachCount().toSortedMap(),
+            recentFailures = audits
+                .filter { audit ->
+                    !audit.allowed || audit.modelStatus != ContentModerationModelStatus.SUCCESS
+                }
+                .take(RECENT_MODERATION_FAILURE_LIMIT)
+                .map { audit -> audit.toContentModerationAuditResult() },
         )
     }
 
@@ -652,6 +684,31 @@ class AdminOperationsService(
         )
     }
 
+    private fun List<ContentModerationAuditEvent>.highRiskCategoryCounts(): Map<String, Int> {
+        return filter { audit -> audit.riskLevel == ContentModerationRiskLevel.HIGH }
+            .flatMap { audit -> audit.categories }
+            .groupingBy { category -> category.name }
+            .eachCount()
+            .toSortedMap()
+    }
+
+    private fun ContentModerationAuditEvent.toContentModerationAuditResult(): AdminContentModerationAuditResult {
+        return AdminContentModerationAuditResult(
+            id = id,
+            memberId = memberId,
+            target = target.name,
+            allowed = allowed,
+            riskLevel = riskLevel.name,
+            categories = categories.map { category -> category.name },
+            modelStatus = modelStatus.name,
+            latencyMs = latencyMs,
+            textHash = textHash,
+            textLength = textLength,
+            contentSummary = contentSummary,
+            createdAt = createdAt,
+        )
+    }
+
     private fun String.isOnOrAfter(since: Instant): Boolean {
         return runCatching { !Instant.parse(this).isBefore(since) }.getOrDefault(false)
     }
@@ -730,6 +787,7 @@ class AdminOperationsService(
         private const val LETTER_NOTE_MIN_LENGTH = 2
         private const val LETTER_NOTE_MAX_LENGTH = 500
         private const val LETTER_SUMMARY_MAX_LENGTH = 64
+        private const val RECENT_MODERATION_FAILURE_LIMIT = 10
         private const val REPORT_RESOURCE_TYPE = "REPORT"
         private const val LETTER_RESOURCE_TYPE = "LETTER"
         private const val LETTER_REASSIGNED_EVENT = "admin_letter_reassigned"

@@ -2,8 +2,14 @@ package com.maumonmobile.adapter.`in`.web.observability
 
 import com.jayway.jsonpath.JsonPath
 import com.maumonmobile.application.port.out.AuthMemberRepository
+import com.maumonmobile.application.port.out.ContentModerationAuditRepository
 import com.maumonmobile.domain.auth.AuthMember
 import com.maumonmobile.domain.auth.AuthMemberRole
+import com.maumonmobile.domain.moderation.ContentModerationAuditDraft
+import com.maumonmobile.domain.moderation.ContentModerationCategory
+import com.maumonmobile.domain.moderation.ContentModerationModelStatus
+import com.maumonmobile.domain.moderation.ContentModerationRiskLevel
+import com.maumonmobile.domain.moderation.ContentModerationTarget
 import com.maumonmobile.global.observability.MobileApiMetricsRegistry
 import com.maumonmobile.global.security.JwtTokenProvider
 import org.assertj.core.api.Assertions.assertThat
@@ -25,6 +31,7 @@ class MobileObservabilityControllerTest @Autowired constructor(
     private val mockMvc: MockMvc,
     private val metricsRegistry: MobileApiMetricsRegistry,
     private val authMemberRepository: AuthMemberRepository,
+    private val contentModerationAuditRepository: ContentModerationAuditRepository,
     private val jwtTokenProvider: JwtTokenProvider,
 ) {
 
@@ -62,6 +69,45 @@ class MobileObservabilityControllerTest @Autowired constructor(
         assertThat(responseBody).doesNotContain(email)
         assertThat(responseBody).doesNotContain("wrong-password")
         assertThat(responseBody).contains("p95LatencyMs", "successRate", "errorCodes")
+    }
+
+    @Test
+    fun apiMetricsIncludeContentModerationHistoryWithoutRawPayloads() {
+        metricsRegistry.clear()
+        val adminAccessToken = adminAccessToken()
+        contentModerationAuditRepository.save(
+            ContentModerationAuditDraft(
+                memberId = null,
+                target = ContentModerationTarget.REPORT,
+                allowed = false,
+                riskLevel = ContentModerationRiskLevel.HIGH,
+                categories = listOf(ContentModerationCategory.SPAM),
+                modelStatus = ContentModerationModelStatus.TIMEOUT,
+                latencyMs = 900,
+                textHash = "c".repeat(64),
+                textLength = 24,
+                contentSummary = "length=24;personalInfo=false;categoryCount=1",
+            ),
+        )
+
+        val result = mockMvc.get("/api/v1/observability/api-metrics") {
+            header("Authorization", "Bearer $adminAccessToken")
+        }
+            .andExpect {
+                status { isOk() }
+                jsonPath("$.data.ai.contentModerationHistory.totalCount") {
+                    value(org.hamcrest.Matchers.greaterThanOrEqualTo(1))
+                }
+                jsonPath("$.data.ai.contentModerationHistory.modelFailureCount") {
+                    value(org.hamcrest.Matchers.greaterThanOrEqualTo(1))
+                }
+                jsonPath("$.data.ai.contentModerationHistory.highRiskCategories.SPAM") {
+                    value(org.hamcrest.Matchers.greaterThanOrEqualTo(1))
+                }
+            }
+            .andReturn()
+
+        assertThat(result.response.contentAsString).doesNotContain("원문", "010-1234-5678")
     }
 
     private fun signupAndLogin(email: String): String {

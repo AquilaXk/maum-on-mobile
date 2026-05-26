@@ -4,6 +4,7 @@ import com.maumonmobile.application.port.out.AuthMemberRepository
 import com.maumonmobile.application.port.out.AdminAuditRepository
 import com.maumonmobile.application.port.out.AuthOidcStateRepository
 import com.maumonmobile.application.port.out.ConsultationRepository
+import com.maumonmobile.application.port.out.ContentModerationAuditRepository
 import com.maumonmobile.application.port.out.ConsultationSafetyAuditRepository
 import com.maumonmobile.application.port.out.DiaryRepository
 import com.maumonmobile.application.port.out.ImageAssetRepository
@@ -36,6 +37,7 @@ class PersistentRepositoryContextTest @Autowired constructor(
     private val adminAuditRepository: AdminAuditRepository,
     private val authOidcStateRepository: AuthOidcStateRepository,
     private val consultationRepository: ConsultationRepository,
+    private val contentModerationAuditRepository: ContentModerationAuditRepository,
     private val consultationSafetyAuditRepository: ConsultationSafetyAuditRepository,
     private val diaryRepository: DiaryRepository,
     private val imageAssetRepository: ImageAssetRepository,
@@ -52,6 +54,7 @@ class PersistentRepositoryContextTest @Autowired constructor(
         assertNotInMemoryRepository(adminAuditRepository)
         assertNotInMemoryRepository(authOidcStateRepository)
         assertNotInMemoryRepository(consultationRepository)
+        assertNotInMemoryRepository(contentModerationAuditRepository)
         assertNotInMemoryRepository(consultationSafetyAuditRepository)
         assertNotInMemoryRepository(diaryRepository)
         assertNotInMemoryRepository(imageAssetRepository)
@@ -75,6 +78,7 @@ class PersistentRepositoryContextTest @Autowired constructor(
         assertThat(tableExists("admin_audit_events")).isTrue()
         assertThat(tableExists("consultation_sessions")).isTrue()
         assertThat(tableExists("consultation_messages")).isTrue()
+        assertThat(tableExists("content_moderation_audit_events")).isTrue()
         assertThat(tableExists("consultation_safety_audit_events")).isTrue()
         assertThat(tableExists("sse_stream_tickets")).isTrue()
         assertThat(tableExists("sse_stream_sessions")).isTrue()

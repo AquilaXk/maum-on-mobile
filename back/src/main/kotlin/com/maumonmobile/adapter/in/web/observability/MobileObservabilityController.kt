@@ -1,10 +1,15 @@
 package com.maumonmobile.adapter.`in`.web.observability
 
 import com.maumonmobile.application.port.out.AuthMemberRepository
+import com.maumonmobile.application.port.out.ContentModerationAuditRepository
 import com.maumonmobile.domain.auth.AuthMemberRole
 import com.maumonmobile.domain.auth.AuthMemberStatus
+import com.maumonmobile.domain.moderation.ContentModerationAuditEvent
+import com.maumonmobile.domain.moderation.ContentModerationModelStatus
+import com.maumonmobile.domain.moderation.ContentModerationRiskLevel
 import com.maumonmobile.global.observability.MobileApiMetricsRegistry
 import com.maumonmobile.global.observability.MobileApiMetricsSnapshot
+import com.maumonmobile.global.observability.MobileContentModerationHistoryMetrics
 import com.maumonmobile.global.security.AuthenticatedUser
 import com.maumonmobile.global.web.ApiException
 import com.maumonmobile.global.web.ApiResponse
@@ -19,12 +24,20 @@ import org.springframework.web.bind.annotation.RestController
 class MobileObservabilityController(
     private val metricsRegistry: MobileApiMetricsRegistry,
     private val authMemberRepository: AuthMemberRepository,
+    private val contentModerationAuditRepository: ContentModerationAuditRepository,
 ) {
 
     @GetMapping("/api-metrics")
     fun apiMetrics(authentication: Authentication): ApiResponse<MobileApiMetricsSnapshot> {
         ensureAdmin(authentication.authenticatedUser())
-        return ApiResponse.success(metricsRegistry.snapshot())
+        val snapshot = metricsRegistry.snapshot()
+        return ApiResponse.success(
+            snapshot.copy(
+                ai = snapshot.ai.copy(
+                    contentModerationHistory = contentModerationAuditRepository.findAll().toHistoryMetrics(),
+                ),
+            ),
+        )
     }
 
     private fun ensureAdmin(user: AuthenticatedUser) {
@@ -49,6 +62,21 @@ class MobileObservabilityController(
             )
         }
     }
+}
+
+private fun List<ContentModerationAuditEvent>.toHistoryMetrics(): MobileContentModerationHistoryMetrics {
+    return MobileContentModerationHistoryMetrics(
+        totalCount = size,
+        blockedCount = count { audit -> !audit.allowed },
+        modelFailureCount = count { audit -> audit.modelStatus != ContentModerationModelStatus.SUCCESS },
+        highRiskCategories = filter { audit -> audit.riskLevel == ContentModerationRiskLevel.HIGH }
+            .flatMap { audit -> audit.categories }
+            .groupingBy { category -> category.name }
+            .eachCount()
+            .toSortedMap(),
+        modelStatuses = groupingBy { audit -> audit.modelStatus.name }.eachCount().toSortedMap(),
+        targets = groupingBy { audit -> audit.target.name }.eachCount().toSortedMap(),
+    )
 }
 
 private fun Authentication.authenticatedUser(): AuthenticatedUser {

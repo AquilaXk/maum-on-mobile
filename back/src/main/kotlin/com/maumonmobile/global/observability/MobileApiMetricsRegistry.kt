@@ -224,8 +224,18 @@ data class MobileNotificationMetrics(
 data class MobileAiMetrics(
     val model: Map<String, Int> = emptyMap(),
     val contentModeration: Map<String, Int> = emptyMap(),
+    val contentModerationHistory: MobileContentModerationHistoryMetrics = MobileContentModerationHistoryMetrics(),
     val consultationSafety: Map<String, Int> = emptyMap(),
     val consultationStream: Map<String, Int> = emptyMap(),
+)
+
+data class MobileContentModerationHistoryMetrics(
+    val totalCount: Int = 0,
+    val blockedCount: Int = 0,
+    val modelFailureCount: Int = 0,
+    val highRiskCategories: Map<String, Int> = emptyMap(),
+    val modelStatuses: Map<String, Int> = emptyMap(),
+    val targets: Map<String, Int> = emptyMap(),
 )
 
 data class MobileClientTelemetryMetrics(
