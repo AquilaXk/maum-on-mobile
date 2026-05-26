@@ -798,6 +798,49 @@ class OperationsController extends ChangeNotifier {
     }
   }
 
+  Future<void> openReportById(int reportId) async {
+    selectView(OperationsView.reports);
+    final summary = _findReportSummary(reportId);
+    if (summary != null) {
+      await openReport(summary);
+      return;
+    }
+
+    _setState(
+      _state.copyWith(
+        isDetailLoading: true,
+        clearErrorMessage: true,
+        clearNoticeMessage: true,
+      ),
+    );
+
+    try {
+      final detail = await _reportRepository.fetchAdminReport(reportId);
+      _setState(
+        _state.copyWith(
+          selectedReport: detail,
+          selectedAction: AdminReportAction.fromApiValue(detail.status),
+          actionReason: detail.actionReason ?? '',
+          isDetailLoading: false,
+          clearErrorMessage: true,
+        ),
+      );
+    } on Object catch (error) {
+      _handleError(error);
+      _setState(_state.copyWith(isDetailLoading: false));
+    }
+  }
+
+  AdminReportSummary? _findReportSummary(int reportId) {
+    for (final report in _state.reports) {
+      if (report.id == reportId) {
+        return report;
+      }
+    }
+
+    return null;
+  }
+
   void selectAction(AdminReportAction action) {
     _setState(
       _state.copyWith(

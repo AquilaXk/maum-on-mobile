@@ -104,6 +104,7 @@ class NotificationController extends ChangeNotifier {
   int _reconnectAttempts = 0;
   String? _registeredDeviceToken;
   final Set<String> _seenStreamEventKeys = <String>{};
+  final Set<int> _openingNotificationIds = <int>{};
 
   NotificationState get state => _state;
 
@@ -152,12 +153,39 @@ class NotificationController extends ChangeNotifier {
 
     try {
       final updated = await _repository.markRead(notification.id);
-      _replaceNotification(updated);
+      _replaceNotification(updated.withRoutingFrom(notification));
     } on Object catch (error) {
       _handleError(error);
       _setState(
         _state.copyWith(errorMessage: _messageFromError(error)),
       );
+    }
+  }
+
+  Future<NotificationItem?> openNotification(
+    NotificationItem notification,
+  ) async {
+    if (notification.id <= 0 || notification.isRead) {
+      return notification;
+    }
+
+    if (!_openingNotificationIds.add(notification.id)) {
+      return null;
+    }
+
+    try {
+      final updated = await _repository.markRead(notification.id);
+      final routed = updated.withRoutingFrom(notification);
+      _replaceNotification(routed);
+      return routed;
+    } on Object catch (error) {
+      _handleError(error);
+      _setState(
+        _state.copyWith(errorMessage: _messageFromError(error)),
+      );
+      return null;
+    } finally {
+      _openingNotificationIds.remove(notification.id);
     }
   }
 
@@ -328,6 +356,15 @@ class NotificationController extends ChangeNotifier {
     );
   }
 
+  void showNotice(String message) {
+    _setState(
+      _state.copyWith(
+        noticeMessage: message,
+        clearErrorMessage: true,
+      ),
+    );
+  }
+
   Future<void> unregisterRegisteredDeviceToken() async {
     final client = _pushPermissionClient;
     final knownToken = _registeredDeviceToken;
@@ -463,6 +500,10 @@ class NotificationController extends ChangeNotifier {
     final notification = NotificationItem(
       id: event.notificationId ?? --_localEventSequence,
       content: event.message,
+      type: event.notificationType ?? event.type.notificationType,
+      targetType: event.targetType ?? event.type.defaultTargetType,
+      targetId: event.targetId ?? event.letterId ?? event.reportId,
+      routeKey: event.routeKey ?? event.type.defaultRouteKey,
       isRead: false,
       createdAt: createdAt,
     );
@@ -618,5 +659,71 @@ class NotificationController extends ChangeNotifier {
     _reconnectTimer?.cancel();
     unawaited(_cancelStream());
     super.dispose();
+  }
+}
+
+extension on NotificationItem {
+  NotificationItem withRoutingFrom(NotificationItem source) {
+    if (hasExplicitRouting) {
+      return this;
+    }
+
+    return copyWith(
+      type: source.type,
+      targetType: source.targetType,
+      targetId: source.targetId,
+      routeKey: source.routeKey,
+    );
+  }
+
+  bool get hasExplicitRouting {
+    return type != 'fallback' ||
+        targetType != null ||
+        targetId != null ||
+        routeKey != 'notifications';
+  }
+}
+
+extension on NotificationStreamEventType {
+  String get notificationType {
+    return switch (this) {
+      NotificationStreamEventType.newLetter => 'new_letter',
+      NotificationStreamEventType.letterRead => 'letter_read',
+      NotificationStreamEventType.writingStatus => 'writing_status',
+      NotificationStreamEventType.replyArrival => 'reply_arrival',
+      NotificationStreamEventType.reportStatus => 'report_status',
+      NotificationStreamEventType.consultationReply => 'consultation_reply',
+      NotificationStreamEventType.connect || NotificationStreamEventType.unknown =>
+        'fallback',
+    };
+  }
+
+  String? get defaultTargetType {
+    return switch (this) {
+      NotificationStreamEventType.newLetter ||
+      NotificationStreamEventType.letterRead ||
+      NotificationStreamEventType.writingStatus ||
+      NotificationStreamEventType.replyArrival =>
+        'LETTER',
+      NotificationStreamEventType.reportStatus => 'REPORT',
+      NotificationStreamEventType.consultationReply => 'CONSULTATION',
+      NotificationStreamEventType.connect || NotificationStreamEventType.unknown =>
+        null,
+    };
+  }
+
+  String get defaultRouteKey {
+    return switch (this) {
+      NotificationStreamEventType.newLetter ||
+      NotificationStreamEventType.letterRead ||
+      NotificationStreamEventType.writingStatus ||
+      NotificationStreamEventType.replyArrival =>
+        'letter',
+      NotificationStreamEventType.consultationReply => 'consultation',
+      NotificationStreamEventType.reportStatus ||
+      NotificationStreamEventType.connect ||
+      NotificationStreamEventType.unknown =>
+        'notifications',
+    };
   }
 }

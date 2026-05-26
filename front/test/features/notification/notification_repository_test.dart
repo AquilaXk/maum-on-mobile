@@ -17,6 +17,10 @@ void main() {
             {
               'id': 7,
               'content': '새로운 랜덤 편지가 도착했습니다!',
+              'type': 'new_letter',
+              'targetType': 'LETTER',
+              'targetId': 42,
+              'routeKey': 'letter',
               'isRead': false,
               'createDate': '2026-05-24T09:00:00',
               'readAt': null,
@@ -32,6 +36,13 @@ void main() {
       expect(transport.requests.single.method, ApiMethod.get);
       expect(notifications.single.id, 7);
       expect(notifications.single.content, '새로운 랜덤 편지가 도착했습니다!');
+      expect(notifications.single.type, 'new_letter');
+      expect(notifications.single.targetType, 'LETTER');
+      expect(notifications.single.targetId, 42);
+      expect(notifications.single.routeKey, 'letter');
+      expect(notifications.single.tapPayload.destination,
+          NotificationTapDestination.letter);
+      expect(notifications.single.tapPayload.letterId, 42);
       expect(notifications.single.isRead, isFalse);
       expect(notifications.single.readAt, isNull);
     });
@@ -43,6 +54,10 @@ void main() {
           'data': {
             'id': 7,
             'content': '새로운 랜덤 편지가 도착했습니다!',
+            'type': 'new_letter',
+            'targetType': 'LETTER',
+            'targetId': 42,
+            'routeKey': 'letter',
             'isRead': true,
             'createdAt': '2026-05-24T09:00:00',
             'readAt': '2026-05-24T09:01:00',
@@ -80,6 +95,7 @@ void main() {
       expect(transport.requests[0].path, '/api/v1/notifications/7/read');
       expect(transport.requests[0].method, ApiMethod.post);
       expect(notification.isRead, isTrue);
+      expect(notification.tapPayload.letterId, 42);
       expect(notification.readAt, '2026-05-24T09:01:00');
       expect(transport.requests[1].path, '/api/v1/notifications/read-all');
       expect(readAll.updatedCount, 3);

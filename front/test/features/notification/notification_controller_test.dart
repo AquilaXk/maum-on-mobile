@@ -11,10 +11,22 @@ import 'package:maum_on_mobile_front/features/notification/domain/notification_m
 void main() {
   test('maps notification tap payloads to authenticated routes', () {
     expect(
-      NotificationTapPayload.fromJson({'type': 'reply_arrival', 'letterId': 7})
-          .destination,
+      NotificationTapPayload.fromJson({
+        'type': 'reply_arrival',
+        'letterId': 7,
+      }).destination,
       NotificationTapDestination.letter,
     );
+    final targetPayload = NotificationTapPayload.fromJson({
+      'type': 'new_letter',
+      'targetType': 'LETTER',
+      'targetId': '9',
+      'routeKey': 'letter',
+      'notificationId': '17',
+    });
+    expect(targetPayload.destination, NotificationTapDestination.letter);
+    expect(targetPayload.letterId, 9);
+    expect(targetPayload.notificationId, 17);
     expect(
       NotificationTapPayload.fromJson({'event': 'consultation_reply'})
           .destination,
@@ -154,6 +166,60 @@ void main() {
       expect(repository.markReadIds, [3]);
       expect(repository.markAllReadCount, 1);
       expect(controller.state.notifications.every((item) => item.isRead), isTrue);
+    });
+
+    test('opens unread notifications by marking read once before navigation',
+        () async {
+      final markReadCompleter = Completer<NotificationItem>();
+      final repository = _FakeNotificationRepository(
+        notificationsQueue: [
+          [
+            const NotificationItem(
+              id: 8,
+              content: '보낸 편지에 답장이 도착했습니다!',
+              type: 'reply_arrival',
+              targetType: 'LETTER',
+              targetId: 8,
+              routeKey: 'letter',
+              isRead: false,
+              createdAt: '2026-05-24T09:00:00',
+            ),
+          ],
+        ],
+        markReadCompleter: markReadCompleter,
+      );
+      final controller = NotificationController(repository: repository);
+
+      await controller.load();
+      final firstOpen = controller.openNotification(
+        controller.state.notifications.single,
+      );
+      final secondOpen = controller.openNotification(
+        controller.state.notifications.single,
+      );
+      await Future<void>.delayed(Duration.zero);
+
+      expect(repository.markReadIds, [8]);
+
+      markReadCompleter.complete(
+        const NotificationItem(
+          id: 8,
+          content: '보낸 편지에 답장이 도착했습니다!',
+          type: 'reply_arrival',
+          targetType: 'LETTER',
+          targetId: 8,
+          routeKey: 'letter',
+          isRead: true,
+          createdAt: '2026-05-24T09:00:00',
+          readAt: '2026-05-24T09:01:00',
+        ),
+      );
+
+      final opened = await firstOpen;
+      expect(await secondOpen, isNull);
+      expect(opened?.isRead, isTrue);
+      expect(opened?.tapPayload.destination, NotificationTapDestination.letter);
+      expect(controller.state.notifications.single.isRead, isTrue);
     });
 
     test('requests push permission and registers the device token', () async {
@@ -367,13 +433,16 @@ class _FakeNotificationRepository implements NotificationRepository {
       [],
     ],
     Completer<NotificationSubscriptionTicket>? ticketCompleter,
+    Completer<NotificationItem>? markReadCompleter,
     this.ticketError,
   })  : _notificationsQueue =
             List<List<NotificationItem>>.of(notificationsQueue),
-        _ticketCompleter = ticketCompleter;
+        _ticketCompleter = ticketCompleter,
+        _markReadCompleter = markReadCompleter;
 
   final List<List<NotificationItem>> _notificationsQueue;
   final Completer<NotificationSubscriptionTicket>? _ticketCompleter;
+  final Completer<NotificationItem>? _markReadCompleter;
   final Object? ticketError;
   final List<String> connectTickets = [];
   final List<int> markReadIds = [];
@@ -399,6 +468,11 @@ class _FakeNotificationRepository implements NotificationRepository {
   @override
   Future<NotificationItem> markRead(int notificationId) async {
     markReadIds.add(notificationId);
+    final completer = _markReadCompleter;
+    if (completer != null) {
+      return completer.future;
+    }
+
     return NotificationItem(
       id: notificationId,
       content: '상대방이 편지를 읽었습니다.',

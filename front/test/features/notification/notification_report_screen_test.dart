@@ -12,8 +12,11 @@ import 'package:maum_on_mobile_front/features/report/domain/report_models.dart';
 
 void main() {
   testWidgets('renders notifications and submits a report', (tester) async {
+    final semantics = SemanticsTester(tester);
+    addTearDown(semantics.dispose);
     final notificationRepository = _FakeNotificationRepository();
     final reportRepository = _FakeReportRepository();
+    final openedNotifications = <NotificationItem>[];
     final notificationController = NotificationController(
       repository: notificationRepository,
     );
@@ -32,6 +35,7 @@ void main() {
           notificationController: notificationController,
           reportController: reportController,
           onBack: () {},
+          onOpenNotification: openedNotifications.add,
         ),
       ),
     );
@@ -44,6 +48,13 @@ void main() {
     expect(find.text('알림/신고'), findsOneWidget);
     expect(find.text('상대방이 편지를 읽었습니다.'), findsOneWidget);
     expect(find.text('보낸 편지에 답장이 도착했습니다!'), findsWidgets);
+
+    await tester.tap(find.byKey(const ValueKey('notification-card-1')));
+    await tester.pumpAndSettle();
+
+    expect(notificationRepository.markReadIds, [1]);
+    expect(openedNotifications.single.isRead, isTrue);
+    expect(find.bySemanticsLabel(RegExp('읽은 알림.*편지')), findsOneWidget);
 
     await tester.tap(find.text('신고'));
     await tester.pumpAndSettle();
@@ -69,6 +80,7 @@ void main() {
 
 class _FakeNotificationRepository implements NotificationRepository {
   int ticketRequestCount = 0;
+  final List<int> markReadIds = [];
   StreamController<NotificationStreamEvent>? _controller;
 
   @override
@@ -77,6 +89,10 @@ class _FakeNotificationRepository implements NotificationRepository {
       NotificationItem(
         id: 1,
         content: '상대방이 편지를 읽었습니다.',
+        type: 'letter_read',
+        targetType: 'LETTER',
+        targetId: 12,
+        routeKey: 'letter',
         isRead: false,
         createdAt: '2026-05-24T09:00:00',
       ),
@@ -85,9 +101,14 @@ class _FakeNotificationRepository implements NotificationRepository {
 
   @override
   Future<NotificationItem> markRead(int notificationId) async {
+    markReadIds.add(notificationId);
     return NotificationItem(
       id: notificationId,
       content: '상대방이 편지를 읽었습니다.',
+      type: 'letter_read',
+      targetType: 'LETTER',
+      targetId: 12,
+      routeKey: 'letter',
       isRead: true,
       createdAt: '2026-05-24T09:00:00',
       readAt: '2026-05-24T09:01:00',

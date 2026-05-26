@@ -51,6 +51,10 @@ class NotificationItem {
     required this.content,
     required this.isRead,
     required this.createdAt,
+    this.type = 'fallback',
+    this.targetType,
+    this.targetId,
+    this.routeKey = 'notifications',
     this.readAt,
   });
 
@@ -63,6 +67,10 @@ class NotificationItem {
     return NotificationItem(
       id: _readInt(map, 'id'),
       content: map['content']?.toString() ?? '',
+      type: _readNullableString(map['type']) ?? 'fallback',
+      targetType: _readNullableString(map['targetType']),
+      targetId: _readOptionalInt(map, 'targetId'),
+      routeKey: _readNullableString(map['routeKey']) ?? 'notifications',
       isRead: map['isRead'] == true || map['read'] == true,
       createdAt: (map['createdAt'] ??
               map['createdDate'] ??
@@ -76,13 +84,57 @@ class NotificationItem {
 
   final int id;
   final String content;
+  final String type;
+  final String? targetType;
+  final int? targetId;
+  final String routeKey;
   final bool isRead;
   final String createdAt;
   final String? readAt;
 
+  int? get letterId {
+    return targetType?.toUpperCase() == 'LETTER' ? targetId : null;
+  }
+
+  int? get reportId {
+    return targetType?.toUpperCase() == 'REPORT' ? targetId : null;
+  }
+
+  NotificationTapDestination get destination {
+    return _destinationFromRouteKey(routeKey, fallbackType: type);
+  }
+
+  NotificationTapPayload get tapPayload {
+    return NotificationTapPayload(
+      destination: destination,
+      notificationId: id > 0 ? id : null,
+      letterId: letterId,
+      reportId: reportId,
+      rawType: type,
+    );
+  }
+
+  String get destinationLabel {
+    return switch (destination) {
+      NotificationTapDestination.letter => '편지',
+      NotificationTapDestination.consultation => '상담',
+      NotificationTapDestination.operations => '운영',
+      NotificationTapDestination.notifications => '알림',
+    };
+  }
+
+  String get accessibilityLabel {
+    final readState = isRead ? '읽은' : '읽지 않은';
+    return '$readState 알림, $content, $destinationLabel로 이동';
+  }
+
   NotificationItem copyWith({
     int? id,
     String? content,
+    String? type,
+    String? targetType,
+    int? targetId,
+    String? routeKey,
     bool? isRead,
     String? createdAt,
     String? readAt,
@@ -90,6 +142,10 @@ class NotificationItem {
     return NotificationItem(
       id: id ?? this.id,
       content: content ?? this.content,
+      type: type ?? this.type,
+      targetType: targetType ?? this.targetType,
+      targetId: targetId ?? this.targetId,
+      routeKey: routeKey ?? this.routeKey,
       isRead: isRead ?? this.isRead,
       createdAt: createdAt ?? this.createdAt,
       readAt: readAt ?? this.readAt,
@@ -114,33 +170,28 @@ class NotificationTapPayload {
     }
 
     final map = _stringKeyedMap(json);
-    final rawType = (map['type'] ??
-            map['event'] ??
-            map['route'] ??
-            map['destination'] ??
-            '')
+    final rawType = (map['type'] ?? map['event'] ?? '')
         .toString()
         .trim()
         .toLowerCase();
-    final destination = switch (rawType) {
-      'letter' ||
-      'letters' ||
-      'new_letter' ||
-      'letter_read' ||
-      'writing_status' ||
-      'reply_arrival' =>
-        NotificationTapDestination.letter,
-      'consultation' || 'consultation_reply' =>
-        NotificationTapDestination.consultation,
-      'operations' || 'admin' => NotificationTapDestination.operations,
-      _ => NotificationTapDestination.notifications,
-    };
+    final routeKey = (map['routeKey'] ?? map['route'] ?? map['destination'])
+        ?.toString()
+        .trim()
+        .toLowerCase();
+    final destination = _destinationFromRouteKey(
+      routeKey ?? '',
+      fallbackType: rawType,
+    );
+    final targetType = map['targetType']?.toString().trim().toUpperCase();
+    final targetId = _readOptionalInt(map, 'targetId');
 
     return NotificationTapPayload(
       destination: destination,
       notificationId: _readOptionalInt(map, 'notificationId'),
-      letterId: _readOptionalInt(map, 'letterId'),
-      reportId: _readOptionalInt(map, 'reportId'),
+      letterId: _readOptionalInt(map, 'letterId') ??
+          (targetType == 'LETTER' ? targetId : null),
+      reportId: _readOptionalInt(map, 'reportId') ??
+          (targetType == 'REPORT' ? targetId : null),
       rawType: rawType.isEmpty ? null : rawType,
     );
   }
@@ -150,6 +201,28 @@ class NotificationTapPayload {
   final int? letterId;
   final int? reportId;
   final String? rawType;
+}
+
+NotificationTapDestination _destinationFromRouteKey(
+  String routeKey, {
+  String fallbackType = '',
+}) {
+  final normalizedRoute = routeKey.trim().toLowerCase();
+  final normalizedType = fallbackType.trim().toLowerCase();
+  return switch (normalizedRoute.isEmpty ? normalizedType : normalizedRoute) {
+    'letter' ||
+    'letters' ||
+    'new_letter' ||
+    'letter_read' ||
+    'writing_status' ||
+    'reply_arrival' =>
+      NotificationTapDestination.letter,
+    'consultation' || 'consultation_reply' =>
+      NotificationTapDestination.consultation,
+    'operations' || 'operations_action' || 'admin' =>
+      NotificationTapDestination.operations,
+    _ => NotificationTapDestination.notifications,
+  };
 }
 
 class NotificationSubscriptionTicket {
@@ -179,6 +252,10 @@ class NotificationStreamEvent {
     required this.type,
     required this.data,
     required this.message,
+    this.notificationType,
+    this.targetType,
+    this.targetId,
+    this.routeKey,
     this.letterId,
     this.reportId,
     this.status,
@@ -271,6 +348,10 @@ class NotificationStreamEvent {
           type: NotificationStreamEventType.newLetter,
           data: data,
           message: message.isEmpty ? '새로운 랜덤 편지가 도착했습니다!' : message,
+          notificationType: payload.notificationType,
+          targetType: payload.targetType,
+          targetId: payload.targetId,
+          routeKey: payload.routeKey,
           letterId: payload.letterId,
           status: payload.status,
           notificationId: payload.notificationId,
@@ -280,6 +361,10 @@ class NotificationStreamEvent {
           type: NotificationStreamEventType.letterRead,
           data: data,
           message: message.isEmpty ? '상대방이 편지를 읽었습니다.' : message,
+          notificationType: payload.notificationType,
+          targetType: payload.targetType,
+          targetId: payload.targetId,
+          routeKey: payload.routeKey,
           letterId: payload.letterId,
           status: payload.status,
           notificationId: payload.notificationId,
@@ -289,6 +374,10 @@ class NotificationStreamEvent {
           type: NotificationStreamEventType.writingStatus,
           data: data,
           message: message.isEmpty ? '상대방이 답장을 작성 중입니다.' : message,
+          notificationType: payload.notificationType,
+          targetType: payload.targetType,
+          targetId: payload.targetId,
+          routeKey: payload.routeKey,
           letterId: payload.letterId,
           status: payload.status,
           notificationId: payload.notificationId,
@@ -298,6 +387,10 @@ class NotificationStreamEvent {
           type: NotificationStreamEventType.replyArrival,
           data: data,
           message: message.isEmpty ? '보낸 편지에 답장이 도착했습니다!' : message,
+          notificationType: payload.notificationType,
+          targetType: payload.targetType,
+          targetId: payload.targetId,
+          routeKey: payload.routeKey,
           letterId: payload.letterId,
           status: payload.status,
           notificationId: payload.notificationId,
@@ -307,6 +400,10 @@ class NotificationStreamEvent {
           type: NotificationStreamEventType.reportStatus,
           data: data,
           message: message.isEmpty ? '신고 처리 결과가 등록되었습니다.' : message,
+          notificationType: payload.notificationType,
+          targetType: payload.targetType,
+          targetId: payload.targetId,
+          routeKey: payload.routeKey,
           reportId: payload.reportId,
           status: payload.status,
           notificationId: payload.notificationId,
@@ -316,6 +413,10 @@ class NotificationStreamEvent {
           type: NotificationStreamEventType.consultationReply,
           data: data,
           message: message.isEmpty ? '상담 답변이 도착했습니다.' : message,
+          notificationType: payload.notificationType,
+          targetType: payload.targetType,
+          targetId: payload.targetId,
+          routeKey: payload.routeKey,
           status: payload.status,
           notificationId: payload.notificationId,
           createdAt: payload.createdAt,
@@ -327,6 +428,10 @@ class NotificationStreamEvent {
   final NotificationStreamEventType type;
   final String data;
   final String message;
+  final String? notificationType;
+  final String? targetType;
+  final int? targetId;
+  final String? routeKey;
   final int? letterId;
   final int? reportId;
   final String? status;
@@ -403,6 +508,10 @@ class NotificationDeviceTokenResult {
 class _NotificationPayload {
   const _NotificationPayload({
     required this.message,
+    this.notificationType,
+    this.targetType,
+    this.targetId,
+    this.routeKey,
     this.letterId,
     this.reportId,
     this.status,
@@ -411,6 +520,10 @@ class _NotificationPayload {
   });
 
   final String message;
+  final String? notificationType;
+  final String? targetType;
+  final int? targetId;
+  final String? routeKey;
   final int? letterId;
   final int? reportId;
   final String? status;
@@ -425,6 +538,10 @@ _NotificationPayload _decodePayload(String data) {
       final map = _stringKeyedMap(decoded);
       return _NotificationPayload(
         message: (map['message'] ?? map['content'] ?? data).toString(),
+        notificationType: _readNullableString(map['type']),
+        targetType: _readNullableString(map['targetType']),
+        targetId: _readOptionalInt(map, 'targetId'),
+        routeKey: _readNullableString(map['routeKey']),
         letterId: _readOptionalInt(map, 'letterId'),
         reportId: _readOptionalInt(map, 'reportId'),
         status: _readNullableString(map['status']),
