@@ -25,6 +25,11 @@ EOF
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --platform)
+      if [[ $# -lt 2 || -z "${2:-}" ]]; then
+        echo "Missing value for --platform." >&2
+        usage >&2
+        exit 2
+      fi
       platform="${2:-}"
       shift 2
       ;;

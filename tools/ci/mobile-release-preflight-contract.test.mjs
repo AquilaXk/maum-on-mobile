@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { existsSync, readFileSync, statSync } from "node:fs";
 import path from "node:path";
+import { spawnSync } from "node:child_process";
 import test from "node:test";
 
 const root = process.cwd();
@@ -54,4 +55,15 @@ test("README documents release preflight commands", () => {
   assert.match(readme, /tools\/ci\/run-mobile-release-preflight\.sh --platform android/);
   assert.match(readme, /tools\/ci\/run-mobile-release-preflight\.sh --platform ios/);
   assert.match(readme, /tools\/ci\/run-mobile-release-preflight\.sh --platform all/);
+});
+
+test("mobile release preflight rejects a missing platform value", () => {
+  const result = spawnSync("tools/ci/run-mobile-release-preflight.sh", ["--platform"], {
+    cwd: root,
+    encoding: "utf8",
+  });
+
+  assert.equal(result.status, 2);
+  assert.match(result.stderr, /Missing value for --platform/);
+  assert.doesNotMatch(result.stderr, /shift/);
 });
