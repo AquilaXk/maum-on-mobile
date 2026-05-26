@@ -565,17 +565,31 @@ class _CommentTile extends StatelessWidget {
                   ],
                 ),
               ] else ...[
-                Text(comment.content),
+                _MentionText(
+                  key: ValueKey('story-comment-content-${comment.id}'),
+                  text: comment.content,
+                ),
                 const SizedBox(height: AppSpacing.xs),
                 _ResponsiveActionWrap(
                   key: ValueKey('story-comment-action-row-${comment.id}'),
                   children: [
                     TextButton.icon(
                       key:
+                          ValueKey('story-comment-reply-button-${comment.id}'),
+                      onPressed: state.isSubmitting
+                          ? null
+                          : () => controller.startReply(comment),
+                      icon: const Icon(Icons.reply_outlined),
+                      label: const Text('답글'),
+                    ),
+                    TextButton.icon(
+                      key:
                           ValueKey('story-comment-report-button-${comment.id}'),
-                      onPressed: () => controller.selectCommentReportTarget(
-                        comment,
-                      ),
+                      onPressed: state.isSubmitting
+                          ? null
+                          : () => controller.selectCommentReportTarget(
+                                comment,
+                              ),
                       icon: const Icon(Icons.flag_outlined),
                       label: const Text('신고'),
                     ),
@@ -583,9 +597,11 @@ class _CommentTile extends StatelessWidget {
                       TextButton.icon(
                         key:
                             ValueKey('story-comment-edit-button-${comment.id}'),
-                        onPressed: () => controller.startEditingComment(
-                          comment,
-                        ),
+                        onPressed: state.isSubmitting
+                            ? null
+                            : () => controller.startEditingComment(
+                                  comment,
+                                ),
                         icon: const Icon(Icons.edit_outlined),
                         label: const Text('수정'),
                       ),
@@ -601,6 +617,18 @@ class _CommentTile extends StatelessWidget {
                     ],
                   ],
                 ),
+                if (state.activeReplyCommentId == comment.id) ...[
+                  const SizedBox(height: AppSpacing.sm),
+                  _ReplyComposer(
+                    parentCommentId: comment.id,
+                    draft: state.replyDrafts[comment.id] ?? '',
+                    isSubmitting: state.isSubmitting,
+                    canSubmit: state.canSubmitReply(comment.id),
+                    onChanged: controller.updateReplyDraft,
+                    onSubmit: controller.submitReply,
+                    onCancel: controller.cancelReply,
+                  ),
+                ],
               ],
               if (comment.replies.isNotEmpty) ...[
                 const SizedBox(height: AppSpacing.sm),
@@ -619,6 +647,128 @@ class _CommentTile extends StatelessWidget {
         ),
       ),
     );
+  }
+}
+
+class _ReplyComposer extends StatefulWidget {
+  const _ReplyComposer({
+    required this.parentCommentId,
+    required this.draft,
+    required this.isSubmitting,
+    required this.canSubmit,
+    required this.onChanged,
+    required this.onSubmit,
+    required this.onCancel,
+  });
+
+  final int parentCommentId;
+  final String draft;
+  final bool isSubmitting;
+  final bool canSubmit;
+  final void Function(int parentCommentId, String content) onChanged;
+  final Future<void> Function(int parentCommentId) onSubmit;
+  final void Function(int parentCommentId) onCancel;
+
+  @override
+  State<_ReplyComposer> createState() => _ReplyComposerState();
+}
+
+class _ReplyComposerState extends State<_ReplyComposer> {
+  late final TextEditingController _controller =
+      TextEditingController(text: widget.draft);
+  var _isSubmitting = false;
+
+  @override
+  void didUpdateWidget(covariant _ReplyComposer oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (_controller.text != widget.draft) {
+      _controller.value = TextEditingValue(
+        text: widget.draft,
+        selection: TextSelection.collapsed(offset: widget.draft.length),
+      );
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surfaceContainerHighest,
+        borderRadius: AppRadii.card,
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(AppSpacing.md),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            TextField(
+              key: ValueKey('story-reply-field-${widget.parentCommentId}'),
+              controller: _controller,
+              minLines: 2,
+              maxLines: 4,
+              decoration: const InputDecoration(
+                labelText: '답글',
+                border: OutlineInputBorder(),
+              ),
+              enabled: !widget.isSubmitting,
+              onChanged: (content) => widget.onChanged(
+                widget.parentCommentId,
+                content,
+              ),
+            ),
+            const SizedBox(height: AppSpacing.xs),
+            _ResponsiveActionWrap(
+              children: [
+                FilledButton.tonalIcon(
+                  key: ValueKey(
+                    'story-reply-submit-button-${widget.parentCommentId}',
+                  ),
+                  onPressed: widget.canSubmit &&
+                          !widget.isSubmitting &&
+                          !_isSubmitting
+                      ? _submit
+                      : null,
+                  icon: widget.isSubmitting || _isSubmitting
+                      ? const SizedBox.square(
+                          dimension: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.send_outlined),
+                  label: const Text('답글 등록'),
+                ),
+                OutlinedButton.icon(
+                  key: ValueKey(
+                    'story-reply-cancel-button-${widget.parentCommentId}',
+                  ),
+                  onPressed: widget.isSubmitting
+                      ? null
+                      : () => widget.onCancel(widget.parentCommentId),
+                  icon: const Icon(Icons.close),
+                  label: const Text('취소'),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _submit() async {
+    setState(() => _isSubmitting = true);
+    try {
+      await widget.onSubmit(widget.parentCommentId);
+    } finally {
+      if (mounted) {
+        setState(() => _isSubmitting = false);
+      }
+    }
   }
 }
 
@@ -735,6 +885,49 @@ class _ResponsiveActionWrap extends StatelessWidget {
     );
   }
 }
+
+class _MentionText extends StatelessWidget {
+  const _MentionText({
+    required this.text,
+    super.key,
+  });
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    final baseStyle = DefaultTextStyle.of(context).style;
+    final mentionStyle = baseStyle.copyWith(
+      color: Theme.of(context).colorScheme.primary,
+      fontWeight: FontWeight.w800,
+    );
+    final spans = <TextSpan>[];
+    var cursor = 0;
+
+    for (final match in _mentionPattern.allMatches(text)) {
+      if (match.start > cursor) {
+        spans.add(TextSpan(text: text.substring(cursor, match.start)));
+      }
+      spans.add(
+        TextSpan(
+          text: match.group(0),
+          style: mentionStyle,
+        ),
+      );
+      cursor = match.end;
+    }
+
+    if (cursor < text.length) {
+      spans.add(TextSpan(text: text.substring(cursor)));
+    }
+
+    return Text.rich(
+      TextSpan(style: baseStyle, children: spans),
+    );
+  }
+}
+
+final RegExp _mentionPattern = RegExp(r'@[0-9A-Za-z._\-가-힣]{2,30}');
 
 class _Pill extends StatelessWidget {
   const _Pill({required this.label});
