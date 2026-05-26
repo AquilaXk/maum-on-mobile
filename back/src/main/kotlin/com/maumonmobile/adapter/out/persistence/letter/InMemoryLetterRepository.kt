@@ -15,14 +15,14 @@ class InMemoryLetterRepository : LetterRepository {
     private val sequence = AtomicLong(1L)
     private val lettersById = ConcurrentHashMap<Long, Letter>()
 
-    override fun save(senderId: Long, senderNickname: String, draft: LetterDraft): Letter {
+    override fun save(senderId: Long, senderNickname: String, draft: LetterDraft, receiverId: Long?): Letter {
         val id = sequence.getAndIncrement()
         val now = Instant.now().toString()
         val letter = Letter(
             id = id,
             senderId = senderId,
             senderNickname = senderNickname,
-            receiverId = null,
+            receiverId = receiverId,
             title = draft.title,
             content = draft.content,
             status = "SENT",
