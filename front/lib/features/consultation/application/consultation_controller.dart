@@ -27,10 +27,13 @@ class ConsultationState {
   final String? errorMessage;
   final ConsultationSafetyResult? safetyNotice;
 
+  bool get inputBlockedBySafety => safetyNotice?.blocksConversation ?? false;
+
   bool get canSubmit {
     return connectionState == ConsultationConnectionState.connected &&
         draft.trim().isNotEmpty &&
         draft.trim().length <= ConsultationController.maxMessageLength &&
+        !inputBlockedBySafety &&
         !isSending &&
         !isStreaming;
   }
@@ -182,6 +185,10 @@ class ConsultationController extends ChangeNotifier {
   }
 
   void updateDraft(String draft) {
+    if (_state.inputBlockedBySafety) {
+      return;
+    }
+
     _setState(
       _state.copyWith(
         draft: draft,
@@ -193,6 +200,10 @@ class ConsultationController extends ChangeNotifier {
   }
 
   Future<void> submitMessage() async {
+    if (_state.inputBlockedBySafety) {
+      return;
+    }
+
     final content = _state.draft.trim();
     if (content.isEmpty || _state.isSending || _state.isStreaming) {
       return;
@@ -324,9 +335,8 @@ class ConsultationController extends ChangeNotifier {
         _finishStreaming();
         return;
       case ConsultationStreamEventType.error:
-        final message = event.data.isEmpty
-            ? '상담 응답 생성 중 오류가 발생했습니다.'
-            : event.data;
+        final message =
+            event.data.isEmpty ? '상담 응답 생성 중 오류가 발생했습니다.' : event.data;
         _replaceActiveAssistantWithSystem(message);
         _setState(
           _state.copyWith(
