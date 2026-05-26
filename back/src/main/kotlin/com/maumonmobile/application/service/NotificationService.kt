@@ -113,6 +113,10 @@ private fun Notification.toResult(): NotificationResult {
     return NotificationResult(
         id = id,
         content = content,
+        type = type,
+        targetType = targetType,
+        targetId = targetId,
+        routeKey = routeKey,
         isRead = isRead,
         createdAt = createdAt,
         readAt = readAt,
