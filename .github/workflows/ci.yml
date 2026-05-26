@@ -293,6 +293,10 @@ jobs:
           channel: stable
           cache: true
 
+      - name: Run Android release preflight
+        if: ${{ steps.scaffold.outputs.present == 'true' && steps.scaffold.outputs.stack == 'flutter' }}
+        run: tools/ci/run-mobile-release-preflight.sh --platform android
+
       - name: Build Flutter Android debug app
         if: ${{ steps.scaffold.outputs.present == 'true' && steps.scaffold.outputs.stack == 'flutter' }}
         working-directory: front
@@ -385,6 +389,10 @@ jobs:
         with:
           channel: stable
           cache: true
+
+      - name: Run iOS release preflight
+        if: ${{ steps.scaffold.outputs.present == 'true' && steps.scaffold.outputs.stack == 'flutter' }}
+        run: tools/ci/run-mobile-release-preflight.sh --platform ios
 
       - name: Build Flutter iOS app
         if: ${{ steps.scaffold.outputs.present == 'true' && steps.scaffold.outputs.stack == 'flutter' }}

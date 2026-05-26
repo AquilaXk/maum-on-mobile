@@ -26,6 +26,9 @@ Run Flutter commands through the repository wrapper:
 - `tools/flutterw run -d ios`: run the app on an iOS simulator or device.
 - `tools/flutterw build apk --debug`: build the Android debug app without release signing.
 - `tools/flutterw build ios --simulator --no-codesign`: build the iOS simulator app without code signing.
+- `tools/ci/run-mobile-release-preflight.sh --platform android`: check Android release build tooling.
+- `tools/ci/run-mobile-release-preflight.sh --platform ios`: check iOS release build tooling.
+- `tools/ci/run-mobile-release-preflight.sh --platform all`: check Android and iOS release build tooling.
 
 Run repository contract tests from the repository root:
 
