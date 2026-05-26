@@ -4,6 +4,7 @@ set -euo pipefail
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
 ios_dir="${repo_root}/front/ios"
 self_path="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)/$(basename "${BASH_SOURCE[0]}")"
+bundler_version="2.4.22"
 
 if [[ -n "${POD_BIN:-}" ]]; then
   exec "${POD_BIN}" "$@"
@@ -14,9 +15,9 @@ if [[ -f "${ios_dir}/Gemfile" ]] && command -v bundle >/dev/null 2>&1; then
   export BUNDLE_USER_HOME="${BUNDLE_USER_HOME:-${ios_dir}/.bundle/home}"
   export BUNDLE_USER_CACHE="${BUNDLE_USER_CACHE:-${ios_dir}/.bundle/cache}"
   export BUNDLE_USER_CONFIG="${BUNDLE_USER_CONFIG:-${ios_dir}/.bundle/config}"
-  if bundle check >/dev/null 2>&1; then
+  if bundle "_${bundler_version}_" check >/dev/null 2>&1; then
     export RUBYOPT="-rlogger${RUBYOPT:+ ${RUBYOPT}}"
-    exec bundle exec pod "$@"
+    exec bundle "_${bundler_version}_" exec pod "$@"
   fi
 
   cat >&2 <<'EOF'
@@ -25,7 +26,7 @@ CocoaPods bundle is not installed.
 Run this before retrying iOS Flutter builds:
 - gem install bundler -v 2.4.22
 - cd front/ios
-- bundle install
+- bundle _2.4.22_ install
 EOF
   exit 127
 fi
