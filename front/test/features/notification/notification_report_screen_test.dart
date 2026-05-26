@@ -12,7 +12,7 @@ import 'package:maum_on_mobile_front/features/report/domain/report_models.dart';
 
 void main() {
   testWidgets('renders notifications and submits a report', (tester) async {
-    final semantics = SemanticsTester(tester);
+    final semantics = tester.ensureSemantics();
     addTearDown(semantics.dispose);
     final notificationRepository = _FakeNotificationRepository();
     final reportRepository = _FakeReportRepository();
