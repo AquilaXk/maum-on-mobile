@@ -23,6 +23,7 @@ if [[ -f "${ios_dir}/Gemfile" ]] && command -v bundle >/dev/null 2>&1; then
 CocoaPods bundle is not installed.
 
 Run this before retrying iOS Flutter builds:
+- gem install bundler -v 2.4.22
 - cd front/ios
 - bundle install
 EOF

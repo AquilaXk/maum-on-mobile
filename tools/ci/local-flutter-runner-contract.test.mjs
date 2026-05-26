@@ -39,6 +39,7 @@ test("repository exposes a CocoaPods wrapper for bundled iOS dependencies", () =
   assert.match(script, /BUNDLE_USER_HOME/, "Wrapper must keep Bundler state inside the ignored iOS bundle directory");
   assert.match(script, /bundle exec pod/, "Wrapper must prefer bundled CocoaPods");
   assert.match(script, /RUBYOPT="-rlogger/, "Wrapper must preload logger for macOS system Ruby");
+  assert.match(script, /gem install bundler -v 2\.4\.22/, "Wrapper must point users at the Bundler version in Gemfile.lock");
   assert.match(script, /CocoaPods bundle is not installed/, "Wrapper must explain missing bundled dependencies");
 });
 
@@ -72,6 +73,7 @@ test("README documents the local Flutter wrapper commands", () => {
   const readme = read("README.md");
 
   assert.match(readme, /tools\/flutterw --version/, "README must document the Flutter wrapper");
+  assert.match(readme, /gem install --user-install bundler -v 2\.4\.22/, "README must document the Bundler version needed by the iOS lockfile");
   assert.match(readme, /cd front\/ios && bundle install/, "README must document bundled CocoaPods setup");
   assert.match(readme, /tools\/ci\/run-local-mobile-checks\.sh/, "README must document the one-command local check");
   assert.match(readme, /tools\/ci\/run-local-mobile-checks\.sh --doctor/, "README must document local doctor mode");

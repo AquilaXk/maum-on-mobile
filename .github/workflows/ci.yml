@@ -396,8 +396,9 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          bundle config --local path vendor/bundle
-          bundle install --jobs 4 --retry 3
+          gem install bundler -v 2.4.22 --no-document
+          bundle _2.4.22_ config set --local path vendor/bundle
+          bundle _2.4.22_ install --jobs 4 --retry 3
 
       - name: Run iOS release preflight
         if: ${{ steps.scaffold.outputs.present == 'true' && steps.scaffold.outputs.stack == 'flutter' }}
