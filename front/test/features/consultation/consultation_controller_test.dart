@@ -169,6 +169,40 @@ void main() {
       expect(repository.sentMessages, ['죽고 싶어요']);
     });
 
+    test('keeps reconnect errors behind an active safety notice', () async {
+      final repository = _FakeConsultationRepository(
+        sendResult: const ConsultationSendResult(
+          accepted: false,
+          safety: ConsultationSafetyResult(
+            category: ConsultationRiskCategory.selfHarm,
+            severity: ConsultationRiskSeverity.critical,
+            actionPolicy: ConsultationActionPolicy.blockAndEscalate,
+            message: '지금 안전이 가장 중요합니다. 119에 도움을 요청해 주세요.',
+          ),
+        ),
+      );
+      final controller = ConsultationController(
+        repository: repository,
+        reconnectBackoffDelays: const [Duration.zero],
+      );
+
+      await controller.connect();
+      repository.emit(const ConsultationStreamEvent.connect('connected'));
+      controller.updateDraft('죽고 싶어요');
+      await controller.submitMessage();
+
+      repository.emitError(Exception('closed'));
+      await Future<void>.delayed(Duration.zero);
+
+      expect(controller.state.safetyNotice, isNotNull);
+      expect(controller.state.errorMessage, isNull);
+      expect(
+        controller.state.messages
+            .where((message) => message.content.contains('자동으로 다시 연결')),
+        isEmpty,
+      );
+    });
+
     test('restores normal draft but clears blocked sensitive draft', () async {
       final draftRepository = StorageDraftRecoveryRepository(
         storage: MemoryDraftRecoveryStorage(),
@@ -235,7 +269,10 @@ void main() {
 
     test('surfaces stream errors and reconnects on demand', () async {
       final repository = _FakeConsultationRepository();
-      final controller = ConsultationController(repository: repository);
+      final controller = ConsultationController(
+        repository: repository,
+        reconnectBackoffDelays: const [],
+      );
 
       await controller.connect();
       repository.emitError(Exception('closed'));
@@ -253,12 +290,135 @@ void main() {
           ConsultationConnectionState.connecting);
     });
 
+    test('automatically reconnects with bounded backoff after stream errors',
+        () async {
+      final repository = _FakeConsultationRepository();
+      final controller = ConsultationController(
+        repository: repository,
+        reconnectBackoffDelays: const [Duration.zero, Duration.zero],
+      );
+
+      await controller.connect();
+      repository.emit(const ConsultationStreamEvent.connect('connected'));
+      repository.emitError(Exception('first close'));
+      await Future<void>.delayed(Duration.zero);
+      await Future<void>.delayed(Duration.zero);
+
+      expect(repository.connectCount, 2);
+      expect(controller.state.connectionState,
+          ConsultationConnectionState.connecting);
+      expect(
+        controller.state.messages
+            .where((message) => message.content.contains('자동으로 다시 연결'))
+            .length,
+        1,
+      );
+
+      repository.emitError(Exception('second close'));
+      await Future<void>.delayed(Duration.zero);
+      await Future<void>.delayed(Duration.zero);
+
+      expect(repository.connectCount, 3);
+
+      repository.emitError(Exception('third close'));
+      await Future<void>.delayed(Duration.zero);
+      await Future<void>.delayed(Duration.zero);
+
+      expect(repository.connectCount, 3);
+      expect(
+          controller.state.connectionState, ConsultationConnectionState.error);
+      expect(
+        controller.state.messages
+            .where((message) => message.content.contains('자동으로 다시 연결'))
+            .length,
+        1,
+      );
+    });
+
+    test('keeps heartbeat quiet and reconnects stream error events', () async {
+      final repository = _FakeConsultationRepository();
+      final controller = ConsultationController(
+        repository: repository,
+        reconnectBackoffDelays: const [Duration.zero],
+      );
+
+      await controller.connect();
+      repository.emit(const ConsultationStreamEvent.connect('connected'));
+      repository.emit(const ConsultationStreamEvent.heartbeat('ping'));
+
+      expect(
+        controller.state.messages.where(
+          (message) => message.content.contains('ping'),
+        ),
+        isEmpty,
+      );
+
+      repository.emit(
+        const ConsultationStreamEvent.streamError('연결이 지연되고 있습니다.'),
+      );
+      await Future<void>.delayed(Duration.zero);
+      await Future<void>.delayed(Duration.zero);
+
+      expect(repository.connectCount, 2);
+      expect(controller.state.connectionState,
+          ConsultationConnectionState.connecting);
+    });
+
+    test('stores failed sends for retry and deletion', () async {
+      final repository = _FakeConsultationRepository()
+        ..sendErrors.add(Exception('network down'));
+      final draftRepository = StorageDraftRecoveryRepository(
+        storage: MemoryDraftRecoveryStorage(),
+      );
+      final controller = ConsultationController(
+        repository: repository,
+        currentMemberId: 7,
+        draftRepository: draftRepository,
+      );
+
+      await controller.connect();
+      repository.emit(const ConsultationStreamEvent.connect('connected'));
+      controller.updateDraft('다시 보내고 싶은 말');
+      await controller.submitMessage();
+
+      expect(controller.state.failedMessage?.content, '다시 보내고 싶은 말');
+      final failedDraft = await draftRepository.read(
+        const DraftKey(memberId: 7, surface: DraftSurface.consultation),
+      );
+      expect(failedDraft?.isFailed, isTrue);
+
+      await controller.retryFailedMessage();
+
+      expect(repository.sentMessages, ['다시 보내고 싶은 말', '다시 보내고 싶은 말']);
+      expect(controller.state.failedMessage, isNull);
+      expect(
+        await draftRepository.read(
+          const DraftKey(memberId: 7, surface: DraftSurface.consultation),
+        ),
+        isNull,
+      );
+
+      repository.sendErrors.add(Exception('network down'));
+      controller.updateDraft('삭제할 실패 메시지');
+      await controller.submitMessage();
+
+      await controller.deleteFailedMessage();
+
+      expect(controller.state.failedMessage, isNull);
+      expect(
+        controller.state.messages
+            .where((message) => message.content.contains('삭제할 실패 메시지')),
+        isEmpty,
+      );
+    });
+
     test('clears expired sessions when the stream rejects authorization',
         () async {
       final repository = _FakeConsultationRepository();
       var unauthorizedCount = 0;
       final controller = ConsultationController(
         repository: repository,
+        reconnectBackoffDelays: const [Duration.zero],
         onUnauthorized: () {
           unauthorizedCount += 1;
         },
@@ -275,6 +435,7 @@ void main() {
       await Future<void>.delayed(Duration.zero);
 
       expect(unauthorizedCount, 1);
+      expect(repository.connectCount, 1);
       expect(
           controller.state.connectionState, ConsultationConnectionState.error);
       expect(controller.state.errorMessage, '다시 로그인해 주세요.');
@@ -327,6 +488,7 @@ class _FakeConsultationRepository implements ConsultationRepository {
   final List<ConsultationMessage> recentMessages;
   final ConsultationSendResult sendResult;
   final List<String> sentMessages = [];
+  final List<Object> sendErrors = [];
   int connectCount = 0;
   int cancelCount = 0;
   int loadRecentCount = 0;
@@ -349,6 +511,9 @@ class _FakeConsultationRepository implements ConsultationRepository {
   @override
   Future<ConsultationSendResult> sendMessage(String message) async {
     sentMessages.add(message);
+    if (sendErrors.isNotEmpty) {
+      throw sendErrors.removeAt(0);
+    }
     return sendResult;
   }
 
