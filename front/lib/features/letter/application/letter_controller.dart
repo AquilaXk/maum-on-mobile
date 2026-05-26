@@ -61,11 +61,29 @@ class LetterState {
   final String? noticeMessage;
   final LetterReportTarget? reportTarget;
 
+  bool get hasComposeDraft =>
+      title.trim().isNotEmpty || content.trim().isNotEmpty;
+
+  bool get isComposeOverLimit {
+    return title.trim().length > LetterLimits.titleMaxLength ||
+        content.trim().length > LetterLimits.contentMaxLength;
+  }
+
+  bool get isReplyOverLimit {
+    return replyContent.trim().length > LetterLimits.replyMaxLength;
+  }
+
   bool get canSubmitLetter =>
-      title.trim().isNotEmpty && content.trim().isNotEmpty && !isSubmitting;
+      title.trim().isNotEmpty &&
+      content.trim().isNotEmpty &&
+      !isComposeOverLimit &&
+      !isSubmitting;
 
   bool get canSubmitReply =>
-      canReply && replyContent.trim().isNotEmpty && !isSubmitting;
+      canReply &&
+      replyContent.trim().isNotEmpty &&
+      !isReplyOverLimit &&
+      !isSubmitting;
 
   bool get canReply {
     final letter = selectedLetter;
@@ -440,6 +458,18 @@ class LetterController extends ChangeNotifier {
         title: '',
         content: '',
         clearErrorMessage: true,
+      ),
+    );
+    unawaited(_draftRepository?.delete(_composeDraftKey));
+  }
+
+  void resetCompose() {
+    _setState(
+      _state.copyWith(
+        title: '',
+        content: '',
+        clearErrorMessage: true,
+        clearNoticeMessage: true,
       ),
     );
     unawaited(_draftRepository?.delete(_composeDraftKey));

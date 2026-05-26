@@ -75,6 +75,37 @@ void main() {
     expect(settingsOpenCount, 1);
   });
 
+  testWidgets('opens latest received letter from the summary action',
+      (tester) async {
+    final repository = _FakeLetterRepository(
+      statsQueue: [
+        LetterStats(
+          receivedCount: 1,
+          latestReceivedLetter: _summary(id: 8, title: '최근 받은 편지'),
+          latestSentLetter: _summary(id: 2, title: '최근 보낸 편지'),
+        ),
+      ],
+      receivedPages: [
+        _page([_summary(id: 1, title: '목록 편지')]),
+      ],
+      details: [_detail(id: 8, status: LetterStatus.accepted)],
+    );
+    final controller = LetterController(letterRepository: repository);
+
+    await tester.pumpWidget(
+      MaterialApp(home: LetterScreen(controller: controller, onBack: () {})),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(
+      find.byKey(const ValueKey('letter-latest-received-button')),
+    );
+    await tester.pumpAndSettle();
+
+    expect(repository.requestedDetailIds, [8]);
+    expect(find.byKey(const ValueKey('letter-reply-field')), findsOneWidget);
+  });
+
   testWidgets('submits a new letter and moves to sent mailbox', (tester) async {
     final repository = _FakeLetterRepository(
       statsQueue: [_stats(), _stats()],
@@ -157,6 +188,71 @@ void main() {
 
     expect(find.byKey(const ValueKey('letter-title-field')), findsNothing);
     expect(find.text('랜덤 편지 수신'), findsOneWidget);
+  });
+
+  testWidgets('resets compose fields and exposes length limits', (tester) async {
+    final controller = LetterController(
+      letterRepository: _FakeLetterRepository(
+        statsQueue: [_stats()],
+        receivedPages: [_page([])],
+      ),
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(home: LetterScreen(controller: controller, onBack: () {})),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('letter-compose-button')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('제목은 60자, 본문은 1000자까지 보낼 수 있습니다.'), findsOneWidget);
+
+    await tester.enterText(
+      find.byKey(const ValueKey('letter-title-field')),
+      '초기화할 편지',
+    );
+    await tester.enterText(
+      find.byKey(const ValueKey('letter-content-field')),
+      '초기화할 본문',
+    );
+    await tester.ensureVisible(
+      find.byKey(const ValueKey('letter-compose-reset-button')),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('letter-compose-reset-button')));
+    await tester.pumpAndSettle();
+
+    final titleField = tester.widget<TextFormField>(
+      find.byKey(const ValueKey('letter-title-field')),
+    );
+    final contentField = tester.widget<TextFormField>(
+      find.byKey(const ValueKey('letter-content-field')),
+    );
+
+    expect(titleField.controller?.text, isEmpty);
+    expect(contentField.controller?.text, isEmpty);
+  });
+
+  testWidgets('opens detail when launched from a letter notification',
+      (tester) async {
+    final repository = _FakeLetterRepository(
+      details: [_detail(id: 12, status: LetterStatus.replied)],
+    );
+    final controller = LetterController(letterRepository: repository);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: LetterScreen(
+          controller: controller,
+          initialLetterId: 12,
+          onBack: () {},
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(repository.requestedDetailIds, [12]);
+    expect(find.byKey(const ValueKey('letter-list-back-button')), findsOneWidget);
   });
 
   testWidgets('shows receiver guidance when no recipient is available',
@@ -419,6 +515,7 @@ class _FakeLetterRepository implements LetterRepository {
   final int createdId;
   final Object? createError;
   final List<LetterDraft> createdDrafts = [];
+  final List<int> requestedDetailIds = [];
   final List<int> acceptedIds = [];
   final List<({int id, String replyContent})> replies = [];
 
@@ -450,6 +547,7 @@ class _FakeLetterRepository implements LetterRepository {
 
   @override
   Future<LetterDetail> fetchLetter(int id) async {
+    requestedDetailIds.add(id);
     return details.removeAt(0);
   }
 
