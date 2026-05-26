@@ -17,15 +17,15 @@ Mobile app repository for Maum On, focused on Android and iOS clients.
 
 ## Frontend Commands
 
-Run Flutter commands from `front/`:
+Run Flutter commands through the repository wrapper:
 
-- `flutter pub get`: install Flutter dependencies.
-- `flutter analyze`: run static analysis.
-- `flutter test`: run simulator-free widget and unit tests.
-- `flutter run -d android`: run the app on an Android emulator or device.
-- `flutter run -d ios`: run the app on an iOS simulator or device.
-- `flutter build apk --debug`: build the Android debug app without release signing.
-- `flutter build ios --simulator --no-codesign`: build the iOS simulator app without code signing.
+- `tools/flutterw --version`: verify the Flutter SDK found by the repository wrapper.
+- `tools/ci/run-local-mobile-checks.sh`: install Flutter dependencies, analyze the app, and run tests from `front/`.
+- `tools/ci/run-local-mobile-checks.sh --doctor`: check local Flutter, Android SDK, Xcode, and CocoaPods state.
+- `tools/flutterw run -d android`: run the app on an Android emulator or device.
+- `tools/flutterw run -d ios`: run the app on an iOS simulator or device.
+- `tools/flutterw build apk --debug`: build the Android debug app without release signing.
+- `tools/flutterw build ios --simulator --no-codesign`: build the iOS simulator app without code signing.
 
 Run repository contract tests from the repository root:
 
