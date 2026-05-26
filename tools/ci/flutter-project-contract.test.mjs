@@ -55,7 +55,11 @@ test("front uses a Flutter Android/iOS app scaffold", () => {
   assert.match(read("front/lib/app/supported_platforms.dart"), /android/, "Android support must be explicit");
   assert.match(read("front/lib/app/supported_platforms.dart"), /ios/, "iOS support must be explicit");
   assert.match(read(androidAppBuildFile), /com\.aquilaxk\.maumonmobile/, "Android application id must be configured");
-  assert.match(read(androidAppBuildFile), /minSdk\s*=\s*23/, "Android minimum SDK must be configured");
+  assert.match(
+    read(androidAppBuildFile),
+    /minSdk\s*=\s*(23|flutter\.minSdkVersion)/,
+    "Android minimum SDK must be configured"
+  );
   assert.match(read(androidSettingsFile), /include\(":app"\)/, "Android settings must include the app module");
   assert.match(read("front/android/app/src/main/AndroidManifest.xml"), /android:label="Maum On"/, "Android app label must be configured");
   assert.match(

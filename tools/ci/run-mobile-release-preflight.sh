@@ -98,6 +98,23 @@ new_temp_file() {
   printf '%s' "${file}"
 }
 
+flutter_config_android_sdk() {
+  local config_output
+  local sdk_path
+
+  if ! config_output="$("${repo_root}/tools/flutterw" config --list 2>/dev/null)"; then
+    return 1
+  fi
+
+  sdk_path="$(printf '%s\n' "${config_output}" | awk -F': ' '/^[[:space:]]*android-sdk:/ { print $2; exit }')"
+  if [[ -n "${sdk_path}" && "${sdk_path}" != "(Not set)" && -d "${sdk_path}" ]]; then
+    printf '%s' "${sdk_path}"
+    return 0
+  fi
+
+  return 1
+}
+
 check_flutter() {
   local doctor_output
   local output
@@ -135,6 +152,8 @@ check_android() {
     sdk_path="${ANDROID_HOME}"
   elif [[ -n "${ANDROID_SDK_ROOT:-}" && -d "${ANDROID_SDK_ROOT}" ]]; then
     sdk_path="${ANDROID_SDK_ROOT}"
+  else
+    sdk_path="$(flutter_config_android_sdk || true)"
   fi
 
   if [[ -n "${sdk_path}" ]]; then

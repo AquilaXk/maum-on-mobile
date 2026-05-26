@@ -327,28 +327,12 @@ jobs:
           MAUMON_ANDROID_KEYSTORE_PASSWORD: ${{ secrets.MAUMON_ANDROID_KEYSTORE_PASSWORD }}
           MAUMON_ANDROID_KEY_ALIAS: ${{ secrets.MAUMON_ANDROID_KEY_ALIAS }}
           MAUMON_ANDROID_KEY_PASSWORD: ${{ secrets.MAUMON_ANDROID_KEY_PASSWORD }}
+          MAUMON_FIREBASE_APP_ID: ${{ secrets.MAUMON_FIREBASE_APP_ID }}
+          MAUMON_FIREBASE_PROJECT_ID: ${{ secrets.MAUMON_FIREBASE_PROJECT_ID }}
+          MAUMON_FIREBASE_API_KEY: ${{ secrets.MAUMON_FIREBASE_API_KEY }}
+          MAUMON_FIREBASE_SENDER_ID: ${{ secrets.MAUMON_FIREBASE_SENDER_ID }}
         shell: bash
-        run: |
-          set -euo pipefail
-
-          missing=false
-          for name in MAUMON_ANDROID_KEYSTORE_BASE64 MAUMON_ANDROID_KEYSTORE_PASSWORD MAUMON_ANDROID_KEY_ALIAS MAUMON_ANDROID_KEY_PASSWORD; do
-            if [[ -z "${!name:-}" ]]; then
-              echo "Skipping Android release appbundle; missing ${name}."
-              missing=true
-            fi
-          done
-
-          if [[ "${missing}" == "true" ]]; then
-            exit 0
-          fi
-
-          release_keystore="${RUNNER_TEMP}/maumon-release.keystore"
-          printf '%s' "${MAUMON_ANDROID_KEYSTORE_BASE64}" | base64 --decode > "${release_keystore}"
-          export MAUMON_ANDROID_KEYSTORE_PATH="${release_keystore}"
-
-          cd front
-          flutter build appbundle --release
+        run: bash tools/ci/run-android-release-appbundle.sh
 
       - name: Run Android checks
         if: ${{ steps.scaffold.outputs.present == 'true' && steps.scaffold.outputs.stack == 'gradle' }}

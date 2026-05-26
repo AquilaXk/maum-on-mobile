@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
-import { existsSync, readFileSync } from "node:fs";
+import { execFileSync } from "node:child_process";
+import { existsSync, readFileSync, statSync } from "node:fs";
 import path from "node:path";
 import test from "node:test";
 
@@ -29,9 +30,17 @@ test("Android release builds require dedicated signing inputs", () => {
 
 test("Android store-facing metadata stays release ready", () => {
   const manifest = read("front/android/app/src/main/AndroidManifest.xml");
+  const buildFile = read("front/android/app/build.gradle.kts");
 
   assert.match(read("front/pubspec.yaml"), /^version:\s*\d+\.\d+\.\d+\+\d+/m);
-  assert.match(read("front/android/app/build.gradle.kts"), /applicationId\s*=\s*"com\.aquilaxk\.maumonmobile"/);
+  assert.match(buildFile, /applicationId\s*=\s*"com\.aquilaxk\.maumonmobile"/);
+  assert.match(buildFile, /playStoreMinimumTargetSdk\s*=\s*35/);
+  assert.match(buildFile, /compileSdk\s*=\s*maxOf\(flutter\.compileSdkVersion,\s*playStoreMinimumTargetSdk\)/);
+  assert.match(buildFile, /targetSdk\s*=\s*maxOf\(flutter\.targetSdkVersion,\s*playStoreMinimumTargetSdk\)/);
+  assert.match(buildFile, /MAUMON_FIREBASE_APP_ID/);
+  assert.match(buildFile, /MAUMON_FIREBASE_PROJECT_ID/);
+  assert.match(buildFile, /MAUMON_FIREBASE_API_KEY/);
+  assert.match(buildFile, /MAUMON_FIREBASE_SENDER_ID/);
   assert.match(manifest, /android:label="Maum On"/);
   assert.match(manifest, /android:icon="@mipmap\/ic_launcher"/);
   assert.match(manifest, /<uses-permission[^>]*android:name="android\.permission\.CAMERA"[^>]*\/?>/);
@@ -50,9 +59,25 @@ test("Android store-facing metadata stays release ready", () => {
     );
   }
 
+  assert.ok(existsSync(path.join(root, "front/android/app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml")));
+  assert.ok(existsSync(path.join(root, "front/android/app/src/main/res/mipmap-anydpi-v26/ic_launcher_round.xml")));
+  assert.ok(existsSync(path.join(root, "front/android/app/src/main/res/drawable/ic_launcher_foreground.xml")));
+  assert.match(read("front/android/app/src/main/res/values/colors.xml"), /ic_launcher_background/);
   assert.ok(existsSync(path.join(root, "front/android/app/src/main/res/drawable/launch_background.xml")));
   assert.ok(existsSync(path.join(root, "front/android/app/src/main/res/drawable-v21/launch_background.xml")));
   assert.match(read("front/android/app/src/main/res/xml/diary_image_paths.xml"), /<cache-path[\s\S]*path="diary_images\/"/);
+});
+
+test("Android release build config keeps Play appbundle optimization gates on", () => {
+  const buildFile = read("front/android/app/build.gradle.kts");
+  const proguardRules = read("front/android/app/proguard-rules.pro");
+
+  assert.match(buildFile, /isMinifyEnabled\s*=\s*true/);
+  assert.match(buildFile, /isShrinkResources\s*=\s*true/);
+  assert.match(buildFile, /proguard-android-optimize\.txt/);
+  assert.match(buildFile, /proguardFiles\(/);
+  assert.ok(existsSync(path.join(root, "front/android/app/proguard-rules.pro")));
+  assert.match(proguardRules, /com\.google\.android\.play\.core\.\*\*/);
 });
 
 test("iOS release profile declares signing, entitlement, and version contracts", () => {
@@ -157,10 +182,79 @@ test("CI exposes manual Android and iOS release build preflights", () => {
   assert.match(workflow, /workflow_dispatch:/);
   assert.match(workflow, /node --test tools\/ci\/mobile-release-config-contract\.test\.mjs/);
   assert.match(workflow, /MAUMON_ANDROID_KEYSTORE_BASE64/);
-  assert.match(workflow, /flutter build appbundle --release/);
+  assert.match(workflow, /bash tools\/ci\/run-android-release-appbundle\.sh/);
   assert.match(workflow, /gem install bundler -v 2\.4\.22 --no-document/);
   assert.match(workflow, /bundle _2\.4\.22_ config set --local path vendor\/bundle/);
   assert.match(workflow, /bundle _2\.4\.22_ install --jobs 4 --retry 3/);
   assert.match(workflow, /\.\.\/tools\/flutterw build ios --no-codesign/);
   assert.match(read("tools/ci/run-mobile-release-preflight.sh"), /DEVELOPER_DIR/);
+});
+
+test("Android release appbundle script fails clearly without signing and Firebase inputs", () => {
+  const script = path.join(root, "tools/ci/run-android-release-appbundle.sh");
+  const scriptContents = read("tools/ci/run-android-release-appbundle.sh");
+
+  assert.ok(existsSync(script));
+  assert.ok((statSync(script).mode & 0o111) !== 0, "Android release appbundle script must be executable");
+  assert.match(scriptContents, /tools\/flutterw/, "Android release appbundle script must use the repository Flutter wrapper");
+
+  let output = "";
+  try {
+    execFileSync("bash", [script], {
+      cwd: root,
+      env: {
+        ...process.env,
+        MAUMON_ANDROID_RELEASE_DRY_RUN: "true",
+        MAUMON_ANDROID_KEYSTORE_BASE64: "",
+        MAUMON_ANDROID_KEYSTORE_PASSWORD: "",
+        MAUMON_ANDROID_KEY_ALIAS: "",
+        MAUMON_ANDROID_KEY_PASSWORD: "",
+        MAUMON_FIREBASE_APP_ID: "",
+        MAUMON_FIREBASE_PROJECT_ID: "",
+        MAUMON_FIREBASE_API_KEY: "",
+        MAUMON_FIREBASE_SENDER_ID: "",
+      },
+      encoding: "utf8",
+      stdio: "pipe",
+    });
+    assert.fail("Expected Android release appbundle script to fail without required inputs.");
+  } catch (error) {
+    output = `${error.stdout ?? ""}${error.stderr ?? ""}`;
+  }
+
+  for (const name of [
+    "MAUMON_ANDROID_KEYSTORE_BASE64",
+    "MAUMON_ANDROID_KEYSTORE_PASSWORD",
+    "MAUMON_ANDROID_KEY_ALIAS",
+    "MAUMON_ANDROID_KEY_PASSWORD",
+    "MAUMON_FIREBASE_APP_ID",
+    "MAUMON_FIREBASE_PROJECT_ID",
+    "MAUMON_FIREBASE_API_KEY",
+    "MAUMON_FIREBASE_SENDER_ID",
+  ]) {
+    assert.match(output, new RegExp(name), `Missing clear failure for ${name}`);
+  }
+});
+
+test("Android release appbundle script supports a signed dry run before building", () => {
+  const script = path.join(root, "tools/ci/run-android-release-appbundle.sh");
+  const output = execFileSync("bash", [script], {
+    cwd: root,
+    env: {
+      ...process.env,
+      MAUMON_ANDROID_RELEASE_DRY_RUN: "true",
+      MAUMON_ANDROID_KEYSTORE_BASE64: "ZmFrZS1rZXlzdG9yZQ==",
+      MAUMON_ANDROID_KEYSTORE_PASSWORD: "password",
+      MAUMON_ANDROID_KEY_ALIAS: "maumon",
+      MAUMON_ANDROID_KEY_PASSWORD: "password",
+      MAUMON_FIREBASE_APP_ID: "1:1234567890:android:abcdef",
+      MAUMON_FIREBASE_PROJECT_ID: "maum-on",
+      MAUMON_FIREBASE_API_KEY: "fake-api-key",
+      MAUMON_FIREBASE_SENDER_ID: "1234567890",
+    },
+    encoding: "utf8",
+  });
+
+  assert.match(output, /Android release appbundle dry run ok/);
+  assert.match(output, /flutter build appbundle --release/);
 });
