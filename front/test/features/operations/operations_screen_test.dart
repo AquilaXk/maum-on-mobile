@@ -180,6 +180,67 @@ void main() {
     expect(find.text('회원 조치가 저장되었습니다.'), findsOneWidget);
   });
 
+  testWidgets('prioritizes dashboard queues on compact screens',
+      (tester) async {
+    tester.view.physicalSize = const Size(320, 780);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    final controller = OperationsController(
+      reportRepository: _FakeReportRepository(),
+      operationsRepository: _FakeOperationsRepository(),
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        builder: (context, child) {
+          return MediaQuery(
+            data: MediaQuery.of(context).copyWith(
+              textScaler: const TextScaler.linear(1.35),
+            ),
+            child: child!,
+          );
+        },
+        home: OperationsScreen(controller: controller, onBack: () {}),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('우선 확인'), findsOneWidget);
+    expect(find.text('미처리 신고 1건을 먼저 확인합니다.'), findsOneWidget);
+    expect(find.byKey(const ValueKey('operations-priority-reports-button')),
+        findsOneWidget);
+    expect(find.byKey(const ValueKey('operations-priority-letters-button')),
+        findsOneWidget);
+
+    await tester.ensureVisible(
+      find.byKey(const ValueKey('operations-priority-reports-button')),
+    );
+    await tester.tap(
+      find.byKey(const ValueKey('operations-priority-reports-button')),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('신고 대기열'), findsOneWidget);
+
+    await tester.ensureVisible(
+      find.byKey(const ValueKey('operations-view-dashboard')),
+    );
+    await tester.tap(find.byKey(const ValueKey('operations-view-dashboard')));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(
+      find.byKey(const ValueKey('operations-priority-letters-button')),
+    );
+    await tester.tap(
+      find.byKey(const ValueKey('operations-priority-letters-button')),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('편지 검수'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('shows observability metrics without narrow screen overflow',
       (tester) async {
     tester.view.physicalSize = const Size(320, 780);
