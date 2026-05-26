@@ -273,6 +273,21 @@ class AuthController extends ChangeNotifier {
     _setAuthenticated(session.member, hasRestored: true);
   }
 
+  Future<void> completeExternalLoginCallback({
+    required String provider,
+    required String code,
+    required String state,
+  }) async {
+    final session = await _authRepository.exchangeOidcSession(
+      OidcSessionRequest(
+        provider: provider.trim(),
+        code: code.trim(),
+        state: state.trim(),
+      ),
+    );
+    _setAuthenticated(session.member, hasRestored: true);
+  }
+
   Future<void> clearSession() async {
     try {
       await _authRepository.logout();

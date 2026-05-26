@@ -5,6 +5,7 @@ import com.maumonmobile.application.port.`in`.AuthSessionResult
 import com.maumonmobile.application.port.`in`.AuthUseCase
 import com.maumonmobile.application.port.`in`.LoginCommand
 import com.maumonmobile.application.port.`in`.LogoutCommand
+import com.maumonmobile.application.port.`in`.OidcAppCallbackCommand
 import com.maumonmobile.application.port.`in`.OidcAuthorizeCommand
 import com.maumonmobile.application.port.`in`.OidcAuthorizeResult
 import com.maumonmobile.application.port.`in`.OidcCallbackCommand
@@ -57,8 +58,6 @@ class AuthService(
     private val sseSessionRevocationPort: SseSessionRevocationPort,
     @param:Value("\${app.auth.oidc.provider-authorization-base-url:https://login.maumon.local}")
     private val providerAuthorizationBaseUrl: String,
-    @param:Value("\${app.auth.oidc.callback-base-url:http://localhost}")
-    private val callbackBaseUrl: String,
     @param:Value("\${app.auth.oidc.client-id:maum-on-mobile}")
     private val oidcClientId: String,
     @param:Value("\${app.auth.oidc.state-ttl:PT10M}")
@@ -244,7 +243,7 @@ class AuthService(
                 .pathSegment(provider, "authorize")
                 .queryParam("response_type", "code")
                 .queryParam("client_id", oidcClientId)
-                .queryParam("redirect_uri", callbackUri(provider))
+                .queryParam("redirect_uri", savedState.redirectUri)
                 .queryParam("state", savedState.state)
                 .queryParam("nonce", savedState.nonce)
                 .queryParam("code_challenge", codeChallenge(codeVerifier))
@@ -252,6 +251,23 @@ class AuthService(
                 .build()
                 .toUriString(),
         )
+    }
+
+    override fun completeOidcAppCallback(command: OidcAppCallbackCommand): AuthSessionResult {
+        val provider = command.provider.normalizedProvider()
+        val savedState = consumableOidcState(
+            provider = provider,
+            state = command.state,
+        )
+        val code = command.code.trim().takeIf(String::isNotEmpty)
+            ?: throw ApiException(ErrorCode.INVALID_REQUEST, "외부 로그인 코드를 확인해 주세요.")
+        val identity = verifiedOidcIdentity(
+            provider = provider,
+            savedState = savedState,
+            code = code,
+        )
+
+        return issueSession(findOrCreateSocialMember(provider, identity))
     }
 
     override fun completeOidcCallback(command: OidcCallbackCommand): OidcCallbackResult {
@@ -282,35 +298,12 @@ class AuthService(
             )
         }
 
-        val code = command.code?.trim()?.takeIf(String::isNotEmpty)
-            ?: return OidcCallbackResult(
-                appRedirect(
-                    savedState.redirectUri,
-                    mapOf("error" to "invalid_request"),
-                ),
-            )
-        val identity = try {
-            authOidcIdentityProvider.verify(
-                AuthOidcTokenCommand(
-                    provider = provider,
-                    code = code,
-                    codeVerifier = savedState.codeVerifier,
-                    redirectUri = callbackUri(provider),
-                    clientId = oidcClientId,
-                    expectedNonce = savedState.nonce,
-                ),
-            )
-        } catch (_: AuthOidcVerificationException) {
-            return OidcCallbackResult(
-                appRedirect(
-                    savedState.redirectUri,
-                    mapOf("error" to "invalid_request"),
-                ),
-            )
-        }
-        val session = issueSession(findOrCreateSocialMember(provider, identity))
-
-        return OidcCallbackResult(successRedirect(savedState.redirectUri, session))
+        return OidcCallbackResult(
+            appRedirect(
+                savedState.redirectUri,
+                mapOf("error" to "invalid_request"),
+            ),
+        )
     }
 
     override fun me(user: AuthenticatedUser): AuthMemberResult {
@@ -380,31 +373,6 @@ class AuthService(
         )
     }
 
-    private fun callbackUri(provider: String): String {
-        return UriComponentsBuilder.fromUriString(callbackBaseUrl.trimEnd('/'))
-            .path("/api/v1/auth/oidc/callback/{provider}")
-            .buildAndExpand(provider)
-            .toUriString()
-    }
-
-    private fun successRedirect(redirectUri: String, session: AuthSessionResult): String {
-        return appRedirect(
-            redirectUri,
-            mapOf(
-                "status" to "success",
-                "access_token" to session.accessToken,
-                "refresh_token" to session.refreshToken,
-                "token_type" to session.tokenType,
-                "expires_in" to session.expiresInSeconds.toString(),
-                "member_id" to session.member.id.toString(),
-                "email" to session.member.email,
-                "nickname" to session.member.nickname,
-                "role" to session.member.role,
-                "member_status" to session.member.status,
-            ),
-        )
-    }
-
     private fun stateMismatchRedirect(redirectUri: String): String {
         return appRedirect(
             redirectUri,
@@ -421,6 +389,44 @@ class AuthService(
             .filterValues(String::isNotEmpty)
             .forEach { (key, value) -> builder.queryParam(key, value) }
         return builder.build().encode().toUriString()
+    }
+
+    private fun consumableOidcState(provider: String, state: String?): AuthOidcState {
+        val savedState = state
+            ?.trim()
+            ?.takeIf(String::isNotEmpty)
+            ?.let(authOidcStateRepository::findByState)
+
+        if (savedState == null || savedState.provider != provider || savedState.isExpired() || savedState.isConsumed) {
+            throw ApiException(ErrorCode.UNAUTHORIZED, "외부 로그인 요청을 확인하지 못했습니다.")
+        }
+
+        if (!authOidcStateRepository.markConsumed(savedState.id, Instant.now().toString())) {
+            throw ApiException(ErrorCode.UNAUTHORIZED, "외부 로그인 요청을 확인하지 못했습니다.")
+        }
+
+        return savedState
+    }
+
+    private fun verifiedOidcIdentity(
+        provider: String,
+        savedState: AuthOidcState,
+        code: String,
+    ): AuthOidcIdentity {
+        return try {
+            authOidcIdentityProvider.verify(
+                AuthOidcTokenCommand(
+                    provider = provider,
+                    code = code,
+                    codeVerifier = savedState.codeVerifier,
+                    redirectUri = savedState.redirectUri,
+                    clientId = oidcClientId,
+                    expectedNonce = savedState.nonce,
+                ),
+            )
+        } catch (_: AuthOidcVerificationException) {
+            throw ApiException(ErrorCode.UNAUTHORIZED, "외부 로그인 코드를 확인하지 못했습니다.")
+        }
     }
 
     private fun AuthOidcState.isExpired(): Boolean {

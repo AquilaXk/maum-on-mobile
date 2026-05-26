@@ -16,6 +16,8 @@ abstract interface class AuthRepository {
 
   Future<AuthSession> refreshSession();
 
+  Future<AuthSession> exchangeOidcSession(OidcSessionRequest request);
+
   Future<void> saveSession(AuthSession session);
 
   Future<AuthMember> me();
@@ -121,6 +123,20 @@ class ApiAuthRepository implements AuthRepository {
   }
 
   @override
+  Future<AuthSession> exchangeOidcSession(OidcSessionRequest request) async {
+    final encodedProvider = Uri.encodeComponent(request.provider);
+    final session = await _apiClient.post<AuthSession>(
+      '/api/v1/auth/oidc/session/$encodedProvider',
+      body: request.toJson(),
+      requiresAuth: false,
+      retryOnUnauthorized: false,
+      parser: AuthSession.fromJson,
+    );
+    await _saveSession(session);
+    return session;
+  }
+
+  @override
   Future<void> saveSession(AuthSession session) {
     return _saveSession(session);
   }
@@ -181,8 +197,8 @@ class AuthSessionTokenRefresher implements AuthTokenRefresher {
       final session = await _authRepository.refreshSession();
       return TokenPair(
         accessToken: session.accessToken,
-        refreshToken: session.refreshToken ??
-            ApiAuthRepository.serverManagedRefreshToken,
+        refreshToken:
+            session.refreshToken ?? ApiAuthRepository.serverManagedRefreshToken,
       );
     } on Object {
       return null;
