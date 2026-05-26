@@ -78,6 +78,7 @@ void main() {
                 'postId': 4,
                 'createDate': '2026-05-24T10:00:00',
                 'modifyDate': '2026-05-24T10:00:00',
+                'deleted': true,
                 'replies': [
                   {
                     'id': 12,
@@ -95,6 +96,7 @@ void main() {
             'size': 20,
             'totalElements': 1,
             'totalPages': 1,
+            'hasNext': false,
             'last': true,
           },
         }),
@@ -106,7 +108,9 @@ void main() {
 
       expect(story.canEdit(9), isTrue);
       expect(story.resolutionStatus, StoryResolutionStatus.resolved);
-      expect(comments.items.single.canEdit(9), isTrue);
+      expect(comments.hasNext, isFalse);
+      expect(comments.items.single.deleted, isTrue);
+      expect(comments.items.single.canEdit(9), isFalse);
       expect(comments.items.single.replies.single.content, '고마워요.');
     });
 

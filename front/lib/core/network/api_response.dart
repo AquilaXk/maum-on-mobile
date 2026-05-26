@@ -86,7 +86,8 @@ class PageResponse<T> {
     required this.totalElements,
     required this.totalPages,
     required this.last,
-  });
+    bool? hasNext,
+  }) : hasNext = hasNext ?? !last;
 
   factory PageResponse.fromJson(
     Object? json,
@@ -103,13 +104,16 @@ class PageResponse<T> {
       throw const FormatException('Expected page response items.');
     }
 
+    final last = map['last'] == true;
+
     return PageResponse<T>(
       items: rawItems.map(itemParser).toList(growable: false),
       page: _readInt(map, 'page'),
       size: _readInt(map, 'size'),
       totalElements: _readInt(map, 'totalElements'),
       totalPages: _readInt(map, 'totalPages'),
-      last: map['last'] == true,
+      last: last,
+      hasNext: map.containsKey('hasNext') ? map['hasNext'] == true : !last,
     );
   }
 
@@ -119,6 +123,7 @@ class PageResponse<T> {
   final int totalElements;
   final int totalPages;
   final bool last;
+  final bool hasNext;
 }
 
 int _readInt(Map<String, Object?> map, String key) {

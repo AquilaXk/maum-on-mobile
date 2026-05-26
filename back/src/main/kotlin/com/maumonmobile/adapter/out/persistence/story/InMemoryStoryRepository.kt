@@ -150,6 +150,16 @@ class InMemoryStoryRepository : StoryRepository {
         return updatedComment
     }
 
+    override fun markCommentDeleted(comment: StoryComment): StoryComment {
+        val deletedComment = comment.copy(
+            content = StoryComment.DELETED_CONTENT,
+            deleted = true,
+            modifyDate = Instant.now().toString(),
+        )
+        commentsById[deletedComment.id] = deletedComment
+        return deletedComment
+    }
+
     override fun findCommentById(id: Long): StoryComment? = commentsById[id]
 
     override fun findCommentsByPostId(postId: Long): List<StoryComment> {

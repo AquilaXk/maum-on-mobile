@@ -101,16 +101,22 @@ class StoryService(
             .groupBy { comment -> comment.parentCommentId }
         val topLevel = comments
             .filter { comment -> comment.parentCommentId == null }
-            .sortedByDescending { comment -> comment.createDate }
+            .sortedWith(
+                compareByDescending<StoryComment> { comment -> comment.createDate }
+                    .thenByDescending { comment -> comment.id },
+            )
         val pageItems = topLevel.pageSlice(safePage, safeSize)
+        val totalPages = totalPages(topLevel.size, safeSize)
+        val hasNext = safePage + 1 < totalPages
 
         return StoryCommentPageResult(
             content = pageItems.map { comment -> comment.toResult(repliesByParent) },
             page = safePage,
             size = safeSize,
             totalElements = topLevel.size.toLong(),
-            totalPages = totalPages(topLevel.size, safeSize),
-            last = safePage >= totalPages(topLevel.size, safeSize) - 1,
+            totalPages = totalPages,
+            hasNext = hasNext,
+            last = !hasNext,
         )
     }
 
@@ -131,6 +137,9 @@ class StoryService(
             if (parent.postId != postId) {
                 throw ApiException(ErrorCode.INVALID_REQUEST, "댓글 대상이 올바르지 않습니다.")
             }
+            if (!parent.canReceiveReply) {
+                throw ApiException(ErrorCode.INVALID_REQUEST, "삭제된 댓글에는 답글을 작성할 수 없습니다.")
+            }
         }
 
         contentModerationService.ensureAllowed(ContentModerationTarget.COMMENT, command.content)
@@ -146,13 +155,24 @@ class StoryService(
 
     override fun updateComment(user: AuthenticatedUser, commentId: Long, content: String) {
         val comment = findOwnedComment(user, commentId)
+        if (!comment.canBeEditedBy(user.memberId())) {
+            throw ApiException(ErrorCode.CONFLICT, "삭제된 댓글은 수정할 수 없습니다.")
+        }
         contentModerationService.ensureAllowed(ContentModerationTarget.COMMENT, content)
         storyRepository.updateComment(comment, content.trim())
     }
 
     override fun deleteComment(user: AuthenticatedUser, commentId: Long) {
-        findOwnedComment(user, commentId)
-        storyRepository.deleteComment(commentId)
+        val comment = findOwnedComment(user, commentId)
+        if (comment.deleted) {
+            throw ApiException(ErrorCode.CONFLICT, "이미 삭제된 댓글입니다.")
+        }
+
+        if (storyRepository.findCommentsByPostId(comment.postId).any { it.parentCommentId == commentId }) {
+            storyRepository.markCommentDeleted(comment)
+        } else {
+            storyRepository.deleteComment(commentId)
+        }
     }
 
     private fun findMember(user: AuthenticatedUser): AuthMember {
@@ -226,7 +246,7 @@ private fun StoryComment.toResult(
     repliesByParent: Map<Long?, List<StoryComment>>,
 ): StoryCommentResult {
     val replies = repliesByParent[id]
-        ?.sortedBy { comment -> comment.createDate }
+        ?.sortedWith(compareBy<StoryComment> { comment -> comment.createDate }.thenBy { it.id })
         ?.map { reply -> reply.toResult(repliesByParent) }
         ?: emptyList()
 
@@ -239,6 +259,7 @@ private fun StoryComment.toResult(
         postId = postId,
         createDate = createDate,
         modifyDate = modifyDate,
+        deleted = deleted,
         replies = replies,
     )
 }

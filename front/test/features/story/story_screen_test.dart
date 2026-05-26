@@ -387,6 +387,50 @@ void main() {
     expect(mentionSpan.style?.fontWeight, FontWeight.w800);
   });
 
+  testWidgets('renders deleted comments without reply or author actions',
+      (tester) async {
+    final controller = StoryController(
+      storyRepository: _FakeStoryRepository(
+        details: [
+          _detail(id: 14, title: '삭제 댓글 글', content: '본문', authorId: 99),
+        ],
+        commentPages: [
+          _commentPage([
+            _comment(
+              id: 80,
+              content: '삭제된 댓글입니다.',
+              authorId: 7,
+              deleted: true,
+            ),
+          ]),
+        ],
+      ),
+      currentMemberId: 7,
+    );
+    await controller.openStoryById(14);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: StoryScreen(controller: controller, onBack: () {}),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('삭제된 댓글입니다.'), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('story-comment-reply-button-80')),
+      findsNothing,
+    );
+    expect(
+      find.byKey(const ValueKey('story-comment-edit-button-80')),
+      findsNothing,
+    );
+    expect(
+      find.byKey(const ValueKey('story-comment-delete-button-80')),
+      findsNothing,
+    );
+  });
+
   testWidgets('long story and comments stay scrollable on a small screen',
       (tester) async {
     tester.view.physicalSize = const Size(390, 844);
@@ -490,6 +534,7 @@ StoryComment _comment({
   required String content,
   int authorId = 10,
   String nickname = '댓글이',
+  bool deleted = false,
   List<StoryComment> replies = const [],
 }) {
   return StoryComment(
@@ -500,6 +545,7 @@ StoryComment _comment({
     postId: 1,
     createDate: '2026-05-24T10:00:00',
     modifyDate: '2026-05-24T10:00:00',
+    deleted: deleted,
     replies: replies,
   );
 }

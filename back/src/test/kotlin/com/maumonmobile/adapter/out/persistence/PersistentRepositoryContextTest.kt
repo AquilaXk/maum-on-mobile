@@ -174,6 +174,42 @@ class PersistentRepositoryContextTest @Autowired constructor(
     }
 
     @Test
+    fun storyCommentDeletionStateRoundTripsThroughStorage() {
+        val member = authMemberRepository.save(
+            AuthMember(
+                id = 0,
+                email = "story-delete-persistence@example.com",
+                passwordHash = "hashed-password",
+                nickname = "작성자",
+            ),
+        )
+        val post = storyRepository.savePost(
+            authorId = member.id,
+            authorNickname = member.nickname,
+            draft = StoryPostDraft(
+                title = "삭제 상태 스토리",
+                content = "삭제 상태 저장 확인",
+                category = "WORRY",
+                thumbnail = null,
+            ),
+        )
+        val comment = storyRepository.saveComment(
+            postId = post.id,
+            authorId = member.id,
+            authorNickname = member.nickname,
+            authorEmail = member.email,
+            parentCommentId = null,
+            content = "삭제될 댓글",
+        )
+
+        val deletedComment = storyRepository.markCommentDeleted(comment)
+
+        assertThat(deletedComment.deleted).isTrue()
+        assertThat(deletedComment.content).isEqualTo("삭제된 댓글입니다.")
+        assertThat(storyRepository.findCommentById(comment.id)?.deleted).isTrue()
+    }
+
+    @Test
     fun consultationMessagesRoundTripThroughStorage() {
         val member = authMemberRepository.save(
             AuthMember(

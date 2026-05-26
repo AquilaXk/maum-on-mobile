@@ -42,6 +42,8 @@ interface StoryRepository {
 
     fun updateComment(comment: StoryComment, content: String): StoryComment
 
+    fun markCommentDeleted(comment: StoryComment): StoryComment
+
     fun findCommentById(id: Long): StoryComment?
 
     fun findCommentsByPostId(postId: Long): List<StoryComment>
