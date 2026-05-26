@@ -13,6 +13,7 @@ import org.springframework.web.bind.annotation.PatchMapping
 import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestMapping
+import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.bind.annotation.RestController
 
 @RestController
@@ -22,9 +23,19 @@ class AdminReportController(
 ) {
 
     @GetMapping
-    fun list(authentication: Authentication): ApiResponse<List<AdminReportSummary>> {
+    fun list(
+        authentication: Authentication,
+        @RequestParam(required = false) status: String?,
+        @RequestParam(required = false) targetType: String?,
+        @RequestParam(required = false) sort: String?,
+    ): ApiResponse<List<AdminReportSummary>> {
         return ApiResponse.success(
-            reportUseCase.listForAdmin(authentication.authenticatedUser()),
+            reportUseCase.listForAdmin(
+                user = authentication.authenticatedUser(),
+                status = status,
+                targetType = targetType,
+                sort = sort,
+            ),
         )
     }
 

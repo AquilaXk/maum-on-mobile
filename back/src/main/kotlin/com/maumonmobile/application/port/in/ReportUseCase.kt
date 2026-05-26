@@ -5,7 +5,12 @@ import com.maumonmobile.global.security.AuthenticatedUser
 interface ReportUseCase {
     fun create(user: AuthenticatedUser, command: ReportCreateCommand): Long
 
-    fun listForAdmin(user: AuthenticatedUser): List<AdminReportSummary>
+    fun listForAdmin(
+        user: AuthenticatedUser,
+        status: String?,
+        targetType: String?,
+        sort: String?,
+    ): List<AdminReportSummary>
 
     fun getForAdmin(user: AuthenticatedUser, reportId: Long): AdminReportDetail
 
@@ -30,6 +35,7 @@ data class ReportStatusResult(
     val actionReason: String?,
     val handledBy: AdminReportMember?,
     val handledAt: String?,
+    val latestAudit: AdminAuditEventResult,
 )
 
 data class AdminReportSummary(
@@ -47,6 +53,7 @@ data class AdminReportSummary(
     val actionReason: String?,
     val handledBy: AdminReportMember?,
     val handledAt: String?,
+    val actionCount: Int,
 )
 
 data class AdminReportDetail(
@@ -63,6 +70,7 @@ data class AdminReportDetail(
     val actionReason: String?,
     val handledBy: AdminReportMember?,
     val handledAt: String?,
+    val auditEvents: List<AdminAuditEventResult>,
 )
 
 data class AdminReportTarget(

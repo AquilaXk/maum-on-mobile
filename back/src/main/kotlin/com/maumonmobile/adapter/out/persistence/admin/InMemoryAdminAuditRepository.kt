@@ -32,6 +32,13 @@ class InMemoryAdminAuditRepository : AdminAuditRepository {
         return event
     }
 
+    override fun findAll(): List<AdminAuditEvent> {
+        return eventsById.values.sortedWith(
+            compareByDescending<AdminAuditEvent> { event -> event.createdAt }
+                .thenByDescending { event -> event.id },
+        )
+    }
+
     override fun findByTargetMemberId(memberId: Long): List<AdminAuditEvent> {
         return eventsById.values
             .filter { event -> event.targetMemberId == memberId }

@@ -54,6 +54,7 @@ class AdminOperationsControllerTest @Autowired constructor(
     fun adminReadsDashboardAndMemberListWithFilters() {
         val admin = savedMember(role = AuthMemberRole.ADMIN, nickname = "운영자")
         val member = savedMember(emailPrefix = "dashboard-member", nickname = "대시회원")
+        val auditTarget = savedMember(emailPrefix = "dashboard-audit-target", nickname = "집계조치대상")
         val adminToken = accessToken(admin)
         val memberToken = accessToken(member)
         val firstPost = savePost(member, "대시보드 신고 대상")
@@ -84,6 +85,14 @@ class AdminOperationsControllerTest @Autowired constructor(
             senderNickname = member.nickname,
             draft = LetterDraft(title = "오늘 편지", content = "집계 확인"),
         )
+        mockMvc.patch("/api/v1/admin/members/${auditTarget.id}/status") {
+            header("Authorization", "Bearer $adminToken")
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"status":"BLOCKED","reason":"대시보드 감사 집계"}"""
+        }
+            .andExpect {
+                status { isOk() }
+            }
 
         mockMvc.get("/api/v1/admin/dashboard") {
             header("Authorization", "Bearer $memberToken")
@@ -103,6 +112,10 @@ class AdminOperationsControllerTest @Autowired constructor(
                 jsonPath("$.data.todayLetterCount") { value(greaterThanOrEqualTo(1)) }
                 jsonPath("$.data.todayDiaryCount") { value(greaterThanOrEqualTo(1)) }
                 jsonPath("$.data.receivableMemberCount") { value(greaterThanOrEqualTo(1)) }
+                jsonPath("$.data.blockedMemberCount") { value(greaterThanOrEqualTo(1)) }
+                jsonPath("$.data.adminMemberCount") { value(greaterThanOrEqualTo(1)) }
+                jsonPath("$.data.unassignedLetterCount") { value(greaterThanOrEqualTo(1)) }
+                jsonPath("$.data.todayAdminActionCount") { value(greaterThanOrEqualTo(1)) }
             }
 
         mockMvc.get("/api/v1/admin/members") {
@@ -128,6 +141,7 @@ class AdminOperationsControllerTest @Autowired constructor(
     fun adminChangesMemberStatusRoleAndReadsAuditTrail() {
         val admin = savedMember(role = AuthMemberRole.ADMIN, nickname = "감사자")
         val member = savedMember(emailPrefix = "audit-member", nickname = "감사대상")
+        val letterSender = savedMember(emailPrefix = "audit-letter-sender", nickname = "수신편지발신")
         val adminToken = accessToken(admin)
         val post = savePost(member, "감사 상세 게시글")
         saveReport(member, post.id)
@@ -147,6 +161,12 @@ class AdminOperationsControllerTest @Autowired constructor(
             senderId = member.id,
             senderNickname = member.nickname,
             draft = LetterDraft(title = "감사 편지", content = "회원 상세 포함"),
+        )
+        letterRepository.save(
+            senderId = letterSender.id,
+            senderNickname = letterSender.nickname,
+            receiverId = member.id,
+            draft = LetterDraft(title = "받은 감사 편지", content = "회원 상세 수신 이력 포함"),
         )
 
         mockMvc.patch("/api/v1/admin/members/${member.id}/status") {
@@ -193,7 +213,8 @@ class AdminOperationsControllerTest @Autowired constructor(
                 jsonPath("$.data.member.email") { value(member.email) }
                 jsonPath("$.data.reports[0].targetTitle") { value("감사 상세 게시글") }
                 jsonPath("$.data.posts[0].title") { value("감사 상세 게시글") }
-                jsonPath("$.data.letters[0].title") { value("감사 편지") }
+                jsonPath("$.data.letters[*].title") { value(hasItem("감사 편지")) }
+                jsonPath("$.data.letters[*].title") { value(hasItem("받은 감사 편지")) }
                 jsonPath("$.data.diaries[0].title") { value("감사 기록") }
                 jsonPath("$.data.auditEvents[*].action") {
                     value(hasItem("ROLE_CHANGE"))

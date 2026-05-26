@@ -66,6 +66,7 @@ class AdminOperationsService(
         val letters = letterRepository.findAll()
         val diaries = diaryRepository.findAllPublicAndPrivate()
         val members = authMemberRepository.findAll()
+        val adminActions = adminAuditRepository.findAll()
 
         return AdminDashboardResult(
             todayReportCount = reports.count { report -> report.createdAt.isOnOrAfter(todayStart) },
@@ -76,6 +77,10 @@ class AdminOperationsService(
             receivableMemberCount = members.count { member ->
                 member.status == AuthMemberStatus.ACTIVE && member.randomReceiveAllowed
             },
+            blockedMemberCount = members.count { member -> member.status == AuthMemberStatus.BLOCKED },
+            adminMemberCount = members.count { member -> member.role == AuthMemberRole.ADMIN },
+            unassignedLetterCount = letters.count { letter -> letter.receiverId == null && letter.status == "SENT" },
+            todayAdminActionCount = adminActions.count { event -> event.createdAt.isOnOrAfter(todayStart) },
         )
     }
 
@@ -135,7 +140,7 @@ class AdminOperationsService(
             .filter { post -> post.authorId == memberId }
             .sortedByDescending { post -> post.createDate }
         val letters = letterRepository.findAll()
-            .filter { letter -> letter.senderId == memberId }
+            .filter { letter -> letter.senderId == memberId || letter.receiverId == memberId }
             .sortedByDescending { letter -> letter.createdDate }
         val diaries = diaryRepository.findByMemberId(memberId)
             .sortedByDescending { diary -> diary.createDate }
@@ -531,7 +536,9 @@ class AdminOperationsService(
             randomReceiveAllowed = member.randomReceiveAllowed,
             reportCount = reportRepository.findAll().count { report -> report.reporterId == member.id },
             postCount = storyRepository.findPosts().count { post -> post.authorId == member.id },
-            letterCount = letterRepository.findAll().count { letter -> letter.senderId == member.id },
+            letterCount = letterRepository.findAll().count { letter ->
+                letter.senderId == member.id || letter.receiverId == member.id
+            },
             diaryCount = diaryRepository.findByMemberId(member.id).size,
         )
     }
@@ -562,6 +569,7 @@ class AdminOperationsService(
             actionReason = actionReason,
             handledBy = handledBy?.let(::memberReportSummary),
             handledAt = handledAt,
+            actionCount = adminAuditRepository.findByTargetResource(REPORT_RESOURCE_TYPE, id).size,
         )
     }
 
@@ -722,6 +730,7 @@ class AdminOperationsService(
         private const val LETTER_NOTE_MIN_LENGTH = 2
         private const val LETTER_NOTE_MAX_LENGTH = 500
         private const val LETTER_SUMMARY_MAX_LENGTH = 64
+        private const val REPORT_RESOURCE_TYPE = "REPORT"
         private const val LETTER_RESOURCE_TYPE = "LETTER"
         private const val LETTER_REASSIGNED_EVENT = "admin_letter_reassigned"
         private val ADMIN_LETTER_STATUSES = setOf(

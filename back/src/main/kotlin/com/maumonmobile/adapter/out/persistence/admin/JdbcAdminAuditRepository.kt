@@ -70,6 +70,17 @@ class JdbcAdminAuditRepository(
         )
     }
 
+    override fun findAll(): List<AdminAuditEvent> {
+        return jdbc.query(
+            """
+                select *
+                  from admin_audit_events
+                 order by created_at desc, id desc
+            """.trimIndent(),
+            rowMapper,
+        )
+    }
+
     override fun findByTargetResource(resourceType: String, resourceId: Long): List<AdminAuditEvent> {
         return jdbc.query(
             """
