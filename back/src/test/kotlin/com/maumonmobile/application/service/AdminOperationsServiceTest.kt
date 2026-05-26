@@ -4,6 +4,7 @@ import com.maumonmobile.adapter.out.persistence.admin.InMemoryAdminAuditReposito
 import com.maumonmobile.adapter.out.persistence.auth.InMemoryAuthMemberRepository
 import com.maumonmobile.adapter.out.persistence.diary.InMemoryDiaryRepository
 import com.maumonmobile.adapter.out.persistence.letter.InMemoryLetterRepository
+import com.maumonmobile.adapter.out.persistence.moderation.InMemoryContentModerationAuditRepository
 import com.maumonmobile.adapter.out.persistence.notification.InMemoryNotificationDeviceTokenRepository
 import com.maumonmobile.adapter.out.persistence.report.InMemoryReportRepository
 import com.maumonmobile.adapter.out.persistence.story.InMemoryStoryRepository
@@ -77,6 +78,7 @@ class AdminOperationsServiceTest {
     private fun adminOperationsFixture(): AdminOperationsFixture {
         val authMemberRepository = InMemoryAuthMemberRepository()
         val adminAuditRepository = InMemoryAdminAuditRepository()
+        val contentModerationAuditRepository = InMemoryContentModerationAuditRepository()
         val diaryRepository = InMemoryDiaryRepository()
         val letterRepository = InMemoryLetterRepository()
         val notificationDeviceTokenRepository = InMemoryNotificationDeviceTokenRepository()
@@ -85,6 +87,7 @@ class AdminOperationsServiceTest {
         val service = AdminOperationsService(
             authMemberRepository = authMemberRepository,
             adminAuditRepository = adminAuditRepository,
+            contentModerationAuditRepository = contentModerationAuditRepository,
             diaryRepository = diaryRepository,
             letterRepository = letterRepository,
             notificationDeviceTokenRepository = notificationDeviceTokenRepository,

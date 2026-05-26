@@ -2,6 +2,7 @@ package com.maumonmobile.application.service
 
 import com.maumonmobile.adapter.out.persistence.auth.InMemoryAuthMemberRepository
 import com.maumonmobile.adapter.out.persistence.letter.InMemoryLetterRepository
+import com.maumonmobile.adapter.out.persistence.moderation.InMemoryContentModerationAuditRepository
 import com.maumonmobile.application.port.`in`.LetterSaveCommand
 import com.maumonmobile.application.port.out.ContentModerationClassification
 import com.maumonmobile.application.port.out.ContentModerationClassificationRequest
@@ -137,6 +138,7 @@ class LetterServiceTest {
         val contentModerationService = ContentModerationService(
             contentModerationClassifier = AllowingContentModerationClassifier,
             metricsRegistry = MobileApiMetricsRegistry(),
+            auditRepository = InMemoryContentModerationAuditRepository(),
             moderationTimeout = Duration.ofSeconds(1),
         )
         val service = LetterService(

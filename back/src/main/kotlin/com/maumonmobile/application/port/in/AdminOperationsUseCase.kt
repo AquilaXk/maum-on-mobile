@@ -5,6 +5,8 @@ import com.maumonmobile.global.security.AuthenticatedUser
 interface AdminOperationsUseCase {
     fun dashboard(user: AuthenticatedUser): AdminDashboardResult
 
+    fun contentModerationSummary(user: AuthenticatedUser): AdminContentModerationSummaryResult
+
     fun listMembers(
         user: AuthenticatedUser,
         query: String?,
@@ -75,6 +77,32 @@ data class AdminDashboardResult(
     val adminMemberCount: Int,
     val unassignedLetterCount: Int,
     val todayAdminActionCount: Int,
+)
+
+data class AdminContentModerationSummaryResult(
+    val totalCount: Int,
+    val blockedCount: Int,
+    val modelFailureCount: Int,
+    val failureRate: Double,
+    val highRiskCategories: Map<String, Int>,
+    val modelStatuses: Map<String, Int>,
+    val targets: Map<String, Int>,
+    val recentFailures: List<AdminContentModerationAuditResult>,
+)
+
+data class AdminContentModerationAuditResult(
+    val id: Long,
+    val memberId: Long?,
+    val target: String,
+    val allowed: Boolean,
+    val riskLevel: String,
+    val categories: List<String>,
+    val modelStatus: String,
+    val latencyMs: Long,
+    val textHash: String,
+    val textLength: Int,
+    val contentSummary: String,
+    val createdAt: String,
 )
 
 data class AdminMemberPage(

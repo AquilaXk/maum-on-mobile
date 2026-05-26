@@ -1,17 +1,20 @@
 package com.maumonmobile.application.service
 
+import com.maumonmobile.adapter.out.persistence.moderation.InMemoryContentModerationAuditRepository
 import com.maumonmobile.application.port.`in`.ContentModerationCommand
 import com.maumonmobile.application.port.out.ContentModerationClassification
 import com.maumonmobile.application.port.out.ContentModerationClassificationRequest
 import com.maumonmobile.application.port.out.ContentModerationClassifier
 import com.maumonmobile.application.port.out.ContentModerationUnavailableException
 import com.maumonmobile.domain.moderation.ContentModerationCategory
+import com.maumonmobile.domain.moderation.ContentModerationModelStatus
 import com.maumonmobile.domain.moderation.ContentModerationRiskLevel
 import com.maumonmobile.global.observability.MobileApiMetricsRegistry
 import com.maumonmobile.global.security.AuthenticatedUser
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import java.time.Duration
+import java.util.concurrent.TimeoutException
 
 class ContentModerationServiceTest {
 
@@ -28,6 +31,7 @@ class ContentModerationServiceTest {
                 ),
             ),
             metricsRegistry = metrics,
+            auditRepository = InMemoryContentModerationAuditRepository(),
             moderationTimeout = Duration.ofSeconds(1),
         )
 
@@ -44,9 +48,11 @@ class ContentModerationServiceTest {
 
     @Test
     fun blocksContentWhenClassifierIsUnavailable() {
+        val auditRepository = InMemoryContentModerationAuditRepository()
         val service = ContentModerationService(
             contentModerationClassifier = FailingClassifier(),
             metricsRegistry = MobileApiMetricsRegistry(),
+            auditRepository = auditRepository,
             moderationTimeout = Duration.ofSeconds(1),
         )
 
@@ -58,6 +64,65 @@ class ContentModerationServiceTest {
         assertThat(result.allowed).isFalse()
         assertThat(result.riskLevel).isEqualTo(ContentModerationRiskLevel.HIGH)
         assertThat(result.categories).containsExactly(ContentModerationCategory.INAPPROPRIATE)
+        assertThat(auditRepository.findRecent(10).single().modelStatus)
+            .isEqualTo(ContentModerationModelStatus.UNAVAILABLE)
+    }
+
+    @Test
+    fun recordsModerationAuditWithoutRawTextOrPersonalInformation() {
+        val auditRepository = InMemoryContentModerationAuditRepository()
+        val service = ContentModerationService(
+            contentModerationClassifier = FixedClassifier(
+                ContentModerationClassification(
+                    allowed = false,
+                    riskLevel = ContentModerationRiskLevel.HIGH,
+                    categories = listOf(ContentModerationCategory.PERSONAL_INFO),
+                    message = "개인정보가 포함되어 수정이 필요합니다.",
+                ),
+            ),
+            metricsRegistry = MobileApiMetricsRegistry(),
+            auditRepository = auditRepository,
+            moderationTimeout = Duration.ofSeconds(1),
+        )
+
+        service.review(
+            user = AuthenticatedUser(id = "7", email = "pii@example.com", roles = setOf("USER")),
+            command = ContentModerationCommand(
+                targetType = "story",
+                text = "연락처는 010-1234-5678이고 이메일은 danger@example.com 입니다.",
+            ),
+        )
+
+        val audit = auditRepository.findRecent(10).single()
+        assertThat(audit.memberId).isEqualTo(7L)
+        assertThat(audit.target.name).isEqualTo("STORY")
+        assertThat(audit.allowed).isFalse()
+        assertThat(audit.textHash).hasSize(64)
+        assertThat(audit.textLength).isGreaterThan(0)
+        assertThat(audit.contentSummary).contains("length=", "personalInfo=true")
+        assertThat(audit.contentSummary).doesNotContain("010-1234-5678", "danger@example.com", "연락처")
+    }
+
+    @Test
+    fun recordsTimeoutAsRetryableModelFailure() {
+        val auditRepository = InMemoryContentModerationAuditRepository()
+        val service = ContentModerationService(
+            contentModerationClassifier = TimeoutClassifier(),
+            metricsRegistry = MobileApiMetricsRegistry(),
+            auditRepository = auditRepository,
+            moderationTimeout = Duration.ofMillis(50),
+        )
+
+        val result = service.review(
+            user = AuthenticatedUser(id = "8", email = "timeout@example.com", roles = setOf("USER")),
+            command = ContentModerationCommand(targetType = "letter", text = "모델 지연 케이스"),
+        )
+
+        assertThat(result.allowed).isFalse()
+        assertThat(result.message).contains("잠시 후 다시 시도")
+        val audit = auditRepository.findRecent(10).single()
+        assertThat(audit.modelStatus).isEqualTo(ContentModerationModelStatus.TIMEOUT)
+        assertThat(audit.allowed).isFalse()
     }
 }
 
@@ -72,5 +137,11 @@ private class FixedClassifier(
 private class FailingClassifier : ContentModerationClassifier {
     override fun classify(request: ContentModerationClassificationRequest): ContentModerationClassification {
         throw ContentModerationUnavailableException("model unavailable")
+    }
+}
+
+private class TimeoutClassifier : ContentModerationClassifier {
+    override fun classify(request: ContentModerationClassificationRequest): ContentModerationClassification {
+        throw TimeoutException("model timeout")
     }
 }

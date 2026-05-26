@@ -1,6 +1,7 @@
 package com.maumonmobile.adapter.`in`.web.admin
 
 import com.maumonmobile.application.port.out.AuthMemberRepository
+import com.maumonmobile.application.port.out.ContentModerationAuditRepository
 import com.maumonmobile.application.port.out.DiaryRepository
 import com.maumonmobile.application.port.out.LetterRepository
 import com.maumonmobile.application.port.out.NotificationDeviceTokenRepository
@@ -12,6 +13,11 @@ import com.maumonmobile.domain.auth.AuthMemberRole
 import com.maumonmobile.domain.auth.AuthMemberStatus
 import com.maumonmobile.domain.diary.DiaryDraft
 import com.maumonmobile.domain.letter.LetterDraft
+import com.maumonmobile.domain.moderation.ContentModerationAuditDraft
+import com.maumonmobile.domain.moderation.ContentModerationCategory
+import com.maumonmobile.domain.moderation.ContentModerationModelStatus
+import com.maumonmobile.domain.moderation.ContentModerationRiskLevel
+import com.maumonmobile.domain.moderation.ContentModerationTarget
 import com.maumonmobile.domain.notification.NotificationDevicePlatform
 import com.maumonmobile.domain.report.ReportDraft
 import com.maumonmobile.domain.report.ReportReason
@@ -42,6 +48,7 @@ class AdminOperationsControllerTest @Autowired constructor(
     private val mockMvc: MockMvc,
     private val authMemberRepository: AuthMemberRepository,
     private val diaryRepository: DiaryRepository,
+    private val contentModerationAuditRepository: ContentModerationAuditRepository,
     private val letterRepository: LetterRepository,
     private val notificationDeviceTokenRepository: NotificationDeviceTokenRepository,
     private val notificationRepository: NotificationRepository,
@@ -250,6 +257,65 @@ class AdminOperationsControllerTest @Autowired constructor(
                 status { isForbidden() }
                 jsonPath("$.error.code") { value("FORBIDDEN") }
                 jsonPath("$.error.cause") { value("ROLE_CHANGED") }
+            }
+    }
+
+    @Test
+    fun adminReadsContentModerationAuditSummaryWithoutRawText() {
+        val admin = savedMember(role = AuthMemberRole.ADMIN, nickname = "검수운영자")
+        val member = savedMember(emailPrefix = "moderation-audit-member", nickname = "검수대상")
+        val memberToken = accessToken(member)
+        val adminToken = accessToken(admin)
+        contentModerationAuditRepository.save(
+            ContentModerationAuditDraft(
+                memberId = member.id,
+                target = ContentModerationTarget.STORY,
+                allowed = false,
+                riskLevel = ContentModerationRiskLevel.HIGH,
+                categories = listOf(ContentModerationCategory.PERSONAL_INFO),
+                modelStatus = ContentModerationModelStatus.SUCCESS,
+                latencyMs = 37,
+                textHash = "a".repeat(64),
+                textLength = 42,
+                contentSummary = "length=42;personalInfo=true;categoryCount=1",
+            ),
+        )
+        contentModerationAuditRepository.save(
+            ContentModerationAuditDraft(
+                memberId = member.id,
+                target = ContentModerationTarget.LETTER,
+                allowed = false,
+                riskLevel = ContentModerationRiskLevel.HIGH,
+                categories = listOf(ContentModerationCategory.INAPPROPRIATE),
+                modelStatus = ContentModerationModelStatus.UNAVAILABLE,
+                latencyMs = 1200,
+                textHash = "b".repeat(64),
+                textLength = 12,
+                contentSummary = "length=12;personalInfo=false;categoryCount=1",
+            ),
+        )
+
+        mockMvc.get("/api/v1/admin/moderation/summary") {
+            header("Authorization", "Bearer $memberToken")
+        }
+            .andExpect {
+                status { isForbidden() }
+            }
+
+        mockMvc.get("/api/v1/admin/moderation/summary") {
+            header("Authorization", "Bearer $adminToken")
+        }
+            .andExpect {
+                status { isOk() }
+                jsonPath("$.data.totalCount") { value(greaterThanOrEqualTo(2)) }
+                jsonPath("$.data.blockedCount") { value(greaterThanOrEqualTo(2)) }
+                jsonPath("$.data.modelFailureCount") { value(greaterThanOrEqualTo(1)) }
+                jsonPath("$.data.highRiskCategories.PERSONAL_INFO") { value(greaterThanOrEqualTo(1)) }
+                jsonPath("$.data.modelStatuses.UNAVAILABLE") { value(greaterThanOrEqualTo(1)) }
+                jsonPath("$.data.recentFailures[0].contentSummary") {
+                    value(not(containsString("010-1234-5678")))
+                }
+                jsonPath("$.data.recentFailures[0].textHash") { value(org.hamcrest.Matchers.hasLength(64)) }
             }
     }
 
