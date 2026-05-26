@@ -20,8 +20,10 @@ import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestMapping
+import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.bind.annotation.RestController
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter
+import java.util.UUID
 
 @RestController
 @RequestMapping("/api/v1/consultations")
@@ -37,9 +39,13 @@ class ConsultationController(
     }
 
     @GetMapping("/recent")
-    fun recent(authentication: Authentication): ApiResponse<ConsultationHistoryResponse> {
+    fun recent(
+        authentication: Authentication,
+        @RequestParam(required = false) afterId: Long?,
+        @RequestParam(required = false) limit: Int?,
+    ): ApiResponse<ConsultationHistoryResponse> {
         return ApiResponse.success(
-            consultationUseCase.history(authentication.authenticatedUser()).toResponse(),
+            consultationUseCase.history(authentication.authenticatedUser(), afterId = afterId, limit = limit).toResponse(),
         )
     }
 
@@ -52,10 +58,11 @@ class ConsultationController(
             user = authentication.authenticatedUser(),
             command = request.toCommand(),
         )
+        val requestId = UUID.randomUUID().toString()
         if (result.safety?.actionPolicy !in SAFETY_BLOCKING_POLICIES && result.errorMessage == null) {
-            streamRegistry.publishReply(result.memberId, result.chunks)
+            streamRegistry.publishReply(result.memberId, requestId = requestId, chunks = result.chunks)
         } else if (result.safety?.actionPolicy !in SAFETY_BLOCKING_POLICIES && result.errorMessage != null) {
-            streamRegistry.publishError(result.memberId, result.errorMessage)
+            streamRegistry.publishError(result.memberId, requestId = requestId, message = result.errorMessage)
         }
         return ApiResponse.success(result.toResponse())
     }
@@ -76,6 +83,7 @@ data class ConsultationChatRequest(
 
 data class ConsultationHistoryResponse(
     val messages: List<ConsultationMessageResponse>,
+    val nextCursor: Long?,
 )
 
 data class ConsultationMessageResponse(
@@ -108,7 +116,10 @@ private fun ConsultationChatRequest.toCommand(): ConsultationChatCommand {
 }
 
 private fun ConsultationHistoryResult.toResponse(): ConsultationHistoryResponse {
-    return ConsultationHistoryResponse(messages = messages.map(ConsultationMessageResult::toResponse))
+    return ConsultationHistoryResponse(
+        messages = messages.map(ConsultationMessageResult::toResponse),
+        nextCursor = nextCursor,
+    )
 }
 
 private fun ConsultationMessageResult.toResponse(): ConsultationMessageResponse {

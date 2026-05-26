@@ -5,7 +5,7 @@ import com.maumonmobile.global.security.AuthenticatedUser
 interface ConsultationUseCase {
     fun connect(user: AuthenticatedUser): ConsultationSessionResult
 
-    fun history(user: AuthenticatedUser): ConsultationHistoryResult
+    fun history(user: AuthenticatedUser, afterId: Long? = null, limit: Int? = null): ConsultationHistoryResult
 
     fun chat(user: AuthenticatedUser, command: ConsultationChatCommand): ConsultationChatResult
 
@@ -41,6 +41,7 @@ data class ConsultationDeleteSensitiveHistoryResult(
 
 data class ConsultationHistoryResult(
     val messages: List<ConsultationMessageResult>,
+    val nextCursor: Long?,
 )
 
 data class ConsultationMessageResult(

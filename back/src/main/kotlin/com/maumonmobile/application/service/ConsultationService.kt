@@ -52,12 +52,16 @@ class ConsultationService(
         return ConsultationSessionResult(memberId = findActiveMember(user).id)
     }
 
-    override fun history(user: AuthenticatedUser): ConsultationHistoryResult {
+    override fun history(user: AuthenticatedUser, afterId: Long?, limit: Int?): ConsultationHistoryResult {
         val member = findActiveMember(user)
+        val messages = consultationRepository.findByMemberId(
+            memberId = member.id,
+            afterId = afterId,
+            limit = limit?.coerceIn(MIN_HISTORY_LIMIT, MAX_HISTORY_LIMIT),
+        )
         return ConsultationHistoryResult(
-            messages = consultationRepository.findByMemberId(member.id).map { message ->
-                message.toResult()
-            },
+            messages = messages.map { message -> message.toResult() },
+            nextCursor = messages.lastOrNull()?.id,
         )
     }
 
@@ -327,6 +331,8 @@ class ConsultationService(
         private const val SAFETY_AUDIT_PREVIEW_LENGTH = 120
         private const val AI_CONTEXT_MESSAGE_LIMIT = 6
         private const val CRITICAL_RATE_LIMIT = 2
+        private const val MIN_HISTORY_LIMIT = 1
+        private const val MAX_HISTORY_LIMIT = 100
         private val SAFETY_RATE_WINDOW: Duration = Duration.ofMinutes(30)
         private val SENSITIVE_RETENTION: Duration = Duration.ofDays(30)
         private const val SELF_HARM_MESSAGE =

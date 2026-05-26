@@ -38,6 +38,55 @@ void main() {
       expect(controller.state.messages.last.content, '천천히 호흡해 볼까요?');
     });
 
+    test('ignores duplicated streamed chunks with the same request sequence',
+        () async {
+      final repository = _FakeConsultationRepository();
+      final controller = ConsultationController(repository: repository);
+
+      await controller.connect();
+      repository.emit(const ConsultationStreamEvent.connect('connected'));
+      controller.updateDraft('중복 응답을 막아 주세요');
+      await controller.submitMessage();
+      repository
+        ..emit(
+          const ConsultationStreamEvent.chat(
+            '천천히 ',
+            requestId: 'reply-1',
+            sequence: 0,
+          ),
+        )
+        ..emit(
+          const ConsultationStreamEvent.chat(
+            '천천히 ',
+            requestId: 'reply-1',
+            sequence: 0,
+          ),
+        )
+        ..emit(
+          const ConsultationStreamEvent.chat(
+            '호흡해 볼까요?',
+            requestId: 'reply-1',
+            sequence: 1,
+          ),
+        )
+        ..emit(
+          const ConsultationStreamEvent.done(
+            requestId: 'reply-1',
+            sequence: 2,
+          ),
+        )
+        ..emit(
+          const ConsultationStreamEvent.chat(
+            '호흡해 볼까요?',
+            requestId: 'reply-1',
+            sequence: 1,
+          ),
+        );
+
+      expect(controller.state.messages.last.content, '천천히 호흡해 볼까요?');
+      expect(controller.state.isStreaming, isFalse);
+    });
+
     test('loads recent messages before opening a stream', () async {
       final repository = _FakeConsultationRepository(
         recentMessages: [

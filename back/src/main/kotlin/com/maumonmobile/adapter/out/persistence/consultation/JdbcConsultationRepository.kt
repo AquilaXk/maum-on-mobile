@@ -60,7 +60,21 @@ class JdbcConsultationRepository(
         return findById(id) ?: error("저장된 상담 메시지를 확인하지 못했습니다.")
     }
 
-    override fun findByMemberId(memberId: Long): List<ConsultationMessage> {
+    override fun findByMemberId(memberId: Long, afterId: Long?, limit: Int?): List<ConsultationMessage> {
+        val parameters = params().withValue("memberId", memberId)
+        val cursorCondition = if (afterId != null) {
+            parameters.withValue("afterId", afterId)
+            "and m.id > :afterId"
+        } else {
+            ""
+        }
+        val limitClause = if (limit != null) {
+            parameters.withValue("limit", limit.coerceAtLeast(1))
+            "limit :limit"
+        } else {
+            ""
+        }
+
         return jdbc.query(
             """
                 select m.id,
@@ -74,9 +88,11 @@ class JdbcConsultationRepository(
                   join consultation_sessions s on s.id = m.session_id
                  where s.member_id = :memberId
                    and m.hidden = false
+                   $cursorCondition
                  order by m.created_at asc, m.id asc
+                 $limitClause
             """.trimIndent(),
-            params().withValue("memberId", memberId),
+            parameters,
             rowMapper,
         )
     }

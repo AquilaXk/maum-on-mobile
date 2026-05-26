@@ -16,6 +16,7 @@ class MobileApiMetricsRegistry {
     private val aiModel = ConcurrentHashMap<String, AtomicInteger>()
     private val contentModeration = ConcurrentHashMap<String, AtomicInteger>()
     private val consultationSafety = ConcurrentHashMap<String, AtomicInteger>()
+    private val consultationStream = ConcurrentHashMap<String, AtomicInteger>()
     private val clientTelemetryEvents = ConcurrentHashMap<String, AtomicInteger>()
     private val clientTelemetryRoutes = ConcurrentHashMap<String, AtomicInteger>()
     private val clientTelemetryPlatforms = ConcurrentHashMap<String, AtomicInteger>()
@@ -74,6 +75,7 @@ class MobileApiMetricsRegistry {
                 model = aiModel.toCountMap(),
                 contentModeration = contentModeration.toCountMap(),
                 consultationSafety = consultationSafety.toCountMap(),
+                consultationStream = consultationStream.toCountMap(),
             ),
             client = MobileClientTelemetryMetrics(
                 events = clientTelemetryEvents.toCountMap(),
@@ -116,6 +118,10 @@ class MobileApiMetricsRegistry {
         consultationSafety.increment("${category.uppercase()}.${actionPolicy.uppercase()}")
     }
 
+    fun recordConsultationStream(status: String) {
+        consultationStream.increment(status.lowercase())
+    }
+
     fun recordClientTelemetry(
         eventType: String,
         route: String,
@@ -154,6 +160,7 @@ class MobileApiMetricsRegistry {
         aiModel.clear()
         contentModeration.clear()
         consultationSafety.clear()
+        consultationStream.clear()
         clientTelemetryEvents.clear()
         clientTelemetryRoutes.clear()
         clientTelemetryPlatforms.clear()
@@ -218,6 +225,7 @@ data class MobileAiMetrics(
     val model: Map<String, Int> = emptyMap(),
     val contentModeration: Map<String, Int> = emptyMap(),
     val consultationSafety: Map<String, Int> = emptyMap(),
+    val consultationStream: Map<String, Int> = emptyMap(),
 )
 
 data class MobileClientTelemetryMetrics(

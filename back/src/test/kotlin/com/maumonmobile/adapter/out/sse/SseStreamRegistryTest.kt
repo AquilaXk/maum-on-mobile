@@ -6,6 +6,7 @@ import com.maumonmobile.application.port.out.SseStreamBusPort
 import com.maumonmobile.application.port.out.SseStreamBusUnavailableException
 import com.maumonmobile.domain.stream.SseStreamEvent
 import com.maumonmobile.domain.stream.SseStreamType
+import com.maumonmobile.global.observability.MobileApiMetricsRegistry
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.Test
@@ -131,12 +132,37 @@ class SseStreamRegistryTest {
             .contains("retryable")
     }
 
+    @Test
+    fun consultationBusFailureRecordsStreamFailureSeparately() {
+        val metrics = MobileApiMetricsRegistry()
+        val factory = CapturingSseEmitterFactory()
+        val registry = registry(
+            instanceId = "failing-consultation",
+            bus = FailingSseStreamBus(),
+            sessions = InMemorySseStreamSessionRepository(),
+            clock = MutableClock(),
+            emitterFactory = factory,
+            metricsRegistry = metrics,
+        )
+        registry.open(SseStreamType.CONSULTATION, memberId = 13L, connectData = "connected")
+
+        assertThatThrownBy {
+            registry.publish(SseStreamType.CONSULTATION, memberId = 13L, eventName = "chat", data = "안녕하세요")
+        }.isInstanceOf(SseStreamBusUnavailableException::class.java)
+
+        assertThat(metrics.snapshot().ai.consultationStream)
+            .containsEntry("publish_failure", 1)
+        assertThat(metrics.snapshot().ai.model).isEmpty()
+        assertThat(metrics.snapshot().ai.consultationSafety).isEmpty()
+    }
+
     private fun registry(
         instanceId: String,
         bus: SseStreamBusPort,
         sessions: InMemorySseStreamSessionRepository,
         clock: Clock,
         emitterFactory: SseEmitterFactory,
+        metricsRegistry: MobileApiMetricsRegistry = MobileApiMetricsRegistry(),
     ): SseStreamRegistry {
         return SseStreamRegistry(
             streamBusPort = bus,
@@ -150,6 +176,7 @@ class SseStreamRegistryTest {
                 heartbeatInterval = Duration.ofSeconds(15)
                 reconnectDelay = Duration.ofSeconds(3)
             },
+            metricsRegistry = metricsRegistry,
         )
     }
 }

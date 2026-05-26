@@ -129,6 +129,9 @@ class ConsultationController extends ChangeNotifier {
   int _reconnectAttempt = 0;
   int _messageSequence = 0;
   String? _activeAssistantMessageId;
+  String? _activeStreamRequestId;
+  final Set<String> _processedStreamChunkKeys = <String>{};
+  final Set<String> _completedStreamRequestIds = <String>{};
 
   ConsultationState get state => _state;
 
@@ -257,7 +260,7 @@ class ConsultationController extends ChangeNotifier {
     final userMessage = _createMessage(ConsultationMessageRole.user, content);
     final assistantMessage =
         _createMessage(ConsultationMessageRole.assistant, '');
-    _activeAssistantMessageId = assistantMessage.id;
+    _prepareForOutgoingStream(assistantMessage.id);
     _setState(
       _state.copyWith(
         messages: [..._state.messages, userMessage, assistantMessage],
@@ -294,7 +297,7 @@ class ConsultationController extends ChangeNotifier {
 
     final assistantMessage =
         _createMessage(ConsultationMessageRole.assistant, '');
-    _activeAssistantMessageId = assistantMessage.id;
+    _prepareForOutgoingStream(assistantMessage.id);
     _setState(
       _state.copyWith(
         messages: [
@@ -437,6 +440,10 @@ class ConsultationController extends ChangeNotifier {
   }
 
   void _handleStreamEvent(ConsultationStreamEvent event) {
+    if (_shouldIgnoreCompletedStreamEvent(event)) {
+      return;
+    }
+
     switch (event.type) {
       case ConsultationStreamEventType.connect:
         _reconnectAttempt = 0;
@@ -456,10 +463,10 @@ class ConsultationController extends ChangeNotifier {
         );
         return;
       case ConsultationStreamEventType.chat:
-        _appendAssistantChunk(event.data);
+        _appendAssistantChunk(event);
         return;
       case ConsultationStreamEventType.done:
-        _finishStreaming();
+        _finishStreaming(event);
         return;
       case ConsultationStreamEventType.error:
         final message =
@@ -604,8 +611,13 @@ class ConsultationController extends ChangeNotifier {
     );
   }
 
-  void _appendAssistantChunk(String chunk) {
+  void _appendAssistantChunk(ConsultationStreamEvent event) {
+    final chunk = event.data;
     if (chunk.isEmpty) {
+      return;
+    }
+
+    if (!_markStreamChunkForAppend(event)) {
       return;
     }
 
@@ -675,8 +687,14 @@ class ConsultationController extends ChangeNotifier {
     );
   }
 
-  void _finishStreaming() {
+  void _finishStreaming([ConsultationStreamEvent? event]) {
+    final requestId = event?.requestId ?? _activeStreamRequestId;
+    if (requestId != null) {
+      _completedStreamRequestIds.add(requestId);
+    }
     _activeAssistantMessageId = null;
+    _activeStreamRequestId = null;
+    _processedStreamChunkKeys.clear();
     _setState(_state.copyWith(isStreaming: false));
   }
 
@@ -739,6 +757,8 @@ class ConsultationController extends ChangeNotifier {
     _cancelPendingReconnect();
     await currentSubscription?.cancel();
     _activeAssistantMessageId = null;
+    _activeStreamRequestId = null;
+    _processedStreamChunkKeys.clear();
     _setState(
       _state.copyWith(
         connectionState: connectionState,
@@ -760,6 +780,8 @@ class ConsultationController extends ChangeNotifier {
       unawaited(currentSubscription.cancel());
     }
     _activeAssistantMessageId = null;
+    _activeStreamRequestId = null;
+    _processedStreamChunkKeys.clear();
     _setState(
       _state.copyWith(
         connectionState: connectionState,
@@ -800,6 +822,48 @@ class ConsultationController extends ChangeNotifier {
     }
 
     return '요청을 처리하지 못했습니다.';
+  }
+
+  void _prepareForOutgoingStream(String assistantMessageId) {
+    _activeAssistantMessageId = assistantMessageId;
+    _activeStreamRequestId = null;
+    _processedStreamChunkKeys.clear();
+  }
+
+  bool _markStreamChunkForAppend(ConsultationStreamEvent event) {
+    final requestId = event.requestId;
+    if (requestId == null) {
+      return true;
+    }
+
+    if (_completedStreamRequestIds.contains(requestId)) {
+      return false;
+    }
+
+    final activeRequestId = _activeStreamRequestId;
+    if (activeRequestId == null) {
+      _activeStreamRequestId = requestId;
+    } else if (activeRequestId != requestId) {
+      return false;
+    }
+
+    final sequence = event.sequence;
+    if (sequence == null) {
+      return true;
+    }
+
+    return _processedStreamChunkKeys.add('$requestId:$sequence');
+  }
+
+  bool _shouldIgnoreCompletedStreamEvent(ConsultationStreamEvent event) {
+    final requestId = event.requestId;
+    if (requestId == null || !_completedStreamRequestIds.contains(requestId)) {
+      return false;
+    }
+
+    return event.type == ConsultationStreamEventType.chat ||
+        event.type == ConsultationStreamEventType.done ||
+        event.type == ConsultationStreamEventType.error;
   }
 
   void _setState(ConsultationState nextState) {
