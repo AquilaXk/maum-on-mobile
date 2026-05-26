@@ -42,6 +42,7 @@ class StoryState {
     this.hasLoaded = false,
     this.errorMessage,
     this.noticeMessage,
+    this.moderationFeedback,
     this.reportTarget,
   });
 
@@ -69,6 +70,7 @@ class StoryState {
   final bool hasLoaded;
   final String? errorMessage;
   final String? noticeMessage;
+  final ContentModerationFeedback? moderationFeedback;
   final StoryReportTarget? reportTarget;
 
   bool get isEditingStory => editingStoryId != null;
@@ -135,6 +137,8 @@ class StoryState {
     bool clearErrorMessage = false,
     String? noticeMessage,
     bool clearNoticeMessage = false,
+    ContentModerationFeedback? moderationFeedback,
+    bool clearModerationFeedback = false,
     StoryReportTarget? reportTarget,
     bool clearReportTarget = false,
   }) {
@@ -172,6 +176,9 @@ class StoryState {
           clearErrorMessage ? null : errorMessage ?? this.errorMessage,
       noticeMessage:
           clearNoticeMessage ? null : noticeMessage ?? this.noticeMessage,
+      moderationFeedback: clearModerationFeedback
+          ? null
+          : moderationFeedback ?? this.moderationFeedback,
       reportTarget:
           clearReportTarget ? null : reportTarget ?? this.reportTarget,
     );
@@ -412,12 +419,24 @@ class StoryController extends ChangeNotifier {
   }
 
   void updateStoryTitle(String title) {
-    _setState(_state.copyWith(storyTitle: title, clearErrorMessage: true));
+    _setState(
+      _state.copyWith(
+        storyTitle: title,
+        clearErrorMessage: true,
+        clearModerationFeedback: true,
+      ),
+    );
     _saveStoryDraft();
   }
 
   void updateStoryContent(String content) {
-    _setState(_state.copyWith(storyContent: content, clearErrorMessage: true));
+    _setState(
+      _state.copyWith(
+        storyContent: content,
+        clearErrorMessage: true,
+        clearModerationFeedback: true,
+      ),
+    );
     _saveStoryDraft();
   }
 
@@ -544,7 +563,13 @@ class StoryController extends ChangeNotifier {
   }
 
   void updateCommentDraft(String content) {
-    _setState(_state.copyWith(commentDraft: content, clearErrorMessage: true));
+    _setState(
+      _state.copyWith(
+        commentDraft: content,
+        clearErrorMessage: true,
+        clearModerationFeedback: true,
+      ),
+    );
     _saveCommentDraft();
   }
 
@@ -563,6 +588,7 @@ class StoryController extends ChangeNotifier {
         replyDrafts: nextDrafts,
         clearErrorMessage: true,
         clearNoticeMessage: true,
+        clearModerationFeedback: true,
       ),
     );
   }
@@ -575,6 +601,7 @@ class StoryController extends ChangeNotifier {
         clearActiveReplyCommentId: true,
         replyDrafts: nextDrafts,
         clearErrorMessage: true,
+        clearModerationFeedback: true,
       ),
     );
   }
@@ -586,6 +613,7 @@ class StoryController extends ChangeNotifier {
       _state.copyWith(
         replyDrafts: nextDrafts,
         clearErrorMessage: true,
+        clearModerationFeedback: true,
       ),
     );
   }
@@ -681,6 +709,7 @@ class StoryController extends ChangeNotifier {
         editingCommentContent: comment.content,
         clearErrorMessage: true,
         clearNoticeMessage: true,
+        clearModerationFeedback: true,
       ),
     );
   }
@@ -690,6 +719,7 @@ class StoryController extends ChangeNotifier {
       _state.copyWith(
         editingCommentContent: content,
         clearErrorMessage: true,
+        clearModerationFeedback: true,
       ),
     );
   }
@@ -700,6 +730,16 @@ class StoryController extends ChangeNotifier {
         clearEditingCommentId: true,
         editingCommentContent: '',
         clearErrorMessage: true,
+        clearModerationFeedback: true,
+      ),
+    );
+  }
+
+  void clearModerationFeedback() {
+    _setState(
+      _state.copyWith(
+        clearErrorMessage: true,
+        clearModerationFeedback: true,
       ),
     );
   }
@@ -890,21 +930,54 @@ class StoryController extends ChangeNotifier {
       return true;
     }
 
-    final result = await repository.reviewText(
-      targetType: targetType,
-      text: text,
-    );
+    final ContentModerationResult result;
+    try {
+      result = await repository.reviewText(
+        targetType: targetType,
+        text: text,
+      );
+    } on ApiClientException catch (error) {
+      if (error.sessionInvalidated) {
+        rethrow;
+      }
+      final feedback = ContentModerationFeedback.failure(
+        targetType: targetType,
+        error: error,
+      );
+      _setState(
+        _state.copyWith(
+          isSubmitting: false,
+          errorMessage: feedback.message,
+          moderationFeedback: feedback,
+          clearNoticeMessage: true,
+        ),
+      );
+      return false;
+    }
+
     if (result.allowed) {
       if (result.riskLevel != ContentModerationRiskLevel.low) {
-        _setState(_state.copyWith(noticeMessage: result.message));
+        _setState(
+          _state.copyWith(
+            noticeMessage: result.message,
+            clearModerationFeedback: true,
+          ),
+        );
+      } else if (_state.moderationFeedback != null) {
+        _setState(_state.copyWith(clearModerationFeedback: true));
       }
       return true;
     }
 
+    final feedback = ContentModerationFeedback.blocked(
+      targetType: targetType,
+      result: result,
+    );
     _setState(
       _state.copyWith(
         isSubmitting: false,
         errorMessage: result.message,
+        moderationFeedback: feedback,
         clearNoticeMessage: true,
       ),
     );
@@ -920,6 +993,7 @@ class StoryController extends ChangeNotifier {
         _state.copyWith(
           errorMessage: error.message,
           clearNoticeMessage: true,
+          clearModerationFeedback: true,
         ),
       );
       return;
@@ -929,6 +1003,7 @@ class StoryController extends ChangeNotifier {
       _state.copyWith(
         errorMessage: '요청을 처리하지 못했습니다.',
         clearNoticeMessage: true,
+        clearModerationFeedback: true,
       ),
     );
   }

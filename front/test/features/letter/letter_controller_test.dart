@@ -51,6 +51,39 @@ void main() {
       expect(controller.state.noticeMessage, '편지가 전송되었습니다.');
     });
 
+    test('blocks high-risk letter text and keeps compose draft', () async {
+      final repository = _FakeLetterRepository();
+      final moderationRepository = _FakeContentModerationRepository(
+        result: const ContentModerationResult(
+          allowed: false,
+          riskLevel: ContentModerationRiskLevel.high,
+          message: '전송하지 못했습니다.',
+          categories: [ContentModerationCategory.profanity],
+        ),
+      );
+      final controller = LetterController(
+        letterRepository: repository,
+        moderationRepository: moderationRepository,
+      );
+
+      controller.startCompose();
+      controller.updateTitle('거친 편지');
+      controller.updateContent('위험한 표현');
+      await controller.submitLetter();
+
+      expect(repository.createdDrafts, isEmpty);
+      expect(controller.state.errorMessage, '전송하지 못했습니다.');
+      expect(controller.state.title, '거친 편지');
+      expect(controller.state.content, '위험한 표현');
+      expect(controller.state.moderationFeedback?.status,
+          ContentModerationFeedbackStatus.policyBlocked);
+      expect(controller.state.moderationFeedback?.title, '편지 표현을 수정해 주세요.');
+      expect(
+        controller.state.moderationFeedback?.guidanceItems,
+        contains('비난, 욕설, 위협으로 읽힐 수 있는 표현을 부드럽게 바꿔 주세요.'),
+      );
+    });
+
     test('blocks overlong compose drafts and resets compose fields', () async {
       final controller = LetterController(
         letterRepository: _FakeLetterRepository(),
@@ -237,6 +270,32 @@ void main() {
 
       expect(controller.state.errorMessage, '전송하지 못했습니다.');
       expect(controller.state.noticeMessage, isNull);
+    });
+
+    test('keeps reply draft when moderation model is unavailable', () async {
+      final repository = _FakeLetterRepository(
+        details: [_detail(id: 42, status: LetterStatus.accepted)],
+      );
+      final moderationRepository = _FakeContentModerationRepository(
+        error: const ApiClientException(
+          kind: ApiErrorKind.server,
+          message: '검수 결과를 확인하지 못했습니다.',
+        ),
+      );
+      final controller = LetterController(
+        letterRepository: repository,
+        moderationRepository: moderationRepository,
+      );
+
+      await controller.openLetterById(42);
+      controller.updateReplyContent('모델 장애 뒤에도 남아야 하는 답장');
+      await controller.submitReply();
+
+      expect(repository.replies, isEmpty);
+      expect(controller.state.replyContent, '모델 장애 뒤에도 남아야 하는 답장');
+      expect(controller.state.moderationFeedback?.status,
+          ContentModerationFeedbackStatus.modelUnavailable);
+      expect(controller.state.moderationFeedback?.title, '검수 결과를 불러오지 못했습니다.');
     });
 
     test('restores compose and reply drafts per member', () async {
@@ -494,9 +553,14 @@ class _DeferredLoadRepository implements LetterRepository {
 }
 
 class _FakeContentModerationRepository implements ContentModerationRepository {
-  _FakeContentModerationRepository({required this.result});
+  _FakeContentModerationRepository({
+    ContentModerationResult? result,
+    List<ContentModerationResult>? results,
+    this.error,
+  }) : results = results ?? [if (result != null) result];
 
-  final ContentModerationResult result;
+  final List<ContentModerationResult> results;
+  final Object? error;
   final List<ContentModerationRequest> requests = [];
 
   @override
@@ -505,6 +569,13 @@ class _FakeContentModerationRepository implements ContentModerationRepository {
     required String text,
   }) async {
     requests.add(ContentModerationRequest(targetType: targetType, text: text));
-    return result;
+    final nextError = error;
+    if (nextError != null) {
+      throw nextError;
+    }
+    if (results.isEmpty) {
+      throw StateError('No moderation result configured.');
+    }
+    return results.length == 1 ? results.single : results.removeAt(0);
   }
 }

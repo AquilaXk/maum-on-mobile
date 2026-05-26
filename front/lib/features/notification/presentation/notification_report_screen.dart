@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../../moderation/presentation/content_moderation_feedback_panel.dart';
 import '../../report/application/report_controller.dart';
 import '../../report/domain/report_models.dart';
 import '../../../shared/ui/app_design_system.dart';
@@ -143,8 +144,8 @@ class _NotificationReportScreenState extends State<NotificationReportScreen>
                         widget.notificationController.state.connectionState,
                     pushNotificationState: widget
                         .notificationController.state.pushNotificationState,
-                    canOpenPushSettings: widget
-                        .notificationController.state.canOpenPushSettings,
+                    canOpenPushSettings:
+                        widget.notificationController.state.canOpenPushSettings,
                     unreadCount:
                         widget.notificationController.state.unreadCount,
                     lastReceivedAt:
@@ -153,8 +154,8 @@ class _NotificationReportScreenState extends State<NotificationReportScreen>
                     onReconnect: widget.notificationController.reconnect,
                     onRequestPush:
                         widget.notificationController.requestPushPermission,
-                    onOpenPushSettings:
-                        widget.notificationController.openPushNotificationSettings,
+                    onOpenPushSettings: widget
+                        .notificationController.openPushNotificationSettings,
                     onMarkAllRead: widget.notificationController.markAllRead,
                   ),
                   const TabBar(
@@ -189,6 +190,8 @@ class _NotificationReportScreenState extends State<NotificationReportScreen>
                           onContentChanged:
                               widget.reportController.updateContent,
                           onSubmit: widget.reportController.submit,
+                          onDismissFeedback:
+                              widget.reportController.clearModerationFeedback,
                         ),
                       ],
                     ),
@@ -578,6 +581,7 @@ class _ReportForm extends StatelessWidget {
     required this.onReasonSelected,
     required this.onContentChanged,
     required this.onSubmit,
+    required this.onDismissFeedback,
   });
 
   final ReportState state;
@@ -589,6 +593,7 @@ class _ReportForm extends StatelessWidget {
   final ValueChanged<ReportReasonCode> onReasonSelected;
   final ValueChanged<String> onContentChanged;
   final Future<void> Function() onSubmit;
+  final VoidCallback onDismissFeedback;
 
   @override
   Widget build(BuildContext context) {
@@ -699,7 +704,14 @@ class _ReportForm extends StatelessWidget {
             const SizedBox(height: AppSpacing.xs),
             _InlineNotice(message: validationMessage, isError: true),
           ],
-          if (state.errorMessage != null) ...[
+          if (state.moderationFeedback != null) ...[
+            const SizedBox(height: AppSpacing.xs),
+            ContentModerationFeedbackPanel(
+              feedback: state.moderationFeedback!,
+              onRetry: onSubmit,
+              onDismiss: onDismissFeedback,
+            ),
+          ] else if (state.errorMessage != null) ...[
             const SizedBox(height: AppSpacing.xs),
             _InlineNotice(message: state.errorMessage!, isError: true),
           ],

@@ -4,6 +4,7 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 
 import '../../../shared/ui/app_design_system.dart';
+import '../../moderation/presentation/content_moderation_feedback_panel.dart';
 import '../application/diary_controller.dart';
 import '../domain/diary_models.dart';
 import 'diary_image_picker.dart';
@@ -206,7 +207,14 @@ class _DiaryScreenState extends State<DiaryScreen> {
             ),
           ],
           children: [
-            if (state.errorMessage != null) ...[
+            if (state.moderationFeedback != null) ...[
+              ContentModerationFeedbackPanel(
+                feedback: state.moderationFeedback!,
+                onRetry: widget.controller.submit,
+                onDismiss: widget.controller.clearModerationFeedback,
+              ),
+              const SizedBox(height: AppSpacing.sm),
+            ] else if (state.errorMessage != null) ...[
               AppNotice(
                 message: state.errorMessage!,
                 tone: AppNoticeTone.error,
@@ -519,10 +527,10 @@ class _PublicEntriesSection extends StatelessWidget {
           else
             OutlinedButton.icon(
               key: const ValueKey('diary-public-load-more-button'),
-              onPressed: state.isPublicLoadingMore ||
-                      state.publicErrorMessage != null
-                  ? null
-                  : onLoadMore,
+              onPressed:
+                  state.isPublicLoadingMore || state.publicErrorMessage != null
+                      ? null
+                      : onLoadMore,
               icon: state.isPublicLoadingMore
                   ? const SizedBox.square(
                       dimension: 18,
@@ -813,9 +821,8 @@ class _ContentBlocksEditor extends StatelessWidget {
             ),
             OutlinedButton.icon(
               key: const ValueKey('diary-clear-images-button'),
-              onPressed: blocks.any((block) => block.isImage)
-                  ? onClearImage
-                  : null,
+              onPressed:
+                  blocks.any((block) => block.isImage) ? onClearImage : null,
               icon: const Icon(Icons.hide_image_outlined),
               label: const Text('이미지 모두 제거'),
             ),
@@ -1013,8 +1020,7 @@ class _ImageBlockPanel extends StatelessWidget {
                         : () => onReplaceImage(DiaryImageSource.camera),
                     icon: const Icon(Icons.photo_camera_outlined),
                   ),
-                  if (block.uploadStatus ==
-                      DiaryImageBlockUploadStatus.failed)
+                  if (block.uploadStatus == DiaryImageBlockUploadStatus.failed)
                     IconButton(
                       key: ValueKey('diary-retry-image-${block.id}'),
                       tooltip: '이미지 업로드 다시 시도',

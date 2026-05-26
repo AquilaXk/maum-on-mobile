@@ -83,7 +83,60 @@ void main() {
           ContentModerationTarget.story);
       expect(moderationRepository.requests.single.text, contains('너 죽어 버려'));
       expect(controller.state.errorMessage, '위험도가 높은 표현이 포함되어 수정이 필요합니다.');
+      expect(controller.state.storyContent, '너 죽어 버려');
+      expect(controller.state.moderationFeedback?.status,
+          ContentModerationFeedbackStatus.policyBlocked);
+      expect(controller.state.moderationFeedback?.title, '스토리 표현을 수정해 주세요.');
+      expect(
+        controller.state.moderationFeedback?.guidanceItems,
+        contains('비난, 욕설, 위협으로 읽힐 수 있는 표현을 부드럽게 바꿔 주세요.'),
+      );
       expect(controller.state.isSubmitting, isFalse);
+    });
+
+    test('retries story submission after blocked text is edited', () async {
+      final repository = _FakeStoryRepository(
+        storyPages: [
+          _storyPage([]),
+          _storyPage([_summary(id: 13, title: '순화한 글')]),
+        ],
+        createdStoryId: 13,
+        details: [_detail(id: 13, title: '순화한 글', authorId: 7)],
+        commentPages: [_commentPage([])],
+      );
+      final moderationRepository = _FakeContentModerationRepository(
+        results: [
+          const ContentModerationResult(
+            allowed: false,
+            riskLevel: ContentModerationRiskLevel.high,
+            message: '위험도가 높은 표현이 포함되어 수정이 필요합니다.',
+            categories: [ContentModerationCategory.profanity],
+          ),
+          const ContentModerationResult(
+            allowed: true,
+            riskLevel: ContentModerationRiskLevel.low,
+            message: '검수 결과 저장 가능한 내용입니다.',
+            categories: [],
+          ),
+        ],
+      );
+      final controller = StoryController(
+        storyRepository: repository,
+        currentMemberId: 7,
+        moderationRepository: moderationRepository,
+      );
+
+      controller.startCreate();
+      controller.updateStoryTitle('순화한 글');
+      controller.updateStoryContent('너 죽어 버려');
+      await controller.submitStory();
+      controller.updateStoryContent('속상했지만 다시 말해 볼게요.');
+      await controller.submitStory();
+
+      expect(repository.createdDrafts.single.content, '속상했지만 다시 말해 볼게요.');
+      expect(moderationRepository.requests, hasLength(2));
+      expect(controller.state.moderationFeedback, isNull);
+      expect(controller.state.noticeMessage, '스토리가 등록되었습니다.');
     });
 
     test('blocks high-risk comments before creating a comment', () async {
@@ -117,6 +170,13 @@ void main() {
         contains('010-1234-5678'),
       );
       expect(controller.state.errorMessage, '위험도가 높은 표현이 포함되어 수정이 필요합니다.');
+      expect(controller.state.commentDraft, '010-1234-5678');
+      expect(controller.state.moderationFeedback?.targetType,
+          ContentModerationTarget.comment);
+      expect(
+        controller.state.moderationFeedback?.guidanceItems,
+        contains('전화번호, 이메일, 주소처럼 개인을 특정할 수 있는 표현을 지워 주세요.'),
+      );
     });
 
     test('clears moderation notice when story submission fails', () async {
@@ -177,7 +237,8 @@ void main() {
 
       expect(restoredStoryController.state.storyTitle, '작성 중 글');
       expect(restoredStoryController.state.storyContent, '이어 쓸 본문');
-      expect(restoredStoryController.state.storyCategory, StoryCategory.question);
+      expect(
+          restoredStoryController.state.storyCategory, StoryCategory.question);
 
       await controller.openStoryById(42);
       controller.updateCommentDraft('작성 중 댓글');
@@ -337,7 +398,8 @@ void main() {
       controller.startReply(firstComment);
       await controller.submitReply(firstComment.id);
 
-      expect(repository.createdComments.single.parentCommentId, firstComment.id);
+      expect(
+          repository.createdComments.single.parentCommentId, firstComment.id);
       expect(repository.createdComments.single.content, '@마음친구 고마워요');
       expect(controller.state.replyDrafts[firstComment.id], isNull);
       expect(controller.state.replyDrafts[secondComment.id], '다른 답글 초안');
@@ -462,12 +524,13 @@ class _FakeStoryRepository implements StoryRepository {
   final List<({int id, StoryDraft draft})> updatedDrafts = [];
   final List<int> deletedStoryIds = [];
   final List<({int id, StoryResolutionStatus status})> statusUpdates = [];
-  final List<({
-    int postId,
-    int authorId,
-    String content,
-    int? parentCommentId,
-  })> createdComments = [];
+  final List<
+      ({
+        int postId,
+        int authorId,
+        String content,
+        int? parentCommentId,
+      })> createdComments = [];
   final List<({int id, String content})> updatedComments = [];
   final List<int> deletedCommentIds = [];
 
@@ -555,9 +618,12 @@ class _FakeStoryRepository implements StoryRepository {
 }
 
 class _FakeContentModerationRepository implements ContentModerationRepository {
-  _FakeContentModerationRepository({required this.result});
+  _FakeContentModerationRepository({
+    ContentModerationResult? result,
+    List<ContentModerationResult>? results,
+  }) : results = results ?? [if (result != null) result];
 
-  final ContentModerationResult result;
+  final List<ContentModerationResult> results;
   final List<ContentModerationRequest> requests = [];
 
   @override
@@ -566,6 +632,9 @@ class _FakeContentModerationRepository implements ContentModerationRepository {
     required String text,
   }) async {
     requests.add(ContentModerationRequest(targetType: targetType, text: text));
-    return result;
+    if (results.isEmpty) {
+      throw StateError('No moderation result configured.');
+    }
+    return results.length == 1 ? results.single : results.removeAt(0);
   }
 }

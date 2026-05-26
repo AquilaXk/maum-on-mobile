@@ -37,6 +37,7 @@ class LetterState {
     this.hasLoaded = false,
     this.errorMessage,
     this.noticeMessage,
+    this.moderationFeedback,
     this.reportTarget,
   });
 
@@ -59,6 +60,7 @@ class LetterState {
   final bool hasLoaded;
   final String? errorMessage;
   final String? noticeMessage;
+  final ContentModerationFeedback? moderationFeedback;
   final LetterReportTarget? reportTarget;
 
   bool get hasComposeDraft =>
@@ -153,6 +155,8 @@ class LetterState {
     bool clearErrorMessage = false,
     String? noticeMessage,
     bool clearNoticeMessage = false,
+    ContentModerationFeedback? moderationFeedback,
+    bool clearModerationFeedback = false,
     LetterReportTarget? reportTarget,
     bool clearReportTarget = false,
   }) {
@@ -179,6 +183,9 @@ class LetterState {
           clearErrorMessage ? null : errorMessage ?? this.errorMessage,
       noticeMessage:
           clearNoticeMessage ? null : noticeMessage ?? this.noticeMessage,
+      moderationFeedback: clearModerationFeedback
+          ? null
+          : moderationFeedback ?? this.moderationFeedback,
       reportTarget:
           clearReportTarget ? null : reportTarget ?? this.reportTarget,
     );
@@ -337,17 +344,30 @@ class LetterController extends ChangeNotifier {
         clearSelectedLetter: true,
         clearErrorMessage: true,
         clearNoticeMessage: true,
+        clearModerationFeedback: true,
       ),
     );
   }
 
   void updateTitle(String title) {
-    _setState(_state.copyWith(title: title, clearErrorMessage: true));
+    _setState(
+      _state.copyWith(
+        title: title,
+        clearErrorMessage: true,
+        clearModerationFeedback: true,
+      ),
+    );
     _saveComposeDraft();
   }
 
   void updateContent(String content) {
-    _setState(_state.copyWith(content: content, clearErrorMessage: true));
+    _setState(
+      _state.copyWith(
+        content: content,
+        clearErrorMessage: true,
+        clearModerationFeedback: true,
+      ),
+    );
     _saveComposeDraft();
   }
 
@@ -427,9 +447,8 @@ class LetterController extends ChangeNotifier {
       }
       _setState(
         _state.copyWith(
-          replyContent: replyDraft?.fields['content'] ??
-              detail.replyContent ??
-              '',
+          replyContent:
+              replyDraft?.fields['content'] ?? detail.replyContent ?? '',
           clearErrorMessage: true,
         ),
       );
@@ -526,7 +545,13 @@ class LetterController extends ChangeNotifier {
   }
 
   void updateReplyContent(String content) {
-    _setState(_state.copyWith(replyContent: content, clearErrorMessage: true));
+    _setState(
+      _state.copyWith(
+        replyContent: content,
+        clearErrorMessage: true,
+        clearModerationFeedback: true,
+      ),
+    );
     _saveReplyDraft();
 
     final letter = _state.selectedLetter;
@@ -556,6 +581,15 @@ class LetterController extends ChangeNotifier {
         _handleError(error);
       }
     });
+  }
+
+  void clearModerationFeedback() {
+    _setState(
+      _state.copyWith(
+        clearErrorMessage: true,
+        clearModerationFeedback: true,
+      ),
+    );
   }
 
   Future<void> submitReply() async {
@@ -751,21 +785,53 @@ class LetterController extends ChangeNotifier {
       return true;
     }
 
-    final result = await repository.reviewText(
-      targetType: ContentModerationTarget.letter,
-      text: text,
-    );
+    final ContentModerationResult result;
+    try {
+      result = await repository.reviewText(
+        targetType: ContentModerationTarget.letter,
+        text: text,
+      );
+    } on ApiClientException catch (error) {
+      if (error.sessionInvalidated) {
+        rethrow;
+      }
+      final feedback = ContentModerationFeedback.failure(
+        targetType: ContentModerationTarget.letter,
+        error: error,
+      );
+      _setState(
+        _state.copyWith(
+          isSubmitting: false,
+          errorMessage: feedback.message,
+          moderationFeedback: feedback,
+          clearNoticeMessage: true,
+        ),
+      );
+      return false;
+    }
     if (result.allowed) {
       if (result.riskLevel != ContentModerationRiskLevel.low) {
-        _setState(_state.copyWith(noticeMessage: result.message));
+        _setState(
+          _state.copyWith(
+            noticeMessage: result.message,
+            clearModerationFeedback: true,
+          ),
+        );
+      } else if (_state.moderationFeedback != null) {
+        _setState(_state.copyWith(clearModerationFeedback: true));
       }
       return true;
     }
 
+    final feedback = ContentModerationFeedback.blocked(
+      targetType: ContentModerationTarget.letter,
+      result: result,
+    );
     _setState(
       _state.copyWith(
         isSubmitting: false,
         errorMessage: result.message,
+        moderationFeedback: feedback,
         clearNoticeMessage: true,
       ),
     );
@@ -781,6 +847,7 @@ class LetterController extends ChangeNotifier {
         _state.copyWith(
           errorMessage: _messageFromError(error),
           clearNoticeMessage: true,
+          clearModerationFeedback: true,
         ),
       );
       return;
@@ -790,6 +857,7 @@ class LetterController extends ChangeNotifier {
       _state.copyWith(
         errorMessage: '요청을 처리하지 못했습니다.',
         clearNoticeMessage: true,
+        clearModerationFeedback: true,
       ),
     );
   }

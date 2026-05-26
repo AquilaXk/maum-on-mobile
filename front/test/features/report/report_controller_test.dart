@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:maum_on_mobile_front/core/network/api_error.dart';
 import 'package:maum_on_mobile_front/features/moderation/data/content_moderation_repository.dart';
 import 'package:maum_on_mobile_front/features/moderation/domain/content_moderation_models.dart';
 import 'package:maum_on_mobile_front/features/report/application/report_controller.dart';
@@ -96,6 +97,45 @@ void main() {
       expect(moderationRepository.requests.single.targetType,
           ContentModerationTarget.report);
       expect(controller.state.errorMessage, '위험도가 높은 표현이 포함되어 수정이 필요합니다.');
+      expect(controller.state.content, '너 죽어 버려');
+      expect(controller.state.moderationFeedback?.status,
+          ContentModerationFeedbackStatus.policyBlocked);
+      expect(controller.state.moderationFeedback?.targetType,
+          ContentModerationTarget.report);
+      expect(
+        controller.state.moderationFeedback?.guidanceItems,
+        contains('비난, 욕설, 위협으로 읽힐 수 있는 표현을 부드럽게 바꿔 주세요.'),
+      );
+    });
+
+    test('keeps report text when moderation network fails', () async {
+      final repository = _FakeReportRepository();
+      final moderationRepository = _FakeContentModerationRepository(
+        error: const ApiClientException(
+          kind: ApiErrorKind.network,
+          message: '네트워크 연결을 확인해 주세요.',
+        ),
+      );
+      final controller = ReportController(
+        repository: repository,
+        moderationRepository: moderationRepository,
+      )
+        ..selectTarget(
+          const ReportTarget(
+            type: ReportTargetType.comment,
+            id: 7,
+            label: '댓글',
+          ),
+        )
+        ..updateContent('연결 뒤 다시 보낼 신고 내용');
+
+      await controller.submit();
+
+      expect(repository.drafts, isEmpty);
+      expect(controller.state.content, '연결 뒤 다시 보낼 신고 내용');
+      expect(controller.state.moderationFeedback?.status,
+          ContentModerationFeedbackStatus.networkError);
+      expect(controller.state.moderationFeedback?.title, '연결 후 다시 검수해 주세요.');
     });
   });
 }
@@ -129,9 +169,14 @@ class _FakeReportRepository implements ReportRepository {
 }
 
 class _FakeContentModerationRepository implements ContentModerationRepository {
-  _FakeContentModerationRepository({required this.result});
+  _FakeContentModerationRepository({
+    ContentModerationResult? result,
+    List<ContentModerationResult>? results,
+    this.error,
+  }) : results = results ?? [if (result != null) result];
 
-  final ContentModerationResult result;
+  final List<ContentModerationResult> results;
+  final Object? error;
   final List<ContentModerationRequest> requests = [];
 
   @override
@@ -140,6 +185,13 @@ class _FakeContentModerationRepository implements ContentModerationRepository {
     required String text,
   }) async {
     requests.add(ContentModerationRequest(targetType: targetType, text: text));
-    return result;
+    final nextError = error;
+    if (nextError != null) {
+      throw nextError;
+    }
+    if (results.isEmpty) {
+      throw StateError('No moderation result configured.');
+    }
+    return results.length == 1 ? results.single : results.removeAt(0);
   }
 }
