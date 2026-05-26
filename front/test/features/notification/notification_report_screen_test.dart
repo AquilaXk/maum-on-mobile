@@ -13,68 +13,71 @@ import 'package:maum_on_mobile_front/features/report/domain/report_models.dart';
 void main() {
   testWidgets('renders notifications and submits a report', (tester) async {
     final semantics = tester.ensureSemantics();
-    addTearDown(semantics.dispose);
-    final notificationRepository = _FakeNotificationRepository();
-    final reportRepository = _FakeReportRepository();
-    final openedNotifications = <NotificationItem>[];
-    final notificationController = NotificationController(
-      repository: notificationRepository,
-    );
-    final reportController = ReportController(repository: reportRepository)
-      ..selectTarget(
-        const ReportTarget(
-          type: ReportTargetType.letter,
-          id: 12,
-          label: '도착한 편지',
+    try {
+      final notificationRepository = _FakeNotificationRepository();
+      final reportRepository = _FakeReportRepository();
+      final openedNotifications = <NotificationItem>[];
+      final notificationController = NotificationController(
+        repository: notificationRepository,
+      );
+      final reportController = ReportController(repository: reportRepository)
+        ..selectTarget(
+          const ReportTarget(
+            type: ReportTargetType.letter,
+            id: 12,
+            label: '도착한 편지',
+          ),
+        );
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: NotificationReportScreen(
+            notificationController: notificationController,
+            reportController: reportController,
+            onBack: () {},
+            onOpenNotification: openedNotifications.add,
+          ),
         ),
       );
+      await tester.pump();
+      notificationRepository.emit(
+        const NotificationStreamEvent.replyArrival('보낸 편지에 답장이 도착했습니다!'),
+      );
+      await tester.pump();
 
-    await tester.pumpWidget(
-      MaterialApp(
-        home: NotificationReportScreen(
-          notificationController: notificationController,
-          reportController: reportController,
-          onBack: () {},
-          onOpenNotification: openedNotifications.add,
-        ),
-      ),
-    );
-    await tester.pump();
-    notificationRepository.emit(
-      const NotificationStreamEvent.replyArrival('보낸 편지에 답장이 도착했습니다!'),
-    );
-    await tester.pump();
+      expect(find.text('알림/신고'), findsOneWidget);
+      expect(find.text('상대방이 편지를 읽었습니다.'), findsOneWidget);
+      expect(find.text('보낸 편지에 답장이 도착했습니다!'), findsWidgets);
 
-    expect(find.text('알림/신고'), findsOneWidget);
-    expect(find.text('상대방이 편지를 읽었습니다.'), findsOneWidget);
-    expect(find.text('보낸 편지에 답장이 도착했습니다!'), findsWidgets);
+      await tester.tap(find.byKey(const ValueKey('notification-card-1')));
+      await tester.pumpAndSettle();
 
-    await tester.tap(find.byKey(const ValueKey('notification-card-1')));
-    await tester.pumpAndSettle();
+      expect(notificationRepository.markReadIds, [1]);
+      expect(openedNotifications.single.isRead, isTrue);
+      expect(find.bySemanticsLabel(RegExp('읽은 알림.*편지')), findsOneWidget);
 
-    expect(notificationRepository.markReadIds, [1]);
-    expect(openedNotifications.single.isRead, isTrue);
-    expect(find.bySemanticsLabel(RegExp('읽은 알림.*편지')), findsOneWidget);
+      await tester.tap(find.text('신고'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('report-reason-spam')));
+      await tester.enterText(
+        find.byKey(const ValueKey('report-content-field')),
+        '반복 광고입니다.',
+      );
+      final submitButton = find.byKey(const ValueKey('report-submit-button'));
+      await tester.drag(
+        find.byKey(const ValueKey('report-form')),
+        const Offset(0, -1000),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(submitButton);
+      await tester.pump();
 
-    await tester.tap(find.text('신고'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const ValueKey('report-reason-spam')));
-    await tester.enterText(
-      find.byKey(const ValueKey('report-content-field')),
-      '반복 광고입니다.',
-    );
-    final submitButton = find.byKey(const ValueKey('report-submit-button'));
-    await tester.drag(
-      find.byKey(const ValueKey('report-form')),
-      const Offset(0, -1000),
-    );
-    await tester.pumpAndSettle();
-    await tester.tap(submitButton);
-    await tester.pump();
-
-    expect(reportRepository.drafts, hasLength(1));
-    expect(find.text('신고가 접수되었습니다.'), findsOneWidget);
-    expect(find.text('이미 접수된 신고입니다.'), findsOneWidget);
+      expect(reportRepository.drafts, hasLength(1));
+      expect(find.text('신고가 접수되었습니다.'), findsOneWidget);
+      expect(find.text('이미 접수된 신고입니다.'), findsOneWidget);
+    } finally {
+      semantics.dispose();
+    }
   });
 }
 

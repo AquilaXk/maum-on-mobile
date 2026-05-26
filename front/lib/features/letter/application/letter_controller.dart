@@ -212,6 +212,12 @@ class LetterController extends ChangeNotifier {
     if (entry == null || entry.fields.isEmpty) {
       return;
     }
+    // 알림 딥링크처럼 이미 상세 이동이 시작된 경우 임시저장이 화면을 덮어쓰지 않게 한다.
+    if (_state.mode != LetterViewMode.mailbox ||
+        _state.isLoading ||
+        _state.selectedLetter != null) {
+      return;
+    }
 
     _setState(
       _state.copyWith(
