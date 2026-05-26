@@ -79,6 +79,33 @@ void main() {
       expect(controller.state.errorMessage, isNull);
     });
 
+    test('duplicate code callback is ignored after the first exchange',
+        () async {
+      final repository = _FakeAuthRepository(restoredSession: _session());
+      final authController = AuthController(
+        authRepository: repository,
+      );
+      final controller = ExternalLoginController(
+        authController: authController,
+        launcher: _RecordingExternalLoginLauncher(),
+        config: ExternalLoginConfig(
+          apiBaseUrl: Uri.parse('https://api.example.test'),
+        ),
+      );
+      final callbackUri = Uri.parse(
+        'maumon://auth/callback?provider=kakao'
+        '&code=provider-code'
+        '&state=provider-state',
+      );
+
+      expect(await controller.handleIncomingUri(callbackUri), isTrue);
+      expect(await controller.handleIncomingUri(callbackUri), isTrue);
+
+      expect(authController.state.isAuthenticated, isTrue);
+      expect(repository.oidcSessionRequests, hasLength(1));
+      expect(controller.state.errorMessage, isNull);
+    });
+
     test('code callback uses the started provider when callback omits provider',
         () async {
       final repository = _FakeAuthRepository(restoredSession: _session());

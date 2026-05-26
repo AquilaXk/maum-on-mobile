@@ -125,6 +125,31 @@
       ]
     },
     {
+      "id": "push.cold-start-routing",
+      "name": "푸시 콜드스타트 라우팅",
+      "area": "frontend",
+      "failureStep": "앱 종료, 백그라운드, 포그라운드 푸시 탭 라우팅",
+      "evidence": [
+        {
+          "path": "front/test/features/notification/notification_tap_launch_queue_test.dart",
+          "patterns": [
+            "NotificationTapLaunchSource.coldStart",
+            "NotificationTapAuthState.restoring",
+            "NotificationTapAuthState.expired"
+          ]
+        },
+        {
+          "path": "tools/ci/mobile-deeplink-push-coldstart.json",
+          "patterns": [
+            "\"coldStart\"",
+            "\"background\"",
+            "\"foreground\"",
+            "\"operations\""
+          ]
+        }
+      ]
+    },
+    {
       "id": "realtime.lifecycle",
       "name": "실시간 연결과 생명주기",
       "area": "frontend",

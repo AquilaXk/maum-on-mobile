@@ -1,0 +1,98 @@
+{
+  "version": 1,
+  "platforms": ["android", "ios"],
+  "launchStates": ["coldStart", "background", "foreground"],
+  "authStates": ["restoring", "authenticated", "expired"],
+  "externalLoginCallback": {
+    "scheme": "maumon",
+    "host": "auth",
+    "path": "/callback",
+    "statuses": ["success", "cancelled", "error", "duplicate"],
+    "dedupeBy": "provider+code+state",
+    "recoverableMessages": {
+      "cancelled": "외부 로그인이 취소되었습니다.",
+      "providerMissing": "로그인 제공자를 확인할 수 없습니다. 다시 시도해 주세요.",
+      "stateMismatch": "로그인 요청이 만료되었습니다. 다시 시도해 주세요.",
+      "sessionFailure": "로그인 세션을 확인하지 못했습니다. 다시 시도해 주세요."
+    }
+  },
+  "pushRoutes": [
+    {
+      "destination": "story",
+      "sources": ["coldStart", "background", "foreground"],
+      "requiredPayload": ["notificationId", "storyId"],
+      "fallback": {
+        "destination": "notifications"
+      },
+      "recoveryMessage": "스토리를 바로 열 수 없어 알림 목록에서 다시 선택해 주세요."
+    },
+    {
+      "destination": "letter",
+      "sources": ["coldStart", "background", "foreground"],
+      "requiredPayload": ["notificationId", "letterId"],
+      "fallback": {
+        "destination": "notifications"
+      },
+      "recoveryMessage": "편지를 바로 열 수 없어 알림 목록에서 다시 선택해 주세요."
+    },
+    {
+      "destination": "consultation",
+      "sources": ["coldStart", "background", "foreground"],
+      "requiredPayload": ["notificationId"],
+      "fallback": {
+        "destination": "notifications"
+      },
+      "recoveryMessage": "상담 응답을 바로 열 수 없어 알림 목록에서 다시 선택해 주세요."
+    },
+    {
+      "destination": "notifications",
+      "sources": ["coldStart", "background", "foreground"],
+      "requiredPayload": ["notificationId"],
+      "fallback": {
+        "destination": "notifications"
+      },
+      "recoveryMessage": "알림 목록에서 내용을 확인해 주세요."
+    },
+    {
+      "destination": "operations",
+      "sources": ["coldStart", "background", "foreground"],
+      "requiredPayload": ["notificationId", "reportId"],
+      "fallback": {
+        "destination": "notifications"
+      },
+      "recoveryMessage": "운영 항목을 바로 열 수 없어 알림 목록에서 다시 선택해 주세요."
+    }
+  ],
+  "authRecovery": {
+    "restoring": "로그인 확인 후 알림으로 이동합니다.",
+    "expired": "로그인이 만료되었습니다. 다시 로그인하면 알림으로 이동합니다."
+  },
+  "nativeChecks": {
+    "android": {
+      "manifestPatterns": [
+        "android:launchMode=\"singleTop\"",
+        "android:exported=\"true\"",
+        "flutter_deeplinking_enabled",
+        "android:scheme=\"maumon\"",
+        "android:host=\"auth\"",
+        "android:path=\"/callback\"",
+        "android.intent.category.BROWSABLE",
+        "android.intent.category.DEFAULT",
+        "com.google.firebase.MESSAGING_EVENT",
+        "android.permission.POST_NOTIFICATIONS"
+      ]
+    },
+    "ios": {
+      "infoPlistPatterns": [
+        "<key>FlutterDeepLinkingEnabled</key>",
+        "<key>CFBundleURLSchemes</key>",
+        "<string>maumon</string>",
+        "<key>UIBackgroundModes</key>",
+        "<string>remote-notification</string>"
+      ],
+      "entitlementPatterns": [
+        "<key>aps-environment</key>"
+      ]
+    }
+  }
+}
