@@ -76,6 +76,9 @@ class PersistentRepositoryContextTest @Autowired constructor(
         assertThat(tableExists("consultation_sessions")).isTrue()
         assertThat(tableExists("consultation_messages")).isTrue()
         assertThat(tableExists("consultation_safety_audit_events")).isTrue()
+        assertThat(tableExists("sse_stream_tickets")).isTrue()
+        assertThat(tableExists("sse_stream_sessions")).isTrue()
+        assertThat(tableExists("sse_stream_events")).isTrue()
     }
 
     @Test

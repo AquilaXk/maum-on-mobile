@@ -24,6 +24,7 @@ import com.maumonmobile.application.port.out.AuthOidcVerificationException
 import com.maumonmobile.application.port.out.PasswordResetMailCommand
 import com.maumonmobile.application.port.out.PasswordResetMailSender
 import com.maumonmobile.application.port.out.PasswordResetTokenRepository
+import com.maumonmobile.application.port.out.SseSessionRevocationPort
 import com.maumonmobile.domain.auth.AuthMember
 import com.maumonmobile.domain.auth.AuthMemberStatus
 import com.maumonmobile.domain.auth.AuthOidcState
@@ -53,6 +54,7 @@ class AuthService(
     private val passwordResetMailSender: PasswordResetMailSender,
     private val passwordEncoder: PasswordEncoder,
     private val jwtTokenProvider: JwtTokenProvider,
+    private val sseSessionRevocationPort: SseSessionRevocationPort,
     @param:Value("\${app.auth.oidc.provider-authorization-base-url:https://login.maumon.local}")
     private val providerAuthorizationBaseUrl: String,
     @param:Value("\${app.auth.oidc.callback-base-url:http://localhost}")
@@ -316,10 +318,15 @@ class AuthService(
     }
 
     override fun logout(command: LogoutCommand) {
-        command.refreshToken
+        val refreshToken = command.refreshToken
             ?.trim()
             ?.takeIf { refreshToken -> refreshToken.isNotEmpty() }
-            ?.let(authMemberRepository::revokeRefreshToken)
+            ?: return
+        val member = authMemberRepository.findByRefreshToken(refreshToken)
+        authMemberRepository.revokeRefreshToken(refreshToken)
+        if (member != null) {
+            sseSessionRevocationPort.closeMemberSessions(member.id)
+        }
     }
 
     private fun issueSession(member: AuthMember): AuthSessionResult {
