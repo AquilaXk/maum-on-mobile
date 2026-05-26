@@ -29,6 +29,13 @@ void main() {
     expect(targetPayload.targetType, 'LETTER');
     expect(targetPayload.targetId, 9);
     expect(targetPayload.notificationId, 17);
+    final legacyLetterPayload = NotificationTapPayload.fromJson({
+      'type': 'new_letter',
+      'targetId': '11',
+      'routeKey': 'new_letter',
+    });
+    expect(legacyLetterPayload.destination, NotificationTapDestination.letter);
+    expect(legacyLetterPayload.letterId, 11);
     final storyTargetPayload = NotificationTapPayload.fromJson({
       'targetType': 'POST',
       'targetId': '21',
@@ -40,6 +47,15 @@ void main() {
           .destination,
       NotificationTapDestination.consultation,
     );
+    final legacyReportPayload = NotificationTapPayload.fromJson({
+      'event': 'report_status',
+      'targetId': '12',
+    });
+    expect(
+      legacyReportPayload.destination,
+      NotificationTapDestination.operations,
+    );
+    expect(legacyReportPayload.reportId, 12);
     expect(
       NotificationTapPayload.fromJson({'routeKey': 'diary'}).destination,
       NotificationTapDestination.diary,

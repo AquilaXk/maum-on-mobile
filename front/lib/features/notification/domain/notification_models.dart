@@ -226,11 +226,32 @@ class NotificationTapPayload {
   String get normalizedTargetType => targetType?.trim().toUpperCase() ?? '';
 
   int? get letterId {
-    return _letterId ?? (normalizedTargetType == 'LETTER' ? targetId : null);
+    if (_letterId != null) {
+      return _letterId;
+    }
+    if (targetId == null) {
+      return null;
+    }
+    return switch (normalizedTargetType) {
+      'LETTER' => targetId,
+      '' when _inferredDestination == NotificationTapDestination.letter =>
+        targetId,
+      _ => null,
+    };
   }
 
   int? get reportId {
-    return _reportId ?? (normalizedTargetType == 'REPORT' ? targetId : null);
+    if (_reportId != null) {
+      return _reportId;
+    }
+    if (targetId == null) {
+      return null;
+    }
+    return switch (normalizedTargetType) {
+      'REPORT' => targetId,
+      '' when _isReportRoute => targetId,
+      _ => null,
+    };
   }
 
   int? get storyId {
@@ -253,6 +274,23 @@ class NotificationTapPayload {
 
   bool get hasTargetReference {
     return normalizedTargetType.isNotEmpty || targetId != null;
+  }
+
+  NotificationTapDestination get _inferredDestination {
+    return _destinationFromRouteKey(
+      routeKey ?? '',
+      fallbackType: rawType ?? '',
+      targetType: targetType,
+    );
+  }
+
+  bool get _isReportRoute {
+    final normalizedRoute = routeKey?.trim().toLowerCase() ?? '';
+    final normalizedType = rawType?.trim().toLowerCase() ?? '';
+    return normalizedRoute == 'report' ||
+        normalizedRoute == 'reports' ||
+        normalizedRoute == 'report_status' ||
+        normalizedType == 'report_status';
   }
 }
 
@@ -282,7 +320,9 @@ NotificationTapDestination _destinationFromRouteKey(
       NotificationTapDestination.letter,
     'consultation' || 'consultation_reply' =>
       NotificationTapDestination.consultation,
-    'operations' || 'operations_action' || 'admin' =>
+    'operations' || 'operations_action' || 'admin' || 'report' ||
+    'reports' ||
+    'report_status' =>
       NotificationTapDestination.operations,
     'settings' || 'setting' || 'account' || 'profile' =>
       NotificationTapDestination.settings,
