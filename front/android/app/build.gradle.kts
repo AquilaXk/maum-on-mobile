@@ -18,6 +18,7 @@ fun releaseSigningValue(name: String): String? =
         ?: providers.environmentVariable(name).orNull
         ?: releaseSigningProperties.getProperty(name)
 
+val playStoreMinimumTargetSdk = 35
 val androidReleaseKeystorePath = releaseSigningValue("MAUMON_ANDROID_KEYSTORE_PATH")
 val androidReleaseKeystorePassword = releaseSigningValue("MAUMON_ANDROID_KEYSTORE_PASSWORD")
 val androidReleaseKeyAlias = releaseSigningValue("MAUMON_ANDROID_KEY_ALIAS")
@@ -28,10 +29,20 @@ val hasAndroidReleaseSigning = listOf(
     androidReleaseKeyAlias,
     androidReleaseKeyPassword,
 ).all { !it.isNullOrBlank() }
+val androidReleaseFirebaseValues = mapOf(
+    "MAUMON_FIREBASE_APP_ID" to releaseSigningValue("MAUMON_FIREBASE_APP_ID"),
+    "MAUMON_FIREBASE_PROJECT_ID" to releaseSigningValue("MAUMON_FIREBASE_PROJECT_ID"),
+    "MAUMON_FIREBASE_API_KEY" to releaseSigningValue("MAUMON_FIREBASE_API_KEY"),
+    "MAUMON_FIREBASE_SENDER_ID" to releaseSigningValue("MAUMON_FIREBASE_SENDER_ID"),
+)
+val missingAndroidReleaseFirebaseValues = androidReleaseFirebaseValues
+    .filterValues { it.isNullOrBlank() }
+    .keys
+val hasAndroidReleaseFirebaseConfiguration = missingAndroidReleaseFirebaseValues.isEmpty()
 
 android {
     namespace = "com.aquilaxk.maumonmobile"
-    compileSdk = flutter.compileSdkVersion
+    compileSdk = maxOf(flutter.compileSdkVersion, playStoreMinimumTargetSdk)
     ndkVersion = flutter.ndkVersion
 
     compileOptions {
@@ -43,18 +54,18 @@ android {
         applicationId = "com.aquilaxk.maumonmobile"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
-        minSdk = 23
-        targetSdk = flutter.targetSdkVersion
+        minSdk = flutter.minSdkVersion
+        targetSdk = maxOf(flutter.targetSdkVersion, playStoreMinimumTargetSdk)
         versionCode = flutter.versionCode
         versionName = flutter.versionName
         manifestPlaceholders["maumonFirebaseApplicationId"] =
-            releaseSigningValue("MAUMON_FIREBASE_APP_ID") ?: ""
+            androidReleaseFirebaseValues["MAUMON_FIREBASE_APP_ID"] ?: ""
         manifestPlaceholders["maumonFirebaseProjectId"] =
-            releaseSigningValue("MAUMON_FIREBASE_PROJECT_ID") ?: ""
+            androidReleaseFirebaseValues["MAUMON_FIREBASE_PROJECT_ID"] ?: ""
         manifestPlaceholders["maumonFirebaseApiKey"] =
-            releaseSigningValue("MAUMON_FIREBASE_API_KEY") ?: ""
+            androidReleaseFirebaseValues["MAUMON_FIREBASE_API_KEY"] ?: ""
         manifestPlaceholders["maumonFirebaseSenderId"] =
-            releaseSigningValue("MAUMON_FIREBASE_SENDER_ID") ?: ""
+            androidReleaseFirebaseValues["MAUMON_FIREBASE_SENDER_ID"] ?: ""
     }
 
     signingConfigs {
@@ -70,6 +81,12 @@ android {
 
     buildTypes {
         release {
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro",
+            )
             if (hasAndroidReleaseSigning) {
                 signingConfig = signingConfigs.getByName("release")
             }
@@ -87,6 +104,14 @@ gradle.taskGraph.whenReady {
             "Android release signing requires MAUMON_ANDROID_KEYSTORE_PATH, " +
                 "MAUMON_ANDROID_KEYSTORE_PASSWORD, MAUMON_ANDROID_KEY_ALIAS, " +
                 "and MAUMON_ANDROID_KEY_PASSWORD."
+        )
+    }
+
+    if (releaseTaskRequested && !hasAndroidReleaseFirebaseConfiguration) {
+        throw GradleException(
+            "Android release Firebase configuration requires " +
+                missingAndroidReleaseFirebaseValues.joinToString(", ") +
+                "."
         )
     }
 }
