@@ -253,6 +253,61 @@ void main() {
       expect(controller.state.selectedImage?.filename, isNull);
     });
 
+    test('uploads multiple image blocks and keeps the edited block order',
+        () async {
+      final repository = _FakeDiaryRepository(
+        pages: [_page([]), _page([])],
+        createdId: 12,
+      );
+      final imageRepository = _FakeDiaryImageRepository();
+      final controller = DiaryController(
+        diaryRepository: repository,
+        imageRepository: imageRepository,
+        now: DateTime(2026, 5, 20),
+      );
+
+      await controller.load();
+      controller.updateTitle('블록 기록');
+      controller.updateContent('첫 문단');
+      controller.attachImage(
+        const DiaryImageAttachment(filename: 'first.png', bytes: [1]),
+      );
+      final firstImageId = controller.state.imageBlocks.single.id;
+      controller.addTextBlockAfter(firstImageId);
+      final secondTextId = controller.state.contentBlocks
+          .where((block) => block.isText)
+          .last
+          .id;
+      controller.updateTextBlock(secondTextId, '둘째 문단');
+      controller.attachImage(
+        const DiaryImageAttachment(filename: 'second.png', bytes: [2]),
+      );
+      final secondImageId = controller.state.imageBlocks.last.id;
+      controller.moveContentBlock(secondImageId, -1);
+
+      await controller.submit();
+
+      final draft = repository.createdDrafts.single;
+      expect(imageRepository.uploadedImages.map((image) => image.filename), [
+        'first.png',
+        'second.png',
+      ]);
+      expect(draft.content, '첫 문단\n\n둘째 문단');
+      expect(draft.imageUrl, '/images/uploads/first.png');
+      expect(draft.contentBlocks.map((block) => block.type), [
+        DiaryContentBlockType.text,
+        DiaryContentBlockType.image,
+        DiaryContentBlockType.image,
+        DiaryContentBlockType.text,
+      ]);
+      expect(
+        draft.contentBlocks
+            .where((block) => block.isImage)
+            .map((block) => block.uploadStatus),
+        everyElement(DiaryImageBlockUploadStatus.uploaded),
+      );
+    });
+
     test('keeps selected image and explains retry on upload failure',
         () async {
       final repository = _FakeDiaryRepository(pages: [_page([])]);
@@ -373,13 +428,15 @@ void main() {
         const DiaryImageAttachment(filename: 'first.png', bytes: [9]),
       );
       await controller.submit();
-      controller.attachImage(
+      final uploadedBlockId = controller.state.imageBlocks.single.id;
+      controller.replaceImageBlock(
+        uploadedBlockId,
         const DiaryImageAttachment(filename: 'second.png', bytes: [7]),
       );
 
       expect(imageRepository.deletedUrls, ['/images/uploads/replace-temp.png']);
       expect(controller.state.imageUrl, isNull);
-      expect(controller.state.selectedImage?.filename, 'second.png');
+      expect(controller.state.imageBlocks.single.image?.filename, 'second.png');
     });
 
     test('shows image attachment failure without clearing the draft', () async {
@@ -398,6 +455,46 @@ void main() {
       expect(controller.state.content, '작성 중인 내용');
       expect(controller.state.errorMessage, '사진 권한이 허용되지 않았습니다.');
       expect(controller.state.selectedImage, isNull);
+    });
+
+    test('marks a failed image block and retries it on the next save',
+        () async {
+      final repository = _FakeDiaryRepository(
+        pages: [_page([]), _page([])],
+        createdId: 13,
+      );
+      final imageRepository = _FakeDiaryImageRepository(
+        uploadError: const ApiClientException(
+          kind: ApiErrorKind.server,
+          message: '업로드 실패',
+        ),
+      );
+      final controller = DiaryController(
+        diaryRepository: repository,
+        imageRepository: imageRepository,
+        now: DateTime(2026, 5, 20),
+      );
+
+      await controller.load();
+      controller.updateTitle('재시도 기록');
+      controller.updateContent('사진을 다시 올립니다.');
+      controller.attachImage(
+        const DiaryImageAttachment(filename: 'retry.png', bytes: [3]),
+      );
+      await controller.submit();
+
+      final failedBlock = controller.state.imageBlocks.single;
+      expect(repository.createdDrafts, isEmpty);
+      expect(failedBlock.uploadStatus, DiaryImageBlockUploadStatus.failed);
+      expect(failedBlock.errorMessage, '업로드 실패');
+
+      imageRepository.uploadError = null;
+      controller.retryImageBlockUpload(failedBlock.id);
+      await controller.submit();
+
+      expect(repository.createdDrafts.single.imageUrl,
+          '/images/uploads/retry.png');
+      expect(controller.state.noticeMessage, '오늘의 기록이 저장되었습니다.');
     });
 
     test('restores member-scoped draft and marks failed diary for retry',
@@ -449,6 +546,53 @@ void main() {
       expect(failed.single.failureMessage, '네트워크 연결을 확인해 주세요.');
     });
 
+    test('restores draft content block order and image failure state', () async {
+      final draftRepository = StorageDraftRecoveryRepository(
+        storage: MemoryDraftRecoveryStorage(),
+      );
+      const key = DraftKey(memberId: 8, surface: DraftSurface.diary);
+      await draftRepository.saveEditing(
+        key,
+        fields: {
+          'title': '블록 초안',
+          'content': '앞 문단\n\n뒤 문단',
+          'contentBlocks': encodeDiaryContentBlocks([
+            DiaryContentBlock.text(id: 'text-0', text: '앞 문단'),
+            DiaryContentBlock.image(
+              id: 'image-3',
+              filename: 'lost.png',
+              byteSize: 3,
+              uploadStatus: DiaryImageBlockUploadStatus.pending,
+            ),
+            DiaryContentBlock.text(id: 'text-4', text: '뒤 문단'),
+          ]),
+          'category': 'daily',
+          'isPrivate': 'true',
+        },
+      );
+      final controller = DiaryController(
+        diaryRepository: _FakeDiaryRepository(pages: [_page([])]),
+        imageRepository: _FakeDiaryImageRepository(),
+        currentMemberId: 8,
+        draftRepository: draftRepository,
+        now: DateTime(2026, 5, 20),
+      );
+
+      await controller.restoreDraft();
+
+      expect(controller.state.title, '블록 초안');
+      expect(controller.state.content, '앞 문단\n\n뒤 문단');
+      expect(controller.state.contentBlocks.map((block) => block.id), [
+        'text-0',
+        'image-3',
+        'text-4',
+      ]);
+      expect(controller.state.imageBlocks.single.uploadStatus,
+          DiaryImageBlockUploadStatus.failed);
+      expect(controller.state.imageBlocks.single.errorMessage,
+          contains('다시 선택'));
+    });
+
     test('invokes unauthorized callback on expired auth', () async {
       var unauthorizedCount = 0;
       final controller = DiaryController(
@@ -473,12 +617,12 @@ void main() {
 
 class _FakeDiaryImageRepository implements DiaryImageRepository {
   _FakeDiaryImageRepository({
-    this.uploadedUrl = '/images/uploads/mind.png',
+    this.uploadedUrl,
     this.uploadError,
   });
 
-  final String uploadedUrl;
-  final Object? uploadError;
+  final String? uploadedUrl;
+  Object? uploadError;
   final List<DiaryImageAttachment> uploadedImages = [];
   final List<String> deletedUrls = [];
 
@@ -491,7 +635,7 @@ class _FakeDiaryImageRepository implements DiaryImageRepository {
     }
 
     return UploadedDiaryImage(
-      imageUrl: uploadedUrl,
+      imageUrl: uploadedUrl ?? '/images/uploads/${image.filename}',
       originalFilename: image.filename,
       contentType: 'image/png',
       byteSize: image.bytes.length,
