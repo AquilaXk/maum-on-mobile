@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 enum ConsultationMessageRole {
   user,
   assistant,
@@ -180,7 +182,12 @@ class ConsultationSendResult {
 }
 
 class ConsultationStreamEvent {
-  const ConsultationStreamEvent._(this.type, this.data);
+  const ConsultationStreamEvent._(
+    this.type,
+    this.data, {
+    this.requestId,
+    this.sequence,
+  });
 
   const ConsultationStreamEvent.connect(String data)
       : this._(ConsultationStreamEventType.connect, data);
@@ -188,14 +195,37 @@ class ConsultationStreamEvent {
   const ConsultationStreamEvent.heartbeat(String data)
       : this._(ConsultationStreamEventType.heartbeat, data);
 
-  const ConsultationStreamEvent.chat(String data)
-      : this._(ConsultationStreamEventType.chat, data);
+  const ConsultationStreamEvent.chat(
+    String data, {
+    String? requestId,
+    int? sequence,
+  }) : this._(
+          ConsultationStreamEventType.chat,
+          data,
+          requestId: requestId,
+          sequence: sequence,
+        );
 
-  const ConsultationStreamEvent.done()
-      : this._(ConsultationStreamEventType.done, 'done');
+  const ConsultationStreamEvent.done({
+    String? requestId,
+    int? sequence,
+  }) : this._(
+          ConsultationStreamEventType.done,
+          'done',
+          requestId: requestId,
+          sequence: sequence,
+        );
 
-  const ConsultationStreamEvent.error(String data)
-      : this._(ConsultationStreamEventType.error, data);
+  const ConsultationStreamEvent.error(
+    String data, {
+    String? requestId,
+    int? sequence,
+  }) : this._(
+          ConsultationStreamEventType.error,
+          data,
+          requestId: requestId,
+          sequence: sequence,
+        );
 
   const ConsultationStreamEvent.streamError(String data)
       : this._(ConsultationStreamEventType.streamError, data);
@@ -207,19 +237,35 @@ class ConsultationStreamEvent {
     required String event,
     required String data,
   }) {
+    final payload = _tryJsonDecode(data);
     return switch (event) {
       'connect' => ConsultationStreamEvent.connect(data),
       'heartbeat' => ConsultationStreamEvent.heartbeat(data),
-      'chat' => ConsultationStreamEvent.chat(data),
-      'chat_done' => const ConsultationStreamEvent.done(),
-      'chat_error' => ConsultationStreamEvent.error(data),
-      'stream_error' => ConsultationStreamEvent.streamError(data),
+      'chat' => ConsultationStreamEvent.chat(
+          _jsonFieldOrRaw(payload, data, 'chunk'),
+          requestId: _jsonString(payload, 'requestId'),
+          sequence: _jsonInt(payload, 'sequence'),
+        ),
+      'chat_done' => ConsultationStreamEvent.done(
+          requestId: _jsonString(payload, 'requestId'),
+          sequence: _jsonInt(payload, 'sequence'),
+        ),
+      'chat_error' => ConsultationStreamEvent.error(
+          _jsonFieldOrRaw(payload, data, 'message'),
+          requestId: _jsonString(payload, 'requestId'),
+          sequence: _jsonInt(payload, 'sequence'),
+        ),
+      'stream_error' => ConsultationStreamEvent.streamError(
+          _jsonFieldOrRaw(payload, data, 'message'),
+        ),
       _ => ConsultationStreamEvent.unknown(data),
     };
   }
 
   final ConsultationStreamEventType type;
   final String data;
+  final String? requestId;
+  final int? sequence;
 }
 
 ConsultationMessageRole _roleFromJson(Object? value) {
@@ -232,4 +278,44 @@ ConsultationMessageRole _roleFromJson(Object? value) {
 
 Map<String, Object?> _stringKeyedMap(Map<Object?, Object?> map) {
   return map.map((key, value) => MapEntry(key.toString(), value));
+}
+
+String _jsonFieldOrRaw(Object? decoded, String data, String field) {
+  if (decoded is Map) {
+    final value = decoded[field];
+    if (value != null) {
+      return value.toString();
+    }
+  }
+  return data;
+}
+
+Object? _tryJsonDecode(String data) {
+  try {
+    return jsonDecode(data);
+  } on FormatException {
+    return null;
+  }
+}
+
+String? _jsonString(Object? decoded, String field) {
+  if (decoded is! Map) {
+    return null;
+  }
+  final value = decoded[field];
+  return value?.toString();
+}
+
+int? _jsonInt(Object? decoded, String field) {
+  if (decoded is! Map) {
+    return null;
+  }
+  final value = decoded[field];
+  if (value is int) {
+    return value;
+  }
+  if (value is num) {
+    return value.toInt();
+  }
+  return int.tryParse(value?.toString() ?? '');
 }

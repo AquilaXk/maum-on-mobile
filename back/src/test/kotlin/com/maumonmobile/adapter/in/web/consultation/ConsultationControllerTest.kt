@@ -1,5 +1,7 @@
 package com.maumonmobile.adapter.`in`.web.consultation
 
+import com.fasterxml.jackson.core.type.TypeReference
+import com.fasterxml.jackson.databind.ObjectMapper
 import com.jayway.jsonpath.JsonPath
 import com.maumonmobile.application.port.out.ConsultationAiRequest
 import com.maumonmobile.application.port.out.ConsultationAiResponder
@@ -7,6 +9,7 @@ import com.maumonmobile.application.port.out.ConsultationAiResponse
 import com.maumonmobile.application.port.out.ConsultationAiUnavailableException
 import com.maumonmobile.application.port.out.ConsultationSafetyAuditRepository
 import com.maumonmobile.domain.consultation.ConsultationRiskSeverity
+import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
@@ -16,6 +19,8 @@ import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Primary
 import org.springframework.http.MediaType
+import org.springframework.jdbc.core.namedparam.MapSqlParameterSource
+import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate
 import org.springframework.mock.web.MockHttpServletResponse
 import org.springframework.test.context.ActiveProfiles
 import org.springframework.test.context.TestPropertySource
@@ -32,7 +37,9 @@ class ConsultationControllerTest @Autowired constructor(
     private val mockMvc: MockMvc,
     private val consultationSafetyAuditRepository: ConsultationSafetyAuditRepository,
     private val consultationAiResponder: CapturingConsultationAiResponder,
+    private val jdbc: NamedParameterJdbcTemplate,
 ) {
+    private val objectMapper = ObjectMapper()
 
     @BeforeEach
     fun resetAiResponder() {
@@ -88,6 +95,109 @@ class ConsultationControllerTest @Autowired constructor(
                 jsonPath("$.data.messages[0].sensitive") { value(false) }
                 jsonPath("$.data.messages[1].role") { value("ASSISTANT") }
                 jsonPath("$.data.messages[1].content") { value("함께 살펴볼게요.") }
+            }
+    }
+
+    @Test
+    fun chatPublishesJsonStreamEventsWithRequestIdAndSequence() {
+        val member = signupAndLogin("consultation-stream-events@example.com", "스트림이")
+
+        mockMvc.post("/api/v1/consultations/chat") {
+            header("Authorization", "Bearer ${member.accessToken}")
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"message":"스트림 중복 표시를 막고 싶어요."}"""
+        }
+            .andExpect {
+                status { isOk() }
+            }
+
+        val events = consultationStreamEvents(member.memberId.toLong())
+        assertThat(events.map { event -> event.eventName })
+            .containsExactly("chat", "chat", "chat_done")
+
+        val firstChunk = events[0].data.toJsonMap()
+        val secondChunk = events[1].data.toJsonMap()
+        val done = events[2].data.toJsonMap()
+        val requestId = firstChunk["requestId"]?.toString()
+
+        assertThat(requestId).isNotBlank()
+        assertThat(firstChunk["sequence"]).isEqualTo(0)
+        assertThat(firstChunk["chunk"]).isEqualTo("함께 ")
+        assertThat(secondChunk["requestId"]).isEqualTo(requestId)
+        assertThat(secondChunk["sequence"]).isEqualTo(1)
+        assertThat(secondChunk["chunk"]).isEqualTo("살펴볼게요.")
+        assertThat(done["requestId"]).isEqualTo(requestId)
+        assertThat(done["sequence"]).isEqualTo(2)
+        assertThat(done["done"]).isEqualTo(true)
+    }
+
+    @Test
+    fun chatFailurePublishesJsonStreamErrorWithRequestIdAndSequence() {
+        val member = signupAndLogin("consultation-stream-error@example.com", "오류이")
+
+        mockMvc.post("/api/v1/consultations/chat") {
+            header("Authorization", "Bearer ${member.accessToken}")
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"message":"응답 실패를 재현해요."}"""
+        }
+            .andExpect {
+                status { isOk() }
+            }
+
+        val events = consultationStreamEvents(member.memberId.toLong())
+        assertThat(events.map { event -> event.eventName }).containsExactly("chat_error")
+
+        val payload = events.single().data.toJsonMap()
+        assertThat(payload["requestId"]?.toString()).isNotBlank()
+        assertThat(payload["sequence"]).isEqualTo(0)
+        assertThat(payload["message"]).isEqualTo("지금은 답변을 만들지 못했습니다. 잠시 후 다시 시도해 주세요.")
+    }
+
+    @Test
+    fun recentHistoryCanBeLoadedAfterCursorWithLimit() {
+        val member = signupAndLogin("consultation-cursor@example.com", "커서이")
+
+        mockMvc.post("/api/v1/consultations/chat") {
+            header("Authorization", "Bearer ${member.accessToken}")
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"message":"첫 상담이에요."}"""
+        }
+            .andExpect {
+                status { isOk() }
+            }
+        mockMvc.post("/api/v1/consultations/chat") {
+            header("Authorization", "Bearer ${member.accessToken}")
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"message":"두 번째 상담이에요."}"""
+        }
+            .andExpect {
+                status { isOk() }
+            }
+
+        val fullHistory = mockMvc.get("/api/v1/consultations/recent") {
+            header("Authorization", "Bearer ${member.accessToken}")
+        }
+            .andExpect {
+                status { isOk() }
+                jsonPath("$.data.messages.length()") { value(4) }
+            }
+            .andReturn()
+            .response
+        val afterId = fullHistory.readJsonLong("$.data.messages[1].id")
+        val expectedCursor = fullHistory.readJsonLong("$.data.messages[3].id")
+
+        mockMvc.get("/api/v1/consultations/recent") {
+            header("Authorization", "Bearer ${member.accessToken}")
+            param("afterId", afterId.toString())
+            param("limit", "2")
+        }
+            .andExpect {
+                status { isOk() }
+                jsonPath("$.data.messages.length()") { value(2) }
+                jsonPath("$.data.messages[0].role") { value("USER") }
+                jsonPath("$.data.messages[0].content") { value("두 번째 상담이에요.") }
+                jsonPath("$.data.messages[1].role") { value("ASSISTANT") }
+                jsonPath("$.data.nextCursor") { value(expectedCursor.toInt()) }
             }
     }
 
@@ -327,6 +437,28 @@ class ConsultationControllerTest @Autowired constructor(
         org.assertj.core.api.Assertions.assertThat(count).isGreaterThanOrEqualTo(1)
     }
 
+    private fun consultationStreamEvents(memberId: Long): List<CapturedStreamEvent> {
+        return jdbc.query(
+            """
+                select event_name, data
+                  from sse_stream_events
+                 where stream_type = 'CONSULTATION'
+                   and member_id = :memberId
+                 order by id
+            """.trimIndent(),
+            MapSqlParameterSource("memberId", memberId),
+        ) { rs, _ ->
+            CapturedStreamEvent(
+                eventName = rs.getString("event_name"),
+                data = rs.getString("data"),
+            )
+        }
+    }
+
+    private fun String.toJsonMap(): Map<String, Any?> {
+        return objectMapper.readValue(this, object : TypeReference<Map<String, Any?>>() {})
+    }
+
     @TestConfiguration(proxyBeanMethods = false)
     class ConsultationAiTestConfig {
         @Bean
@@ -361,10 +493,19 @@ private data class TestMember(
     val accessToken: String,
 )
 
+private data class CapturedStreamEvent(
+    val eventName: String,
+    val data: String,
+)
+
 private fun MockHttpServletResponse.readJsonString(path: String): String {
     return JsonPath.read<String>(contentAsString, path)
 }
 
 private fun MockHttpServletResponse.readJsonInt(path: String): Int {
     return JsonPath.read<Int>(contentAsString, path)
+}
+
+private fun MockHttpServletResponse.readJsonLong(path: String): Long {
+    return JsonPath.read<Number>(contentAsString, path).toLong()
 }

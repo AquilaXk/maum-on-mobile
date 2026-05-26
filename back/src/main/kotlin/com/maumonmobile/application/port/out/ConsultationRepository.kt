@@ -12,7 +12,7 @@ interface ConsultationRepository {
         retentionUntil: String? = null,
     ): ConsultationMessage
 
-    fun findByMemberId(memberId: Long): List<ConsultationMessage>
+    fun findByMemberId(memberId: Long, afterId: Long? = null, limit: Int? = null): List<ConsultationMessage>
 
     fun hideSensitiveByMemberId(memberId: Long): Int
 }

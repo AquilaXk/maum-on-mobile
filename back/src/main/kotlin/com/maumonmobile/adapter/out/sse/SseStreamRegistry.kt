@@ -8,6 +8,7 @@ import com.maumonmobile.domain.stream.SseStreamEvent
 import com.maumonmobile.domain.stream.SseStreamSession
 import com.maumonmobile.domain.stream.SseStreamTicket
 import com.maumonmobile.domain.stream.SseStreamType
+import com.maumonmobile.global.observability.MobileApiMetricsRegistry
 import org.slf4j.LoggerFactory
 import org.springframework.scheduling.annotation.Scheduled
 import org.springframework.stereotype.Component
@@ -27,6 +28,7 @@ class SseStreamRegistry(
     private val emitterFactory: SseEmitterFactory,
     private val clock: Clock,
     private val properties: SseStreamProperties,
+    private val metricsRegistry: MobileApiMetricsRegistry,
 ) : SseSessionRevocationPort {
     private val instanceId = properties.instanceId.trim().takeIf(String::isNotEmpty) ?: UUID.randomUUID().toString()
     private val localConnectionsBySessionId = ConcurrentHashMap<String, LocalSseConnection>()
@@ -56,7 +58,19 @@ class SseStreamRegistry(
         )?.memberId
     }
 
+    fun reconnectDelayMillis(): Long {
+        return properties.reconnectDelay.toMillis()
+    }
+
     fun open(streamType: SseStreamType, memberId: Long, connectData: String): SseEmitter {
+        return open(streamType, memberId) { connectData }
+    }
+
+    fun open(
+        streamType: SseStreamType,
+        memberId: Long,
+        connectDataFactory: (SseStreamSession) -> String,
+    ): SseEmitter {
         val now = now()
         val session = SseStreamSession(
             id = UUID.randomUUID().toString(),
@@ -80,7 +94,7 @@ class SseStreamRegistry(
         emitter.onError {
             closeLocalSession(session.id, completeEmitter = false)
         }
-        sendOrRemove(connection, CONNECT_EVENT, connectData)
+        sendOrRemove(connection, CONNECT_EVENT, connectDataFactory(session))
         return emitter
     }
 
@@ -96,9 +110,11 @@ class SseStreamRegistry(
                 ),
             )
         } catch (exception: SseStreamBusUnavailableException) {
+            recordStreamFailure(streamType, "publish_failure")
             sendRetryableStreamError(streamType, memberId)
             throw exception
         } catch (exception: RuntimeException) {
+            recordStreamFailure(streamType, "publish_failure")
             sendRetryableStreamError(streamType, memberId)
             throw SseStreamBusUnavailableException("SSE 스트림 이벤트 발행에 실패했습니다.", exception)
         }
@@ -197,8 +213,15 @@ class SseStreamRegistry(
     }
 
     private fun closeFailedSession(connection: LocalSseConnection, exception: Exception) {
+        recordStreamFailure(connection.session.streamType, "emitter_failure")
         closeLocalSession(connection.session.id, completeEmitter = false)
         connection.emitter.completeWithError(exception)
+    }
+
+    private fun recordStreamFailure(streamType: SseStreamType, status: String) {
+        if (streamType == SseStreamType.CONSULTATION) {
+            metricsRegistry.recordConsultationStream(status)
+        }
     }
 
     private fun closeLocalSession(sessionId: String, completeEmitter: Boolean) {
@@ -222,7 +245,8 @@ class SseStreamRegistry(
         private const val CONNECT_EVENT = "connect"
         private const val HEARTBEAT_EVENT = "heartbeat"
         private const val STREAM_ERROR_EVENT = "stream_error"
-        private const val STREAM_ERROR_RETRYABLE_DATA = """{"retryable":true}"""
+        private const val STREAM_ERROR_RETRYABLE_DATA =
+            """{"retryable":true,"message":"스트림 연결이 지연되고 있습니다."}"""
         private const val DELIVERED_EVENT_RETENTION_FACTOR = 20
         private val log = LoggerFactory.getLogger(SseStreamRegistry::class.java)
     }
