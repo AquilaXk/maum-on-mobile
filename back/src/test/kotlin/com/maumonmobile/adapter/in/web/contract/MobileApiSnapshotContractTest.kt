@@ -1,7 +1,5 @@
 package com.maumonmobile.adapter.`in`.web.contract
 
-import com.fasterxml.jackson.databind.JsonNode
-import com.fasterxml.jackson.databind.ObjectMapper
 import com.maumonmobile.domain.letter.LetterStatus
 import com.maumonmobile.domain.moderation.ContentModerationCategory
 import com.maumonmobile.domain.moderation.ContentModerationRiskLevel
@@ -11,6 +9,8 @@ import com.maumonmobile.domain.report.ReportTargetType
 import com.maumonmobile.global.web.ErrorCode
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
+import tools.jackson.databind.JsonNode
+import tools.jackson.databind.ObjectMapper
 import java.nio.file.Files
 import java.nio.file.Path
 
@@ -44,10 +44,12 @@ class MobileApiSnapshotContractTest {
     fun sharedSnapshotsKeepCommonEnvelopePageAndErrorShapesSeparate() {
         val contract = readContract()
         val schema = contract.required("schema")
+        val pageKeys = schema.requiredArray("pageKeys")
+        val errorKeys = schema.requiredArray("errorKeys")
 
         assertThat(schema.requiredArray("envelopeKeys"))
             .containsExactly("success", "data", "error")
-        assertThat(schema.requiredArray("pageKeys"))
+        assertThat(pageKeys)
             .containsExactly(
                 "content",
                 "page",
@@ -57,7 +59,7 @@ class MobileApiSnapshotContractTest {
                 "last",
                 "hasNext",
             )
-        assertThat(schema.requiredArray("errorKeys"))
+        assertThat(errorKeys)
             .containsExactly("code", "message", "fieldErrors", "retryable", "cause")
 
         snapshots(contract).forEach { snapshot ->
@@ -72,21 +74,13 @@ class MobileApiSnapshotContractTest {
                     .isTrue()
             } else {
                 val error = response.required("error")
-                assertThat(error.has("code")).isTrue()
-                assertThat(error.has("message")).isTrue()
+                assertRequiredKeys(error, errorKeys, snapshot.requiredText("id"))
                 assertThat(error.required("fieldErrors").isArray).isTrue()
             }
 
             if (snapshot.requiredText("contract") == "page") {
                 val data = response.required("data")
-                assertThat(data.has("content"))
-                    .withFailMessage("Update ${snapshot.requiredText("id")} page snapshot with content")
-                    .isTrue()
-                assertThat(data.has("page")).isTrue()
-                assertThat(data.has("size")).isTrue()
-                assertThat(data.has("totalElements")).isTrue()
-                assertThat(data.has("totalPages")).isTrue()
-                assertThat(data.has("last")).isTrue()
+                assertRequiredKeys(data, pageKeys, snapshot.requiredText("id"))
             }
         }
     }
@@ -151,6 +145,18 @@ class MobileApiSnapshotContractTest {
             )
             .containsExactlyElementsOf(expected)
     }
+
+    private fun assertRequiredKeys(
+        node: JsonNode,
+        keys: List<String>,
+        snapshotId: String,
+    ) {
+        keys.forEach { key ->
+            assertThat(node.has(key))
+                .withFailMessage("Update contracts/mobile-api/response-snapshots.json: $snapshotId is missing $key")
+                .isTrue()
+        }
+    }
 }
 
 private fun JsonNode.required(fieldName: String): JsonNode {
@@ -161,12 +167,12 @@ private fun JsonNode.required(fieldName: String): JsonNode {
     return value
 }
 
-private fun JsonNode.requiredText(fieldName: String): String = required(fieldName).asText()
+private fun JsonNode.requiredText(fieldName: String): String = required(fieldName).asString()
 
 private fun JsonNode.requiredArray(fieldName: String): List<String> {
     val value = required(fieldName)
     assertThat(value.isArray)
         .withFailMessage("Expected JSON array field: $fieldName")
         .isTrue()
-    return value.map { item -> item.asText() }
+    return value.map { item -> item.asString() }
 }
