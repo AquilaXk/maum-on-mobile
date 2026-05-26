@@ -504,6 +504,8 @@ class StoryController extends ChangeNotifier {
           mode: StoryViewMode.list,
           clearSelectedStory: true,
           comments: const [],
+          clearActiveReplyCommentId: true,
+          replyDrafts: const {},
           isSubmitting: false,
         ),
       );

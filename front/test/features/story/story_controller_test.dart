@@ -229,6 +229,9 @@ void main() {
       controller.startEditingSelectedStory();
       controller.updateStoryTitle('수정됨');
       await controller.submitStory();
+      final replyTarget = _comment(id: 51, authorId: 10, content: '삭제 전 댓글');
+      controller.startReply(replyTarget);
+      controller.updateReplyDraft(replyTarget.id, '@댓글이 답글 초안');
       await controller.deleteSelectedStory();
 
       expect(repository.statusUpdates.single.status,
@@ -236,6 +239,8 @@ void main() {
       expect(repository.updatedDrafts.single.draft.title, '수정됨');
       expect(repository.deletedStoryIds, [5]);
       expect(controller.state.mode, StoryViewMode.list);
+      expect(controller.state.activeReplyCommentId, isNull);
+      expect(controller.state.replyDrafts, isEmpty);
     });
 
     test('keeps edit actions unavailable for non-author stories', () async {

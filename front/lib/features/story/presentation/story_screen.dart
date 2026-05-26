@@ -585,9 +585,11 @@ class _CommentTile extends StatelessWidget {
                     TextButton.icon(
                       key:
                           ValueKey('story-comment-report-button-${comment.id}'),
-                      onPressed: () => controller.selectCommentReportTarget(
-                        comment,
-                      ),
+                      onPressed: state.isSubmitting
+                          ? null
+                          : () => controller.selectCommentReportTarget(
+                                comment,
+                              ),
                       icon: const Icon(Icons.flag_outlined),
                       label: const Text('신고'),
                     ),
@@ -595,9 +597,11 @@ class _CommentTile extends StatelessWidget {
                       TextButton.icon(
                         key:
                             ValueKey('story-comment-edit-button-${comment.id}'),
-                        onPressed: () => controller.startEditingComment(
-                          comment,
-                        ),
+                        onPressed: state.isSubmitting
+                            ? null
+                            : () => controller.startEditingComment(
+                                  comment,
+                                ),
                         icon: const Icon(Icons.edit_outlined),
                         label: const Text('수정'),
                       ),
@@ -672,6 +676,7 @@ class _ReplyComposer extends StatefulWidget {
 class _ReplyComposerState extends State<_ReplyComposer> {
   late final TextEditingController _controller =
       TextEditingController(text: widget.draft);
+  var _isSubmitting = false;
 
   @override
   void didUpdateWidget(covariant _ReplyComposer oldWidget) {
@@ -724,10 +729,12 @@ class _ReplyComposerState extends State<_ReplyComposer> {
                   key: ValueKey(
                     'story-reply-submit-button-${widget.parentCommentId}',
                   ),
-                  onPressed: widget.canSubmit
-                      ? () => widget.onSubmit(widget.parentCommentId)
+                  onPressed: widget.canSubmit &&
+                          !widget.isSubmitting &&
+                          !_isSubmitting
+                      ? _submit
                       : null,
-                  icon: widget.isSubmitting
+                  icon: widget.isSubmitting || _isSubmitting
                       ? const SizedBox.square(
                           dimension: 18,
                           child: CircularProgressIndicator(strokeWidth: 2),
@@ -751,6 +758,17 @@ class _ReplyComposerState extends State<_ReplyComposer> {
         ),
       ),
     );
+  }
+
+  Future<void> _submit() async {
+    setState(() => _isSubmitting = true);
+    try {
+      await widget.onSubmit(widget.parentCommentId);
+    } finally {
+      if (mounted) {
+        setState(() => _isSubmitting = false);
+      }
+    }
   }
 }
 
