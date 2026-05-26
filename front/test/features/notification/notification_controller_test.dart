@@ -26,7 +26,15 @@ void main() {
     });
     expect(targetPayload.destination, NotificationTapDestination.letter);
     expect(targetPayload.letterId, 9);
+    expect(targetPayload.targetType, 'LETTER');
+    expect(targetPayload.targetId, 9);
     expect(targetPayload.notificationId, 17);
+    final storyTargetPayload = NotificationTapPayload.fromJson({
+      'targetType': 'POST',
+      'targetId': '21',
+    });
+    expect(storyTargetPayload.destination, NotificationTapDestination.story);
+    expect(storyTargetPayload.storyId, 21);
     expect(
       NotificationTapPayload.fromJson({'event': 'consultation_reply'})
           .destination,

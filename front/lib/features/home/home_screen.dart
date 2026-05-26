@@ -20,6 +20,7 @@ class HomeScreen extends StatefulWidget {
     this.isAdmin = false,
     this.unreadNotificationCount = 0,
     this.hasLiveNotificationConnection = false,
+    this.onRefresh,
     this.onOpenOperations,
     super.key,
   });
@@ -37,6 +38,7 @@ class HomeScreen extends StatefulWidget {
   final bool isAdmin;
   final int unreadNotificationCount;
   final bool hasLiveNotificationConnection;
+  final Future<void> Function()? onRefresh;
   final VoidCallback? onOpenOperations;
 
   @override
@@ -92,7 +94,7 @@ class _HomeScreenState extends State<HomeScreen> {
           eyebrow: widget.routeTitle,
           title: 'Maum On',
           subtitle: '${widget.nickname}님, 오늘의 마음을 이어가세요.',
-          onRefresh: widget.homeController.load,
+          onRefresh: widget.onRefresh ?? widget.homeController.load,
           actions: [
             _HomeNotificationHeaderButton(
               unreadCount: widget.unreadNotificationCount,

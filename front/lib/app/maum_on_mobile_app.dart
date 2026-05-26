@@ -105,7 +105,8 @@ class MaumOnMobileApp extends StatefulWidget {
   State<MaumOnMobileApp> createState() => _MaumOnMobileAppState();
 }
 
-class _MaumOnMobileAppState extends State<MaumOnMobileApp> {
+class _MaumOnMobileAppState extends State<MaumOnMobileApp>
+    with WidgetsBindingObserver {
   late final ApiConfig _apiConfig = ApiConfig.fromEnvironment();
   late final SecureAuthTokenStore _tokenStore = const SecureAuthTokenStore();
   late final AuthTokenRefreshCoordinator _tokenRefreshCoordinator =
@@ -147,12 +148,14 @@ class _MaumOnMobileAppState extends State<MaumOnMobileApp> {
   LetterController? _letterController;
   int? _letterMemberId;
   bool _openLetterComposer = false;
+  bool _notificationBootstrapRequested = false;
   String? _authenticatedSessionKey;
   Future<void>? _authenticatedInvalidationFuture;
   bool _pushTokenUnregisterRequested = false;
   ReportTarget? _pendingReportTarget;
   NotificationTapPayload? _pendingNotificationTap;
   int? _pendingLetterId;
+  int? _pendingStoryId;
   int? _pendingOperationsReportId;
   String? _pendingNotificationNotice;
   AuthenticatedRoute _route = AuthenticatedRoute.home;
@@ -165,6 +168,7 @@ class _MaumOnMobileAppState extends State<MaumOnMobileApp> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     Future<void>.microtask(_authController.restoreSession);
     if (widget.listenForDeepLinks) {
       Future<void>.microtask(_bindDeepLinks);
@@ -174,6 +178,7 @@ class _MaumOnMobileAppState extends State<MaumOnMobileApp> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _deepLinkSubscription?.cancel();
     _pushTapSubscription?.cancel();
     _externalLoginController.dispose();
@@ -188,6 +193,11 @@ class _MaumOnMobileAppState extends State<MaumOnMobileApp> {
     _disposeStoryController();
     _disposeLetterController();
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    _notificationController?.handleLifecycleState(state);
   }
 
   @override
@@ -266,12 +276,6 @@ class _MaumOnMobileAppState extends State<MaumOnMobileApp> {
     required String status,
     required String routeTitle,
   }) {
-    final unreadNotificationCount =
-        _notificationController?.state.unreadCount ?? 0;
-    final hasLiveNotificationConnection =
-        _notificationController?.state.connectionState ==
-            NotificationConnectionState.connected;
-
     return switch (_route) {
       AuthenticatedRoute.diary => DiaryScreen(
           controller: _diaryControllerFor(memberId),
@@ -298,67 +302,127 @@ class _MaumOnMobileAppState extends State<MaumOnMobileApp> {
               onOpenSettings: () => _openRoute(AuthenticatedRoute.settings),
               onLogout: _logout,
             )
-          : HomeScreen(
+          : _buildHomeRoute(
+              memberId: memberId,
               routeTitle: routeTitle,
               nickname: nickname,
-              homeController: _homeControllerFor(memberId),
-              onWriteDiary: () => _openRoute(AuthenticatedRoute.diary),
-              onWriteLetter: () {
-                setState(() {
-                  _openLetterComposer = true;
-                  _route = AuthenticatedRoute.letter;
-                });
-              },
-              onViewStory: () => _openRoute(AuthenticatedRoute.story),
-              onOpenConsultation: () =>
-                  _openRoute(AuthenticatedRoute.consultation),
-              onOpenNotifications: () => _openRoute(
-                AuthenticatedRoute.notifications,
-              ),
-              onOpenSettings: () => _openRoute(AuthenticatedRoute.settings),
-              unreadNotificationCount: unreadNotificationCount,
-              hasLiveNotificationConnection: hasLiveNotificationConnection,
-              onLogout: () {
-                _logout();
-              },
+              isAdmin: false,
             ),
       AuthenticatedRoute.settings => SettingsScreen(
           controller: _settingsControllerFor(memberId),
           onBack: _returnHome,
         ),
       AuthenticatedRoute.letter => _buildLetterRoute(memberId),
-      AuthenticatedRoute.story => StoryScreen(
-          controller: _storyControllerFor(memberId),
-          onBack: _returnHome,
-        ),
-      AuthenticatedRoute.home => HomeScreen(
+      AuthenticatedRoute.story => _buildStoryRoute(memberId),
+      AuthenticatedRoute.home => _buildHomeRoute(
+          memberId: memberId,
           routeTitle: routeTitle,
           nickname: nickname,
-          homeController: _homeControllerFor(memberId),
-          onWriteDiary: () => _openRoute(AuthenticatedRoute.diary),
-          onWriteLetter: () {
-            setState(() {
-              _openLetterComposer = true;
-              _route = AuthenticatedRoute.letter;
-            });
-          },
-          onViewStory: () => _openRoute(AuthenticatedRoute.story),
-          onOpenConsultation: () => _openRoute(AuthenticatedRoute.consultation),
-          onOpenNotifications: () => _openRoute(
-            AuthenticatedRoute.notifications,
-          ),
-          onOpenSettings: () => _openRoute(AuthenticatedRoute.settings),
-          unreadNotificationCount: unreadNotificationCount,
-          hasLiveNotificationConnection: hasLiveNotificationConnection,
           isAdmin: role == 'ADMIN',
           onOpenOperations: role == 'ADMIN'
               ? () => _openRoute(AuthenticatedRoute.operations)
               : null,
-          onLogout: () {
-            _logout();
-          },
         ),
     };
+  }
+
+  Widget _buildHomeRoute({
+    required int memberId,
+    required String routeTitle,
+    required String nickname,
+    required bool isAdmin,
+    VoidCallback? onOpenOperations,
+  }) {
+    final homeController = _homeControllerFor(memberId);
+    final notificationController = _homeNotificationControllerFor(memberId);
+
+    Widget buildHome({
+      required int unreadCount,
+      required bool hasLiveConnection,
+    }) {
+      return HomeScreen(
+        routeTitle: routeTitle,
+        nickname: nickname,
+        homeController: homeController,
+        onRefresh: notificationController == null
+            ? homeController.load
+            : () => _refreshHomeDashboard(
+                  homeController,
+                  notificationController,
+                ),
+        onWriteDiary: () => _openRoute(AuthenticatedRoute.diary),
+        onWriteLetter: () {
+          setState(() {
+            _openLetterComposer = true;
+            _route = AuthenticatedRoute.letter;
+          });
+        },
+        onViewStory: () => _openRoute(AuthenticatedRoute.story),
+        onOpenConsultation: () => _openRoute(AuthenticatedRoute.consultation),
+        onOpenNotifications: () => _openRoute(AuthenticatedRoute.notifications),
+        onOpenSettings: () => _openRoute(AuthenticatedRoute.settings),
+        unreadNotificationCount: unreadCount,
+        hasLiveNotificationConnection: hasLiveConnection,
+        isAdmin: isAdmin,
+        onOpenOperations: onOpenOperations,
+        onLogout: _logout,
+      );
+    }
+
+    if (notificationController == null) {
+      return buildHome(unreadCount: 0, hasLiveConnection: false);
+    }
+
+    return AnimatedBuilder(
+      animation: notificationController,
+      builder: (context, _) {
+        final notificationState = notificationController.state;
+        return buildHome(
+          unreadCount: notificationState.unreadCount,
+          hasLiveConnection: notificationState.connectionState ==
+              NotificationConnectionState.connected,
+        );
+      },
+    );
+  }
+
+  NotificationController? _homeNotificationControllerFor(int memberId) {
+    final shouldBootstrap =
+        !kDebugMode || widget.notificationRepository != null;
+    if (!shouldBootstrap && _notificationController == null) {
+      return null;
+    }
+
+    final controller = _notificationControllerFor(memberId);
+    if (shouldBootstrap && !_notificationBootstrapRequested) {
+      _notificationBootstrapRequested = true;
+      unawaited(controller.load(silent: true));
+      if (_shouldSyncPushPermission) {
+        unawaited(controller.syncPushPermissionStatus());
+      }
+      unawaited(controller.connect());
+    }
+    return controller;
+  }
+
+  bool get _shouldSyncPushPermission {
+    return !kDebugMode || widget.pushNotificationPermissionClient != null;
+  }
+
+  Future<void> _refreshHomeDashboard(
+    HomeController homeController,
+    NotificationController notificationController,
+  ) async {
+    await Future.wait([
+      homeController.load(),
+      notificationController.load(silent: true),
+      if (_shouldSyncPushPermission)
+        notificationController.syncPushPermissionStatus(),
+    ]);
+    if (notificationController.state.connectionState !=
+        NotificationConnectionState.connected) {
+      unawaited(notificationController.connect());
+    }
   }
 
   Widget _buildNotificationRoute(int memberId) {
@@ -379,6 +443,7 @@ class _MaumOnMobileAppState extends State<MaumOnMobileApp> {
       notificationController: notificationController,
       reportController: reportController,
       onOpenNotification: _openNotificationItem,
+      closeNotificationStreamOnDispose: false,
       onBack: _returnHome,
     );
   }
@@ -386,7 +451,9 @@ class _MaumOnMobileAppState extends State<MaumOnMobileApp> {
   void _logout() {
     _disposeAuthenticatedControllers(unregisterPushToken: true);
     _pendingNotificationTap = null;
+    _pendingReportTarget = null;
     _pendingLetterId = null;
+    _pendingStoryId = null;
     _pendingOperationsReportId = null;
     _pendingNotificationNotice = null;
     _route = AuthenticatedRoute.home;
@@ -412,6 +479,7 @@ class _MaumOnMobileAppState extends State<MaumOnMobileApp> {
     _openLetterComposer = false;
     _pendingReportTarget = null;
     _pendingLetterId = null;
+    _pendingStoryId = null;
     _pendingOperationsReportId = null;
     _pendingNotificationNotice = null;
     _route = AuthenticatedRoute.home;
@@ -453,6 +521,7 @@ class _MaumOnMobileAppState extends State<MaumOnMobileApp> {
     _pendingNotificationTap = null;
     _pendingReportTarget = null;
     _pendingLetterId = null;
+    _pendingStoryId = null;
     _pendingOperationsReportId = null;
     _pendingNotificationNotice = null;
     _openLetterComposer = false;
@@ -468,6 +537,10 @@ class _MaumOnMobileAppState extends State<MaumOnMobileApp> {
     _disposeAuthenticatedControllers(unregisterPushToken: true);
     _pendingNotificationTap = null;
     _pendingReportTarget = null;
+    _pendingLetterId = null;
+    _pendingStoryId = null;
+    _pendingOperationsReportId = null;
+    _pendingNotificationNotice = null;
     _openLetterComposer = false;
     _route = AuthenticatedRoute.home;
     _authenticatedSessionKey = null;
@@ -494,6 +567,18 @@ class _MaumOnMobileAppState extends State<MaumOnMobileApp> {
     );
   }
 
+  Widget _buildStoryRoute(int memberId) {
+    final storyController = _storyControllerFor(memberId);
+    final initialStoryId = _pendingStoryId;
+    _pendingStoryId = null;
+
+    return StoryScreen(
+      controller: storyController,
+      initialStoryId: initialStoryId,
+      onBack: _returnHome,
+    );
+  }
+
   void _openRoute(AuthenticatedRoute route) {
     setState(() {
       _route = route;
@@ -505,6 +590,7 @@ class _MaumOnMobileAppState extends State<MaumOnMobileApp> {
       _openLetterComposer = false;
       _pendingReportTarget = null;
       _pendingLetterId = null;
+      _pendingStoryId = null;
       _pendingOperationsReportId = null;
       _pendingNotificationNotice = null;
       _route = route;
@@ -516,6 +602,7 @@ class _MaumOnMobileAppState extends State<MaumOnMobileApp> {
       _openLetterComposer = false;
       _pendingReportTarget = null;
       _pendingLetterId = null;
+      _pendingStoryId = null;
       _pendingOperationsReportId = null;
       _pendingNotificationNotice = null;
       _route = AuthenticatedRoute.home;
@@ -609,6 +696,7 @@ class _MaumOnMobileAppState extends State<MaumOnMobileApp> {
     controller?.dispose();
     _notificationController = null;
     _notificationMemberId = null;
+    _notificationBootstrapRequested = false;
   }
 
   Future<void> _unregisterCurrentPushToken() async {
@@ -963,11 +1051,12 @@ class _MaumOnMobileAppState extends State<MaumOnMobileApp> {
     _openLetterComposer = false;
     _pendingReportTarget = null;
     _pendingLetterId = null;
+    _pendingStoryId = null;
     _pendingOperationsReportId = null;
     _pendingNotificationNotice = null;
     _route = switch (payload.destination) {
       NotificationTapDestination.diary => AuthenticatedRoute.diary,
-      NotificationTapDestination.story => AuthenticatedRoute.story,
+      NotificationTapDestination.story => _storyRouteFor(payload),
       NotificationTapDestination.letter => _letterRouteFor(payload),
       NotificationTapDestination.consultation =>
         AuthenticatedRoute.consultation,
@@ -987,6 +1076,20 @@ class _MaumOnMobileAppState extends State<MaumOnMobileApp> {
 
     _pendingLetterId = letterId;
     return AuthenticatedRoute.letter;
+  }
+
+  AuthenticatedRoute _storyRouteFor(NotificationTapPayload payload) {
+    final storyId = payload.storyId;
+    if (storyId == null || storyId <= 0) {
+      if (payload.hasTargetReference) {
+        _pendingNotificationNotice = '스토리를 바로 열 수 없어 알림 목록에 머뭅니다.';
+        return AuthenticatedRoute.notifications;
+      }
+      return AuthenticatedRoute.story;
+    }
+
+    _pendingStoryId = storyId;
+    return AuthenticatedRoute.story;
   }
 
   AuthenticatedRoute _operationsRouteFor(NotificationTapPayload payload) {
