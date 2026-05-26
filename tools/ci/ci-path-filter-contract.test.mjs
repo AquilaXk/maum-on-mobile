@@ -258,6 +258,18 @@ test("path classifier keeps back Gradle changes in backend gate", async () => {
   assert.equal(outputs.android, "false");
 });
 
+test("path classifier enables backend, frontend, and repository checks for shared mobile API contracts", async () => {
+  const outputs = await classifyChangedFiles(["contracts/mobile-api/response-snapshots.json"]);
+
+  assert.equal(outputs.docs_only, "false");
+  assert.equal(outputs.backend, "true");
+  assert.equal(outputs.frontend, "true");
+  assert.equal(outputs.repository, "true");
+  assert.equal(outputs.android, "false");
+  assert.equal(outputs.ios, "false");
+  assert.equal(outputs.javascript, "false");
+});
+
 test("path classifier enables root JavaScript checks for root package changes", async () => {
   const outputs = await classifyChangedFiles(["package.json", "src/app.ts"]);
 
