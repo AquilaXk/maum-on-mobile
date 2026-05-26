@@ -111,6 +111,46 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('filters report queue by target and status', (tester) async {
+    final controller = OperationsController(
+      reportRepository: _FakeReportRepository(includeClosedLetterReport: true),
+      operationsRepository: _FakeOperationsRepository(),
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: OperationsScreen(controller: controller, onBack: () {}),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const ValueKey('operations-view-reports')));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const ValueKey('operations-report-1')), findsOneWidget);
+    expect(find.byKey(const ValueKey('operations-report-4')), findsOneWidget);
+
+    await tester.tap(
+      find.byKey(const ValueKey('operations-report-target-filter')),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('편지').last);
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const ValueKey('operations-report-1')), findsNothing);
+    expect(find.byKey(const ValueKey('operations-report-4')), findsOneWidget);
+
+    await tester.tap(
+      find.byKey(const ValueKey('operations-report-status-filter')),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('접수').last);
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const ValueKey('operations-report-4')), findsNothing);
+    expect(find.text('처리할 신고가 없습니다.'), findsOneWidget);
+  });
+
   testWidgets('shows dashboard and confirms member risk actions',
       (tester) async {
     final operationsRepository = _FakeOperationsRepository();
@@ -624,12 +664,14 @@ class _FakeReportRepository implements ReportRepository {
   _FakeReportRepository({
     this.reporterEmail = 'reporter@example.com',
     this.targetTitle = '운영 검수 대상',
+    this.includeClosedLetterReport = false,
   });
 
   final List<AdminReportActionDraft> actions = [];
   AdminReportActionResult? lastResult;
   final String reporterEmail;
   final String targetTitle;
+  final bool includeClosedLetterReport;
 
   @override
   Future<int> createReport(ReportDraft draft) {
@@ -663,11 +705,76 @@ class _FakeReportRepository implements ReportRepository {
         handledBy: lastResult?.handledBy,
         handledAt: lastResult?.handledAt,
       ),
+      if (includeClosedLetterReport)
+        AdminReportSummary(
+          id: 4,
+          targetId: 12,
+          targetType: ReportTargetType.letter,
+          reason: 'SPAM',
+          content: '반복 신고된 편지입니다.',
+          status: 'RESOLVED',
+          createdAt: '2026-05-24T09:00:00',
+          targetTitle: '완료된 편지 신고',
+          targetPreview: '처리된 편지입니다.',
+          reporter: _member(
+            id: 5,
+            email: 'letter-reporter@example.com',
+            nickname: '편지신고자',
+          ),
+          targetOwner: _member(
+            id: 6,
+            email: 'letter-owner@example.com',
+            nickname: '편지작성자',
+          ),
+          actionReason: '검수 완료',
+          handledBy: _member(
+            id: 1,
+            email: 'admin@example.com',
+            nickname: '관리자',
+          ),
+          handledAt: '2026-05-24T09:10:00',
+        ),
     ];
   }
 
   @override
   Future<AdminReportDetail> fetchAdminReport(int id) async {
+    if (id == 4) {
+      return AdminReportDetail(
+        id: id,
+        targetId: 12,
+        targetType: ReportTargetType.letter,
+        reason: 'SPAM',
+        content: '반복 신고된 편지입니다.',
+        status: 'RESOLVED',
+        createdAt: '2026-05-24T09:00:00',
+        target: const AdminReportTarget(
+          id: 12,
+          type: ReportTargetType.letter,
+          title: '완료된 편지 신고',
+          preview: '처리된 편지입니다.',
+          ownerId: 6,
+        ),
+        reporter: _member(
+          id: 5,
+          email: 'letter-reporter@example.com',
+          nickname: '편지신고자',
+        ),
+        targetOwner: _member(
+          id: 6,
+          email: 'letter-owner@example.com',
+          nickname: '편지작성자',
+        ),
+        actionReason: '검수 완료',
+        handledBy: _member(
+          id: 1,
+          email: 'admin@example.com',
+          nickname: '관리자',
+        ),
+        handledAt: '2026-05-24T09:10:00',
+      );
+    }
+
     return AdminReportDetail(
       id: id,
       targetId: 10,
