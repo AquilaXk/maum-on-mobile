@@ -10,6 +10,7 @@ class LetterScreen extends StatefulWidget {
     required this.onBack,
     this.initiallyCompose = false,
     this.initialLetterId,
+    this.onOpenRandomReceiveSettings,
     super.key,
   });
 
@@ -17,6 +18,7 @@ class LetterScreen extends StatefulWidget {
   final VoidCallback onBack;
   final bool initiallyCompose;
   final int? initialLetterId;
+  final VoidCallback? onOpenRandomReceiveSettings;
 
   @override
   State<LetterScreen> createState() => _LetterScreenState();
@@ -92,13 +94,15 @@ class _LetterScreenState extends State<LetterScreen> {
               const SizedBox(height: AppSpacing.md),
             ],
             if (state.noticeMessage != null) ...[
-              AppNotice(message: state.noticeMessage!),
+              _LetterNotice(message: state.noticeMessage!),
               const SizedBox(height: AppSpacing.md),
             ],
             switch (state.mode) {
               LetterViewMode.mailbox => _MailboxView(
                   state: state,
                   controller: widget.controller,
+                  onOpenRandomReceiveSettings:
+                      widget.onOpenRandomReceiveSettings,
                 ),
               LetterViewMode.detail => _LetterDetailView(
                   state: state,
@@ -120,10 +124,12 @@ class _MailboxView extends StatelessWidget {
   const _MailboxView({
     required this.state,
     required this.controller,
+    this.onOpenRandomReceiveSettings,
   });
 
   final LetterState state;
   final LetterController controller;
+  final VoidCallback? onOpenRandomReceiveSettings;
 
   @override
   Widget build(BuildContext context) {
@@ -131,6 +137,10 @@ class _MailboxView extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         _StatsSection(stats: state.stats),
+        const SizedBox(height: AppSpacing.md),
+        _ReceiveSettingsCard(
+          onOpenRandomReceiveSettings: onOpenRandomReceiveSettings,
+        ),
         const SizedBox(height: AppSpacing.md),
         Wrap(
           spacing: AppSpacing.xs,
@@ -152,9 +162,13 @@ class _MailboxView extends StatelessWidget {
             semanticLabel: '편지함을 불러오는 중',
           )
         else if (state.isEmpty)
-          const AppStateView.empty(
-            title: '아직 편지가 없습니다.',
-            message: '새 편지를 쓰거나 다른 탭을 확인해 주세요.',
+          AppStateView.empty(
+            title: state.activeTab == LetterMailboxTab.received
+                ? '아직 받은 편지가 없습니다.'
+                : '아직 보낸 편지가 없습니다.',
+            message: state.activeTab == LetterMailboxTab.received
+                ? '랜덤 편지 수신 설정을 켜 두면 새로운 편지를 받을 수 있습니다.'
+                : '새 편지를 쓰면 이곳에서 발송 상태를 확인할 수 있습니다.',
             semanticLabel: '편지함 비어 있음',
           )
         else
@@ -257,6 +271,11 @@ class _LetterCard extends StatelessWidget {
                   overflow: TextOverflow.ellipsis,
                 ),
               ],
+              const SizedBox(height: AppSpacing.xs),
+              Text(
+                letter.status.guidance,
+                style: theme.textTheme.bodySmall,
+              ),
               const SizedBox(height: AppSpacing.sm),
               Text(
                 letter.createdDate,
@@ -318,6 +337,8 @@ class _LetterDetailView extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 _StatusPill(status: letter.status),
+                const SizedBox(height: AppSpacing.xs),
+                _StatusGuidance(status: letter.status),
                 const SizedBox(height: AppSpacing.md),
                 Text(
                   letter.title,
@@ -550,7 +571,7 @@ class _LetterComposeViewState extends State<_LetterComposeView> {
                 ),
                 OutlinedButton(
                   key: const ValueKey('letter-compose-cancel-button'),
-                  onPressed: widget.controller.cancelCompose,
+                  onPressed: _handleCancelCompose,
                   child: const Text('취소'),
                 ),
               ],
@@ -559,6 +580,41 @@ class _LetterComposeViewState extends State<_LetterComposeView> {
         ),
       ),
     );
+  }
+
+  Future<void> _handleCancelCompose() async {
+    final hasDraft = widget.state.title.trim().isNotEmpty ||
+        widget.state.content.trim().isNotEmpty;
+    if (!hasDraft) {
+      widget.controller.cancelCompose();
+      return;
+    }
+
+    final shouldLeave = await showDialog<bool>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('작성 중인 편지를 나갈까요?'),
+          content: const Text('나가면 작성 중인 제목과 본문이 지워집니다.'),
+          actions: [
+            TextButton(
+              key: const ValueKey('letter-compose-keep-button'),
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('계속 작성'),
+            ),
+            FilledButton(
+              key: const ValueKey('letter-compose-leave-button'),
+              onPressed: () => Navigator.of(context).pop(true),
+              child: const Text('나가기'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (shouldLeave == true && mounted) {
+      widget.controller.cancelCompose();
+    }
   }
 }
 
@@ -580,6 +636,100 @@ class _StatusPill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return AppStatusPill(label: status.label, tone: AppStatusTone.success);
+    return AppStatusPill(label: status.displayLabel, tone: status.tone);
+  }
+}
+
+class _LetterNotice extends StatelessWidget {
+  const _LetterNotice({required this.message});
+
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    final isSendSuccess = message == '편지가 전송되었습니다.';
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        AppNotice(
+          message: message,
+          tone: isSendSuccess ? AppNoticeTone.success : AppNoticeTone.neutral,
+        ),
+        if (isSendSuccess) ...[
+          const SizedBox(height: AppSpacing.xs),
+          Text(
+            '보낸 편지함에서 상태를 확인해 주세요.',
+            style: Theme.of(context).textTheme.bodySmall,
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+class _ReceiveSettingsCard extends StatelessWidget {
+  const _ReceiveSettingsCard({this.onOpenRandomReceiveSettings});
+
+  final VoidCallback? onOpenRandomReceiveSettings;
+
+  @override
+  Widget build(BuildContext context) {
+    return AppSectionCard(
+      title: '랜덤 편지 수신',
+      subtitle: '수신 설정을 켜 두면 익명의 마음 편지를 받을 수 있습니다.',
+      child: Align(
+        alignment: Alignment.centerLeft,
+        child: OutlinedButton.icon(
+          key: const ValueKey('letter-receive-settings'),
+          onPressed: onOpenRandomReceiveSettings,
+          icon: const Icon(Icons.tune),
+          label: const Text('수신 설정'),
+        ),
+      ),
+    );
+  }
+}
+
+class _StatusGuidance extends StatelessWidget {
+  const _StatusGuidance({required this.status});
+
+  final LetterStatus status;
+
+  @override
+  Widget build(BuildContext context) {
+    return Text(
+      status.guidance,
+      style: Theme.of(context).textTheme.bodySmall,
+    );
+  }
+}
+
+extension _LetterStatusPresentation on LetterStatus {
+  String get displayLabel {
+    return switch (this) {
+      LetterStatus.sent => '수신 대기',
+      LetterStatus.accepted => '답장 가능',
+      LetterStatus.writing => '답장 작성 중',
+      LetterStatus.replied => '답장 완료',
+    };
+  }
+
+  String get guidance {
+    return switch (this) {
+      LetterStatus.sent => '상대방의 답장을 기다리고 있습니다.',
+      LetterStatus.accepted => '편지를 수락했습니다. 답장을 작성할 수 있습니다.',
+      LetterStatus.writing => '상대방이 답장을 작성하고 있습니다.',
+      LetterStatus.replied => '답장이 도착했습니다. 상세에서 내용을 확인해 주세요.',
+    };
+  }
+
+  AppStatusTone get tone {
+    return switch (this) {
+      LetterStatus.sent => AppStatusTone.warning,
+      LetterStatus.accepted => AppStatusTone.success,
+      LetterStatus.writing => AppStatusTone.neutral,
+      LetterStatus.replied => AppStatusTone.success,
+    };
   }
 }
