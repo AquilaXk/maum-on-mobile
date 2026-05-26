@@ -188,6 +188,7 @@ class StoryComment {
     required this.createDate,
     required this.modifyDate,
     this.authorEmail,
+    this.deleted = false,
     this.replies = const [],
   });
 
@@ -208,6 +209,7 @@ class StoryComment {
       postId: _readInt(map, 'postId'),
       createDate: map['createDate']?.toString() ?? '',
       modifyDate: map['modifyDate']?.toString() ?? '',
+      deleted: map['deleted'] == true,
       replies: rawReplies is List
           ? rawReplies.map(StoryComment.fromJson).toList(growable: false)
           : const [],
@@ -222,11 +224,14 @@ class StoryComment {
   final int postId;
   final String createDate;
   final String modifyDate;
+  final bool deleted;
   final List<StoryComment> replies;
 
   bool canEdit(int memberId) {
-    return authorId == memberId;
+    return !deleted && authorId == memberId;
   }
+
+  bool get canReceiveReply => !deleted;
 }
 
 class StoryReportTarget {

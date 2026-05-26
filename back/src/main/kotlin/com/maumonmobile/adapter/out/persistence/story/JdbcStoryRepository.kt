@@ -261,6 +261,23 @@ class JdbcStoryRepository(
         return findCommentById(comment.id) ?: error("수정된 댓글을 확인하지 못했습니다.")
     }
 
+    override fun markCommentDeleted(comment: StoryComment): StoryComment {
+        jdbc.update(
+            """
+                update story_comments
+                   set content = :content,
+                       deleted = true,
+                       modify_date = :modifyDate
+                 where id = :id
+            """.trimIndent(),
+            params()
+                .withValue("id", comment.id)
+                .withValue("content", StoryComment.DELETED_CONTENT)
+                .withValue("modifyDate", Instant.now().toString()),
+        )
+        return findCommentById(comment.id) ?: error("삭제 상태 댓글을 확인하지 못했습니다.")
+    }
+
     override fun findCommentById(id: Long): StoryComment? {
         return jdbc.query(
             "select * from story_comments where id = :id",
@@ -363,6 +380,7 @@ class JdbcStoryRepository(
                 content = rs.getString("content"),
                 createDate = rs.getString("create_date"),
                 modifyDate = rs.getString("modify_date"),
+                deleted = rs.getBoolean("deleted"),
             )
         }
     }

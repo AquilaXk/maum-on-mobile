@@ -569,65 +569,67 @@ class _CommentTile extends StatelessWidget {
                   key: ValueKey('story-comment-content-${comment.id}'),
                   text: comment.content,
                 ),
-                const SizedBox(height: AppSpacing.xs),
-                _ResponsiveActionWrap(
-                  key: ValueKey('story-comment-action-row-${comment.id}'),
-                  children: [
-                    TextButton.icon(
-                      key:
-                          ValueKey('story-comment-reply-button-${comment.id}'),
-                      onPressed: state.isSubmitting
-                          ? null
-                          : () => controller.startReply(comment),
-                      icon: const Icon(Icons.reply_outlined),
-                      label: const Text('답글'),
-                    ),
-                    TextButton.icon(
-                      key:
-                          ValueKey('story-comment-report-button-${comment.id}'),
-                      onPressed: state.isSubmitting
-                          ? null
-                          : () => controller.selectCommentReportTarget(
-                                comment,
-                              ),
-                      icon: const Icon(Icons.flag_outlined),
-                      label: const Text('신고'),
-                    ),
-                    if (canEdit) ...[
+                if (comment.canReceiveReply) ...[
+                  const SizedBox(height: AppSpacing.xs),
+                  _ResponsiveActionWrap(
+                    key: ValueKey('story-comment-action-row-${comment.id}'),
+                    children: [
                       TextButton.icon(
                         key:
-                            ValueKey('story-comment-edit-button-${comment.id}'),
+                            ValueKey('story-comment-reply-button-${comment.id}'),
                         onPressed: state.isSubmitting
                             ? null
-                            : () => controller.startEditingComment(
-                                  comment,
-                                ),
-                        icon: const Icon(Icons.edit_outlined),
-                        label: const Text('수정'),
+                            : () => controller.startReply(comment),
+                        icon: const Icon(Icons.reply_outlined),
+                        label: const Text('답글'),
                       ),
                       TextButton.icon(
                         key: ValueKey(
-                            'story-comment-delete-button-${comment.id}'),
+                            'story-comment-report-button-${comment.id}'),
                         onPressed: state.isSubmitting
                             ? null
-                            : () => controller.deleteComment(comment),
-                        icon: const Icon(Icons.delete_outline),
-                        label: const Text('삭제'),
+                            : () => controller.selectCommentReportTarget(
+                                  comment,
+                                ),
+                        icon: const Icon(Icons.flag_outlined),
+                        label: const Text('신고'),
                       ),
+                      if (canEdit) ...[
+                        TextButton.icon(
+                          key: ValueKey(
+                              'story-comment-edit-button-${comment.id}'),
+                          onPressed: state.isSubmitting
+                              ? null
+                              : () => controller.startEditingComment(
+                                    comment,
+                                  ),
+                          icon: const Icon(Icons.edit_outlined),
+                          label: const Text('수정'),
+                        ),
+                        TextButton.icon(
+                          key: ValueKey(
+                              'story-comment-delete-button-${comment.id}'),
+                          onPressed: state.isSubmitting
+                              ? null
+                              : () => controller.deleteComment(comment),
+                          icon: const Icon(Icons.delete_outline),
+                          label: const Text('삭제'),
+                        ),
+                      ],
                     ],
-                  ],
-                ),
-                if (state.activeReplyCommentId == comment.id) ...[
-                  const SizedBox(height: AppSpacing.sm),
-                  _ReplyComposer(
-                    parentCommentId: comment.id,
-                    draft: state.replyDrafts[comment.id] ?? '',
-                    isSubmitting: state.isSubmitting,
-                    canSubmit: state.canSubmitReply(comment.id),
-                    onChanged: controller.updateReplyDraft,
-                    onSubmit: controller.submitReply,
-                    onCancel: controller.cancelReply,
                   ),
+                  if (state.activeReplyCommentId == comment.id) ...[
+                    const SizedBox(height: AppSpacing.sm),
+                    _ReplyComposer(
+                      parentCommentId: comment.id,
+                      draft: state.replyDrafts[comment.id] ?? '',
+                      isSubmitting: state.isSubmitting,
+                      canSubmit: state.canSubmitReply(comment.id),
+                      onChanged: controller.updateReplyDraft,
+                      onSubmit: controller.submitReply,
+                      onCancel: controller.cancelReply,
+                    ),
+                  ],
                 ],
               ],
               if (comment.replies.isNotEmpty) ...[

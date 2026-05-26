@@ -79,6 +79,7 @@ data class StoryCommentPageResult(
     val size: Int,
     val totalElements: Long,
     val totalPages: Int,
+    val hasNext: Boolean,
     val last: Boolean,
 )
 
@@ -91,5 +92,6 @@ data class StoryCommentResult(
     val postId: Long,
     val createDate: String,
     val modifyDate: String,
+    val deleted: Boolean,
     val replies: List<StoryCommentResult> = emptyList(),
 )

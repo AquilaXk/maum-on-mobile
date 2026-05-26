@@ -38,4 +38,14 @@ data class StoryComment(
     val content: String,
     val createDate: String,
     val modifyDate: String,
-)
+    val deleted: Boolean = false,
+) {
+    val canReceiveReply: Boolean
+        get() = !deleted
+
+    fun canBeEditedBy(memberId: Long): Boolean = !deleted && authorId == memberId
+
+    companion object {
+        const val DELETED_CONTENT = "삭제된 댓글입니다."
+    }
+}

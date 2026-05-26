@@ -1,6 +1,7 @@
 package com.maumonmobile.adapter.`in`.web.story
 
 import com.jayway.jsonpath.JsonPath
+import org.assertj.core.api.Assertions.assertThat
 import org.hamcrest.Matchers.greaterThan
 import org.hamcrest.Matchers.greaterThanOrEqualTo
 import org.junit.jupiter.api.Test
@@ -203,6 +204,119 @@ class StoryControllerTest @Autowired constructor(
             .andExpect {
                 status { isOk() }
                 jsonPath("$.data.totalElements") { value(0) }
+            }
+    }
+
+    @Test
+    fun deletingParentCommentKeepsRepliesAndRejectsFurtherMutations() {
+        val author = signupAndLogin("story-delete-comment-author@example.com", "작성자")
+        val replier = signupAndLogin("story-delete-comment-replier@example.com", "답글이")
+
+        val createResult = mockMvc.post("/api/v1/posts") {
+            header("Authorization", "Bearer ${author.accessToken}")
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"title":"댓글 삭제 계약","content":"대댓글 보존 확인","category":"WORRY"}"""
+        }
+            .andExpect {
+                status { isOk() }
+            }
+            .andReturn()
+        val postId = createResult.response.readJsonInt("$.data")
+
+        val parentResult = mockMvc.post("/api/v1/posts/$postId/comments") {
+            header("Authorization", "Bearer ${author.accessToken}")
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"content":"부모 댓글"}"""
+        }
+            .andExpect {
+                status { isOk() }
+            }
+            .andReturn()
+        val parentCommentId = parentResult.response.readJsonInt("$.data")
+
+        val replyResult = mockMvc.post("/api/v1/posts/$postId/comments") {
+            header("Authorization", "Bearer ${replier.accessToken}")
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"content":"남아야 하는 답글","parentCommentId":$parentCommentId}"""
+        }
+            .andExpect {
+                status { isOk() }
+            }
+            .andReturn()
+        val replyId = replyResult.response.readJsonInt("$.data")
+
+        mockMvc.post("/api/v1/posts/$postId/comments") {
+            header("Authorization", "Bearer ${replier.accessToken}")
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"content":"페이지 메타 확인용 댓글"}"""
+        }
+            .andExpect {
+                status { isOk() }
+            }
+
+        mockMvc.delete("/api/v1/comments/$parentCommentId") {
+            header("Authorization", "Bearer ${author.accessToken}")
+        }
+            .andExpect {
+                status { isOk() }
+                jsonPath("$.success") { value(true) }
+            }
+
+        mockMvc.get("/api/v1/posts/$postId/comments?page=0&size=1")
+            .andExpect {
+                status { isOk() }
+                jsonPath("$.data.totalElements") { value(2) }
+                jsonPath("$.data.last") { value(false) }
+                jsonPath("$.data.hasNext") { value(true) }
+            }
+
+        val commentsResponse = mockMvc.get("/api/v1/posts/$postId/comments?page=0&size=20")
+            .andExpect {
+                status { isOk() }
+            }
+            .andReturn()
+            .response
+            .contentAsString
+        val comments = JsonPath.read<List<Map<String, Any?>>>(commentsResponse, "$.data.content")
+        val deletedParent = comments.single { comment -> comment["id"] == parentCommentId }
+        @Suppress("UNCHECKED_CAST")
+        val replies = deletedParent["replies"] as List<Map<String, Any?>>
+
+        assertThat(deletedParent["deleted"]).isEqualTo(true)
+        assertThat(deletedParent["content"]).isEqualTo("삭제된 댓글입니다.")
+        assertThat(replies).hasSize(1)
+        assertThat(replies.single()["id"]).isEqualTo(replyId)
+        assertThat(replies.single()["deleted"]).isEqualTo(false)
+
+        mockMvc.put("/api/v1/comments/$parentCommentId") {
+            header("Authorization", "Bearer ${author.accessToken}")
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"content":"수정 시도"}"""
+        }
+            .andExpect {
+                status { isConflict() }
+                jsonPath("$.error.code") { value("CONFLICT") }
+                jsonPath("$.error.message") { value("삭제된 댓글은 수정할 수 없습니다.") }
+            }
+
+        mockMvc.post("/api/v1/posts/$postId/comments") {
+            header("Authorization", "Bearer ${replier.accessToken}")
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"content":"답글 시도","parentCommentId":$parentCommentId}"""
+        }
+            .andExpect {
+                status { isBadRequest() }
+                jsonPath("$.error.code") { value("INVALID_REQUEST") }
+                jsonPath("$.error.message") { value("삭제된 댓글에는 답글을 작성할 수 없습니다.") }
+            }
+
+        mockMvc.delete("/api/v1/comments/$parentCommentId") {
+            header("Authorization", "Bearer ${author.accessToken}")
+        }
+            .andExpect {
+                status { isConflict() }
+                jsonPath("$.error.code") { value("CONFLICT") }
+                jsonPath("$.error.message") { value("이미 삭제된 댓글입니다.") }
             }
     }
 
