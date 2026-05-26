@@ -254,6 +254,16 @@ class _FakeAuthRepository implements AuthRepository {
   }
 
   @override
+  Future<void> requestPasswordReset(PasswordResetRequest request) {
+    throw UnimplementedError();
+  }
+
+  @override
+  Future<void> confirmPasswordReset(PasswordResetConfirmRequest request) {
+    throw UnimplementedError();
+  }
+
+  @override
   Future<AuthSession> restoreSession() async => restoredSession;
 
   @override

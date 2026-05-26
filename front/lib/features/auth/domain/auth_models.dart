@@ -97,6 +97,37 @@ class SignupRequest {
   }
 }
 
+class PasswordResetRequest {
+  const PasswordResetRequest({
+    required this.email,
+  });
+
+  final String email;
+
+  Map<String, Object?> toJson() {
+    return {
+      'email': email,
+    };
+  }
+}
+
+class PasswordResetConfirmRequest {
+  const PasswordResetConfirmRequest({
+    required this.token,
+    required this.newPassword,
+  });
+
+  final String token;
+  final String newPassword;
+
+  Map<String, Object?> toJson() {
+    return {
+      'token': token,
+      'newPassword': newPassword,
+    };
+  }
+}
+
 int _readInt(Map<String, Object?> map, String key) {
   final value = map[key];
 

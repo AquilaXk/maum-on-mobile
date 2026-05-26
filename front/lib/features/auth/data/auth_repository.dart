@@ -8,6 +8,10 @@ abstract interface class AuthRepository {
 
   Future<AuthSession> login(LoginRequest request);
 
+  Future<void> requestPasswordReset(PasswordResetRequest request);
+
+  Future<void> confirmPasswordReset(PasswordResetConfirmRequest request);
+
   Future<AuthSession> restoreSession();
 
   Future<AuthSession> refreshSession();
@@ -55,6 +59,26 @@ class ApiAuthRepository implements AuthRepository {
     );
     await _saveSession(session);
     return session;
+  }
+
+  @override
+  Future<void> requestPasswordReset(PasswordResetRequest request) {
+    return _apiClient.postVoid(
+      '/api/v1/auth/password-reset/request',
+      body: request.toJson(),
+      requiresAuth: false,
+      retryOnUnauthorized: false,
+    );
+  }
+
+  @override
+  Future<void> confirmPasswordReset(PasswordResetConfirmRequest request) {
+    return _apiClient.postVoid(
+      '/api/v1/auth/password-reset/confirm',
+      body: request.toJson(),
+      requiresAuth: false,
+      retryOnUnauthorized: false,
+    );
   }
 
   @override

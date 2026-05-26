@@ -104,6 +104,48 @@ void main() {
       expect(controller.state.infoMessage, '다시 로그인해 주세요.');
       expect(controller.state.sessionRevision, authenticatedRevision + 1);
     });
+
+    test('requestPasswordReset sends a trimmed email and shows generic info',
+        () async {
+      final repository = _FakeAuthRepository();
+      final controller = AuthController(authRepository: repository);
+
+      final requested = await controller.requestPasswordReset(
+        email: '  me@example.com  ',
+      );
+
+      expect(requested, isTrue);
+      expect(repository.passwordResetEmails, ['me@example.com']);
+      expect(controller.state.isAuthenticated, isFalse);
+      expect(
+        controller.state.infoMessage,
+        '계정이 있으면 재설정 안내가 전송됩니다.',
+      );
+      expect(controller.state.errorMessage, isNull);
+    });
+
+    test('confirmPasswordReset sends token and returns to login-ready state',
+        () async {
+      final repository = _FakeAuthRepository();
+      final controller = AuthController(authRepository: repository);
+
+      final confirmed = await controller.confirmPasswordReset(
+        token: ' reset-token ',
+        newPassword: 'new-password',
+      );
+
+      expect(confirmed, isTrue);
+      expect(repository.passwordResetConfirmations.single.token, 'reset-token');
+      expect(
+        repository.passwordResetConfirmations.single.newPassword,
+        'new-password',
+      );
+      expect(
+        controller.state.infoMessage,
+        '비밀번호가 변경되었습니다. 다시 로그인해 주세요.',
+      );
+      expect(controller.state.errorMessage, isNull);
+    });
   });
 }
 
@@ -136,6 +178,8 @@ class _FakeAuthRepository implements AuthRepository {
   final Object? restoreError;
   bool logoutCalled = false;
   int clearLocalSessionCount = 0;
+  final List<String> passwordResetEmails = [];
+  final List<_PasswordResetConfirmation> passwordResetConfirmations = [];
 
   @override
   Future<AuthMember> signup(SignupRequest request) {
@@ -149,6 +193,23 @@ class _FakeAuthRepository implements AuthRepository {
       throw error;
     }
     return loginSession!;
+  }
+
+  @override
+  Future<void> requestPasswordReset(PasswordResetRequest request) async {
+    passwordResetEmails.add(request.email);
+  }
+
+  @override
+  Future<void> confirmPasswordReset(
+    PasswordResetConfirmRequest request,
+  ) async {
+    passwordResetConfirmations.add(
+      _PasswordResetConfirmation(
+        token: request.token,
+        newPassword: request.newPassword,
+      ),
+    );
   }
 
   @override
@@ -182,4 +243,14 @@ class _FakeAuthRepository implements AuthRepository {
   Future<void> clearLocalSession() async {
     clearLocalSessionCount += 1;
   }
+}
+
+class _PasswordResetConfirmation {
+  const _PasswordResetConfirmation({
+    required this.token,
+    required this.newPassword,
+  });
+
+  final String token;
+  final String newPassword;
 }

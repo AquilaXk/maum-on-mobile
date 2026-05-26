@@ -181,6 +181,88 @@ class AuthController extends ChangeNotifier {
     }
   }
 
+  Future<bool> requestPasswordReset({
+    required String email,
+  }) async {
+    _setState(
+      _state.copyWith(
+        isSubmitting: true,
+        clearErrorMessage: true,
+        clearInfoMessage: true,
+      ),
+    );
+
+    try {
+      await _authRepository.requestPasswordReset(
+        PasswordResetRequest(email: email.trim()),
+      );
+      _setState(
+        _state.copyWith(
+          status: AuthStatus.unauthenticated,
+          clearMember: true,
+          isSubmitting: false,
+          hasRestored: true,
+          infoMessage: '계정이 있으면 재설정 안내가 전송됩니다.',
+        ),
+      );
+      return true;
+    } on Object catch (error) {
+      _setState(
+        _state.copyWith(
+          status: AuthStatus.unauthenticated,
+          clearMember: true,
+          isSubmitting: false,
+          hasRestored: true,
+          errorMessage: _messageFromError(error),
+        ),
+      );
+      return false;
+    }
+  }
+
+  Future<bool> confirmPasswordReset({
+    required String token,
+    required String newPassword,
+  }) async {
+    _setState(
+      _state.copyWith(
+        isSubmitting: true,
+        clearErrorMessage: true,
+        clearInfoMessage: true,
+      ),
+    );
+
+    try {
+      await _authRepository.confirmPasswordReset(
+        PasswordResetConfirmRequest(
+          token: token.trim(),
+          newPassword: newPassword,
+        ),
+      );
+      _setState(
+        _state.copyWith(
+          status: AuthStatus.unauthenticated,
+          clearMember: true,
+          isSubmitting: false,
+          hasRestored: true,
+          infoMessage: '비밀번호가 변경되었습니다. 다시 로그인해 주세요.',
+        ),
+      );
+      return true;
+    } on Object catch (error) {
+      _setState(
+        _state.copyWith(
+          status: AuthStatus.unauthenticated,
+          clearMember: true,
+          isSubmitting: false,
+          hasRestored: true,
+          errorMessage: _messageFromError(error),
+        ),
+      );
+      return false;
+    }
+  }
+
   Future<void> logout() async {
     await _authRepository.logout();
     _setUnauthenticated();
