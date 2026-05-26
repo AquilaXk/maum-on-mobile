@@ -8,14 +8,17 @@ enum ConsultationConnectionState {
   idle,
   connecting,
   connected,
+  reconnecting,
   error,
 }
 
 enum ConsultationStreamEventType {
   connect,
+  heartbeat,
   chat,
   done,
   error,
+  streamError,
   unknown,
 }
 
@@ -88,7 +91,8 @@ class ConsultationMessage {
       createdAt: DateTime.tryParse(map['createdAt']?.toString() ?? '') ??
           DateTime.fromMillisecondsSinceEpoch(0),
       sensitive: map['sensitive'] == true,
-      retentionUntil: DateTime.tryParse(map['retentionUntil']?.toString() ?? ''),
+      retentionUntil:
+          DateTime.tryParse(map['retentionUntil']?.toString() ?? ''),
     );
   }
 
@@ -181,6 +185,9 @@ class ConsultationStreamEvent {
   const ConsultationStreamEvent.connect(String data)
       : this._(ConsultationStreamEventType.connect, data);
 
+  const ConsultationStreamEvent.heartbeat(String data)
+      : this._(ConsultationStreamEventType.heartbeat, data);
+
   const ConsultationStreamEvent.chat(String data)
       : this._(ConsultationStreamEventType.chat, data);
 
@@ -189,6 +196,9 @@ class ConsultationStreamEvent {
 
   const ConsultationStreamEvent.error(String data)
       : this._(ConsultationStreamEventType.error, data);
+
+  const ConsultationStreamEvent.streamError(String data)
+      : this._(ConsultationStreamEventType.streamError, data);
 
   const ConsultationStreamEvent.unknown(String data)
       : this._(ConsultationStreamEventType.unknown, data);
@@ -199,9 +209,11 @@ class ConsultationStreamEvent {
   }) {
     return switch (event) {
       'connect' => ConsultationStreamEvent.connect(data),
+      'heartbeat' => ConsultationStreamEvent.heartbeat(data),
       'chat' => ConsultationStreamEvent.chat(data),
       'chat_done' => const ConsultationStreamEvent.done(),
       'chat_error' => ConsultationStreamEvent.error(data),
+      'stream_error' => ConsultationStreamEvent.streamError(data),
       _ => ConsultationStreamEvent.unknown(data),
     };
   }

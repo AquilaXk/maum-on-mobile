@@ -53,7 +53,10 @@ void main() {
 
   testWidgets('shows reconnect action after a stream error', (tester) async {
     final repository = _FakeConsultationRepository();
-    final controller = ConsultationController(repository: repository);
+    final controller = ConsultationController(
+      repository: repository,
+      reconnectBackoffDelays: const [],
+    );
 
     await tester.pumpWidget(
       MaterialApp(
@@ -74,6 +77,70 @@ void main() {
     await tester.pump();
 
     expect(repository.connectCount, 2);
+  });
+
+  testWidgets('shows retry and delete actions for a failed send',
+      (tester) async {
+    final repository = _FakeConsultationRepository()
+      ..sendErrors.add(Exception('network down'));
+    final controller = ConsultationController(repository: repository);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: ConsultationScreen(
+          controller: controller,
+          onBack: () {},
+        ),
+      ),
+    );
+    await tester.pump();
+    repository.emit(const ConsultationStreamEvent.connect('connected'));
+    await tester.pump();
+
+    await tester.enterText(
+      find.byKey(const ValueKey('consultation-message-field')),
+      '전송에 실패할 메시지',
+    );
+    await tester.pump();
+    await tester.tap(find.byKey(const ValueKey('consultation-send-button')));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.byKey(const ValueKey('consultation-failed-message-notice')),
+      findsOneWidget,
+    );
+
+    await tester.tap(
+      find.byKey(const ValueKey('consultation-retry-failed-message-button')),
+    );
+    await tester.pump();
+    repository
+      ..emit(const ConsultationStreamEvent.chat('다시 보냈어요.'))
+      ..emit(const ConsultationStreamEvent.done());
+    await tester.pump();
+
+    expect(repository.sentMessages, ['전송에 실패할 메시지', '전송에 실패할 메시지']);
+    expect(find.text('다시 보냈어요.'), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('consultation-failed-message-notice')),
+      findsNothing,
+    );
+
+    repository.sendErrors.add(Exception('network down'));
+    await tester.enterText(
+      find.byKey(const ValueKey('consultation-message-field')),
+      '삭제할 실패 메시지',
+    );
+    await tester.pump();
+    await tester.tap(find.byKey(const ValueKey('consultation-send-button')));
+    await tester.pumpAndSettle();
+
+    await tester.tap(
+      find.byKey(const ValueKey('consultation-delete-failed-message-button')),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('삭제할 실패 메시지'), findsNothing);
   });
 
   testWidgets('shows safety guidance and deletes sensitive history',
@@ -160,6 +227,7 @@ class _FakeConsultationRepository implements ConsultationRepository {
 
   final ConsultationSendResult sendResult;
   final List<String> sentMessages = [];
+  final List<Object> sendErrors = [];
   int connectCount = 0;
   int deleteSensitiveCount = 0;
   List<ConsultationMessage>? recentMessagesAfterDelete;
@@ -175,6 +243,9 @@ class _FakeConsultationRepository implements ConsultationRepository {
   @override
   Future<ConsultationSendResult> sendMessage(String message) async {
     sentMessages.add(message);
+    if (sendErrors.isNotEmpty) {
+      throw sendErrors.removeAt(0);
+    }
     return sendResult;
   }
 

@@ -109,6 +109,12 @@ class _ConsultationScreenState extends State<ConsultationScreen>
                     onDeleteSensitive:
                         widget.controller.deleteSensitiveMessages,
                   ),
+                if (state.safetyNotice == null && state.failedMessage != null)
+                  _FailedMessageNotice(
+                    failedMessage: state.failedMessage!,
+                    onRetry: widget.controller.retryFailedMessage,
+                    onDelete: widget.controller.deleteFailedMessage,
+                  ),
                 Expanded(
                   child: ListView.builder(
                     key: const ValueKey('consultation-message-list'),
@@ -133,6 +139,94 @@ class _ConsultationScreenState extends State<ConsultationScreen>
           ),
         );
       },
+    );
+  }
+}
+
+class _FailedMessageNotice extends StatelessWidget {
+  const _FailedMessageNotice({
+    required this.failedMessage,
+    required this.onRetry,
+    required this.onDelete,
+  });
+
+  final ConsultationFailedMessage failedMessage;
+  final Future<void> Function() onRetry;
+  final Future<void> Function() onDelete;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return Padding(
+      key: const ValueKey('consultation-failed-message-notice'),
+      padding: const EdgeInsets.fromLTRB(
+        AppSpacing.md,
+        0,
+        AppSpacing.md,
+        AppSpacing.sm,
+      ),
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: colorScheme.secondaryContainer,
+          borderRadius: AppRadii.card,
+          border: Border.all(color: colorScheme.secondary),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(AppSpacing.md),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Semantics(
+                container: true,
+                liveRegion: true,
+                label: '전송 실패. ${failedMessage.errorMessage}',
+                child: ExcludeSemantics(
+                  child: Text(
+                    '전송하지 못한 메시지가 있습니다.',
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          color: colorScheme.onSecondaryContainer,
+                          fontWeight: FontWeight.w700,
+                        ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: AppSpacing.xs),
+              Text(
+                failedMessage.content,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: colorScheme.onSecondaryContainer,
+                    ),
+              ),
+              const SizedBox(height: AppSpacing.sm),
+              Wrap(
+                spacing: AppSpacing.xs,
+                runSpacing: AppSpacing.xs,
+                children: [
+                  FilledButton.tonalIcon(
+                    key: const ValueKey(
+                      'consultation-retry-failed-message-button',
+                    ),
+                    onPressed: () => onRetry(),
+                    icon: const Icon(Icons.refresh),
+                    label: const Text('다시 전송'),
+                  ),
+                  TextButton.icon(
+                    key: const ValueKey(
+                      'consultation-delete-failed-message-button',
+                    ),
+                    onPressed: () => onDelete(),
+                    icon: const Icon(Icons.close),
+                    label: const Text('삭제'),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }
@@ -270,6 +364,7 @@ class _ConsultationHeader extends StatelessWidget {
       ConsultationConnectionState.connecting => '자동 연결 중',
       ConsultationConnectionState.connected when isStreaming => '답변 작성 중',
       ConsultationConnectionState.connected => '상담 연결됨',
+      ConsultationConnectionState.reconnecting => '자동 재연결 중',
       ConsultationConnectionState.error => '재연결 필요',
     };
 

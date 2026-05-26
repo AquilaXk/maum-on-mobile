@@ -8,6 +8,26 @@ import '../../draft_recovery/domain/draft_recovery_models.dart';
 import '../data/consultation_repository.dart';
 import '../domain/consultation_models.dart';
 
+const List<Duration> _defaultReconnectBackoffDelays = [
+  Duration(seconds: 1),
+  Duration(seconds: 2),
+  Duration(seconds: 4),
+];
+
+class ConsultationFailedMessage {
+  const ConsultationFailedMessage({
+    required this.content,
+    required this.userMessageId,
+    required this.errorMessage,
+    this.systemMessageId,
+  });
+
+  final String content;
+  final String userMessageId;
+  final String errorMessage;
+  final String? systemMessageId;
+}
+
 class ConsultationState {
   const ConsultationState({
     required this.messages,
@@ -17,6 +37,7 @@ class ConsultationState {
     this.isStreaming = false,
     this.errorMessage,
     this.safetyNotice,
+    this.failedMessage,
   });
 
   final List<ConsultationMessage> messages;
@@ -26,6 +47,7 @@ class ConsultationState {
   final bool isStreaming;
   final String? errorMessage;
   final ConsultationSafetyResult? safetyNotice;
+  final ConsultationFailedMessage? failedMessage;
 
   bool get inputBlockedBySafety => safetyNotice?.blocksConversation ?? false;
 
@@ -48,6 +70,8 @@ class ConsultationState {
     bool clearErrorMessage = false,
     ConsultationSafetyResult? safetyNotice,
     bool clearSafetyNotice = false,
+    ConsultationFailedMessage? failedMessage,
+    bool clearFailedMessage = false,
   }) {
     return ConsultationState(
       messages: messages ?? this.messages,
@@ -59,6 +83,8 @@ class ConsultationState {
           clearErrorMessage ? null : errorMessage ?? this.errorMessage,
       safetyNotice:
           clearSafetyNotice ? null : safetyNotice ?? this.safetyNotice,
+      failedMessage:
+          clearFailedMessage ? null : failedMessage ?? this.failedMessage,
     );
   }
 }
@@ -69,10 +95,12 @@ class ConsultationController extends ChangeNotifier {
     int currentMemberId = 0,
     DraftRecoveryRepository? draftRepository,
     VoidCallback? onUnauthorized,
+    List<Duration> reconnectBackoffDelays = _defaultReconnectBackoffDelays,
   })  : _repository = repository,
         _currentMemberId = currentMemberId,
         _draftRepository = draftRepository,
         _onUnauthorized = onUnauthorized,
+        _reconnectBackoffDelays = reconnectBackoffDelays,
         _state = ConsultationState(
           messages: [
             ConsultationMessage(
@@ -90,12 +118,15 @@ class ConsultationController extends ChangeNotifier {
   final int _currentMemberId;
   final DraftRecoveryRepository? _draftRepository;
   final VoidCallback? _onUnauthorized;
+  final List<Duration> _reconnectBackoffDelays;
 
   ConsultationState _state;
   StreamSubscription<ConsultationStreamEvent>? _streamSubscription;
+  Timer? _reconnectTimer;
   bool _shouldRestoreConnection = false;
   bool _hasLoadedRecentMessages = false;
   bool _isDisposed = false;
+  int _reconnectAttempt = 0;
   int _messageSequence = 0;
   String? _activeAssistantMessageId;
 
@@ -122,14 +153,14 @@ class ConsultationController extends ChangeNotifier {
     );
   }
 
-  Future<void> connect() async {
+  Future<void> connect({bool reloadRecentMessages = false}) async {
     if (_streamSubscription != null) {
       return;
     }
 
     _shouldRestoreConnection = true;
-    if (!_hasLoadedRecentMessages) {
-      await _loadRecentMessages();
+    if (reloadRecentMessages || !_hasLoadedRecentMessages) {
+      await _loadRecentMessages(force: reloadRecentMessages);
     }
     _setState(
       _state.copyWith(
@@ -151,12 +182,15 @@ class ConsultationController extends ChangeNotifier {
 
   Future<void> reconnect() async {
     _shouldRestoreConnection = true;
+    _reconnectAttempt = 0;
+    _cancelPendingReconnect();
     await _cancelStream();
-    await connect();
+    await connect(reloadRecentMessages: true);
   }
 
   void close() {
     _shouldRestoreConnection = false;
+    _cancelPendingReconnect();
     _cancelStreamForLifecycle(
       connectionState: ConsultationConnectionState.idle,
       clearErrorMessage: true,
@@ -176,6 +210,7 @@ class ConsultationController extends ChangeNotifier {
         lifecycleState == AppLifecycleState.detached) {
       if (_streamSubscription != null) {
         _shouldRestoreConnection = true;
+        _cancelPendingReconnect();
         _cancelStreamForLifecycle(
           connectionState: ConsultationConnectionState.idle,
           clearErrorMessage: true,
@@ -219,25 +254,95 @@ class ConsultationController extends ChangeNotifier {
       return;
     }
 
-    final assistantMessage = _createMessage(
-      ConsultationMessageRole.assistant,
-      '',
-    );
+    final userMessage = _createMessage(ConsultationMessageRole.user, content);
+    final assistantMessage =
+        _createMessage(ConsultationMessageRole.assistant, '');
     _activeAssistantMessageId = assistantMessage.id;
     _setState(
       _state.copyWith(
-        messages: [
-          ..._state.messages,
-          _createMessage(ConsultationMessageRole.user, content),
-          assistantMessage,
-        ],
+        messages: [..._state.messages, userMessage, assistantMessage],
         draft: '',
         isSending: true,
         isStreaming: true,
         clearErrorMessage: true,
+        clearFailedMessage: true,
       ),
     );
 
+    await _sendMessageContent(
+      content,
+      userMessageId: userMessage.id,
+      assistantMessageId: assistantMessage.id,
+    );
+  }
+
+  Future<void> retryFailedMessage() async {
+    final failedMessage = _state.failedMessage;
+    if (failedMessage == null ||
+        _state.inputBlockedBySafety ||
+        _state.isSending ||
+        _state.isStreaming) {
+      return;
+    }
+
+    if (_state.connectionState != ConsultationConnectionState.connected) {
+      _setState(
+        _state.copyWith(errorMessage: '상담 연결 후 다시 시도해 주세요.'),
+      );
+      return;
+    }
+
+    final assistantMessage =
+        _createMessage(ConsultationMessageRole.assistant, '');
+    _activeAssistantMessageId = assistantMessage.id;
+    _setState(
+      _state.copyWith(
+        messages: [
+          for (final message in _state.messages)
+            if (message.id != failedMessage.systemMessageId) message,
+          assistantMessage,
+        ],
+        isSending: true,
+        isStreaming: true,
+        clearErrorMessage: true,
+        clearFailedMessage: true,
+      ),
+    );
+
+    await _sendMessageContent(
+      failedMessage.content,
+      userMessageId: failedMessage.userMessageId,
+      assistantMessageId: assistantMessage.id,
+    );
+  }
+
+  Future<void> deleteFailedMessage() async {
+    final failedMessage = _state.failedMessage;
+    if (failedMessage == null) {
+      return;
+    }
+
+    await _draftRepository?.delete(_draftKey);
+    final messages = [
+      for (final message in _state.messages)
+        if (message.id != failedMessage.userMessageId &&
+            message.id != failedMessage.systemMessageId)
+          message,
+    ];
+    _setState(
+      _state.copyWith(
+        messages: messages.isEmpty ? _initialMessages() : messages,
+        clearErrorMessage: true,
+        clearFailedMessage: true,
+      ),
+    );
+  }
+
+  Future<void> _sendMessageContent(
+    String content, {
+    required String userMessageId,
+    required String assistantMessageId,
+  }) async {
     try {
       final result = await _repository.sendMessage(content);
       final safety = result.safety;
@@ -257,16 +362,29 @@ class ConsultationController extends ChangeNotifier {
       }
 
       await _draftRepository?.delete(_draftKey);
-      _setState(_state.copyWith(isSending: false, clearSafetyNotice: true));
+      _setState(
+        _state.copyWith(
+          isSending: false,
+          clearSafetyNotice: true,
+          clearFailedMessage: true,
+        ),
+      );
     } on Object catch (error) {
+      final errorMessage = _messageFromError(error);
       await _markDraftFailed(content, error);
-      _replaceActiveAssistantWithSystem('전송 실패: ${_messageFromError(error)}');
+      _replaceActiveAssistantWithSystem('전송 실패: $errorMessage');
       _activeAssistantMessageId = null;
       _setState(
         _state.copyWith(
           isSending: false,
           isStreaming: false,
-          errorMessage: _messageFromError(error),
+          errorMessage: errorMessage,
+          failedMessage: ConsultationFailedMessage(
+            content: content,
+            userMessageId: userMessageId,
+            systemMessageId: assistantMessageId,
+            errorMessage: errorMessage,
+          ),
         ),
       );
     }
@@ -321,6 +439,15 @@ class ConsultationController extends ChangeNotifier {
   void _handleStreamEvent(ConsultationStreamEvent event) {
     switch (event.type) {
       case ConsultationStreamEventType.connect:
+        _reconnectAttempt = 0;
+        _setState(
+          _state.copyWith(
+            connectionState: ConsultationConnectionState.connected,
+            clearErrorMessage: true,
+          ),
+        );
+        return;
+      case ConsultationStreamEventType.heartbeat:
         _setState(
           _state.copyWith(
             connectionState: ConsultationConnectionState.connected,
@@ -345,6 +472,11 @@ class ConsultationController extends ChangeNotifier {
         );
         _finishStreaming();
         return;
+      case ConsultationStreamEventType.streamError:
+        _handleRecoverableStreamFailure(
+          event.data.isEmpty ? '상담 연결이 지연되고 있습니다.' : event.data,
+        );
+        return;
       case ConsultationStreamEventType.unknown:
         return;
     }
@@ -357,30 +489,119 @@ class ConsultationController extends ChangeNotifier {
       unawaited(currentSubscription.cancel());
     }
 
-    _finishStreaming();
     if (error is ApiClientException &&
         error.kind == ApiErrorKind.unauthorized) {
+      _finishStreaming();
       _onUnauthorized?.call();
+      _setState(
+        _state.copyWith(
+          connectionState: ConsultationConnectionState.error,
+          isSending: false,
+          errorMessage: _messageFromError(error),
+        ),
+      );
+      return;
     }
-    _appendSystemMessage('상담 연결이 끊어졌습니다. 다시 연결해 주세요.');
-    _setState(
-      _state.copyWith(
-        connectionState: ConsultationConnectionState.error,
-        isSending: false,
-        errorMessage: _messageFromError(error),
-      ),
-    );
+
+    _handleRecoverableStreamFailure(_messageFromError(error));
   }
 
   void _handleStreamDone() {
     _streamSubscription = null;
-    _finishStreaming();
-    if (_state.connectionState == ConsultationConnectionState.connected) {
-      _setState(
-        _state.copyWith(connectionState: ConsultationConnectionState.error),
-      );
-      _appendSystemMessage('상담 연결이 종료되었습니다. 다시 연결해 주세요.');
+    _handleRecoverableStreamFailure('상담 연결이 종료되었습니다.');
+  }
+
+  void _handleRecoverableStreamFailure(String message) {
+    final currentSubscription = _streamSubscription;
+    _streamSubscription = null;
+    if (currentSubscription != null) {
+      unawaited(currentSubscription.cancel());
     }
+
+    _clearPendingAssistantMessage();
+    _finishStreaming();
+    _scheduleReconnect(message);
+  }
+
+  void _scheduleReconnect(String message) {
+    if (!_shouldRestoreConnection || _isDisposed) {
+      return;
+    }
+
+    if (_reconnectAttempt >= _reconnectBackoffDelays.length) {
+      _appendConnectionNotice('상담 연결이 끊어졌습니다. 다시 연결해 주세요.');
+      _setState(
+        _state.copyWith(
+          connectionState: ConsultationConnectionState.error,
+          isSending: false,
+          isStreaming: false,
+          errorMessage: message,
+        ),
+      );
+      return;
+    }
+
+    final delay = _reconnectBackoffDelays[_reconnectAttempt];
+    _reconnectAttempt += 1;
+    _appendConnectionNotice('상담 연결이 끊어졌습니다. 자동으로 다시 연결합니다.');
+    _setState(
+      _state.copyWith(
+        connectionState: ConsultationConnectionState.reconnecting,
+        isSending: false,
+        isStreaming: false,
+        errorMessage: message,
+      ),
+    );
+
+    _cancelPendingReconnect();
+    _reconnectTimer = Timer(delay, () {
+      _reconnectTimer = null;
+      if (!_shouldRestoreConnection || _isDisposed) {
+        return;
+      }
+      unawaited(connect(reloadRecentMessages: true));
+    });
+  }
+
+  void _appendConnectionNotice(String content) {
+    if (_state.inputBlockedBySafety ||
+        _state.messages.any((message) => message.content == content)) {
+      return;
+    }
+
+    _setState(
+      _state.copyWith(
+        messages: [
+          ..._state.messages,
+          _createMessage(ConsultationMessageRole.system, content),
+        ],
+      ),
+    );
+  }
+
+  void _clearPendingAssistantMessage() {
+    final messageId = _activeAssistantMessageId;
+    if (messageId == null) {
+      return;
+    }
+
+    final hasPendingAssistant = _state.messages.any((message) {
+      return message.id == messageId &&
+          message.role == ConsultationMessageRole.assistant &&
+          message.content.isEmpty;
+    });
+    if (!hasPendingAssistant) {
+      return;
+    }
+
+    _setState(
+      _state.copyWith(
+        messages: [
+          for (final message in _state.messages)
+            if (message.id != messageId) message,
+        ],
+      ),
+    );
   }
 
   void _appendAssistantChunk(String chunk) {
@@ -459,8 +680,8 @@ class ConsultationController extends ChangeNotifier {
     _setState(_state.copyWith(isStreaming: false));
   }
 
-  Future<void> _loadRecentMessages() async {
-    if (_hasLoadedRecentMessages) {
+  Future<void> _loadRecentMessages({bool force = false}) async {
+    if (_hasLoadedRecentMessages && !force) {
       return;
     }
 
@@ -470,7 +691,7 @@ class ConsultationController extends ChangeNotifier {
       if (messages.isNotEmpty) {
         _setState(
           _state.copyWith(
-            messages: messages,
+            messages: _mergeRecentMessages(messages),
             clearErrorMessage: true,
           ),
         );
@@ -485,6 +706,29 @@ class ConsultationController extends ChangeNotifier {
     }
   }
 
+  List<ConsultationMessage> _mergeRecentMessages(
+    List<ConsultationMessage> recentMessages,
+  ) {
+    // 재연결 중 서버 기록으로 교체하되, 로컬 전송 실패 항목은 재시도할 수 있게 보존한다.
+    final failedMessage = _state.failedMessage;
+    if (failedMessage == null) {
+      return recentMessages;
+    }
+
+    final recentIds = recentMessages.map((message) => message.id).toSet();
+    final preservedIds = {
+      failedMessage.userMessageId,
+      if (failedMessage.systemMessageId != null) failedMessage.systemMessageId!,
+    };
+    return [
+      ...recentMessages,
+      for (final message in _state.messages)
+        if (preservedIds.contains(message.id) &&
+            !recentIds.contains(message.id))
+          message,
+    ];
+  }
+
   Future<void> _cancelStream({
     ConsultationConnectionState connectionState =
         ConsultationConnectionState.idle,
@@ -492,6 +736,7 @@ class ConsultationController extends ChangeNotifier {
   }) async {
     final currentSubscription = _streamSubscription;
     _streamSubscription = null;
+    _cancelPendingReconnect();
     await currentSubscription?.cancel();
     _activeAssistantMessageId = null;
     _setState(
@@ -510,6 +755,7 @@ class ConsultationController extends ChangeNotifier {
   }) {
     final currentSubscription = _streamSubscription;
     _streamSubscription = null;
+    _cancelPendingReconnect();
     if (currentSubscription != null) {
       unawaited(currentSubscription.cancel());
     }
@@ -568,7 +814,13 @@ class ConsultationController extends ChangeNotifier {
   @override
   void dispose() {
     _isDisposed = true;
+    _cancelPendingReconnect();
     _streamSubscription?.cancel();
     super.dispose();
+  }
+
+  void _cancelPendingReconnect() {
+    _reconnectTimer?.cancel();
+    _reconnectTimer = null;
   }
 }
