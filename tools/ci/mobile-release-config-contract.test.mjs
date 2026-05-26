@@ -88,6 +88,66 @@ test("iOS store-facing metadata and privacy strings stay release ready", () => {
   assert.ok(existsSync(path.join(root, "front/ios/Runner/Base.lproj/LaunchScreen.storyboard")));
 });
 
+test("iOS CocoaPods and privacy manifest stay release ready", () => {
+  const podfile = read("front/ios/Podfile");
+  const podfileLock = read("front/ios/Podfile.lock");
+  const gemfile = read("front/ios/Gemfile");
+  const packageResolved = read("front/ios/Runner.xcworkspace/xcshareddata/swiftpm/Package.resolved");
+  const workspace = read("front/ios/Runner.xcworkspace/contents.xcworkspacedata");
+  const project = read("front/ios/Runner.xcodeproj/project.pbxproj");
+  const debugXcconfig = read("front/ios/Flutter/Debug.xcconfig");
+  const releaseXcconfig = read("front/ios/Flutter/Release.xcconfig");
+  const privacy = read("front/ios/Runner/PrivacyInfo.xcprivacy");
+
+  assert.match(podfile, /platform :ios, '15\.0'/);
+  assert.match(podfile, /COCOAPODS_DISABLE_STATS/);
+  assert.match(podfile, /flutter_ios_podfile_setup/);
+  assert.match(podfile, /target 'Runner' do/);
+  assert.match(podfile, /use_frameworks!/);
+  assert.match(podfile, /flutter_install_all_ios_pods File\.dirname/);
+  assert.match(podfile, /target 'RunnerTests' do[\s\S]*inherit! :search_paths/);
+  assert.match(podfile, /post_install do \|installer\|[\s\S]*flutter_additional_ios_build_settings/);
+
+  assert.match(podfileLock, /Flutter \(1\.0\.0\)/);
+  assert.match(podfileLock, /COCOAPODS: 1\.16\.2/);
+
+  assert.match(gemfile, /source "https:\/\/rubygems\.org"/);
+  assert.match(gemfile, /gem "cocoapods", "~> 1\.16"/);
+  assert.match(gemfile, /gem "ffi", "~> 1\.15\.5"/);
+  assert.match(gemfile, /gem "logger", "1\.3\.0"/);
+
+  assert.match(packageResolved, /"identity" : "dkimagepickercontroller"/);
+  assert.match(packageResolved, /"identity" : "sdwebimage"/);
+
+  assert.match(workspace, /Runner\.xcodeproj/);
+  assert.match(workspace, /Pods\/Pods\.xcodeproj/);
+
+  assert.match(project, /PrivacyInfo\.xcprivacy/);
+  assert.match(project, /PrivacyInfo\.xcprivacy in Resources/);
+  assert.match(project, /\[CP\] Check Pods Manifest\.lock/);
+  assert.match(project, /Pods_Runner\.framework in Frameworks/);
+
+  assert.match(debugXcconfig, /Pods-Runner\.debug\.xcconfig/);
+  assert.match(releaseXcconfig, /Pods-Runner\.release\.xcconfig/);
+
+  assert.match(privacy, /<key>NSPrivacyTracking<\/key>\s*<false\/>/);
+  assert.match(privacy, /<key>NSPrivacyTrackingDomains<\/key>\s*<array>\s*<\/array>/);
+  assert.match(privacy, /<key>NSPrivacyAccessedAPITypes<\/key>\s*<array>/);
+  assert.match(privacy, /<key>NSPrivacyCollectedDataTypes<\/key>\s*<array>/);
+  for (const dataType of [
+    "NSPrivacyCollectedDataTypeEmailAddress",
+    "NSPrivacyCollectedDataTypeUserID",
+    "NSPrivacyCollectedDataTypeOtherUserContent",
+    "NSPrivacyCollectedDataTypePhotosorVideos",
+    "NSPrivacyCollectedDataTypeSensitiveInfo",
+    "NSPrivacyCollectedDataTypePerformanceData",
+  ]) {
+    assert.match(privacy, new RegExp(dataType), `Missing privacy data type: ${dataType}`);
+  }
+  assert.match(privacy, /NSPrivacyCollectedDataTypePurposeAppFunctionality/);
+  assert.match(privacy, /NSPrivacyCollectedDataTypePurposeAnalytics/);
+});
+
 test("CI exposes manual Android and iOS release build preflights", () => {
   const workflow = read(".github/workflows/ci.yml");
 
@@ -95,5 +155,8 @@ test("CI exposes manual Android and iOS release build preflights", () => {
   assert.match(workflow, /node --test tools\/ci\/mobile-release-config-contract\.test\.mjs/);
   assert.match(workflow, /MAUMON_ANDROID_KEYSTORE_BASE64/);
   assert.match(workflow, /flutter build appbundle --release/);
-  assert.match(workflow, /flutter build ios --no-codesign/);
+  assert.match(workflow, /bundle config --local path vendor\/bundle/);
+  assert.match(workflow, /bundle install --jobs 4 --retry 3/);
+  assert.match(workflow, /\.\.\/tools\/flutterw build ios --no-codesign/);
+  assert.match(read("tools/ci/run-mobile-release-preflight.sh"), /DEVELOPER_DIR/);
 });

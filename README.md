@@ -20,6 +20,7 @@ Mobile app repository for Maum On, focused on Android and iOS clients.
 Run Flutter commands through the repository wrapper:
 
 - `tools/flutterw --version`: verify the Flutter SDK found by the repository wrapper.
+- `cd front/ios && bundle install`: install the bundled CocoaPods toolchain before local iOS builds.
 - `tools/ci/run-local-mobile-checks.sh`: install Flutter dependencies, analyze the app, and run tests from `front/`.
 - `tools/ci/run-local-mobile-checks.sh --doctor`: check local Flutter, Android SDK, Xcode, and CocoaPods state.
 - `tools/flutterw run -d android`: run the app on an Android emulator or device.

@@ -3,7 +3,15 @@ set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)"
 flutter="${repo_root}/tools/flutterw"
+pod="${repo_root}/tools/pod"
 mode="checks"
+
+if [[ "$(uname -s)" == "Darwin" && -z "${DEVELOPER_DIR:-}" && -d /Applications/Xcode.app/Contents/Developer ]]; then
+  selected_developer_dir="$(xcode-select -p 2>/dev/null || true)"
+  if [[ "${selected_developer_dir}" == "/Library/Developer/CommandLineTools" ]]; then
+    export DEVELOPER_DIR="/Applications/Xcode.app/Contents/Developer"
+  fi
+fi
 
 usage() {
   cat <<'EOF'
@@ -81,10 +89,10 @@ run_doctor() {
     failed=1
   fi
 
-  if command -v pod >/dev/null 2>&1; then
-    print_status "CocoaPods" "ok" "$(pod --version)"
+  if "${pod}" --version >/tmp/maumon_pod_version.txt 2>&1; then
+    print_status "CocoaPods" "ok" "$(head -n 1 /tmp/maumon_pod_version.txt)"
   else
-    print_status "CocoaPods" "missing" "pod --version failed"
+    print_status "CocoaPods" "missing" "$(tr '\n' ' ' </tmp/maumon_pod_version.txt)"
     failed=1
   fi
 

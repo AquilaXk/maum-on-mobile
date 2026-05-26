@@ -2,9 +2,17 @@
 set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)"
+pod="${repo_root}/tools/pod"
 platform="all"
 failed=0
 temp_files=()
+
+if [[ "$(uname -s)" == "Darwin" && -z "${DEVELOPER_DIR:-}" && -d /Applications/Xcode.app/Contents/Developer ]]; then
+  selected_developer_dir="$(xcode-select -p 2>/dev/null || true)"
+  if [[ "${selected_developer_dir}" == "/Library/Developer/CommandLineTools" ]]; then
+    export DEVELOPER_DIR="/Applications/Xcode.app/Contents/Developer"
+  fi
+fi
 
 cleanup() {
   if [[ "${#temp_files[@]}" -gt 0 ]]; then
@@ -149,7 +157,7 @@ check_ios() {
     record "Xcode" "missing" "${xcode_output//$'\n'/ }"
   fi
 
-  if command -v pod >/dev/null 2>&1 && pod_output="$(pod --version 2>&1)"; then
+  if pod_output="$("${pod}" --version 2>&1)"; then
     record "CocoaPods" "ok" "$(printf '%s\n' "${pod_output}" | head -n 1)"
   else
     record "CocoaPods" "missing" "pod --version failed"

@@ -1,0 +1,44 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
+ios_dir="${repo_root}/front/ios"
+self_path="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)/$(basename "${BASH_SOURCE[0]}")"
+
+if [[ -n "${POD_BIN:-}" ]]; then
+  exec "${POD_BIN}" "$@"
+fi
+
+if [[ -f "${ios_dir}/Gemfile" ]] && command -v bundle >/dev/null 2>&1; then
+  cd "${ios_dir}"
+  export BUNDLE_USER_HOME="${BUNDLE_USER_HOME:-${ios_dir}/.bundle/home}"
+  export BUNDLE_USER_CACHE="${BUNDLE_USER_CACHE:-${ios_dir}/.bundle/cache}"
+  export BUNDLE_USER_CONFIG="${BUNDLE_USER_CONFIG:-${ios_dir}/.bundle/config}"
+  if bundle check >/dev/null 2>&1; then
+    export RUBYOPT="-rlogger${RUBYOPT:+ ${RUBYOPT}}"
+    exec bundle exec pod "$@"
+  fi
+
+  cat >&2 <<'EOF'
+CocoaPods bundle is not installed.
+
+Run this before retrying iOS Flutter builds:
+- cd front/ios
+- bundle install
+EOF
+  exit 127
+fi
+
+if command -v pod >/dev/null 2>&1; then
+  candidate="$(command -v pod)"
+  if [[ "$(cd "$(dirname "${candidate}")" && pwd -P)/$(basename "${candidate}")" != "${self_path}" ]]; then
+    exec "${candidate}" "$@"
+  fi
+fi
+
+cat >&2 <<'EOF'
+CocoaPods not found.
+
+Set POD_BIN=/absolute/path/to/pod, install the front/ios bundle, or install CocoaPods on PATH.
+EOF
+exit 127

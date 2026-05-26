@@ -390,6 +390,15 @@ jobs:
           channel: stable
           cache: true
 
+      - name: Install iOS Ruby dependencies
+        if: ${{ steps.scaffold.outputs.present == 'true' && steps.scaffold.outputs.stack == 'flutter' }}
+        working-directory: front/ios
+        shell: bash
+        run: |
+          set -euo pipefail
+          bundle config --local path vendor/bundle
+          bundle install --jobs 4 --retry 3
+
       - name: Run iOS release preflight
         if: ${{ steps.scaffold.outputs.present == 'true' && steps.scaffold.outputs.stack == 'flutter' }}
         run: tools/ci/run-mobile-release-preflight.sh --platform ios
@@ -400,8 +409,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          flutter pub get
-          flutter build ios --simulator --no-codesign
+          ../tools/flutterw pub get
+          ../tools/flutterw build ios --simulator --no-codesign
 
       - name: Set up Node.js
         if: ${{ steps.scaffold.outputs.present == 'true' && steps.scaffold.outputs.stack == 'flutter' }}
@@ -423,7 +432,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          flutter build ios --no-codesign
+          ../tools/flutterw build ios --no-codesign
 
       - name: Validate iOS project metadata
         if: ${{ steps.scaffold.outputs.present == 'true' && steps.scaffold.outputs.stack == 'xcode' }}
