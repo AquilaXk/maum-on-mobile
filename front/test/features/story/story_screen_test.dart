@@ -208,6 +208,81 @@ void main() {
     expect(reportTarget?.targetId, 4);
   });
 
+  testWidgets('keeps report context visible near the story detail actions',
+      (tester) async {
+    StoryReportTarget? reportTarget;
+    final controller = StoryController(
+      storyRepository: _FakeStoryRepository(
+        details: [
+          _detail(id: 8, title: '신고할 글', content: '확인할 본문', authorId: 99),
+        ],
+        commentPages: [_commentPage([])],
+      ),
+      currentMemberId: 7,
+      onReportTargetSelected: (target) {
+        reportTarget = target;
+      },
+    );
+    await controller.openStoryById(8);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: StoryScreen(controller: controller, onBack: () {}),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const ValueKey('story-detail-action-panel')),
+        findsOneWidget);
+
+    await tester.tap(find.byKey(const ValueKey('story-report-button')));
+    await tester.pump();
+
+    expect(reportTarget?.targetType, 'POST');
+    expect(reportTarget?.targetId, 8);
+    expect(find.byKey(const ValueKey('story-report-target-notice')),
+        findsOneWidget);
+    expect(find.text('확인할 본문'), findsOneWidget);
+  });
+
+  testWidgets('comment action controls keep mobile touch targets',
+      (tester) async {
+    tester.view.physicalSize = const Size(320, 720);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    final controller = StoryController(
+      storyRepository: _FakeStoryRepository(
+        details: [
+          _detail(id: 11, title: '작은 화면', content: '본문', authorId: 99),
+        ],
+        commentPages: [
+          _commentPage([
+            _comment(id: 55, content: '조심스럽게 남긴 댓글입니다.'),
+          ]),
+        ],
+      ),
+      currentMemberId: 7,
+    );
+    await controller.openStoryById(11);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: StoryScreen(controller: controller, onBack: () {}),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final actionRow = find.byKey(const ValueKey('story-comment-action-row-55'));
+    expect(actionRow, findsOneWidget);
+
+    final reportButton =
+        find.byKey(const ValueKey('story-comment-report-button-55'));
+    expect(tester.getSize(reportButton).height, greaterThanOrEqualTo(48));
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('long story and comments stay scrollable on a small screen',
       (tester) async {
     tester.view.physicalSize = const Size(390, 844);
