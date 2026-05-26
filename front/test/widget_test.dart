@@ -38,6 +38,16 @@ class _UnauthenticatedRepository implements AuthRepository {
   }
 
   @override
+  Future<void> requestPasswordReset(PasswordResetRequest request) {
+    throw UnimplementedError();
+  }
+
+  @override
+  Future<void> confirmPasswordReset(PasswordResetConfirmRequest request) {
+    throw UnimplementedError();
+  }
+
+  @override
   Future<AuthSession> restoreSession() {
     throw const ApiClientException(
       kind: ApiErrorKind.unauthorized,

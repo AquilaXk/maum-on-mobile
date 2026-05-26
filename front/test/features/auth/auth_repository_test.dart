@@ -130,6 +130,61 @@ void main() {
       expect(transport.requests.single.body, {'refreshToken': 'old-refresh'});
     });
 
+    test('requestPasswordReset sends email without authentication', () async {
+      final transport = _FakeApiTransport([
+        ApiTransportResponse.ok({'success': true}),
+      ]);
+      final tokenStore = MemoryAuthTokenStore();
+      final repository = ApiAuthRepository(
+        apiClient: ApiClient(transport: transport, tokenStore: tokenStore),
+        tokenStore: tokenStore,
+      );
+
+      await repository.requestPasswordReset(
+        const PasswordResetRequest(email: 'me@example.com'),
+      );
+
+      expect(transport.requests.single.method, ApiMethod.post);
+      expect(
+        transport.requests.single.path,
+        '/api/v1/auth/password-reset/request',
+      );
+      expect(transport.requests.single.requiresAuth, isFalse);
+      expect(transport.requests.single.retryOnUnauthorized, isFalse);
+      expect(transport.requests.single.body, {'email': 'me@example.com'});
+    });
+
+    test('confirmPasswordReset sends token and new password without auth',
+        () async {
+      final transport = _FakeApiTransport([
+        ApiTransportResponse.ok({'success': true}),
+      ]);
+      final tokenStore = MemoryAuthTokenStore();
+      final repository = ApiAuthRepository(
+        apiClient: ApiClient(transport: transport, tokenStore: tokenStore),
+        tokenStore: tokenStore,
+      );
+
+      await repository.confirmPasswordReset(
+        const PasswordResetConfirmRequest(
+          token: 'reset-token',
+          newPassword: 'new-password',
+        ),
+      );
+
+      expect(transport.requests.single.method, ApiMethod.post);
+      expect(
+        transport.requests.single.path,
+        '/api/v1/auth/password-reset/confirm',
+      );
+      expect(transport.requests.single.requiresAuth, isFalse);
+      expect(transport.requests.single.retryOnUnauthorized, isFalse);
+      expect(transport.requests.single.body, {
+        'token': 'reset-token',
+        'newPassword': 'new-password',
+      });
+    });
+
     test('logout clears local tokens after calling logout endpoint', () async {
       final transport = _FakeApiTransport([
         ApiTransportResponse.ok({
