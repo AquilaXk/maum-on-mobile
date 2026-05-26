@@ -14,6 +14,7 @@ class NotificationReportScreen extends StatefulWidget {
     required this.reportController,
     required this.onBack,
     this.onOpenNotification,
+    this.closeNotificationStreamOnDispose = true,
     super.key,
   });
 
@@ -21,6 +22,7 @@ class NotificationReportScreen extends StatefulWidget {
   final ReportController reportController;
   final VoidCallback onBack;
   final ValueChanged<NotificationItem>? onOpenNotification;
+  final bool closeNotificationStreamOnDispose;
 
   @override
   State<NotificationReportScreen> createState() =>
@@ -64,7 +66,9 @@ class _NotificationReportScreenState extends State<NotificationReportScreen>
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
-    widget.notificationController.close();
+    if (widget.closeNotificationStreamOnDispose) {
+      widget.notificationController.close();
+    }
     _reportContentController.dispose();
     _targetIdController.dispose();
     super.dispose();

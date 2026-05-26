@@ -12,6 +12,8 @@ import 'package:maum_on_mobile_front/features/consultation/domain/consultation_m
 import 'package:maum_on_mobile_front/features/diary/data/diary_repository.dart';
 import 'package:maum_on_mobile_front/features/diary/domain/diary_models.dart';
 import 'package:maum_on_mobile_front/features/diary/presentation/diary_image_picker.dart';
+import 'package:maum_on_mobile_front/features/draft_recovery/data/draft_recovery_repository.dart';
+import 'package:maum_on_mobile_front/features/draft_recovery/domain/draft_recovery_models.dart';
 import 'package:maum_on_mobile_front/features/home/data/home_repository.dart';
 import 'package:maum_on_mobile_front/features/home/domain/home_models.dart';
 import 'package:maum_on_mobile_front/features/letter/data/letter_repository.dart';
@@ -48,6 +50,38 @@ void main() {
     expect(find.text('홈'), findsOneWidget);
     expect(find.text('마음이님, 오늘의 마음을 이어가세요.'), findsOneWidget);
     expect(find.text('로그아웃'), findsOneWidget);
+  });
+
+  testWidgets('syncs the home notification badge and read state',
+      (tester) async {
+    final notificationRepository = _FakeNotificationRepository();
+
+    await tester.pumpWidget(
+      MaumOnMobileApp(
+        authRepository: _FakeAuthRepository(restoredSession: _session()),
+        homeRepository: const _FakeHomeRepository(),
+        notificationRepository: notificationRepository,
+        reportRepository: _FakeReportRepository(),
+        diaryRepository: _FakeDiaryRepository(),
+        diaryImagePicker: const _FakeDiaryImagePicker(),
+        storyRepository: _FakeStoryRepository(),
+        letterRepository: _FakeLetterRepository(),
+        listenForDeepLinks: false,
+      ),
+    );
+
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('읽지 않은 알림 1개'), findsOneWidget);
+
+    await _tapVisibleText(tester, '알림/신고');
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('notification-card-1')));
+    await tester.pumpAndSettle();
+    await _returnHome(tester);
+
+    expect(notificationRepository.ticketRequestCount, 1);
+    expect(find.textContaining('읽지 않은 알림 없음'), findsOneWidget);
   });
 
   testWidgets('runs the authenticated mobile smoke flow without network',
@@ -454,6 +488,50 @@ void main() {
     expect(letterRepository.fetchedLetterIds, [3]);
     expect(find.text('편지함'), findsOneWidget);
     expect(find.text('알림으로 연 편지'), findsOneWidget);
+  });
+
+  testWidgets('applies initial story notification tap after session restore',
+      (tester) async {
+    final pushClient = _FakePushNotificationPermissionClient(
+      initialPayload: const NotificationTapPayload(
+        destination: NotificationTapDestination.story,
+        notificationId: 92,
+        targetType: 'POST',
+        targetId: 5,
+      ),
+    );
+    final storyRepository = _FakeStoryRepository(
+      details: {
+        5: _storyDetail(
+          id: 5,
+          title: '알림으로 연 스토리',
+          content: '푸시 탭으로 이동한 스토리입니다.',
+        ),
+      },
+    );
+
+    await tester.pumpWidget(
+      MaumOnMobileApp(
+        authRepository: _FakeAuthRepository(restoredSession: _session()),
+        homeRepository: const _FakeHomeRepository(),
+        notificationRepository: _FakeNotificationRepository(),
+        pushNotificationPermissionClient: pushClient,
+        diaryRepository: _FakeDiaryRepository(),
+        diaryImagePicker: const _FakeDiaryImagePicker(),
+        draftRecoveryRepository: const _EmptyDraftRecoveryRepository(),
+        storyRepository: storyRepository,
+        letterRepository: _FakeLetterRepository(),
+        listenForDeepLinks: false,
+      ),
+    );
+
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
+    await tester.pump(const Duration(milliseconds: 100));
+
+    expect(storyRepository.fetchedStoryIds, [5]);
+    expect(find.text('스토리'), findsOneWidget);
+    expect(find.text('알림으로 연 스토리'), findsOneWidget);
   });
 
   testWidgets('unregisters the push token on logout', (tester) async {
@@ -1056,6 +1134,62 @@ class _FakeSettingsRepository implements SettingsRepository {
   }
 }
 
+class _EmptyDraftRecoveryRepository implements DraftRecoveryRepository {
+  const _EmptyDraftRecoveryRepository();
+
+  @override
+  Future<void> clearMember(int memberId) async {}
+
+  @override
+  Future<void> delete(DraftKey key) async {}
+
+  @override
+  Future<List<DraftEntry>> listFailed({
+    required int memberId,
+    DraftSurface? surface,
+  }) async {
+    return const [];
+  }
+
+  @override
+  Future<void> markFailed(
+    DraftKey key, {
+    required Map<String, String> fields,
+    required String failureMessage,
+  }) async {}
+
+  @override
+  Future<DraftEntry?> read(DraftKey key) async {
+    return null;
+  }
+
+  @override
+  Future<void> saveEditing(
+    DraftKey key, {
+    required Map<String, String> fields,
+  }) async {}
+}
+
+StoryDetail _storyDetail({
+  required int id,
+  required String title,
+  required String content,
+}) {
+  return StoryDetail(
+    id: id,
+    title: title,
+    content: content,
+    summary: '요약',
+    authorNickname: '마음이',
+    category: StoryCategory.worry,
+    resolutionStatus: StoryResolutionStatus.ongoing,
+    viewCount: 1,
+    createDate: '2026-05-24T08:00:00',
+    modifyDate: '2026-05-24T08:00:00',
+    authorId: 7,
+  );
+}
+
 class _FakeStoryRepository implements StoryRepository {
   _FakeStoryRepository({
     List<PageResponse<StorySummary>> storyPages = const [
@@ -1068,9 +1202,16 @@ class _FakeStoryRepository implements StoryRepository {
         last: true,
       ),
     ],
-  }) : _storyPages = List<PageResponse<StorySummary>>.of(storyPages);
+    Map<int, StoryDetail> details = const {},
+    Map<int, PageResponse<StoryComment>> commentPages = const {},
+  })  : _storyPages = List<PageResponse<StorySummary>>.of(storyPages),
+        _details = Map<int, StoryDetail>.of(details),
+        _commentPages = Map<int, PageResponse<StoryComment>>.of(commentPages);
 
   final List<PageResponse<StorySummary>> _storyPages;
+  final Map<int, StoryDetail> _details;
+  final Map<int, PageResponse<StoryComment>> _commentPages;
+  final List<int> fetchedStoryIds = [];
 
   @override
   Future<PageResponse<StorySummary>> fetchStories({
@@ -1092,8 +1233,16 @@ class _FakeStoryRepository implements StoryRepository {
   }
 
   @override
-  Future<StoryDetail> fetchStory(int id) {
-    throw UnimplementedError();
+  Future<StoryDetail> fetchStory(int id) async {
+    fetchedStoryIds.add(id);
+    final detail = _details[id];
+    if (detail == null) {
+      throw const ApiClientException(
+        kind: ApiErrorKind.unknown,
+        message: '스토리를 찾을 수 없습니다.',
+      );
+    }
+    return detail;
   }
 
   @override
@@ -1124,8 +1273,16 @@ class _FakeStoryRepository implements StoryRepository {
     int postId, {
     int page = 0,
     int size = 20,
-  }) {
-    throw UnimplementedError();
+  }) async {
+    return _commentPages[postId] ??
+        const PageResponse(
+          items: [],
+          page: 0,
+          size: 20,
+          totalElements: 0,
+          totalPages: 1,
+          last: true,
+        );
   }
 
   @override

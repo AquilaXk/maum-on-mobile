@@ -104,15 +104,20 @@ class NotificationItem {
   }
 
   NotificationTapDestination get destination {
-    return _destinationFromRouteKey(routeKey, fallbackType: type);
+    return _destinationFromRouteKey(
+      routeKey,
+      fallbackType: type,
+      targetType: targetType,
+    );
   }
 
   NotificationTapPayload get tapPayload {
     return NotificationTapPayload(
       destination: destination,
       notificationId: id > 0 ? id : null,
-      letterId: letterId,
-      reportId: reportId,
+      targetType: targetType,
+      targetId: targetId,
+      routeKey: routeKey,
       rawType: type,
     );
   }
@@ -163,10 +168,14 @@ class NotificationTapPayload {
   const NotificationTapPayload({
     required this.destination,
     this.notificationId,
-    this.letterId,
-    this.reportId,
+    int? letterId,
+    int? reportId,
+    this.targetType,
+    this.targetId,
+    this.routeKey,
     this.rawType,
-  });
+  })  : _letterId = letterId,
+        _reportId = reportId;
 
   factory NotificationTapPayload.fromJson(Object? json) {
     if (json is! Map) {
@@ -184,38 +193,121 @@ class NotificationTapPayload {
         ?.toString()
         .trim()
         .toLowerCase();
-    final destination = _destinationFromRouteKey(
-      routeKey ?? '',
-      fallbackType: rawType,
-    );
     final targetType = map['targetType']?.toString().trim().toUpperCase();
     final targetId = _readOptionalInt(map, 'targetId');
 
     return NotificationTapPayload(
-      destination: destination,
+      destination: _destinationFromRouteKey(
+        routeKey ?? '',
+        fallbackType: rawType,
+        targetType: targetType,
+      ),
       notificationId: _readOptionalInt(map, 'notificationId'),
       letterId: _readOptionalInt(map, 'letterId') ??
           (targetType == 'LETTER' ? targetId : null),
       reportId: _readOptionalInt(map, 'reportId') ??
           (targetType == 'REPORT' ? targetId : null),
+      targetType: targetType,
+      targetId: targetId,
+      routeKey: routeKey,
       rawType: rawType.isEmpty ? null : rawType,
     );
   }
 
   final NotificationTapDestination destination;
   final int? notificationId;
-  final int? letterId;
-  final int? reportId;
+  final int? _letterId;
+  final int? _reportId;
+  final String? targetType;
+  final int? targetId;
+  final String? routeKey;
   final String? rawType;
+
+  String get normalizedTargetType => targetType?.trim().toUpperCase() ?? '';
+
+  int? get letterId {
+    if (_letterId != null) {
+      return _letterId;
+    }
+    if (targetId == null) {
+      return null;
+    }
+    return switch (normalizedTargetType) {
+      'LETTER' => targetId,
+      '' when _inferredDestination == NotificationTapDestination.letter =>
+        targetId,
+      _ => null,
+    };
+  }
+
+  int? get reportId {
+    if (_reportId != null) {
+      return _reportId;
+    }
+    if (targetId == null) {
+      return null;
+    }
+    return switch (normalizedTargetType) {
+      'REPORT' => targetId,
+      '' when _isReportRoute => targetId,
+      _ => null,
+    };
+  }
+
+  int? get storyId {
+    return switch (normalizedTargetType) {
+      'POST' || 'STORY' => targetId,
+      _ => destination == NotificationTapDestination.story &&
+              normalizedTargetType.isEmpty
+          ? targetId
+          : null,
+    };
+  }
+
+  int? get diaryId {
+    return normalizedTargetType == 'DIARY' ? targetId : null;
+  }
+
+  int? get consultationId {
+    return normalizedTargetType == 'CONSULTATION' ? targetId : null;
+  }
+
+  bool get hasTargetReference {
+    return normalizedTargetType.isNotEmpty || targetId != null;
+  }
+
+  NotificationTapDestination get _inferredDestination {
+    return _destinationFromRouteKey(
+      routeKey ?? '',
+      fallbackType: rawType ?? '',
+      targetType: targetType,
+    );
+  }
+
+  bool get _isReportRoute {
+    final normalizedRoute = routeKey?.trim().toLowerCase() ?? '';
+    final normalizedType = rawType?.trim().toLowerCase() ?? '';
+    return normalizedRoute == 'report' ||
+        normalizedRoute == 'reports' ||
+        normalizedRoute == 'report_status' ||
+        normalizedType == 'report_status';
+  }
 }
 
 NotificationTapDestination _destinationFromRouteKey(
   String routeKey, {
   String fallbackType = '',
+  String? targetType,
 }) {
   final normalizedRoute = routeKey.trim().toLowerCase();
   final normalizedType = fallbackType.trim().toLowerCase();
-  return switch (normalizedRoute.isEmpty ? normalizedType : normalizedRoute) {
+  final normalizedTarget = targetType?.trim().toUpperCase() ?? '';
+  final routingKey =
+      normalizedRoute.isEmpty || normalizedRoute == 'notifications'
+          ? normalizedType
+          : normalizedRoute;
+
+  final routeDestination = switch (routingKey) {
     'diary' || 'diaries' || 'daily' => NotificationTapDestination.diary,
     'story' || 'stories' || 'post' || 'comment' =>
       NotificationTapDestination.story,
@@ -228,10 +320,26 @@ NotificationTapDestination _destinationFromRouteKey(
       NotificationTapDestination.letter,
     'consultation' || 'consultation_reply' =>
       NotificationTapDestination.consultation,
-    'operations' || 'operations_action' || 'admin' =>
+    'operations' || 'operations_action' || 'admin' || 'report' ||
+    'reports' ||
+    'report_status' =>
       NotificationTapDestination.operations,
     'settings' || 'setting' || 'account' || 'profile' =>
       NotificationTapDestination.settings,
+    _ => null,
+  };
+
+  if (routeDestination != null) {
+    return routeDestination;
+  }
+
+  return switch (normalizedTarget) {
+    'DIARY' => NotificationTapDestination.diary,
+    'POST' || 'STORY' || 'COMMENT' => NotificationTapDestination.story,
+    'LETTER' => NotificationTapDestination.letter,
+    'CONSULTATION' => NotificationTapDestination.consultation,
+    'REPORT' => NotificationTapDestination.operations,
+    'SETTINGS' || 'ACCOUNT' || 'PROFILE' => NotificationTapDestination.settings,
     _ => NotificationTapDestination.notifications,
   };
 }

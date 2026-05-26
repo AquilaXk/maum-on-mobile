@@ -8,11 +8,13 @@ class StoryScreen extends StatefulWidget {
   const StoryScreen({
     required this.controller,
     required this.onBack,
+    this.initialStoryId,
     super.key,
   });
 
   final StoryController controller;
   final VoidCallback onBack;
+  final int? initialStoryId;
 
   @override
   State<StoryScreen> createState() => _StoryScreenState();
@@ -22,14 +24,21 @@ class _StoryScreenState extends State<StoryScreen> {
   @override
   void initState() {
     super.initState();
+    _openInitialStoryIfNeeded();
     _loadIfNeeded();
   }
 
   @override
   void didUpdateWidget(covariant StoryScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.controller != widget.controller) {
+    final controllerChanged = oldWidget.controller != widget.controller;
+    if (controllerChanged) {
+      _openInitialStoryIfNeeded();
       _loadIfNeeded();
+    }
+    if (!controllerChanged &&
+        oldWidget.initialStoryId != widget.initialStoryId) {
+      _openInitialStoryIfNeeded();
     }
   }
 
@@ -37,6 +46,15 @@ class _StoryScreenState extends State<StoryScreen> {
     if (!widget.controller.state.hasLoaded) {
       Future<void>.microtask(widget.controller.loadStories);
     }
+  }
+
+  void _openInitialStoryIfNeeded() {
+    final storyId = widget.initialStoryId;
+    if (storyId == null || storyId <= 0) {
+      return;
+    }
+
+    Future<void>.microtask(() => widget.controller.openStoryById(storyId));
   }
 
   @override
