@@ -18,6 +18,8 @@ class OperationsState {
     this.systemStatus,
     this.reports = const [],
     this.selectedReport,
+    this.reportStatusFilter,
+    this.reportTargetTypeFilter,
     this.members = const [],
     this.memberPage,
     this.selectedMember,
@@ -67,6 +69,8 @@ class OperationsState {
   final OperationsSystemStatus? systemStatus;
   final List<AdminReportSummary> reports;
   final AdminReportDetail? selectedReport;
+  final String? reportStatusFilter;
+  final ReportTargetType? reportTargetTypeFilter;
   final List<AdminMemberSummary> members;
   final AdminMemberPage? memberPage;
   final AdminMemberDetail? selectedMember;
@@ -109,7 +113,25 @@ class OperationsState {
   final String? systemStatusErrorMessage;
   final String? noticeMessage;
 
-  bool get isEmpty => hasLoaded && reports.isEmpty && errorMessage == null;
+  List<AdminReportSummary> get visibleReports {
+    final filtered = reports.where((report) {
+      final statusMatches =
+          reportStatusFilter == null || report.status == reportStatusFilter;
+      final targetMatches = reportTargetTypeFilter == null ||
+          report.targetType == reportTargetTypeFilter;
+      return statusMatches && targetMatches;
+    }).toList(growable: false);
+    return [...filtered]..sort((a, b) {
+        final openComparison =
+            (b.isOpen ? 1 : 0).compareTo(a.isOpen ? 1 : 0);
+        if (openComparison != 0) {
+          return openComparison;
+        }
+        return b.createdAt.compareTo(a.createdAt);
+      });
+  }
+
+  bool get isEmpty => hasLoaded && visibleReports.isEmpty && errorMessage == null;
 
   bool get isMemberEmpty {
     return hasLoaded && members.isEmpty && errorMessage == null;
@@ -172,6 +194,10 @@ class OperationsState {
     List<AdminReportSummary>? reports,
     AdminReportDetail? selectedReport,
     bool clearSelectedReport = false,
+    String? reportStatusFilter,
+    bool clearReportStatusFilter = false,
+    ReportTargetType? reportTargetTypeFilter,
+    bool clearReportTargetTypeFilter = false,
     List<AdminMemberSummary>? members,
     AdminMemberPage? memberPage,
     AdminMemberDetail? selectedMember,
@@ -233,6 +259,12 @@ class OperationsState {
       reports: reports ?? this.reports,
       selectedReport:
           clearSelectedReport ? null : selectedReport ?? this.selectedReport,
+      reportStatusFilter: clearReportStatusFilter
+          ? null
+          : reportStatusFilter ?? this.reportStatusFilter,
+      reportTargetTypeFilter: clearReportTargetTypeFilter
+          ? null
+          : reportTargetTypeFilter ?? this.reportTargetTypeFilter,
       members: members ?? this.members,
       memberPage: memberPage ?? this.memberPage,
       selectedMember:
@@ -363,8 +395,8 @@ class OperationsController extends ChangeNotifier {
         ),
       );
       await _loadObservability(showLoading: false);
-      if (reports.isNotEmpty && _state.selectedReport == null) {
-        await openReport(reports.first);
+      if (_state.visibleReports.isNotEmpty && _state.selectedReport == null) {
+        await openReport(_state.visibleReports.first);
       }
     } on Object catch (error) {
       _handleError(error);
@@ -472,6 +504,26 @@ class OperationsController extends ChangeNotifier {
         ),
       );
     }
+  }
+
+  void selectReportStatusFilter(String? status) {
+    _setState(
+      _state.copyWith(
+        reportStatusFilter: status,
+        clearReportStatusFilter: status == null,
+        clearNoticeMessage: true,
+      ),
+    );
+  }
+
+  void selectReportTargetTypeFilter(ReportTargetType? targetType) {
+    _setState(
+      _state.copyWith(
+        reportTargetTypeFilter: targetType,
+        clearReportTargetTypeFilter: targetType == null,
+        clearNoticeMessage: true,
+      ),
+    );
   }
 
   Future<void> updateMemberQuery(String query) async {

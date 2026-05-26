@@ -202,6 +202,8 @@ class _OperationsScreenState extends State<OperationsScreen> {
               OperationsView.reports => Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
+                    _ReportFilters(state: state, controller: widget.controller),
+                    const SizedBox(height: AppSpacing.md),
                     _ReportQueue(state: state, controller: widget.controller),
                     const SizedBox(height: AppSpacing.lg),
                     _ReportDetail(
@@ -1901,6 +1903,62 @@ class _AuditSection extends StatelessWidget {
   }
 }
 
+class _ReportFilters extends StatelessWidget {
+  const _ReportFilters({
+    required this.state,
+    required this.controller,
+  });
+
+  final OperationsState state;
+  final OperationsController controller;
+
+  @override
+  Widget build(BuildContext context) {
+    return Wrap(
+      spacing: AppSpacing.xs,
+      runSpacing: AppSpacing.xs,
+      children: [
+        DropdownButton<String?>(
+          key: const ValueKey('operations-report-status-filter'),
+          value: state.reportStatusFilter,
+          hint: const Text('신고 상태'),
+          items: const <DropdownMenuItem<String?>>[
+            DropdownMenuItem(value: null, child: Text('전체 상태')),
+            DropdownMenuItem(value: 'RECEIVED', child: Text('접수')),
+            DropdownMenuItem(value: 'RESOLVED', child: Text('처리 완료')),
+            DropdownMenuItem(value: 'REJECTED', child: Text('반려')),
+            DropdownMenuItem(value: 'HIDDEN', child: Text('숨김')),
+            DropdownMenuItem(value: 'DELETED', child: Text('삭제')),
+            DropdownMenuItem(value: 'RESTRICTED', child: Text('제한')),
+          ],
+          onChanged: controller.selectReportStatusFilter,
+        ),
+        DropdownButton<ReportTargetType?>(
+          key: const ValueKey('operations-report-target-filter'),
+          value: state.reportTargetTypeFilter,
+          hint: const Text('대상 유형'),
+          items: const <DropdownMenuItem<ReportTargetType?>>[
+            DropdownMenuItem(value: null, child: Text('전체 대상')),
+            DropdownMenuItem(
+              value: ReportTargetType.post,
+              child: Text('게시글'),
+            ),
+            DropdownMenuItem(
+              value: ReportTargetType.letter,
+              child: Text('편지'),
+            ),
+            DropdownMenuItem(
+              value: ReportTargetType.comment,
+              child: Text('댓글'),
+            ),
+          ],
+          onChanged: controller.selectReportTargetTypeFilter,
+        ),
+      ],
+    );
+  }
+}
+
 class _ReportQueue extends StatelessWidget {
   const _ReportQueue({
     required this.state,
@@ -1912,6 +1970,8 @@ class _ReportQueue extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final reports = state.visibleReports;
+
     if (state.isLoading && !state.hasLoaded) {
       return const AppStateView.loading(
         title: '신고 목록을 불러오는 중입니다.',
@@ -1932,7 +1992,7 @@ class _ReportQueue extends StatelessWidget {
       children: [
         Text('신고 대기열', style: Theme.of(context).textTheme.titleMedium),
         const SizedBox(height: AppSpacing.xs),
-        for (final report in state.reports) ...[
+        for (final report in reports) ...[
           _ReportQueueTile(
             report: report,
             selected: state.selectedReport?.id == report.id,
