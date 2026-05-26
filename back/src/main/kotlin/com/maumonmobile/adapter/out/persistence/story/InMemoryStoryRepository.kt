@@ -70,6 +70,12 @@ class InMemoryStoryRepository : StoryRepository {
 
     override fun findPosts(): List<StoryPost> = postsById.values.toList()
 
+    override fun findPostsByAuthorId(authorId: Long): List<StoryPost> {
+        return postsById.values
+            .filter { post -> post.authorId == authorId }
+            .toList()
+    }
+
     override fun countPostsByCategoryCreatedBetween(
         category: String,
         startInclusive: String,
@@ -152,6 +158,12 @@ class InMemoryStoryRepository : StoryRepository {
             .toList()
     }
 
+    override fun findCommentsByAuthorId(authorId: Long): List<StoryComment> {
+        return commentsById.values
+            .filter { comment -> comment.authorId == authorId }
+            .toList()
+    }
+
     override fun deleteComment(id: Long) {
         val childIds = commentsById.values
             .filter { comment -> comment.parentCommentId == id }
@@ -165,6 +177,30 @@ class InMemoryStoryRepository : StoryRepository {
             .filter { comment -> comment.postId == postId }
             .map(StoryComment::id)
             .forEach(commentsById::remove)
+    }
+
+    override fun anonymizeMember(memberId: Long, nickname: String, email: String): Int {
+        var updatedCount = 0
+        postsById.entries.forEach { entry ->
+            val post = entry.value
+            if (post.authorId == memberId && post.authorNickname != nickname) {
+                postsById[entry.key] = post.copy(authorNickname = nickname)
+                updatedCount += 1
+            }
+        }
+        commentsById.entries.forEach { entry ->
+            val comment = entry.value
+            if (comment.authorId == memberId &&
+                (comment.authorNickname != nickname || comment.authorEmail != email)
+            ) {
+                commentsById[entry.key] = comment.copy(
+                    authorNickname = nickname,
+                    authorEmail = email,
+                )
+                updatedCount += 1
+            }
+        }
+        return updatedCount
     }
 
     private fun String.isBetween(startInclusive: String, endExclusive: String): Boolean {

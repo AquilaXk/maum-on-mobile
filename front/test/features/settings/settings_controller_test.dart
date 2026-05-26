@@ -20,11 +20,16 @@ void main() {
         ..updateNewPasswordDraft('new-password');
       await controller.savePassword();
       await controller.toggleRandomSetting();
+      await controller.requestDataExport();
+      await controller.downloadDataExport();
 
       expect(repository.nicknameUpdates, ['새 닉네임']);
       expect(repository.emailUpdates, ['new@example.com']);
       expect(repository.passwordUpdates.single.newPassword, 'new-password');
       expect(repository.randomToggleCount, 1);
+      expect(repository.exportRequestCount, 1);
+      expect(repository.downloadedExportIds, [1]);
+      expect(controller.state.downloadedExport?.filename, 'maum-on-data-export-1.json');
       expect(controller.state.settings!.randomReceiveAllowed, isFalse);
     });
 
@@ -93,6 +98,9 @@ class _FakeSettingsRepository implements SettingsRepository {
   final List<PasswordChangeDraft> passwordUpdates = [];
   final List<String?> withdrawPasswords = [];
   int randomToggleCount = 0;
+  int exportRequestCount = 0;
+  final List<int> fetchedExportIds = [];
+  final List<int> downloadedExportIds = [];
 
   @override
   Future<MemberSettings> fetchSettings() async => initialSettings;
@@ -119,6 +127,43 @@ class _FakeSettingsRepository implements SettingsRepository {
   Future<MemberSettings> toggleRandomSetting() async {
     randomToggleCount += 1;
     return initialSettings.copyWith(randomReceiveAllowed: false);
+  }
+
+  @override
+  Future<MemberDataExportJob> requestDataExport() async {
+    exportRequestCount += 1;
+    return const MemberDataExportJob(
+      id: 1,
+      status: MemberDataExportStatus.completed,
+      requestedAt: '2026-05-26T00:00:00Z',
+      completedAt: '2026-05-26T00:00:00Z',
+      expiresAt: '2999-05-27T00:00:00Z',
+      downloadUrl: '/api/v1/members/me/data-exports/1/download',
+    );
+  }
+
+  @override
+  Future<MemberDataExportJob> fetchDataExportStatus(int exportId) async {
+    fetchedExportIds.add(exportId);
+    return MemberDataExportJob(
+      id: exportId,
+      status: MemberDataExportStatus.completed,
+      requestedAt: '2026-05-26T00:00:00Z',
+      completedAt: '2026-05-26T00:00:00Z',
+      expiresAt: '2999-05-27T00:00:00Z',
+      downloadUrl: '/api/v1/members/me/data-exports/$exportId/download',
+    );
+  }
+
+  @override
+  Future<MemberDataExportFile> downloadDataExport(int exportId) async {
+    downloadedExportIds.add(exportId);
+    return MemberDataExportFile(
+      filename: 'maum-on-data-export-$exportId.json',
+      contentType: 'application/json',
+      content: '{"account":{}}',
+      expiresAt: '2999-05-27T00:00:00Z',
+    );
   }
 
   @override

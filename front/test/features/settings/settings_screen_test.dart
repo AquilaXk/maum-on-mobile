@@ -44,9 +44,21 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('settings-random-toggle')));
     await tester.pump();
 
+    await tester.ensureVisible(
+      find.byKey(const ValueKey('settings-request-data-export')),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('settings-request-data-export')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('settings-download-data-export')));
+    await tester.pump();
+
     expect(repository.nicknameUpdates, ['새 닉네임']);
     expect(repository.emailUpdates, ['new@example.com']);
     expect(repository.randomToggleCount, 1);
+    expect(repository.exportRequestCount, 1);
+    expect(repository.downloadedExportIds, [1]);
+    expect(find.textContaining('maum-on-data-export-1.json'), findsWidgets);
   });
 
   testWidgets('confirms withdrawal and clears session', (tester) async {
@@ -99,7 +111,9 @@ class _FakeSettingsRepository implements SettingsRepository {
   final List<String> nicknameUpdates = [];
   final List<String> emailUpdates = [];
   final List<String?> withdrawPasswords = [];
+  final List<int> downloadedExportIds = [];
   int randomToggleCount = 0;
+  int exportRequestCount = 0;
   MemberSettings settings = const MemberSettings(
     id: 7,
     email: 'me@example.com',
@@ -137,6 +151,42 @@ class _FakeSettingsRepository implements SettingsRepository {
       randomReceiveAllowed: !settings.randomReceiveAllowed,
     );
     return settings;
+  }
+
+  @override
+  Future<MemberDataExportJob> requestDataExport() async {
+    exportRequestCount += 1;
+    return const MemberDataExportJob(
+      id: 1,
+      status: MemberDataExportStatus.completed,
+      requestedAt: '2026-05-26T00:00:00Z',
+      completedAt: '2026-05-26T00:00:00Z',
+      expiresAt: '2999-05-27T00:00:00Z',
+      downloadUrl: '/api/v1/members/me/data-exports/1/download',
+    );
+  }
+
+  @override
+  Future<MemberDataExportJob> fetchDataExportStatus(int exportId) async {
+    return MemberDataExportJob(
+      id: exportId,
+      status: MemberDataExportStatus.completed,
+      requestedAt: '2026-05-26T00:00:00Z',
+      completedAt: '2026-05-26T00:00:00Z',
+      expiresAt: '2999-05-27T00:00:00Z',
+      downloadUrl: '/api/v1/members/me/data-exports/$exportId/download',
+    );
+  }
+
+  @override
+  Future<MemberDataExportFile> downloadDataExport(int exportId) async {
+    downloadedExportIds.add(exportId);
+    return MemberDataExportFile(
+      filename: 'maum-on-data-export-$exportId.json',
+      contentType: 'application/json',
+      content: '{"account":{}}',
+      expiresAt: '2999-05-27T00:00:00Z',
+    );
   }
 
   @override

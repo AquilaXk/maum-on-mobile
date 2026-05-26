@@ -17,6 +17,8 @@ interface StoryRepository {
 
     fun findPosts(): List<StoryPost>
 
+    fun findPostsByAuthorId(authorId: Long): List<StoryPost>
+
     fun countPostsByCategoryCreatedBetween(
         category: String,
         startInclusive: String,
@@ -44,7 +46,11 @@ interface StoryRepository {
 
     fun findCommentsByPostId(postId: Long): List<StoryComment>
 
+    fun findCommentsByAuthorId(authorId: Long): List<StoryComment>
+
     fun deleteComment(id: Long)
 
     fun deleteCommentsByPostId(postId: Long)
+
+    fun anonymizeMember(memberId: Long, nickname: String, email: String): Int
 }

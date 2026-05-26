@@ -86,6 +86,18 @@ class InMemoryDiaryRepository : DiaryRepository {
         diariesById.remove(id)
     }
 
+    override fun anonymizeMember(memberId: Long, nickname: String): Int {
+        var updatedCount = 0
+        diariesById.entries.forEach { entry ->
+            val diary = entry.value
+            if (diary.memberId == memberId && diary.nickname != nickname) {
+                diariesById[entry.key] = diary.copy(nickname = nickname)
+                updatedCount += 1
+            }
+        }
+        return updatedCount
+    }
+
     private fun List<DiaryContentBlockDraft>.blocksForPersistence(imageUrl: String?): List<DiaryContentBlock> {
         val savedBlocks = map(DiaryContentBlockDraft::toSavedBlock)
         if (imageUrl == null || savedBlocks.any { block -> block.type == DiaryContentBlockType.IMAGE }) {

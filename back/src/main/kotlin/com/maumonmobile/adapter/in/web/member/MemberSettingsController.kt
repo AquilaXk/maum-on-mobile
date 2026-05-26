@@ -1,5 +1,8 @@
 package com.maumonmobile.adapter.`in`.web.member
 
+import com.maumonmobile.application.port.`in`.MemberDataExportFileResult
+import com.maumonmobile.application.port.`in`.MemberDataExportJobResult
+import com.maumonmobile.application.port.`in`.MemberDataExportUseCase
 import com.maumonmobile.application.port.`in`.MemberEmailUpdateCommand
 import com.maumonmobile.application.port.`in`.MemberPasswordUpdateCommand
 import com.maumonmobile.application.port.`in`.MemberProfileUpdateCommand
@@ -13,7 +16,9 @@ import jakarta.validation.constraints.NotBlank
 import org.springframework.security.core.Authentication
 import org.springframework.web.bind.annotation.DeleteMapping
 import org.springframework.web.bind.annotation.GetMapping
+import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.PatchMapping
+import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RestController
@@ -22,6 +27,7 @@ import org.springframework.web.bind.annotation.RestController
 @RequestMapping("/api/v1/members/me")
 class MemberSettingsController(
     private val memberSettingsUseCase: MemberSettingsUseCase,
+    private val memberDataExportUseCase: MemberDataExportUseCase,
 ) {
 
     @GetMapping
@@ -76,6 +82,27 @@ class MemberSettingsController(
         return ApiResponse.success(
             memberSettingsUseCase.toggleRandomSetting(authentication.authenticatedUser()),
         )
+    }
+
+    @PostMapping("/data-exports")
+    fun requestDataExport(authentication: Authentication): ApiResponse<MemberDataExportJobResult> {
+        return ApiResponse.success(memberDataExportUseCase.request(authentication.authenticatedUser()))
+    }
+
+    @GetMapping("/data-exports/{exportId}")
+    fun getDataExport(
+        authentication: Authentication,
+        @PathVariable exportId: Long,
+    ): ApiResponse<MemberDataExportJobResult> {
+        return ApiResponse.success(memberDataExportUseCase.get(authentication.authenticatedUser(), exportId))
+    }
+
+    @GetMapping("/data-exports/{exportId}/download")
+    fun downloadDataExport(
+        authentication: Authentication,
+        @PathVariable exportId: Long,
+    ): ApiResponse<MemberDataExportFileResult> {
+        return ApiResponse.success(memberDataExportUseCase.download(authentication.authenticatedUser(), exportId))
     }
 
     @DeleteMapping

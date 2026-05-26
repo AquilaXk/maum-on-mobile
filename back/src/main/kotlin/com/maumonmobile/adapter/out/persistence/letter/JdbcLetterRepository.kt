@@ -116,6 +116,24 @@ class JdbcLetterRepository(
         }
     }
 
+    override fun findByMemberId(memberId: Long): List<Letter> {
+        val letters = jdbc.query(
+            """
+                select *
+                  from letters
+                 where sender_id = :memberId
+                    or receiver_id = :memberId
+                 order by created_date desc, id desc
+            """.trimIndent(),
+            params().withValue("memberId", memberId),
+            rowMapper,
+        )
+        val rejectionsByLetter = rejectedMemberIdsByLetterIds(letters.map(Letter::id))
+        return letters.map { letter ->
+            letter.copy(rejectedMemberIds = rejectionsByLetter[letter.id].orEmpty())
+        }
+    }
+
     override fun countCreatedBetween(startInclusive: String, endExclusive: String): Long {
         return jdbc.queryForObject(
             """
@@ -129,6 +147,20 @@ class JdbcLetterRepository(
                 .withValue("endExclusive", endExclusive),
             Long::class.java,
         ) ?: 0L
+    }
+
+    override fun anonymizeMember(memberId: Long, nickname: String): Int {
+        return jdbc.update(
+            """
+                update letters
+                   set sender_nickname = :nickname
+                 where sender_id = :memberId
+                   and sender_nickname <> :nickname
+            """.trimIndent(),
+            params()
+                .withValue("memberId", memberId)
+                .withValue("nickname", nickname),
+        )
     }
 
     private fun rejectedMemberIdsByLetterIds(letterIds: List<Long>): Map<Long, Set<Long>> {

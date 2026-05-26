@@ -44,9 +44,27 @@ class InMemoryLetterRepository : LetterRepository {
 
     override fun findAll(): List<Letter> = lettersById.values.toList()
 
+    override fun findByMemberId(memberId: Long): List<Letter> {
+        return lettersById.values
+            .filter { letter -> letter.senderId == memberId || letter.receiverId == memberId }
+            .toList()
+    }
+
     override fun countCreatedBetween(startInclusive: String, endExclusive: String): Long {
         return lettersById.values
             .count { letter -> letter.createdDate >= startInclusive && letter.createdDate < endExclusive }
             .toLong()
+    }
+
+    override fun anonymizeMember(memberId: Long, nickname: String): Int {
+        var updatedCount = 0
+        lettersById.entries.forEach { entry ->
+            val letter = entry.value
+            if (letter.senderId == memberId && letter.senderNickname != nickname) {
+                lettersById[entry.key] = letter.copy(senderNickname = nickname)
+                updatedCount += 1
+            }
+        }
+        return updatedCount
     }
 }

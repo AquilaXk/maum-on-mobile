@@ -1013,6 +1013,40 @@ class _FakeSettingsRepository implements SettingsRepository {
   }
 
   @override
+  Future<MemberDataExportJob> requestDataExport() async {
+    return const MemberDataExportJob(
+      id: 1,
+      status: MemberDataExportStatus.completed,
+      requestedAt: '2026-05-26T00:00:00Z',
+      completedAt: '2026-05-26T00:00:00Z',
+      expiresAt: '2999-05-27T00:00:00Z',
+      downloadUrl: '/api/v1/members/me/data-exports/1/download',
+    );
+  }
+
+  @override
+  Future<MemberDataExportJob> fetchDataExportStatus(int exportId) async {
+    return MemberDataExportJob(
+      id: exportId,
+      status: MemberDataExportStatus.completed,
+      requestedAt: '2026-05-26T00:00:00Z',
+      completedAt: '2026-05-26T00:00:00Z',
+      expiresAt: '2999-05-27T00:00:00Z',
+      downloadUrl: '/api/v1/members/me/data-exports/$exportId/download',
+    );
+  }
+
+  @override
+  Future<MemberDataExportFile> downloadDataExport(int exportId) async {
+    return MemberDataExportFile(
+      filename: 'maum-on-data-export-$exportId.json',
+      contentType: 'application/json',
+      content: '{"account":{}}',
+      expiresAt: '2999-05-27T00:00:00Z',
+    );
+  }
+
+  @override
   Future<void> withdraw({String? currentPassword}) async {
     withdrawPasswords.add(currentPassword);
   }
