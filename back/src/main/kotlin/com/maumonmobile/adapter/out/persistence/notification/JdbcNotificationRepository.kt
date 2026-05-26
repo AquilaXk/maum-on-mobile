@@ -4,6 +4,7 @@ import com.maumonmobile.adapter.out.persistence.jdbc.insertAndReturnId
 import com.maumonmobile.adapter.out.persistence.jdbc.params
 import com.maumonmobile.adapter.out.persistence.jdbc.withValue
 import com.maumonmobile.application.port.out.NotificationRepository
+import com.maumonmobile.application.port.out.NotificationQueryCondition
 import com.maumonmobile.domain.notification.Notification
 import com.maumonmobile.domain.notification.NotificationTargetMetadata
 import org.springframework.context.annotation.Profile
@@ -58,20 +59,41 @@ class JdbcNotificationRepository(
         return findById(id) ?: error("저장된 알림을 확인하지 못했습니다.")
     }
 
-    override fun findByReceiverId(receiverId: Long): List<Notification> {
+    override fun findByReceiverId(receiverId: Long, condition: NotificationQueryCondition): List<Notification> {
+        val whereClauses = mutableListOf("receiver_id = :receiverId")
+        val queryParams = params().withValue("receiverId", receiverId)
+        condition.afterId?.let { afterId ->
+            whereClauses += "id > :afterId"
+            queryParams.withValue("afterId", afterId)
+        }
+        if (condition.unreadOnly) {
+            whereClauses += "is_read = false"
+        }
+        condition.limit?.let { limit ->
+            queryParams.withValue("limit", limit)
+        }
+
         return jdbc.query(
             """
                 select *
                   from notifications
-                 where receiver_id = :receiverId
+                 where ${whereClauses.joinToString(" and ")}
                  order by created_at desc, id desc
+                 ${condition.limit?.let { "limit :limit" } ?: ""}
             """.trimIndent(),
-            params().withValue("receiverId", receiverId),
+            queryParams,
             rowMapper,
         )
     }
 
     override fun markRead(receiverId: Long, notificationId: Long, readAt: String): Notification? {
+        val current = findById(notificationId)
+            ?.takeIf { notification -> notification.receiverId == receiverId }
+            ?: return null
+        if (current.isRead) {
+            return current
+        }
+
         val updatedRows = jdbc.update(
             """
                 update notifications
@@ -79,6 +101,7 @@ class JdbcNotificationRepository(
                        read_at = :readAt
                  where id = :notificationId
                    and receiver_id = :receiverId
+                   and is_read = false
             """.trimIndent(),
             params()
                 .withValue("notificationId", notificationId)

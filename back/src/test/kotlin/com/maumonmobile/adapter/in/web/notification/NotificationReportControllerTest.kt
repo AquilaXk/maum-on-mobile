@@ -420,6 +420,8 @@ class NotificationReportControllerTest @Autowired constructor(
                 jsonPath("$.data[0].targetType") { value("REPORT") }
                 jsonPath("$.data[0].targetId") { value(pushCommand.data["reportId"]!!.toInt()) }
                 jsonPath("$.data[0].routeKey") { value("notifications") }
+                jsonPath("$.data[0].targetState.available") { value(true) }
+                jsonPath("$.data[0].targetState.code") { value("AVAILABLE") }
             }
             .andReturn()
         val notificationId = notificationsResult.response.readJsonInt("$.data[0].id")
@@ -431,6 +433,26 @@ class NotificationReportControllerTest @Autowired constructor(
                 status { isOk() }
                 jsonPath("$.data.read") { value(true) }
                 jsonPath("$.data.readAt") { isNotEmpty() }
+            }
+
+        mockMvc.get("/api/v1/notifications") {
+            header("Authorization", "Bearer ${owner.accessToken}")
+            param("afterId", "0")
+        }
+            .andExpect {
+                status { isBadRequest() }
+                jsonPath("$.error.code") { value("INVALID_REQUEST") }
+            }
+
+        mockMvc.get("/api/v1/notifications") {
+            header("Authorization", "Bearer ${owner.accessToken}")
+            param("afterId", notificationId.toString())
+            param("unreadOnly", "true")
+            param("limit", "1")
+        }
+            .andExpect {
+                status { isOk() }
+                jsonPath("$.data.length()") { value(0) }
             }
 
         mockMvc.post("/api/v1/notifications/read-all") {

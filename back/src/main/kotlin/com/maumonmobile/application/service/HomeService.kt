@@ -2,8 +2,10 @@ package com.maumonmobile.application.service
 
 import com.maumonmobile.application.port.`in`.HomeStatsResult
 import com.maumonmobile.application.port.`in`.HomeCategorySummaryResult
+import com.maumonmobile.application.port.`in`.HomeContinueWritingCandidateResult
 import com.maumonmobile.application.port.`in`.HomePopularStoryResult
 import com.maumonmobile.application.port.`in`.HomeSummaryResult
+import com.maumonmobile.application.port.`in`.HomeTodayMetricsResult
 import com.maumonmobile.application.port.`in`.HomeUseCase
 import com.maumonmobile.application.port.out.DiaryRepository
 import com.maumonmobile.application.port.out.LetterRepository
@@ -37,6 +39,13 @@ class HomeService(
             todayWorryCount = todayWorryCount,
             todayLetterCount = todayLetterCount,
             todayDiaryCount = todayDiaryCount,
+            todayMetrics = HomeTodayMetricsResult(
+                date = today.toString(),
+                worryCount = todayWorryCount,
+                letterCount = todayLetterCount,
+                diaryCount = todayDiaryCount,
+                totalActivityCount = todayWorryCount + todayLetterCount + todayDiaryCount,
+            ),
             summary = HomeSummaryResult(
                 recoveryMessage = recoveryMessage(),
                 primaryActionLabel = primaryActionLabel(todayDiaryCount, todayLetterCount),
@@ -61,6 +70,11 @@ class HomeService(
                         nickname = post.authorNickname.ifBlank { "익명" },
                     )
                 },
+            continueWritingCandidates = continueWritingCandidates(
+                todayDiaryCount = todayDiaryCount,
+                todayLetterCount = todayLetterCount,
+                todayWorryCount = todayWorryCount,
+            ),
         )
     }
 
@@ -101,6 +115,55 @@ class HomeService(
 
     private fun labelForCategory(category: String): String {
         return HOME_CATEGORIES.firstOrNull { item -> item.apiValue == category }?.label ?: category
+    }
+
+    private fun continueWritingCandidates(
+        todayDiaryCount: Long,
+        todayLetterCount: Long,
+        todayWorryCount: Long,
+    ): List<HomeContinueWritingCandidateResult> {
+        return listOf(
+            HomeContinueWritingCandidateResult(
+                surface = "diary",
+                label = "마음 기록",
+                actionLabel = "기록 이어가기",
+                description = if (todayDiaryCount == 0L) {
+                    "오늘의 첫 기록을 남길 차례입니다."
+                } else {
+                    "오늘 남긴 기록을 이어 정리할 수 있습니다."
+                },
+                priority = if (todayDiaryCount == 0L) 10 else 4,
+            ),
+            HomeContinueWritingCandidateResult(
+                surface = "letter",
+                label = "비밀 편지",
+                actionLabel = "편지 이어가기",
+                description = if (todayLetterCount == 0L) {
+                    "아직 보내지 않은 편지를 시작할 수 있습니다."
+                } else {
+                    "오늘의 편지 흐름을 이어갈 수 있습니다."
+                },
+                priority = if (todayLetterCount == 0L) 8 else 3,
+            ),
+            HomeContinueWritingCandidateResult(
+                surface = "story",
+                label = "스토리",
+                actionLabel = "스토리 이어가기",
+                description = if (todayWorryCount == 0L) {
+                    "비슷한 고민을 나누는 이야기를 작성할 수 있습니다."
+                } else {
+                    "오늘 올라온 고민 흐름에 참여할 수 있습니다."
+                },
+                priority = if (todayWorryCount == 0L) 6 else 5,
+            ),
+            HomeContinueWritingCandidateResult(
+                surface = "consultation",
+                label = "상담",
+                actionLabel = "상담 이어가기",
+                description = "짧은 상담으로 지금의 마음을 정리할 수 있습니다.",
+                priority = 2,
+            ),
+        ).sortedByDescending(HomeContinueWritingCandidateResult::priority)
     }
 
     private companion object {

@@ -1,6 +1,7 @@
 package com.maumonmobile.adapter.out.persistence.notification
 
 import com.maumonmobile.application.port.out.NotificationRepository
+import com.maumonmobile.application.port.out.NotificationQueryCondition
 import com.maumonmobile.domain.notification.Notification
 import com.maumonmobile.domain.notification.NotificationTargetMetadata
 import org.springframework.context.annotation.Profile
@@ -31,16 +32,23 @@ class InMemoryNotificationRepository : NotificationRepository {
         return notification
     }
 
-    override fun findByReceiverId(receiverId: Long): List<Notification> {
-        return notificationsById.values
+    override fun findByReceiverId(receiverId: Long, condition: NotificationQueryCondition): List<Notification> {
+        val sortedNotifications = notificationsById.values
             .filter { notification -> notification.receiverId == receiverId }
+            .filter { notification -> condition.afterId?.let { afterId -> notification.id > afterId } ?: true }
+            .filter { notification -> !condition.unreadOnly || !notification.isRead }
             .sortedByDescending { notification -> notification.createdAt }
+        return condition.limit?.let(sortedNotifications::take) ?: sortedNotifications
     }
 
     override fun markRead(receiverId: Long, notificationId: Long, readAt: String): Notification? {
         val notification = notificationsById[notificationId]
             ?.takeIf { candidate -> candidate.receiverId == receiverId }
             ?: return null
+        if (notification.isRead) {
+            return notification
+        }
+
         val updated = notification.copy(isRead = true, readAt = readAt)
         notificationsById[notificationId] = updated
         return updated
