@@ -88,6 +88,45 @@ test("iOS store-facing metadata and privacy strings stay release ready", () => {
   assert.ok(existsSync(path.join(root, "front/ios/Runner/Base.lproj/LaunchScreen.storyboard")));
 });
 
+test("iOS CocoaPods and privacy manifest stay release ready", () => {
+  const podfile = read("front/ios/Podfile");
+  const workspace = read("front/ios/Runner.xcworkspace/contents.xcworkspacedata");
+  const project = read("front/ios/Runner.xcodeproj/project.pbxproj");
+  const privacy = read("front/ios/Runner/PrivacyInfo.xcprivacy");
+
+  assert.match(podfile, /platform :ios, '15\.0'/);
+  assert.match(podfile, /COCOAPODS_DISABLE_STATS/);
+  assert.match(podfile, /flutter_ios_podfile_setup/);
+  assert.match(podfile, /target 'Runner' do/);
+  assert.match(podfile, /use_frameworks!/);
+  assert.match(podfile, /flutter_install_all_ios_pods File\.dirname/);
+  assert.match(podfile, /target 'RunnerTests' do[\s\S]*inherit! :search_paths/);
+  assert.match(podfile, /post_install do \|installer\|[\s\S]*flutter_additional_ios_build_settings/);
+
+  assert.match(workspace, /Runner\.xcodeproj/);
+  assert.match(workspace, /Pods\/Pods\.xcodeproj/);
+
+  assert.match(project, /PrivacyInfo\.xcprivacy/);
+  assert.match(project, /PrivacyInfo\.xcprivacy in Resources/);
+
+  assert.match(privacy, /<key>NSPrivacyTracking<\/key>\s*<false\/>/);
+  assert.match(privacy, /<key>NSPrivacyTrackingDomains<\/key>\s*<array>\s*<\/array>/);
+  assert.match(privacy, /<key>NSPrivacyAccessedAPITypes<\/key>\s*<array>/);
+  assert.match(privacy, /<key>NSPrivacyCollectedDataTypes<\/key>\s*<array>/);
+  for (const dataType of [
+    "NSPrivacyCollectedDataTypeEmailAddress",
+    "NSPrivacyCollectedDataTypeUserID",
+    "NSPrivacyCollectedDataTypeOtherUserContent",
+    "NSPrivacyCollectedDataTypePhotosorVideos",
+    "NSPrivacyCollectedDataTypeSensitiveInfo",
+    "NSPrivacyCollectedDataTypePerformanceData",
+  ]) {
+    assert.match(privacy, new RegExp(dataType), `Missing privacy data type: ${dataType}`);
+  }
+  assert.match(privacy, /NSPrivacyCollectedDataTypePurposeAppFunctionality/);
+  assert.match(privacy, /NSPrivacyCollectedDataTypePurposeAnalytics/);
+});
+
 test("CI exposes manual Android and iOS release build preflights", () => {
   const workflow = read(".github/workflows/ci.yml");
 
