@@ -343,38 +343,50 @@ class _StoryDetailView extends StatelessWidget {
                 const SizedBox(height: AppSpacing.lg),
                 Text(story.content),
                 const SizedBox(height: AppSpacing.lg),
-                Wrap(
-                  spacing: AppSpacing.xs,
-                  runSpacing: AppSpacing.xs,
+                _ResponsiveActionWrap(
+                  key: const ValueKey('story-detail-action-panel'),
                   children: [
-                    OutlinedButton(
+                    OutlinedButton.icon(
                       key: const ValueKey('story-report-button'),
                       onPressed: controller.selectStoryReportTarget,
-                      child: const Text('신고'),
+                      icon: const Icon(Icons.flag_outlined),
+                      label: const Text('신고'),
                     ),
                     if (canEdit) ...[
-                      FilledButton.tonal(
+                      FilledButton.tonalIcon(
                         key: const ValueKey('story-status-button'),
                         onPressed: state.isSubmitting
                             ? null
                             : controller.toggleSelectedResolutionStatus,
-                        child: const Text('상태 변경'),
+                        icon: const Icon(Icons.check_circle_outline),
+                        label: const Text('상태 변경'),
                       ),
-                      OutlinedButton(
+                      OutlinedButton.icon(
                         key: const ValueKey('story-edit-button'),
                         onPressed: controller.startEditingSelectedStory,
-                        child: const Text('수정'),
+                        icon: const Icon(Icons.edit_outlined),
+                        label: const Text('수정'),
                       ),
-                      OutlinedButton(
+                      OutlinedButton.icon(
                         key: const ValueKey('story-delete-button'),
                         onPressed: state.isSubmitting
                             ? null
                             : controller.deleteSelectedStory,
-                        child: const Text('삭제'),
+                        icon: const Icon(Icons.delete_outline),
+                        label: const Text('삭제'),
                       ),
                     ],
                   ],
                 ),
+                if (state.reportTarget != null) ...[
+                  const SizedBox(height: AppSpacing.sm),
+                  AppNotice(
+                    key: const ValueKey('story-report-target-notice'),
+                    message:
+                        '${state.reportTarget!.label} 신고 대상을 선택했습니다.',
+                    tone: AppNoticeTone.warning,
+                  ),
+                ],
               ],
             ),
           ),
@@ -537,9 +549,7 @@ class _CommentTile extends StatelessWidget {
                   onChanged: controller.updateEditingCommentContent,
                 ),
                 const SizedBox(height: AppSpacing.xs),
-                Wrap(
-                  spacing: AppSpacing.xs,
-                  runSpacing: AppSpacing.xs,
+                _ResponsiveActionWrap(
                   children: [
                     FilledButton.tonal(
                       key: ValueKey('story-comment-save-button-${comment.id}'),
@@ -557,34 +567,36 @@ class _CommentTile extends StatelessWidget {
               ] else ...[
                 Text(comment.content),
                 const SizedBox(height: AppSpacing.xs),
-                Wrap(
-                  spacing: AppSpacing.xs,
-                  runSpacing: AppSpacing.xs,
+                _ResponsiveActionWrap(
+                  key: ValueKey('story-comment-action-row-${comment.id}'),
                   children: [
-                    TextButton(
+                    TextButton.icon(
                       key:
                           ValueKey('story-comment-report-button-${comment.id}'),
                       onPressed: () => controller.selectCommentReportTarget(
                         comment,
                       ),
-                      child: const Text('신고'),
+                      icon: const Icon(Icons.flag_outlined),
+                      label: const Text('신고'),
                     ),
                     if (canEdit) ...[
-                      TextButton(
+                      TextButton.icon(
                         key:
                             ValueKey('story-comment-edit-button-${comment.id}'),
                         onPressed: () => controller.startEditingComment(
                           comment,
                         ),
-                        child: const Text('수정'),
+                        icon: const Icon(Icons.edit_outlined),
+                        label: const Text('수정'),
                       ),
-                      TextButton(
+                      TextButton.icon(
                         key: ValueKey(
                             'story-comment-delete-button-${comment.id}'),
                         onPressed: state.isSubmitting
                             ? null
                             : () => controller.deleteComment(comment),
-                        child: const Text('삭제'),
+                        icon: const Icon(Icons.delete_outline),
+                        label: const Text('삭제'),
                       ),
                     ],
                   ],
@@ -684,6 +696,42 @@ class _StoryEditorView extends StatelessWidget {
             ),
           ],
       ),
+    );
+  }
+}
+
+class _ResponsiveActionWrap extends StatelessWidget {
+  const _ResponsiveActionWrap({
+    required this.children,
+    super.key,
+  });
+
+  final List<Widget> children;
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final useFullWidth =
+            constraints.hasBoundedWidth && constraints.maxWidth < 360;
+
+        return Wrap(
+          spacing: AppSpacing.xs,
+          runSpacing: AppSpacing.xs,
+          children: [
+            for (final child in children)
+              ConstrainedBox(
+                constraints: BoxConstraints(
+                  minHeight: 48,
+                  minWidth: useFullWidth ? constraints.maxWidth : 0,
+                ),
+                child: useFullWidth
+                    ? SizedBox(width: constraints.maxWidth, child: child)
+                    : child,
+              ),
+          ],
+        );
+      },
     );
   }
 }
