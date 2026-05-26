@@ -23,6 +23,12 @@ enum LetterStatus {
   }
 }
 
+abstract final class LetterLimits {
+  static const int titleMaxLength = 60;
+  static const int contentMaxLength = 1000;
+  static const int replyMaxLength = 1000;
+}
+
 enum LetterMailboxTab {
   received(label: '받은 편지함'),
   sent(label: '보낸 편지함');

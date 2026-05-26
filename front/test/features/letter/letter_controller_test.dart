@@ -51,6 +51,31 @@ void main() {
       expect(controller.state.noticeMessage, '편지가 전송되었습니다.');
     });
 
+    test('blocks overlong compose drafts and resets compose fields', () async {
+      final controller = LetterController(
+        letterRepository: _FakeLetterRepository(),
+      );
+
+      controller.startCompose();
+      controller.updateTitle('가' * (LetterLimits.titleMaxLength + 1));
+      controller.updateContent('본문');
+
+      expect(controller.state.canSubmitLetter, isFalse);
+      expect(controller.state.isComposeOverLimit, isTrue);
+
+      controller.updateTitle('제목');
+      controller.updateContent('나' * (LetterLimits.contentMaxLength + 1));
+
+      expect(controller.state.canSubmitLetter, isFalse);
+      expect(controller.state.isComposeOverLimit, isTrue);
+
+      controller.resetCompose();
+
+      expect(controller.state.title, isEmpty);
+      expect(controller.state.content, isEmpty);
+      expect(controller.state.canSubmitLetter, isFalse);
+    });
+
     test('accepts, marks writing, replies, refreshes status, and reports',
         () async {
       LetterReportTarget? selectedTarget;

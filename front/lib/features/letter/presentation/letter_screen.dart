@@ -136,7 +136,15 @@ class _MailboxView extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        _StatsSection(stats: state.stats),
+        _StatsSection(
+          stats: state.stats,
+          onOpenLatestReceived: state.stats?.latestReceivedLetter == null
+              ? null
+              : () => controller.openLetter(state.stats!.latestReceivedLetter!),
+          onOpenLatestSent: state.stats?.latestSentLetter == null
+              ? null
+              : () => controller.openLetter(state.stats!.latestSentLetter!),
+        ),
         const SizedBox(height: AppSpacing.md),
         _ReceiveSettingsCard(
           onOpenRandomReceiveSettings: onOpenRandomReceiveSettings,
@@ -204,30 +212,65 @@ class _MailboxView extends StatelessWidget {
 }
 
 class _StatsSection extends StatelessWidget {
-  const _StatsSection({required this.stats});
+  const _StatsSection({
+    required this.stats,
+    this.onOpenLatestReceived,
+    this.onOpenLatestSent,
+  });
 
   final LetterStats? stats;
+  final VoidCallback? onOpenLatestReceived;
+  final VoidCallback? onOpenLatestSent;
 
   @override
   Widget build(BuildContext context) {
     final latestReceived = stats?.latestReceivedLetter?.title ?? '-';
     final latestSent = stats?.latestSentLetter?.title ?? '-';
 
-    return Wrap(
-      spacing: AppSpacing.xs,
-      runSpacing: AppSpacing.xs,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        AppMetricTile(
-          label: '받은 편지',
-          value: (stats?.receivedCount ?? 0).toString(),
-          tone: AppStatusTone.success,
+        Wrap(
+          spacing: AppSpacing.xs,
+          runSpacing: AppSpacing.xs,
+          children: [
+            AppMetricTile(
+              label: '받은 편지',
+              value: (stats?.receivedCount ?? 0).toString(),
+              tone: AppStatusTone.success,
+            ),
+            AppMetricTile(label: '최근 받은 편지', value: latestReceived),
+            AppMetricTile(
+              label: '최근 보낸 편지',
+              value: latestSent,
+              tone: AppStatusTone.warning,
+            ),
+          ],
         ),
-        AppMetricTile(label: '최근 받은 편지', value: latestReceived),
-        AppMetricTile(
-          label: '최근 보낸 편지',
-          value: latestSent,
-          tone: AppStatusTone.warning,
-        ),
+        if (stats?.latestReceivedLetter != null ||
+            stats?.latestSentLetter != null) ...[
+          const SizedBox(height: AppSpacing.xs),
+          Wrap(
+            spacing: AppSpacing.xs,
+            runSpacing: AppSpacing.xs,
+            children: [
+              if (stats?.latestReceivedLetter != null)
+                OutlinedButton.icon(
+                  key: const ValueKey('letter-latest-received-button'),
+                  onPressed: onOpenLatestReceived,
+                  icon: const Icon(Icons.inbox_outlined),
+                  label: const Text('최근 받은 편지 열기'),
+                ),
+              if (stats?.latestSentLetter != null)
+                OutlinedButton.icon(
+                  key: const ValueKey('letter-latest-sent-button'),
+                  onPressed: onOpenLatestSent,
+                  icon: const Icon(Icons.send_outlined),
+                  label: const Text('최근 보낸 편지 열기'),
+                ),
+            ],
+          ),
+        ],
       ],
     );
   }
@@ -462,12 +505,20 @@ class _ReplyComposerState extends State<_ReplyComposer> {
               controller: _replyController,
               minLines: 4,
               maxLines: 8,
+              maxLength: LetterLimits.replyMaxLength,
               decoration: const InputDecoration(
                 labelText: '답장',
                 border: OutlineInputBorder(),
               ),
               onChanged: widget.controller.updateReplyContent,
             ),
+            if (widget.state.isReplyOverLimit) ...[
+              const SizedBox(height: AppSpacing.xs),
+              const AppNotice(
+                message: '답장은 1000자까지 보낼 수 있습니다.',
+                tone: AppNoticeTone.warning,
+              ),
+            ],
             const SizedBox(height: AppSpacing.sm),
             FilledButton(
               key: const ValueKey('letter-reply-submit-button'),
@@ -535,10 +586,16 @@ class _LetterComposeViewState extends State<_LetterComposeView> {
               '편지 쓰기',
               style: Theme.of(context).textTheme.titleLarge,
             ),
+            const SizedBox(height: AppSpacing.xs),
+            Text(
+              '제목은 60자, 본문은 1000자까지 보낼 수 있습니다.',
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
             const SizedBox(height: AppSpacing.md),
             TextFormField(
               key: const ValueKey('letter-title-field'),
               controller: _titleController,
+              maxLength: LetterLimits.titleMaxLength,
               decoration: const InputDecoration(
                 labelText: '제목',
                 border: OutlineInputBorder(),
@@ -551,12 +608,20 @@ class _LetterComposeViewState extends State<_LetterComposeView> {
               controller: _contentController,
               minLines: 8,
               maxLines: 14,
+              maxLength: LetterLimits.contentMaxLength,
               decoration: const InputDecoration(
                 labelText: '본문',
                 border: OutlineInputBorder(),
               ),
               onChanged: widget.controller.updateContent,
             ),
+            if (widget.state.isComposeOverLimit) ...[
+              const SizedBox(height: AppSpacing.xs),
+              const AppNotice(
+                message: '편지 길이를 줄인 뒤 다시 보내 주세요.',
+                tone: AppNoticeTone.warning,
+              ),
+            ],
             const SizedBox(height: AppSpacing.lg),
             Wrap(
               spacing: AppSpacing.xs,
@@ -568,6 +633,14 @@ class _LetterComposeViewState extends State<_LetterComposeView> {
                       ? widget.controller.submitLetter
                       : null,
                   child: const Text('보내기'),
+                ),
+                OutlinedButton.icon(
+                  key: const ValueKey('letter-compose-reset-button'),
+                  onPressed: widget.state.hasComposeDraft
+                      ? widget.controller.resetCompose
+                      : null,
+                  icon: const Icon(Icons.refresh),
+                  label: const Text('초기화'),
                 ),
                 OutlinedButton(
                   key: const ValueKey('letter-compose-cancel-button'),
