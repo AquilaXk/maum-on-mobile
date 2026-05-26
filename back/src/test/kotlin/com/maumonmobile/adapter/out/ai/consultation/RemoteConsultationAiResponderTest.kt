@@ -1,82 +1,95 @@
 package com.maumonmobile.adapter.out.ai.consultation
 
 import com.maumonmobile.adapter.out.ai.RemoteAiModelProperties
+import com.maumonmobile.adapter.out.ai.VertexAiGenerateContentClient
 import com.maumonmobile.application.port.out.ConsultationAiRequest
 import com.maumonmobile.application.port.out.ConsultationAiUnavailableException
 import com.maumonmobile.domain.consultation.ConsultationMessage
 import com.maumonmobile.domain.consultation.ConsultationMessageSender
-import com.sun.net.httpserver.HttpServer
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.Test
 import tools.jackson.databind.ObjectMapper
-import java.net.InetSocketAddress
+import java.net.URI
 import java.time.Duration
 
 class RemoteConsultationAiResponderTest {
 
     @Test
-    fun sendsMinimizedConsultationPromptToConfiguredModelEndpoint() {
-        TestAiServer(statusCode = 200, responseBody = """{"chunks":["함께 ","정리해요."]}""").use { server ->
-            val responder = RemoteConsultationAiResponder(
-                properties = aiProperties(server.baseUrl),
-                objectMapper = ObjectMapper(),
-            )
+    fun sendsVertexGenerateContentRequestToGeminiFlashModel() {
+        val client = RecordingVertexAiGenerateContentClient(
+            responseBody = vertexResponse("""{"chunks":["함께 ","정리해요."]}"""),
+        )
+        val responder = RemoteConsultationAiResponder(
+            properties = aiProperties(),
+            objectMapper = ObjectMapper(),
+            accessTokenProvider = { "vertex-token" },
+            generateContentClient = client,
+        )
 
-            val response = responder.generate(
-                ConsultationAiRequest(
-                    memberId = 1L,
-                    message = "요즘 불안해요.",
-                    recentMessages = listOf(
-                        ConsultationMessage(
-                            id = 1L,
-                            memberId = 1L,
-                            sender = ConsultationMessageSender.USER,
-                            content = "어제도 불안했어요.",
-                            createdAt = "2026-05-25T00:00:00Z",
-                        ),
+        val response = responder.generate(
+            ConsultationAiRequest(
+                memberId = 1L,
+                message = "요즘 불안해요.",
+                recentMessages = listOf(
+                    ConsultationMessage(
+                        id = 1L,
+                        memberId = 1L,
+                        sender = ConsultationMessageSender.USER,
+                        content = "어제도 불안했어요.",
+                        createdAt = "2026-05-25T00:00:00Z",
                     ),
-                    timeout = Duration.ofSeconds(2),
                 ),
-            )
+                timeout = Duration.ofSeconds(2),
+            ),
+        )
 
-            assertThat(response.chunks).containsExactly("함께", "정리해요.")
-            assertThat(server.requests.single().authorization).isEqualTo("Bearer ai-token")
-            assertThat(server.requests.single().body).contains("maum-on-mobile-safe-v1", "요즘 불안해요.")
-        }
+        assertThat(response.chunks).containsExactly("함께", "정리해요.")
+        assertThat(client.endpoint).isEqualTo(
+            URI.create(
+                "https://us-central1-aiplatform.googleapis.com/v1/projects/maum-on-mobile-dev" +
+                    "/locations/us-central1/publishers/google/models/gemini-2.5-flash:generateContent",
+            ),
+        )
+        assertThat(client.accessToken).isEqualTo("vertex-token")
+        val requestJson = ObjectMapper().readTree(client.requestBody!!)
+        assertThat(requestJson["contents"].toString()).contains("요즘 불안해요.", "어제도 불안했어요.")
+        assertThat(requestJson["generationConfig"].toString()).contains("maxOutputTokens")
     }
 
     @Test
     fun opensCircuitAfterRepeatedModelFailures() {
-        TestAiServer(statusCode = 503, responseBody = """{"error":"busy"}""").use { server ->
-            val properties = aiProperties(server.baseUrl).apply {
-                consultation.maxAttempts = 1
-                circuitBreaker.failureThreshold = 1
-            }
-            val responder = RemoteConsultationAiResponder(
-                properties = properties,
-                objectMapper = ObjectMapper(),
-            )
-            val request = ConsultationAiRequest(
-                memberId = 2L,
-                message = "답변이 필요해요.",
-                recentMessages = emptyList(),
-                timeout = Duration.ofSeconds(1),
-            )
-
-            assertThatThrownBy { responder.generate(request) }
-                .isInstanceOf(ConsultationAiUnavailableException::class.java)
-            assertThatThrownBy { responder.generate(request) }
-                .isInstanceOf(ConsultationAiUnavailableException::class.java)
-            assertThat(server.requests).hasSize(1)
+        val client = RecordingVertexAiGenerateContentClient(failure = IllegalStateException("busy"))
+        val properties = aiProperties().apply {
+            consultation.maxAttempts = 1
+            circuitBreaker.failureThreshold = 1
         }
+        val responder = RemoteConsultationAiResponder(
+            properties = properties,
+            objectMapper = ObjectMapper(),
+            accessTokenProvider = { "vertex-token" },
+            generateContentClient = client,
+        )
+        val request = ConsultationAiRequest(
+            memberId = 2L,
+            message = "답변이 필요해요.",
+            recentMessages = emptyList(),
+            timeout = Duration.ofSeconds(1),
+        )
+
+        assertThatThrownBy { responder.generate(request) }
+            .isInstanceOf(ConsultationAiUnavailableException::class.java)
+        assertThatThrownBy { responder.generate(request) }
+            .isInstanceOf(ConsultationAiUnavailableException::class.java)
+        assertThat(client.calls).isEqualTo(1)
     }
 
-    private fun aiProperties(baseUrl: String): RemoteAiModelProperties {
+    private fun aiProperties(): RemoteAiModelProperties {
         return RemoteAiModelProperties().apply {
-            consultation.endpoint = "$baseUrl/consultation"
-            consultation.authorizationToken = "ai-token"
-            consultation.model = "maum-on-mobile-safe-v1"
+            vertex.projectId = "maum-on-mobile-dev"
+            vertex.location = "us-central1"
+            vertex.model = "gemini-2.5-flash"
+            vertex.credentialsPath = "/tmp/vertex-key.json"
             consultation.maxAttempts = 1
             circuitBreaker.failureThreshold = 3
             circuitBreaker.openDuration = Duration.ofMinutes(1)
@@ -84,38 +97,30 @@ class RemoteConsultationAiResponderTest {
     }
 }
 
-private data class RecordedAiRequest(
-    val path: String,
-    val authorization: String?,
-    val body: String,
-)
+private class RecordingVertexAiGenerateContentClient(
+    private val responseBody: String = "",
+    private val failure: RuntimeException? = null,
+) : VertexAiGenerateContentClient {
+    var endpoint: URI? = null
+    var accessToken: String? = null
+    var requestBody: String? = null
+    var calls: Int = 0
 
-private class TestAiServer(
-    private val statusCode: Int,
-    private val responseBody: String,
-) : AutoCloseable {
-    private val server = HttpServer.create(InetSocketAddress("127.0.0.1", 0), 0)
-    val requests = mutableListOf<RecordedAiRequest>()
-    val baseUrl: String
-        get() = "http://127.0.0.1:${server.address.port}"
-
-    init {
-        server.createContext("/") { exchange ->
-            requests += RecordedAiRequest(
-                path = exchange.requestURI.path,
-                authorization = exchange.requestHeaders.getFirst("Authorization"),
-                body = exchange.requestBody.readBytes().toString(Charsets.UTF_8),
-            )
-            val responseBytes = responseBody.toByteArray(Charsets.UTF_8)
-            exchange.sendResponseHeaders(statusCode, responseBytes.size.toLong())
-            exchange.responseBody.use { body ->
-                body.write(responseBytes)
-            }
-        }
-        server.start()
+    override fun generateContent(
+        endpoint: URI,
+        accessToken: String,
+        requestBody: String,
+        timeout: Duration,
+    ): String {
+        calls += 1
+        this.endpoint = endpoint
+        this.accessToken = accessToken
+        this.requestBody = requestBody
+        failure?.let { throw it }
+        return responseBody
     }
+}
 
-    override fun close() {
-        server.stop(0)
-    }
+private fun vertexResponse(text: String): String {
+    return """{"candidates":[{"content":{"parts":[{"text":${ObjectMapper().writeValueAsString(text)}}]}}]}"""
 }

@@ -3,31 +3,45 @@ package com.maumonmobile.adapter.out.ai.consultation
 import com.maumonmobile.adapter.out.ai.RemoteAiEndpointProperties
 import com.maumonmobile.adapter.out.ai.RemoteAiModelProperties
 import com.maumonmobile.adapter.out.ai.RemoteModelCircuitBreaker
+import com.maumonmobile.adapter.out.ai.JavaHttpVertexAiGenerateContentClient
+import com.maumonmobile.adapter.out.ai.ServiceAccountVertexAiAccessTokenProvider
+import com.maumonmobile.adapter.out.ai.VertexAiAccessTokenProvider
+import com.maumonmobile.adapter.out.ai.VertexAiGenerateContentClient
 import com.maumonmobile.application.port.out.ConsultationAiRequest
 import com.maumonmobile.application.port.out.ConsultationAiResponder
 import com.maumonmobile.application.port.out.ConsultationAiResponse
 import com.maumonmobile.application.port.out.ConsultationAiUnavailableException
 import com.maumonmobile.domain.consultation.ConsultationMessageSender
+import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.context.annotation.Profile
 import org.springframework.stereotype.Component
 import tools.jackson.databind.ObjectMapper
-import java.net.URI
-import java.net.http.HttpClient
-import java.net.http.HttpRequest
-import java.net.http.HttpResponse
 import java.time.Duration
 
 @Component
 @Profile("!test & !local")
-class RemoteConsultationAiResponder(
+class RemoteConsultationAiResponder internal constructor(
     private val properties: RemoteAiModelProperties,
     private val objectMapper: ObjectMapper,
+    private val accessTokenProvider: VertexAiAccessTokenProvider,
+    private val generateContentClient: VertexAiGenerateContentClient,
 ) : ConsultationAiResponder {
+    @Autowired
+    constructor(
+        properties: RemoteAiModelProperties,
+        objectMapper: ObjectMapper,
+    ) : this(
+        properties = properties,
+        objectMapper = objectMapper,
+        accessTokenProvider = ServiceAccountVertexAiAccessTokenProvider(properties.vertex),
+        generateContentClient = JavaHttpVertexAiGenerateContentClient(),
+    )
+
     private val endpoint: RemoteAiEndpointProperties = properties.consultation
     private val circuitBreaker = RemoteModelCircuitBreaker(properties.circuitBreaker)
-    private val httpClient = HttpClient.newHttpClient()
 
     init {
+        properties.vertex.validate()
         endpoint.validate("consultation")
         properties.circuitBreaker.validate()
     }
@@ -40,14 +54,13 @@ class RemoteConsultationAiResponder(
         var lastFailure: Throwable? = null
         repeat(endpoint.maxAttempts) {
             runCatching {
-                val response = httpClient.send(
-                    httpRequest(request),
-                    HttpResponse.BodyHandlers.ofString(),
+                val responseBody = generateContentClient.generateContent(
+                    endpoint = properties.vertex.generateContentEndpoint(),
+                    accessToken = accessTokenProvider.accessToken(),
+                    requestBody = requestBody(request),
+                    timeout = minTimeout(request.timeout, endpoint.requestTimeout),
                 )
-                if (response.statusCode() !in 200..299) {
-                    throw ConsultationAiUnavailableException("상담 모델 응답 상태가 올바르지 않습니다.")
-                }
-                return parseResponse(response.body()).also {
+                return parseResponse(responseBody).also {
                     circuitBreaker.recordSuccess()
                 }
             }.onFailure { failure ->
@@ -59,45 +72,52 @@ class RemoteConsultationAiResponder(
         throw ConsultationAiUnavailableException("상담 모델 응답을 만들지 못했습니다.", lastFailure)
     }
 
-    private fun httpRequest(request: ConsultationAiRequest): HttpRequest {
-        val timeout = minTimeout(request.timeout, endpoint.requestTimeout)
-        val body = objectMapper.writeValueAsString(
+    private fun requestBody(request: ConsultationAiRequest): String {
+        return objectMapper.writeValueAsString(
             mapOf(
-                "model" to endpoint.model,
-                "timeoutMs" to timeout.toMillis(),
-                "input" to mapOf(
-                    "memberId" to request.memberId,
-                    "message" to request.message.take(endpoint.maxInputChars),
-                    "recentMessages" to request.recentMessages
-                        .takeLast(endpoint.recentMessageLimit)
-                        .map { message ->
-                            mapOf(
-                                "role" to message.sender.toModelRole(),
-                                "content" to message.content.take(endpoint.maxInputChars),
-                            )
-                        },
+                "contents" to listOf(
+                    mapOf(
+                        "role" to "user",
+                        "parts" to listOf(mapOf("text" to prompt(request))),
+                    ),
+                ),
+                "generationConfig" to mapOf(
+                    "temperature" to 0.3,
+                    "maxOutputTokens" to 512,
                 ),
             ),
         )
-        val builder = HttpRequest.newBuilder()
-            .uri(URI.create(endpoint.endpoint))
-            .timeout(timeout)
-            .header("Content-Type", "application/json")
-            .POST(HttpRequest.BodyPublishers.ofString(body))
-        if (endpoint.authorizationToken.isNotBlank()) {
-            builder.header("Authorization", "Bearer ${endpoint.authorizationToken}")
-        }
-        return builder.build()
+    }
+
+    private fun prompt(request: ConsultationAiRequest): String {
+        val recentMessages = request.recentMessages
+            .takeLast(endpoint.recentMessageLimit)
+            .joinToString("\n") { message ->
+                "${message.sender.toModelRole()}: ${message.content.take(endpoint.maxInputChars)}"
+            }
+        return """
+            You are Maum On's safe mobile consultation assistant.
+            Return JSON only. Use this shape: {"chunks":["short Korean response part"]}.
+            Keep the answer warm, concise, and non-diagnostic.
+            memberId: ${request.memberId}
+            recentMessages:
+            $recentMessages
+            userMessage: ${request.message.take(endpoint.maxInputChars)}
+        """.trimIndent()
     }
 
     private fun parseResponse(body: String): ConsultationAiResponse {
         val root = runCatching { objectMapper.readTree(body) }
             .getOrElse { throw ConsultationAiUnavailableException("상담 모델 응답을 해석하지 못했습니다.", it) }
-        val chunks = root["chunks"]?.takeIf { node -> node.isArray }?.map { node -> node.asString() }
+        val payload = firstVertexText(root)?.let { text ->
+            runCatching { objectMapper.readTree(extractJsonObject(text)) }
+                .getOrElse { throw ConsultationAiUnavailableException("상담 모델 응답을 해석하지 못했습니다.", it) }
+        } ?: root
+        val chunks = payload["chunks"]?.takeIf { node -> node.isArray }?.map { node -> node.asString() }
             ?: listOfNotNull(
-                root["text"]?.asString(),
-                root["answer"]?.asString(),
-                root["content"]?.asString(),
+                payload["text"]?.asString(),
+                payload["answer"]?.asString(),
+                payload["content"]?.asString(),
             )
         val sanitized = chunks
             .map(String::trim)
@@ -106,6 +126,24 @@ class RemoteConsultationAiResponder(
             throw ConsultationAiUnavailableException("상담 모델 응답이 비어 있습니다.")
         }
         return ConsultationAiResponse(chunks = sanitized)
+    }
+
+    private fun firstVertexText(root: tools.jackson.databind.JsonNode): String? {
+        val candidates = root["candidates"]?.takeIf { node -> node.isArray } ?: return null
+        val firstCandidate = candidates.firstOrNull() ?: return null
+        val parts = firstCandidate["content"]?.let { node -> node["parts"] }
+            ?.takeIf { node -> node.isArray } ?: return null
+        return parts.firstNotNullOfOrNull { part -> part["text"]?.asString()?.takeIf(String::isNotBlank) }
+    }
+
+    private fun extractJsonObject(text: String): String {
+        val normalized = text.trim()
+        val startIndex = normalized.indexOf('{')
+        val endIndex = normalized.lastIndexOf('}')
+        if (startIndex < 0 || endIndex < startIndex) {
+            throw ConsultationAiUnavailableException("상담 모델 JSON 응답이 비어 있습니다.")
+        }
+        return normalized.substring(startIndex, endIndex + 1)
     }
 
     private fun ConsultationMessageSender.toModelRole(): String {

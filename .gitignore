@@ -9,6 +9,7 @@
 .env
 .env.*
 !.env.example
+vertex-key.json
 
 # Editors
 .idea/

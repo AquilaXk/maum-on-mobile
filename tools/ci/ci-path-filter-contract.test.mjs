@@ -130,6 +130,17 @@ test("repository contracts preserve local docs and issue template policies", asy
   assert.match(repositoryContracts, /Unexpected tracked local agent file/);
 });
 
+test("local Vertex AI credentials stay ignored and default to Gemini 2.5 Flash", async () => {
+  const gitignore = await readFile(resolve(repoRoot, ".gitignore"), "utf8");
+  const backendConfig = await readFile(resolve(repoRoot, "back/src/main/resources/application.yml"), "utf8");
+
+  assert.match(gitignore, /^vertex-key\.json$/m);
+  assert.match(backendConfig, /project-id: \$\{GOOGLE_CLOUD_PROJECT_ID:\}/);
+  assert.match(backendConfig, /location: \$\{VERTEX_AI_LOCATION:us-central1\}/);
+  assert.match(backendConfig, /model: \$\{VERTEX_AI_MODEL:gemini-2\.5-flash\}/);
+  assert.match(backendConfig, /credentials-path: \$\{GOOGLE_APPLICATION_CREDENTIALS:\}/);
+});
+
 test("path classifier treats README and pull request template changes as docs-only", async () => {
   const outputs = await classifyChangedFiles(["README.md", ".github/pull_request_template.md"]);
 

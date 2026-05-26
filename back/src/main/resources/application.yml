@@ -36,13 +36,18 @@ app:
     ai:
       timeout: ${MODERATION_AI_TIMEOUT:PT4S}
   ai:
+    vertex:
+      project-id: ${GOOGLE_CLOUD_PROJECT_ID:}
+      location: ${VERTEX_AI_LOCATION:us-central1}
+      model: ${VERTEX_AI_MODEL:gemini-2.5-flash}
+      credentials-path: ${GOOGLE_APPLICATION_CREDENTIALS:}
     circuit-breaker:
       failure-threshold: ${AI_CIRCUIT_FAILURE_THRESHOLD:3}
       open-duration: ${AI_CIRCUIT_OPEN_DURATION:PT1M}
     consultation:
       endpoint: ${AI_CONSULTATION_ENDPOINT:}
       authorization-token: ${AI_CONSULTATION_AUTHORIZATION_TOKEN:}
-      model: ${AI_CONSULTATION_MODEL:maum-on-mobile-safe-v1}
+      model: ${AI_CONSULTATION_MODEL:gemini-2.5-flash}
       request-timeout: ${AI_CONSULTATION_REQUEST_TIMEOUT:PT5S}
       max-attempts: ${AI_CONSULTATION_MAX_ATTEMPTS:2}
       max-input-chars: ${AI_CONSULTATION_MAX_INPUT_CHARS:1000}
@@ -50,7 +55,7 @@ app:
     moderation:
       endpoint: ${AI_MODERATION_ENDPOINT:}
       authorization-token: ${AI_MODERATION_AUTHORIZATION_TOKEN:}
-      model: ${AI_MODERATION_MODEL:maum-on-mobile-moderation-v1}
+      model: ${AI_MODERATION_MODEL:gemini-2.5-flash}
       request-timeout: ${AI_MODERATION_REQUEST_TIMEOUT:PT4S}
       max-attempts: ${AI_MODERATION_MAX_ATTEMPTS:2}
       max-input-chars: ${AI_MODERATION_MAX_INPUT_CHARS:2000}
