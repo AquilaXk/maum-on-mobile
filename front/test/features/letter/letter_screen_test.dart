@@ -10,13 +10,7 @@ void main() {
   testWidgets('renders mailbox stats and opens a received letter',
       (tester) async {
     final repository = _FakeLetterRepository(
-      statsQueue: [
-        LetterStats(
-          receivedCount: 1,
-          latestReceivedLetter: _summary(id: 8, title: '최근 받은 편지'),
-          latestSentLetter: _summary(id: 2, title: '최근 보낸 편지'),
-        ),
-      ],
+      statsQueue: [_stats()],
       receivedPages: [
         _page([_summary(id: 1, title: '도착한 편지')]),
       ],
@@ -84,7 +78,13 @@ void main() {
   testWidgets('opens latest received letter from the summary action',
       (tester) async {
     final repository = _FakeLetterRepository(
-      statsQueue: [_stats()],
+      statsQueue: [
+        LetterStats(
+          receivedCount: 1,
+          latestReceivedLetter: _summary(id: 8, title: '최근 받은 편지'),
+          latestSentLetter: _summary(id: 2, title: '최근 보낸 편지'),
+        ),
+      ],
       receivedPages: [
         _page([_summary(id: 1, title: '목록 편지')]),
       ],
