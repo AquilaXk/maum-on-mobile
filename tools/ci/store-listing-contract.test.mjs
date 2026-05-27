@@ -15,6 +15,10 @@ function readJson(relativePath) {
   return JSON.parse(read(relativePath));
 }
 
+function escapeRegExp(value) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
 function screenRoutes(contract) {
   return new Set(contract.screenshots.flatMap((set) => set.captures.map((capture) => capture.routeKey)));
 }
@@ -32,9 +36,9 @@ test("store listing contract covers required app metadata and links", () => {
   assert.equal(listing.links.privacyPolicyUrl, privacy.storeLinks.privacyPolicyUrl);
   assert.equal(listing.links.termsUrl, privacy.storeLinks.termsUrl);
   assert.equal(listing.links.supportEmail, privacy.storeLinks.supportEmail);
-  assert.match(legal, new RegExp(listing.links.privacyPolicyUrl.replaceAll(".", "\\.")));
-  assert.match(legal, new RegExp(listing.links.termsUrl.replaceAll(".", "\\.")));
-  assert.match(legal, new RegExp(listing.links.supportEmail.replaceAll(".", "\\.")));
+  assert.match(legal, new RegExp(escapeRegExp(listing.links.privacyPolicyUrl)));
+  assert.match(legal, new RegExp(escapeRegExp(listing.links.termsUrl)));
+  assert.match(legal, new RegExp(escapeRegExp(listing.links.supportEmail)));
 
   assert.equal(listing.googlePlay.packageName, "com.aquilaxk.maumonmobile");
   assert.equal(listing.googlePlay.category, "Health & Fitness");
