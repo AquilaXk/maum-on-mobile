@@ -385,7 +385,9 @@
       "id": "flutter-performance-budgets",
       "file": "front/lib/core/observability/mobile_performance_budgets.dart",
       "patterns": [
+        "appStart",
         "firstInteractive",
+        "primaryScreenTransition",
         "feedScrollJank",
         "imageAttachmentReady",
         "consultationStreamRecovery",

@@ -269,6 +269,72 @@ test("release performance gate flags budget breaches and duplicate write regress
   );
 });
 
+test("release performance gate honors contracts that do not require one release number", async () => {
+  const reportDir = await mkdtemp(path.join(tmpdir(), "maum-release-performance-independent-"));
+  const evidenceDir = path.join(reportDir, "runtime");
+  const configPath = path.join(reportDir, "release-performance-gate.json");
+  await mkdir(evidenceDir, { recursive: true });
+  const contract = readContract();
+  contract.releaseLinking.sameReleaseNumber = false;
+  const releaseNumber = "2026.05.27-rc3";
+
+  await writeFile(configPath, `${JSON.stringify(contract, null, 2)}\n`);
+  await writeFile(
+    path.join(evidenceDir, "release-performance-release.json"),
+    `${JSON.stringify({
+      releaseNumber,
+      backendBuildNumber: "backend-410cd4b",
+      androidBuildNumber: "android-20260527.3",
+      iosBuildNumber: "ios-20260527.3",
+      apiContractVersion: "mobile-api-v1",
+    }, null, 2)}\n`,
+  );
+  await writeFile(
+    path.join(evidenceDir, "release-performance-android-results.json"),
+    `${JSON.stringify(buildPlatformResults("android", "android-independent-release", "android-independent-build"), null, 2)}\n`,
+  );
+  await writeFile(
+    path.join(evidenceDir, "release-performance-ios-results.json"),
+    `${JSON.stringify(buildPlatformResults("ios", "ios-independent-release", "ios-independent-build"), null, 2)}\n`,
+  );
+  await writeFile(
+    path.join(evidenceDir, "release-performance-backend-results.json"),
+    `${JSON.stringify({
+      platform: "backend",
+      releaseNumber: "backend-independent-release",
+      buildNumber: "backend-independent-build",
+      results: [
+        {
+          scenario: "backend.api-p95",
+          status: "pass",
+          releaseNumber: "backend-independent-release",
+          buildNumber: "backend-independent-build",
+          p95LatencyMs: 1200,
+          errorRate: 0,
+          successRate: 1,
+          evidence: ["build/reports/mobile-performance/mobile-performance-smoke.json"],
+          notes: "Backend API p95 smoke stayed below the release budget.",
+        },
+      ],
+    }, null, 2)}\n`,
+  );
+
+  await execFileAsync("node", [
+    path.join(root, runnerPath),
+    "--config",
+    configPath,
+    "--report-dir",
+    reportDir,
+    "--runtime-evidence-dir",
+    evidenceDir,
+    "--require-runtime-evidence",
+  ]);
+
+  const report = JSON.parse(await readFile(path.join(reportDir, "release-performance-report.json"), "utf8"));
+  assert.equal(report.status, "pass");
+  assert.equal(report.release.sameReleaseNumber, false);
+});
+
 test("ci workflow publishes performance reports and wires the release performance job", () => {
   const workflow = read(".github/workflows/ci.yml");
 

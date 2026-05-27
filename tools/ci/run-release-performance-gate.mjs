@@ -300,7 +300,8 @@ function validateReleaseMatch(platform, result, release) {
   }
 
   const releaseFailures = [];
-  if (result.releaseNumber !== release.releaseNumber) {
+  const shouldMatchReleaseNumber = release.sameReleaseNumber === true;
+  if (shouldMatchReleaseNumber && result.releaseNumber !== release.releaseNumber) {
     releaseFailures.push({
       reason: "release_number_mismatch",
       message: `${platform}:${result.scenario} releaseNumber '${result.releaseNumber}' does not match '${release.releaseNumber}'.`,
@@ -310,7 +311,7 @@ function validateReleaseMatch(platform, result, release) {
   }
 
   const expectedBuildNumber = buildNumberForPlatform(platform, release);
-  if (expectedBuildNumber && result.buildNumber !== expectedBuildNumber) {
+  if (shouldMatchReleaseNumber && expectedBuildNumber && result.buildNumber !== expectedBuildNumber) {
     releaseFailures.push({
       reason: "build_number_mismatch",
       message: `${platform}:${result.scenario} buildNumber '${result.buildNumber}' does not match '${expectedBuildNumber}'.`,
