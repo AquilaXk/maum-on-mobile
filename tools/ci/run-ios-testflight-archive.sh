@@ -18,6 +18,10 @@ upload_env=(
   MAUMON_APP_STORE_CONNECT_API_ISSUER_ID
   MAUMON_APP_STORE_CONNECT_API_KEY_P8_BASE64
 )
+release_manifest_path="${MAUMON_RELEASE_MANIFEST_PATH:-}"
+release_manifest_abs=""
+release_notes="${MAUMON_IOS_RELEASE_NOTES:-}"
+tester_notes="${MAUMON_IOS_TESTER_NOTES:-}"
 missing_env=()
 temp_dir=""
 keychain_path=""
@@ -52,6 +56,53 @@ pubspec_version() {
   awk '/^version:/ { print $2; exit }' "${front_dir}/pubspec.yaml"
 }
 
+resolve_release_manifest_path() {
+  if [[ -z "${release_manifest_path}" ]]; then
+    release_manifest_abs=""
+  elif [[ "${release_manifest_path}" = /* ]]; then
+    release_manifest_abs="${release_manifest_path}"
+  else
+    release_manifest_abs="${repo_root}/${release_manifest_path}"
+  fi
+}
+
+release_manifest_field() {
+  local field_path="$1"
+  node -e '
+const fs = require("fs");
+const manifestPath = process.argv[1];
+const fieldPath = process.argv[2];
+const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
+let value = manifest;
+for (const key of fieldPath.split(".")) {
+  value = value == null ? undefined : value[key];
+}
+if (value !== undefined && value !== null) {
+  process.stdout.write(String(value).trim());
+}
+' "${release_manifest_abs}" "${field_path}"
+}
+
+load_release_manifest_notes() {
+  resolve_release_manifest_path
+  if [[ -z "${release_manifest_abs}" || ! -f "${release_manifest_abs}" ]]; then
+    return 0
+  fi
+  if ! command -v node >/dev/null 2>&1; then
+    echo "node is unavailable; release manifest notes were not loaded."
+    return 0
+  fi
+
+  if [[ -z "${release_notes}" ]]; then
+    release_notes="$(release_manifest_field "storeReleaseNotes.appStore")"
+  fi
+  if [[ -z "${tester_notes}" ]]; then
+    tester_notes="$(release_manifest_field "testerNotes")"
+  fi
+}
+
+load_release_manifest_notes
+
 if [[ "${dry_run}" == "true" ]]; then
   echo "iOS TestFlight archive dry run ok"
   if command -v xcodebuild >/dev/null 2>&1; then
@@ -60,6 +111,9 @@ if [[ "${dry_run}" == "true" ]]; then
     echo "xcodebuild unavailable in dry run"
   fi
   echo "version: $(pubspec_version)"
+  echo "release manifest: ${release_manifest_abs:-none}"
+  echo "release notes length: ${#release_notes}"
+  echo "tester notes length: ${#tester_notes}"
   echo "flutter build ipa --release --export-options-plist <decoded export options>"
   if [[ "${upload}" == "true" ]]; then
     echo "TestFlight upload dry run: xcrun altool --upload-app --type ios --file <ipa>"
@@ -142,6 +196,9 @@ fi
 
 echo "iOS IPA generated: ${ipa_path}"
 echo "version: $(pubspec_version)"
+echo "release manifest: ${release_manifest_abs:-none}"
+echo "release notes length: ${#release_notes}"
+echo "tester notes length: ${#tester_notes}"
 
 if [[ "${upload}" != "true" ]]; then
   echo "TestFlight upload skipped. Set MAUMON_IOS_TESTFLIGHT_UPLOAD=true to upload."
