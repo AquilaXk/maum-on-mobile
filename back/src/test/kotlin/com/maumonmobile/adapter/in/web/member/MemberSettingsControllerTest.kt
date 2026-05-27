@@ -132,6 +132,14 @@ class MemberSettingsControllerTest @Autowired constructor(
     @Test
     fun withdrawsMemberAfterPasswordConfirmation() {
         val member = signupAndLogin("settings-withdraw@example.com", "탈퇴이")
+        val exportResult = mockMvc.post("/api/v1/members/me/data-exports") {
+            header("Authorization", "Bearer ${member.accessToken}")
+        }
+            .andExpect {
+                status { isOk() }
+            }
+            .andReturn()
+        val exportId = exportResult.response.readJsonLong("$.data.id")
 
         mockMvc.delete("/api/v1/members/me") {
             header("Authorization", "Bearer ${member.accessToken}")
@@ -159,6 +167,32 @@ class MemberSettingsControllerTest @Autowired constructor(
         assertThat(withdrawnMember?.randomReceiveAllowed).isFalse()
 
         mockMvc.get("/api/v1/members/me") {
+            header("Authorization", "Bearer ${member.accessToken}")
+        }
+            .andExpect {
+                status { isUnauthorized() }
+                jsonPath("$.error.code") { value("UNAUTHORIZED") }
+            }
+
+        mockMvc.post("/api/v1/auth/login") {
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"email":"settings-withdraw@example.com","password":"pass1234"}"""
+        }
+            .andExpect {
+                status { isUnauthorized() }
+                jsonPath("$.error.code") { value("UNAUTHORIZED") }
+            }
+
+        mockMvc.post("/api/v1/auth/refresh") {
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"refreshToken":"${member.refreshToken}"}"""
+        }
+            .andExpect {
+                status { isUnauthorized() }
+                jsonPath("$.error.code") { value("UNAUTHORIZED") }
+            }
+
+        mockMvc.get("/api/v1/members/me/data-exports/$exportId/download") {
             header("Authorization", "Bearer ${member.accessToken}")
         }
             .andExpect {
@@ -301,6 +335,7 @@ class MemberSettingsControllerTest @Autowired constructor(
         return TestMember(
             memberId = signupResult.response.readJsonInt("$.data.id"),
             accessToken = loginResult.response.readJsonString("$.data.accessToken"),
+            refreshToken = loginResult.response.readJsonString("$.data.refreshToken"),
         )
     }
 }
@@ -308,6 +343,7 @@ class MemberSettingsControllerTest @Autowired constructor(
 private data class TestMember(
     val memberId: Int,
     val accessToken: String,
+    val refreshToken: String,
 )
 
 private fun MockHttpServletResponse.readJsonInt(path: String): Int {

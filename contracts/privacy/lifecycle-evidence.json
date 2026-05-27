@@ -1,0 +1,381 @@
+{
+  "version": 1,
+  "storePrivacyContract": "contracts/store-privacy/data-safety.json",
+  "storeLinks": {
+    "privacyPolicyUrl": "https://maum-on.app/privacy",
+    "termsUrl": "https://maum-on.app/terms",
+    "supportEmail": "support@maum-on.app",
+    "accountDeletionPath": "settings.member_withdrawal",
+    "dataExportPath": "settings.data_export"
+  },
+  "releaseBlockers": [
+    "missing_required_evidence",
+    "store_privacy_category_mismatch",
+    "store_privacy_link_mismatch",
+    "active_export_after_withdrawal",
+    "runtime_evidence_failed",
+    "missing_runtime_evidence",
+    "residual_file_leftover"
+  ],
+  "appLinks": {
+    "privacyPolicy": {
+      "file": "front/lib/features/legal/domain/legal_disclosures.dart",
+      "patterns": [
+        "privacyPolicyUrl = 'https://maum-on.app/privacy'",
+        "accountDeletionGuidance",
+        "dataExportGuidance"
+      ]
+    },
+    "settingsScreen": {
+      "file": "front/lib/features/settings/presentation/settings_screen.dart",
+      "patterns": [
+        "LegalDisclosureLinks",
+        "keyPrefix: 'settings'",
+        "ValueKey\\('settings-request-data-export'\\)",
+        "ValueKey\\('settings-download-data-export'\\)",
+        "ValueKey\\('settings-request-withdraw'\\)",
+        "ValueKey\\('settings-confirm-withdraw'\\)"
+      ]
+    },
+    "settingsScreenTest": {
+      "file": "front/test/features/settings/settings_screen_test.dart",
+      "patterns": [
+        "settings-privacy-policy-link",
+        "settings-request-data-export",
+        "settings-download-data-export",
+        "settings-request-withdraw",
+        "settings-confirm-withdraw"
+      ]
+    }
+  },
+  "dataExport": {
+    "ttlHours": 24,
+    "evidenceItems": [
+      {
+        "id": "export-routes",
+        "kind": "api",
+        "file": "back/src/main/kotlin/com/maumonmobile/adapter/in/web/member/MemberSettingsController.kt",
+        "patterns": [
+          "@PostMapping\\(\"/data-exports\"\\)",
+          "@GetMapping\\(\"/data-exports/\\{exportId\\}\"\\)",
+          "@GetMapping\\(\"/data-exports/\\{exportId\\}/download\"\\)"
+        ]
+      },
+      {
+        "id": "export-owner-expiry-download",
+        "kind": "e2e",
+        "file": "back/src/test/kotlin/com/maumonmobile/adapter/in/web/member/MemberSettingsControllerTest.kt",
+        "patterns": [
+          "exportsOwnDataWithMaskedSensitiveFieldsAndExpiry",
+          "/api/v1/members/me/data-exports/\\$exportId/download",
+          "status \\{ isForbidden\\(\\) \\}",
+          "status \\{ isGone\\(\\) \\}",
+          "maum-on-data-export-\\$exportId.json"
+        ]
+      },
+      {
+        "id": "export-sensitive-field-mask",
+        "kind": "masking",
+        "file": "back/src/test/kotlin/com/maumonmobile/adapter/in/web/member/MemberSettingsControllerTest.kt",
+        "patterns": [
+          "e\\*\\*\\*@example.com",
+          "\\[민감 상담 내용 숨김\\]",
+          "doesNotContain\\(\"민감 상담 원문\"\\)",
+          "doesNotContain\\(\"타인 댓글\"\\)"
+        ]
+      },
+      {
+        "id": "export-ui-download",
+        "kind": "ui",
+        "file": "front/test/features/settings/settings_repository_test.dart",
+        "patterns": [
+          "requests, checks, and downloads member data export",
+          "/api/v1/members/me/data-exports/3/download",
+          "disables expired data export download"
+        ]
+      }
+    ]
+  },
+  "runtimeEvidence": {
+    "defaultDirectory": "contracts/privacy/runtime-evidence",
+    "requiredFiles": [
+      {
+        "id": "account-withdrawal",
+        "filename": "privacy-account-withdrawal-results.json",
+        "requiredScenarios": [
+          "login_denied_after_withdrawal",
+          "member_data_query_denied_after_withdrawal",
+          "export_download_denied_after_withdrawal"
+        ]
+      },
+      {
+        "id": "data-export",
+        "filename": "privacy-data-export-results.json",
+        "requiredScenarios": [
+          "export_owner_only",
+          "export_expiry_denied",
+          "export_sensitive_fields_masked"
+        ]
+      },
+      {
+        "id": "residual-file-scan",
+        "filename": "privacy-residual-file-results.json",
+        "requiredScenarios": [
+          "image_object_storage_no_leftovers"
+        ],
+        "leftoverFilesField": "leftoverFiles"
+      }
+    ]
+  },
+  "categories": [
+    {
+      "id": "account_info",
+      "deleteAvailable": true,
+      "retentionExceptions": [
+        {
+          "id": "withdrawn-member-tombstone",
+          "reason": "탈퇴 회원 식별 충돌 방지",
+          "duration": "서비스 계정 감사 기간"
+        }
+      ],
+      "evidenceItems": [
+        {
+          "id": "withdraw-anonymizes-account",
+          "kind": "anonymize",
+          "file": "back/src/test/kotlin/com/maumonmobile/adapter/in/web/member/MemberSettingsControllerTest.kt",
+          "patterns": [
+            "withdrawsMemberAfterPasswordConfirmation",
+            "withdrawn-\\$\\{member\\.memberId\\}@maum-on\\.local",
+            "탈퇴한 회원",
+            "randomReceiveAllowed\\)\\.isFalse\\(\\)"
+          ]
+        },
+        {
+          "id": "withdraw-rejects-relogin-refresh-export",
+          "kind": "deny-after-delete",
+          "file": "back/src/test/kotlin/com/maumonmobile/adapter/in/web/member/MemberSettingsControllerTest.kt",
+          "patterns": [
+            "/api/v1/auth/login",
+            "/api/v1/auth/refresh",
+            "/api/v1/members/me/data-exports/\\$exportId/download",
+            "status \\{ isUnauthorized\\(\\) \\}"
+          ]
+        },
+        {
+          "id": "service-revokes-session-artifacts",
+          "kind": "session",
+          "file": "back/src/main/kotlin/com/maumonmobile/application/service/MemberSettingsService.kt",
+          "patterns": [
+            "authMemberRepository\\.revokeRefreshTokens\\(member\\.id\\)",
+            "notificationDeviceTokenRepository\\.disableAll\\(member\\.id\\)",
+            "sseSessionRevocationPort\\.closeMemberSessions\\(member\\.id\\)"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "user_generated_content",
+      "deleteAvailable": true,
+      "retentionExceptions": [
+        {
+          "id": "moderation-and-report-context",
+          "reason": "신고 처리와 운영 감사",
+          "duration": "정책상 필요한 처리 기간"
+        }
+      ],
+      "evidenceItems": [
+        {
+          "id": "withdraw-anonymizes-content-owners",
+          "kind": "anonymize",
+          "file": "back/src/main/kotlin/com/maumonmobile/application/service/MemberSettingsService.kt",
+          "patterns": [
+            "diaryRepository\\.anonymizeMember\\(member\\.id, WITHDRAWN_NICKNAME\\)",
+            "storyRepository\\.anonymizeMember\\(member\\.id, WITHDRAWN_NICKNAME, anonymizedEmail\\)",
+            "letterRepository\\.anonymizeMember\\(member\\.id, WITHDRAWN_NICKNAME\\)"
+          ]
+        },
+        {
+          "id": "export-owned-content-only",
+          "kind": "export",
+          "file": "back/src/test/kotlin/com/maumonmobile/adapter/in/web/member/MemberSettingsControllerTest.kt",
+          "patterns": [
+            "\\$\\.diaries\\[0\\]\\.title",
+            "\\$\\.stories\\.posts\\[0\\]\\.title",
+            "\\$\\.letters\\[0\\]\\.title",
+            "doesNotContain\\(\"타인 댓글\"\\)"
+          ]
+        },
+        {
+          "id": "story-delete-removes-post-and-comments",
+          "kind": "delete",
+          "file": "back/src/main/kotlin/com/maumonmobile/application/service/StoryService.kt",
+          "patterns": [
+            "storyRepository\\.deleteCommentsByPostId\\(postId\\)",
+            "storyRepository\\.deletePost\\(postId\\)",
+            "storyRepository\\.deleteComment\\(commentId\\)"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "photos_or_videos",
+      "deleteAvailable": true,
+      "retentionExceptions": [],
+      "residualFileChecks": [
+        {
+          "id": "diary-managed-image-delete",
+          "file": "back/src/main/kotlin/com/maumonmobile/application/service/DiaryService.kt",
+          "patterns": [
+            "diaryRepository\\.delete\\(diaryId\\)",
+            "imageLifecyclePort\\.deleteDiaryImage\\(diary\\.memberId, imageUrl\\)"
+          ]
+        },
+        {
+          "id": "image-storage-delete",
+          "file": "back/src/main/kotlin/com/maumonmobile/application/service/ImageService.kt",
+          "patterns": [
+            "imageStoragePort\\.delete\\(asset\\.storageKey\\)",
+            "ImageAssetStatus\\.CANCELLED"
+          ]
+        }
+      ],
+      "evidenceItems": [
+        {
+          "id": "image-delete-endpoint",
+          "kind": "delete",
+          "file": "back/src/test/kotlin/com/maumonmobile/adapter/in/web/image/ImageControllerTest.kt",
+          "patterns": [
+            "deletesTemporaryUploadedImage",
+            "/api/v1/images",
+            "status \\{ isOk\\(\\) \\}"
+          ]
+        },
+        {
+          "id": "diary-image-removal-cancels-asset",
+          "kind": "storage",
+          "file": "back/src/test/kotlin/com/maumonmobile/adapter/in/web/diary/DiaryControllerTest.kt",
+          "patterns": [
+            "updateReleasesRemovedContentBlockImages",
+            "ImageAssetStatus\\.CANCELLED",
+            "ImageAssetStatus\\.ATTACHED"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "sensitive_info",
+      "deleteAvailable": true,
+      "retentionExceptions": [
+        {
+          "id": "safety-intervention-retention",
+          "reason": "안전 개입 품질 관리와 위해 대응",
+          "duration": "민감 기록 보존 만료 시각까지"
+        }
+      ],
+      "evidenceItems": [
+        {
+          "id": "withdraw-hides-sensitive-consultation",
+          "kind": "anonymize",
+          "file": "back/src/main/kotlin/com/maumonmobile/application/service/MemberSettingsService.kt",
+          "patterns": [
+            "consultationRepository\\.hideSensitiveByMemberId\\(member\\.id\\)"
+          ]
+        },
+        {
+          "id": "consultation-delete-sensitive-history",
+          "kind": "delete",
+          "file": "back/src/main/kotlin/com/maumonmobile/application/service/ConsultationService.kt",
+          "patterns": [
+            "deleteSensitiveHistory",
+            "consultationRepository\\.hideSensitiveByMemberId\\(member\\.id\\)"
+          ]
+        },
+        {
+          "id": "export-masks-sensitive-content",
+          "kind": "export",
+          "file": "back/src/test/kotlin/com/maumonmobile/adapter/in/web/member/MemberSettingsControllerTest.kt",
+          "patterns": [
+            "\\[민감 상담 내용 숨김\\]",
+            "doesNotContain\\(\"민감 상담 원문\"\\)"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "push_token",
+      "deleteAvailable": true,
+      "retentionExceptions": [],
+      "evidenceItems": [
+        {
+          "id": "withdraw-disables-device-tokens",
+          "kind": "delete",
+          "file": "back/src/main/kotlin/com/maumonmobile/application/service/MemberSettingsService.kt",
+          "patterns": [
+            "notificationDeviceTokenRepository\\.disableAll\\(member\\.id\\)"
+          ]
+        },
+        {
+          "id": "device-token-delete-endpoint",
+          "kind": "delete",
+          "file": "back/src/test/kotlin/com/maumonmobile/adapter/in/web/notification/NotificationReportControllerTest.kt",
+          "patterns": [
+            "/api/v1/notifications/device-tokens",
+            "android-token-123456",
+            "status \\{ isOk\\(\\) \\}"
+          ]
+        },
+        {
+          "id": "device-token-disable-port",
+          "kind": "port",
+          "file": "back/src/main/kotlin/com/maumonmobile/application/port/out/NotificationDeviceTokenRepository.kt",
+          "patterns": [
+            "fun disableAll\\(memberId: Long\\): Int"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "performance_data",
+      "deleteAvailable": false,
+      "retentionExceptions": [
+        {
+          "id": "diagnostics-retention",
+          "reason": "장애 분석과 운영 대응",
+          "duration": "운영 로그 보존 기간"
+        }
+      ],
+      "evidenceItems": [
+        {
+          "id": "retention-policy-disclosed",
+          "kind": "retention",
+          "file": "back/src/test/kotlin/com/maumonmobile/adapter/in/web/member/MemberSettingsControllerTest.kt",
+          "patterns": [
+            "retentionPolicy\\.exportExpiryHours",
+            "value\\(24\\)"
+          ]
+        },
+        {
+          "id": "telemetry-sanitizes-sensitive-values",
+          "kind": "retention",
+          "file": "back/src/main/kotlin/com/maumonmobile/application/service/MobileTelemetryService.kt",
+          "patterns": [
+            "sanitizeRoute",
+            "sanitizeAppVersion",
+            "containsSensitiveValue",
+            "SENSITIVE_KEYS"
+          ]
+        },
+        {
+          "id": "store-contract-non-deletable-diagnostics",
+          "kind": "store",
+          "file": "contracts/store-privacy/data-safety.json",
+          "patterns": [
+            "\"id\": \"performance_data\"",
+            "\"deleteAvailable\": false",
+            "서비스 안정성 기록"
+          ]
+        }
+      ]
+    }
+  ]
+}
