@@ -95,7 +95,13 @@ if ! command -v xcrun >/dev/null 2>&1; then
   exit 1
 fi
 
-xcodebuild -version
+xcode_output="$(xcodebuild -version)"
+xcode_version="$(printf '%s\n' "${xcode_output}" | head -n 1)"
+printf '%s\n' "${xcode_output}"
+if [[ "${xcode_version}" != Xcode\ 26* ]]; then
+  echo "Xcode 26 is required for iOS archive/export; selected ${xcode_version}." >&2
+  exit 1
+fi
 xcrun --sdk iphoneos --show-sdk-version
 
 temp_parent="${RUNNER_TEMP:-${TMPDIR:-/tmp}}"

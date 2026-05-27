@@ -378,6 +378,7 @@ jobs:
           fi
 
       - name: Select Xcode 26
+        id: xcode
         if: ${{ steps.scaffold.outputs.present == 'true' }}
         shell: bash
         run: |
@@ -402,13 +403,27 @@ jobs:
           done
 
           if [[ -z "${selected}" ]]; then
-            echo "Xcode 26 is required for iOS release and TestFlight builds."
-            xcodebuild -version || true
-            exit 1
+            echo "::warning::Xcode 26 is required for iOS archive/upload builds, but it is not installed on this runner."
+          fi
+
+          selected_version="$(xcodebuild -version | head -n 1 || true)"
+          echo "version=${selected_version}" >> "${GITHUB_OUTPUT}"
+          if [[ "${selected_version}" == Xcode\ 26* ]]; then
+            echo "xcode26=true" >> "${GITHUB_OUTPUT}"
+          else
+            echo "xcode26=false" >> "${GITHUB_OUTPUT}"
           fi
 
           xcodebuild -version
-          xcrun --sdk iphoneos --show-sdk-version
+          xcrun --sdk iphoneos --show-sdk-version || true
+
+      - name: Require Xcode 26 for iOS archive or upload
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.ios_release_mode != 'dry-run' && steps.xcode.outputs.xcode26 != 'true' }}
+        shell: bash
+        run: |
+          echo "Xcode 26 is required for iOS archive/upload builds."
+          echo "Selected Xcode: ${{ steps.xcode.outputs.version }}"
+          exit 1
 
       - name: Set up Flutter
         if: ${{ steps.scaffold.outputs.present == 'true' && steps.scaffold.outputs.stack == 'flutter' }}

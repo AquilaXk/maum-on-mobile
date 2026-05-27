@@ -191,6 +191,9 @@ test("CI exposes manual Android and iOS release build preflights", () => {
   assert.match(workflow, /bundle _2\.4\.22_ config set --local path vendor\/bundle/);
   assert.match(workflow, /bundle _2\.4\.22_ install --jobs 4 --retry 3/);
   assert.match(workflow, /Select Xcode 26/);
+  assert.match(workflow, /Require Xcode 26 for iOS archive or upload/);
+  assert.match(workflow, /ios_release_mode != 'dry-run'/);
+  assert.match(workflow, /steps\.xcode\.outputs\.xcode26 != 'true'/);
   assert.match(workflow, /xcodebuild -version/);
   assert.match(workflow, /MAUMON_IOS_DEVELOPMENT_TEAM/);
   assert.match(workflow, /MAUMON_IOS_EXPORT_OPTIONS_PLIST_BASE64/);
@@ -280,6 +283,7 @@ test("iOS TestFlight archive script fails clearly without signing and upload inp
   assert.ok((statSync(script).mode & 0o111) !== 0, "iOS TestFlight archive script must be executable");
   assert.match(scriptContents, /tools\/flutterw/, "iOS archive script must use the repository Flutter wrapper");
   assert.match(scriptContents, /xcodebuild -version/, "iOS archive script must report the selected Xcode version");
+  assert.match(scriptContents, /Xcode\\ 26\*/, "iOS archive script must enforce Xcode 26 for real archive/export");
   assert.match(scriptContents, /flutter build ipa --release/, "iOS archive script must produce an IPA");
   assert.match(scriptContents, /xcrun altool --upload-app/, "iOS archive script must support TestFlight upload");
 

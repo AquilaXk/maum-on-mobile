@@ -31,7 +31,8 @@ test("mobile release preflight script checks Android and iOS toolchains", () => 
   assert.match(script, /android-sdk:/, "Android preflight must parse Flutter's configured Android SDK");
   assert.match(script, /java -version/, "Android preflight must inspect Java");
   assert.match(script, /xcodebuild -version/, "iOS preflight must inspect full Xcode");
-  assert.match(script, /Xcode 26/, "iOS preflight must enforce the Xcode 26 SDK line");
+  assert.match(script, /Xcode 26/, "iOS preflight must inspect the Xcode 26 SDK line");
+  assert.match(script, /archive\/upload requires Xcode 26/, "iOS preflight must warn instead of failing PR checks when Xcode 26 is unavailable");
   assert.match(script, /iphoneos/, "iOS preflight must inspect the iPhoneOS SDK");
   assert.match(script, /pod --version/, "iOS preflight must inspect CocoaPods");
   assert.match(script, /flutter doctor -v/, "Preflight must expose Flutter doctor diagnostics");

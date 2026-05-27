@@ -179,7 +179,7 @@ check_ios() {
     if [[ "${xcode_version}" == Xcode\ 26* ]]; then
       record "Xcode 26" "ok" "${xcode_version}"
     else
-      record "Xcode 26" "missing" "selected ${xcode_version}; Xcode 26 is required"
+      record "Xcode 26" "warn" "selected ${xcode_version}; archive/upload requires Xcode 26"
     fi
   else
     record "Xcode" "missing" "${xcode_output//$'\n'/ }"
