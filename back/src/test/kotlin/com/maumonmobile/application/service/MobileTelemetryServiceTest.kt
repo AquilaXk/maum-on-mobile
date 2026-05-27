@@ -110,6 +110,53 @@ class MobileTelemetryServiceTest {
     }
 
     @Test
+    fun recordsCrashAndAnrSignalsWithSanitizedReleaseContext() {
+        val metrics = MobileApiMetricsRegistry()
+        val service = MobileTelemetryService(metrics)
+
+        val result = service.ingest(
+            user = user("4"),
+            command = MobileTelemetryBatchCommand(
+                events = listOf(
+                    MobileTelemetryEventCommand(
+                        type = "crash_signal",
+                        durationMs = 10,
+                        route = "/crash/4242?email=leak@example.com",
+                        platform = "android",
+                        appVersion = "2.3.4+42",
+                        networkStatus = "offline",
+                    ),
+                    MobileTelemetryEventCommand(
+                        type = "anr_signal",
+                        durationMs = 5_000,
+                        route = "/home/777",
+                        platform = "ios",
+                        appVersion = "2.3.4+42",
+                        networkStatus = "cellular",
+                    ),
+                ),
+            ),
+        )
+
+        assertThat(result.acceptedCount).isEqualTo(2)
+        val snapshot = metrics.snapshot()
+        assertThat(snapshot.client.events)
+            .containsEntry("CRASH_SIGNAL", 1)
+            .containsEntry("ANR_SIGNAL", 1)
+        assertThat(snapshot.client.appVersions).containsEntry("2.3.4+42", 2)
+        assertThat(snapshot.client.platforms)
+            .containsEntry("ANDROID", 1)
+            .containsEntry("IOS", 1)
+        assertThat(snapshot.client.networkStatus)
+            .containsEntry("OFFLINE", 1)
+            .containsEntry("CELLULAR", 1)
+        assertThat(snapshot.client.routes)
+            .containsEntry("/crash/{id}", 1)
+            .containsEntry("/home/{id}", 1)
+        assertThat(snapshot.toString()).doesNotContain("leak@example.com")
+    }
+
+    @Test
     fun rejectsOversizedPayloadAndInvalidEventSchema() {
         val service = MobileTelemetryService(MobileApiMetricsRegistry())
 

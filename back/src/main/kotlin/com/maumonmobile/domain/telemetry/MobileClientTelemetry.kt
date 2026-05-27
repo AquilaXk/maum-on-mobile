@@ -15,6 +15,7 @@ enum class MobileClientTelemetryEventType {
     API_ERROR,
     WRITE_RECOVERY,
     CRASH_SIGNAL,
+    ANR_SIGNAL,
     ;
 
     companion object {
@@ -25,6 +26,7 @@ enum class MobileClientTelemetryEventType {
                 "APIERROR", "API_ERROR" -> API_ERROR
                 "WRITERECOVERY", "WRITE_RECOVERY" -> WRITE_RECOVERY
                 "CRASHSIGNAL", "CRASH_SIGNAL" -> CRASH_SIGNAL
+                "ANRSIGNAL", "ANR_SIGNAL" -> ANR_SIGNAL
                 else -> null
             }
         }

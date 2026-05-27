@@ -354,6 +354,18 @@ test("path classifier enables mobile privacy lifecycle checks for privacy contra
   assert.equal(outputs.javascript, "false");
 });
 
+test("path classifier enables mobile ops observability checks for ops contracts", async () => {
+  const outputs = await classifyChangedFiles(["contracts/ops/observability-gate.json"]);
+
+  assert.equal(outputs.docs_only, "false");
+  assert.equal(outputs.backend, "true");
+  assert.equal(outputs.frontend, "true");
+  assert.equal(outputs.repository, "true");
+  assert.equal(outputs.android, "true");
+  assert.equal(outputs.ios, "true");
+  assert.equal(outputs.javascript, "false");
+});
+
 test("path classifier enables root JavaScript checks for root package changes", async () => {
   const outputs = await classifyChangedFiles(["package.json", "src/app.ts"]);
 

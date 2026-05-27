@@ -769,6 +769,8 @@ class _ObservabilityView extends StatelessWidget {
       );
     }
 
+    final incidentReasons = metrics.incidentReasons;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -788,6 +790,10 @@ class _ObservabilityView extends StatelessWidget {
         const SizedBox(height: AppSpacing.md),
         _ObservabilityMetricTiles(metrics: metrics),
         const SizedBox(height: AppSpacing.lg),
+        if (incidentReasons.isNotEmpty) ...[
+          _IncidentReasonsList(reasons: incidentReasons),
+          const SizedBox(height: AppSpacing.lg),
+        ],
         Text('API endpoint 품질', style: Theme.of(context).textTheme.titleMedium),
         const SizedBox(height: AppSpacing.xs),
         _EndpointMetricsList(endpoints: metrics.endpoints),
@@ -873,6 +879,41 @@ class _ObservabilityMetricTiles extends StatelessWidget {
         AppMetricTile(
           label: '쓰기 복구',
           value: metrics.writeRecoveryEventCount.toString(),
+        ),
+      ],
+    );
+  }
+}
+
+class _IncidentReasonsList extends StatelessWidget {
+  const _IncidentReasonsList({required this.reasons});
+
+  final List<OperationsIncidentReason> reasons;
+
+  @override
+  Widget build(BuildContext context) {
+    if (reasons.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text('최근 장애 원인', style: Theme.of(context).textTheme.titleMedium),
+        const SizedBox(height: AppSpacing.xs),
+        Wrap(
+          spacing: AppSpacing.xs,
+          runSpacing: AppSpacing.xs,
+          children: [
+            for (final reason in reasons)
+              AppStatusPill(
+                label: '${reason.label} · ${reason.detail}',
+                tone: switch (reason.severity) {
+                  OperationsIncidentSeverity.danger => AppStatusTone.danger,
+                  OperationsIncidentSeverity.warning => AppStatusTone.warning,
+                },
+              ),
+          ],
         ),
       ],
     );

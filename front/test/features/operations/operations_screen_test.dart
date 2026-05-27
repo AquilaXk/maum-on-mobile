@@ -317,7 +317,18 @@ void main() {
     expect(operationsRepository.metricsFetchCount, greaterThanOrEqualTo(1));
     expect(find.text('운영 관측'), findsOneWidget);
     expect(find.text('API endpoint 품질'), findsOneWidget);
-    expect(find.textContaining('stats'), findsOneWidget);
+    expect(find.text('최근 장애 원인'), findsOneWidget);
+    expect(find.text('Crash signal · CRASH_SIGNAL · 1'), findsOneWidget);
+    expect(find.text('ANR signal · ANR_SIGNAL · 1'), findsOneWidget);
+    expect(
+      find.text('Push permanent failure · IOS.permanent_failure · 2'),
+      findsOneWidget,
+    );
+    expect(
+      find.text('AI fallback · consultation.fallback · 1'),
+      findsOneWidget,
+    );
+    expect(find.textContaining('stats'), findsWidgets);
     expect(find.text('위험'), findsWidgets);
     expect(find.text('앱 이벤트 집계'), findsOneWidget);
     expect(find.text('쓰기 복구'), findsWidgets);
@@ -586,7 +597,8 @@ void main() {
     await tester.ensureVisible(
       find.byKey(const ValueKey('operations-letter-note-button')),
     );
-    await tester.tap(find.byKey(const ValueKey('operations-letter-note-button')));
+    await tester
+        .tap(find.byKey(const ValueKey('operations-letter-note-button')));
     await tester.pumpAndSettle();
 
     expect(operationsRepository.letterNotes, isEmpty);
@@ -1208,10 +1220,10 @@ MobileApiMetricsSnapshot _metrics() {
       imageLifecycle: {'compressed': 2},
     ),
     notifications: MobileNotificationMetrics(
-      pushDelivery: {'ANDROID.delivered': 3},
+      pushDelivery: {'ANDROID.delivered': 3, 'IOS.permanent_failure': 2},
     ),
     ai: MobileAiMetrics(
-      model: {'consultation.success': 2},
+      model: {'consultation.success': 2, 'consultation.fallback': 1},
       contentModeration: {'POST.HIGH.blocked': 1},
       consultationSafety: {'SELF_HARM.ESCALATE': 1},
     ),
@@ -1220,6 +1232,8 @@ MobileApiMetricsSnapshot _metrics() {
         'APP_START': 1,
         'SCREEN_VIEW': 3,
         'API_ERROR': 1,
+        'CRASH_SIGNAL': 1,
+        'ANR_SIGNAL': 1,
         'WRITE_RECOVERY': 2,
       },
       routes: {'/home': 3, '/letter': 2},
