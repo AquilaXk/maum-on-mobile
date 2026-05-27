@@ -46,6 +46,13 @@ while IFS= read -r file; do
       frontend=true
       repository=true
       ;;
+    contracts/store-content/**)
+      android=true
+      backend=true
+      frontend=true
+      ios=true
+      repository=true
+      ;;
     contracts/store-review/review-seed.json)
       backend=true
       frontend=true
