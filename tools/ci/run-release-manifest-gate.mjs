@@ -219,7 +219,7 @@ function validateVersions(document, sources) {
 }
 
 function compareVersion(versionFailures, field, actual, expected) {
-  if (!actual || !expected) {
+  if (actual === undefined || actual === null || expected === undefined || expected === null) {
     return;
   }
 
@@ -240,13 +240,15 @@ function validateNotes(document) {
   }
 
   const noteFailures = [];
-  const googlePlay = stringValue(getValue(document, "storeReleaseNotes.googlePlay"));
-  const appStore = stringValue(getValue(document, "storeReleaseNotes.appStore"));
+  const requiredStoreFields = contract.manifestSchema?.requiredStoreNoteFields ?? ["googlePlay", "appStore"];
+  const noteLengthLimits = contract.manifestSchema?.noteLengthLimits ?? {};
+  const storeValues = Object.fromEntries(
+    requiredStoreFields.map((field) => [field, stringValue(getValue(document, `storeReleaseNotes.${field}`))]),
+  );
   const testerNotes = stringValue(document.testerNotes);
 
   for (const [field, value] of [
-    ["storeReleaseNotes.googlePlay", googlePlay],
-    ["storeReleaseNotes.appStore", appStore],
+    ...Object.entries(storeValues).map(([field, value]) => [`storeReleaseNotes.${field}`, value]),
     ["testerNotes", testerNotes],
   ]) {
     if (!value) {
@@ -258,26 +260,30 @@ function validateNotes(document) {
     }
   }
 
-  if (googlePlay.length > 500) {
-    noteFailures.push({
-      reason: "release_notes_missing",
-      message: "Google Play release notes must stay at or below 500 characters.",
-      field: "storeReleaseNotes.googlePlay",
-    });
+  for (const [field, value] of Object.entries(storeValues)) {
+    const limit = Number(noteLengthLimits[field]);
+    if (Number.isFinite(limit) && limit > 0 && value.length > limit) {
+      noteFailures.push({
+        reason: "release_notes_missing",
+        message: `Release manifest note '${field}' must stay at or below ${limit} characters.`,
+        field: `storeReleaseNotes.${field}`,
+      });
+    }
   }
 
-  if (appStore.length > 4000 || testerNotes.length > 4000) {
+  const testerNotesLimit = Number(noteLengthLimits.testerNotes);
+  if (Number.isFinite(testerNotesLimit) && testerNotesLimit > 0 && testerNotes.length > testerNotesLimit) {
     noteFailures.push({
       reason: "release_notes_missing",
-      message: "App Store and tester notes must stay at or below 4000 characters.",
-      field: "storeReleaseNotes.appStore",
+      message: `Tester notes must stay at or below ${testerNotesLimit} characters.`,
+      field: "testerNotes",
     });
   }
 
   return {
     status: noteFailures.length === 0 ? "pass" : "fail",
-    googlePlayLength: googlePlay.length,
-    appStoreLength: appStore.length,
+    googlePlayLength: storeValues.googlePlay?.length ?? 0,
+    appStoreLength: storeValues.appStore?.length ?? 0,
     testerNotesLength: testerNotes.length,
     failures: noteFailures,
   };
@@ -318,24 +324,33 @@ function validateRollback(document) {
   }
 
   const rollbackFailures = [];
-  const owner = stringValue(getValue(document, "rollback.owner"));
-  const conditions = Array.isArray(getValue(document, "rollback.conditions"))
-    ? getValue(document, "rollback.conditions").map(stringValue).filter(Boolean)
+  const requiredRollbackFields = contract.manifestSchema?.requiredRollbackFields ?? ["owner", "conditions"];
+  const rollback = document.rollback ?? {};
+  const owner = stringValue(rollback.owner);
+  const conditions = Array.isArray(rollback.conditions)
+    ? rollback.conditions.map(stringValue).filter(Boolean)
     : [];
 
-  if (!owner) {
-    rollbackFailures.push({
-      reason: "rollback_condition_missing",
-      message: "Release manifest rollback owner is missing.",
-      field: "rollback.owner",
-    });
-  }
-  if (conditions.length === 0) {
-    rollbackFailures.push({
-      reason: "rollback_condition_missing",
-      message: "Release manifest rollback conditions are missing.",
-      field: "rollback.conditions",
-    });
+  for (const field of requiredRollbackFields) {
+    if (field === "conditions") {
+      if (conditions.length === 0) {
+        rollbackFailures.push({
+          reason: "rollback_condition_missing",
+          message: "Release manifest rollback conditions are missing.",
+          field: "rollback.conditions",
+        });
+      }
+      continue;
+    }
+
+    const fieldPath = `rollback.${field}`;
+    if (isBlank(getValue(document, fieldPath))) {
+      rollbackFailures.push({
+        reason: "rollback_condition_missing",
+        message: `Release manifest rollback field '${fieldPath}' is missing.`,
+        field: fieldPath,
+      });
+    }
   }
 
   return {

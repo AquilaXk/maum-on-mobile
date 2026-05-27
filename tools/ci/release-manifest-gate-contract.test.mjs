@@ -42,6 +42,17 @@ test("release manifest contract covers version, notes, approval, and rollback bl
     "storeReleaseNotes",
     "testerNotes",
   ]);
+  assert.deepEqual(contract.manifestSchema.requiredStoreNoteFields.sort(), [
+    "appStore",
+    "googlePlay",
+  ]);
+  assert.deepEqual(contract.manifestSchema.requiredRollbackFields.sort(), [
+    "conditions",
+    "owner",
+  ]);
+  assert.equal(contract.manifestSchema.noteLengthLimits.googlePlay, 500);
+  assert.equal(contract.manifestSchema.noteLengthLimits.appStore, 4000);
+  assert.equal(contract.manifestSchema.noteLengthLimits.testerNotes, 4000);
 
   for (const blocker of [
     "missing_release_manifest",
@@ -61,6 +72,11 @@ test("release manifest contract covers version, notes, approval, and rollback bl
     contract.staticEvidence.some((item) => item.file === "tools/ci/run-ios-testflight-archive.sh"),
     "iOS store submit script must be static evidence",
   );
+
+  const runner = read(runnerPath);
+  assert.match(runner, /requiredStoreNoteFields/);
+  assert.match(runner, /requiredRollbackFields/);
+  assert.match(runner, /noteLengthLimits/);
 });
 
 test("repository release sources and store submit scripts are wired to one manifest path", () => {
@@ -179,6 +195,32 @@ test("release manifest runner fails version mismatch and duplicate build numbers
       assert.equal(error.code, 1);
       assert.match(error.stderr, /release_version_mismatch/);
       assert.match(error.stderr, /duplicate_build_number/);
+      return true;
+    },
+  );
+});
+
+test("release manifest runner treats blank version fields as mismatches", async () => {
+  const reportDir = await mkdtemp(path.join(tmpdir(), "maum-release-manifest-blank-version-"));
+  const manifestPath = path.join(reportDir, "release.json");
+  const manifest = validManifest();
+  manifest.android.versionName = "";
+  manifest.ios.buildNumber = "";
+  manifest.backend.version = "";
+  await writeFile(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
+
+  await assert.rejects(
+    execFileAsync("node", [
+      path.join(root, runnerPath),
+      "--manifest",
+      manifestPath,
+      "--report-dir",
+      reportDir,
+      "--require-manifest",
+    ]),
+    (error) => {
+      assert.equal(error.code, 1);
+      assert.match(error.stderr, /release_version_mismatch/);
       return true;
     },
   );

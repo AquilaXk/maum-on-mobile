@@ -42,7 +42,12 @@
     },
     "requiredApprovalFields": ["approver", "changeScope", "deployWindow.start", "deployWindow.end"],
     "requiredRollbackFields": ["owner", "conditions"],
-    "requiredStoreNoteFields": ["googlePlay", "appStore"]
+    "requiredStoreNoteFields": ["googlePlay", "appStore"],
+    "noteLengthLimits": {
+      "googlePlay": 500,
+      "appStore": 4000,
+      "testerNotes": 4000
+    }
   },
   "staticEvidence": [
     {
