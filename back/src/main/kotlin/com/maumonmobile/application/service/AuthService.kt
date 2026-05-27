@@ -60,6 +60,10 @@ class AuthService(
     private val providerAuthorizationBaseUrl: String,
     @param:Value("\${app.auth.oidc.client-id:maum-on-mobile}")
     private val oidcClientId: String,
+    @param:Value("\${app.auth.oidc.apple.authorization-uri:https://appleid.apple.com/auth/authorize}")
+    private val appleAuthorizationUri: String,
+    @param:Value("\${app.auth.oidc.apple.client-id:}")
+    private val appleClientId: String,
     @param:Value("\${app.auth.oidc.state-ttl:PT10M}")
     private val oidcStateTtl: Duration,
     @param:Value("\${app.auth.oidc.default-app-redirect-uri:maumon://auth/callback}")
@@ -239,10 +243,9 @@ class AuthService(
 
         return OidcAuthorizeResult(
             authorizationUri = UriComponentsBuilder
-                .fromUriString(providerAuthorizationBaseUrl.trimEnd('/'))
-                .pathSegment(provider, "authorize")
+                .fromUriString(authorizationEndpoint(provider))
                 .queryParam("response_type", "code")
-                .queryParam("client_id", oidcClientId)
+                .queryParam("client_id", oidcClientIdFor(provider))
                 .queryParam("redirect_uri", savedState.redirectUri)
                 .queryParam("state", savedState.state)
                 .queryParam("nonce", savedState.nonce)
@@ -420,7 +423,7 @@ class AuthService(
                     code = code,
                     codeVerifier = savedState.codeVerifier,
                     redirectUri = savedState.redirectUri,
-                    clientId = oidcClientId,
+                    clientId = oidcClientIdFor(provider),
                     expectedNonce = savedState.nonce,
                 ),
             )
@@ -440,6 +443,29 @@ class AuthService(
         }
 
         return normalized
+    }
+
+    private fun authorizationEndpoint(provider: String): String {
+        if (provider == APPLE_PROVIDER) {
+            return appleAuthorizationUri.trim()
+        }
+
+        return UriComponentsBuilder.fromUriString(providerAuthorizationBaseUrl.trimEnd('/'))
+            .pathSegment(provider, "authorize")
+            .toUriString()
+    }
+
+    private fun oidcClientIdFor(provider: String): String {
+        if (provider == APPLE_PROVIDER) {
+            return appleClientId
+                .trim()
+                .takeIf(String::isNotEmpty)
+                ?: throw IllegalStateException(
+                    "app.auth.oidc.apple.client-id is required for Apple OIDC login.",
+                )
+        }
+
+        return oidcClientId
     }
 
     private fun String.validatedMobileRedirectUri(): String {
@@ -508,6 +534,7 @@ class AuthService(
     }
 
     private companion object {
+        private const val APPLE_PROVIDER = "apple"
         private val secureRandom = SecureRandom()
         private val log = LoggerFactory.getLogger(AuthService::class.java)
     }

@@ -23,6 +23,12 @@ class HttpAuthOidcIdentityProvider(
     private val providerJwksBaseUrl: String,
     @param:Value("\${app.auth.oidc.provider-issuer-base-url:https://login.maumon.local}")
     private val providerIssuerBaseUrl: String,
+    @param:Value("\${app.auth.oidc.apple.token-uri:https://appleid.apple.com/auth/token}")
+    private val appleTokenUri: String,
+    @param:Value("\${app.auth.oidc.apple.jwks-uri:https://appleid.apple.com/auth/keys}")
+    private val appleJwksUri: String,
+    @param:Value("\${app.auth.oidc.apple.issuer:https://appleid.apple.com}")
+    private val appleIssuer: String,
 ) : AuthOidcIdentityProvider {
     private val restClient = RestClient.create()
 
@@ -92,18 +98,30 @@ class HttpAuthOidcIdentityProvider(
     }
 
     private fun tokenUri(provider: String): String {
+        if (provider == APPLE_PROVIDER) {
+            return appleTokenUri.trim()
+        }
+
         return UriComponentsBuilder.fromUriString(providerTokenBaseUrl.trimEnd('/'))
             .pathSegment(provider, "token")
             .toUriString()
     }
 
     private fun jwksUri(provider: String): String {
+        if (provider == APPLE_PROVIDER) {
+            return appleJwksUri.trim()
+        }
+
         return UriComponentsBuilder.fromUriString(providerJwksBaseUrl.trimEnd('/'))
             .pathSegment(provider, "jwks")
             .toUriString()
     }
 
     private fun issuer(provider: String): String {
+        if (provider == APPLE_PROVIDER) {
+            return appleIssuer.trimEnd('/')
+        }
+
         return UriComponentsBuilder.fromUriString(providerIssuerBaseUrl.trimEnd('/'))
             .pathSegment(provider)
             .toUriString()
@@ -127,4 +145,8 @@ class HttpAuthOidcIdentityProvider(
         @field:JsonProperty("id_token")
         val idToken: String? = null,
     )
+
+    private companion object {
+        private const val APPLE_PROVIDER = "apple"
+    }
 }

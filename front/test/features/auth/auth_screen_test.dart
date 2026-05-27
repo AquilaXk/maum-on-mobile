@@ -133,9 +133,10 @@ void main() {
     expect(find.byKey(const ValueKey('auth-terms-link')), findsOneWidget);
   });
 
-  testWidgets('hides third-party login on iOS review builds', (tester) async {
+  testWidgets('shows Apple login and hides Kakao on iOS', (tester) async {
     final repository = _FakeAuthRepository();
     final authController = AuthController(authRepository: repository);
+    final launcher = _FakeExternalLoginLauncher();
 
     await tester.pumpWidget(
       _AuthScreenHarness(
@@ -144,7 +145,7 @@ void main() {
         platform: TargetPlatform.iOS,
         externalLoginController: ExternalLoginController(
           authController: authController,
-          launcher: _FakeExternalLoginLauncher(),
+          launcher: launcher,
           config: ExternalLoginConfig(
             apiBaseUrl: Uri.parse('https://api.example.com'),
           ),
@@ -155,16 +156,33 @@ void main() {
     expect(find.byKey(const ValueKey('login-email-field')), findsOneWidget);
     expect(find.byKey(const ValueKey('login-password-field')), findsOneWidget);
     expect(
+      find.byKey(const ValueKey('external-login-apple-button')),
+      findsOneWidget,
+    );
+    expect(
       find.byKey(const ValueKey('external-login-kakao-button')),
       findsNothing,
     );
     expect(
       find.byKey(const ValueKey('ios-review-email-login-guidance')),
-      findsOneWidget,
+      findsNothing,
     );
     expect(
       find.byKey(const ValueKey('auth-account-deletion-guidance')),
       findsOneWidget,
+    );
+
+    await tester.ensureVisible(
+      find.byKey(const ValueKey('external-login-apple-button')),
+    );
+    await tester.tap(find.byKey(const ValueKey('external-login-apple-button')));
+    await tester.pumpAndSettle();
+
+    final launchedUri = launcher.launchedUris.single;
+    expect(launchedUri.path, '/api/v1/auth/oidc/authorize/apple');
+    expect(
+      launchedUri.queryParameters['redirect_uri'],
+      'maumon://auth/callback?provider=apple',
     );
   });
 
@@ -191,6 +209,10 @@ void main() {
     expect(
       find.byKey(const ValueKey('external-login-kakao-button')),
       findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey('external-login-apple-button')),
+      findsNothing,
     );
     expect(
       find.byKey(const ValueKey('ios-review-email-login-guidance')),
@@ -225,8 +247,13 @@ class _AuthScreenHarness extends StatelessWidget {
 }
 
 class _FakeExternalLoginLauncher implements ExternalLoginLauncher {
+  final List<Uri> launchedUris = [];
+
   @override
-  Future<bool> launch(Uri uri) async => true;
+  Future<bool> launch(Uri uri) async {
+    launchedUris.add(uri);
+    return true;
+  }
 }
 
 class _FakeAuthRepository implements AuthRepository {
