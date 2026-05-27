@@ -29,6 +29,7 @@ import '../features/letter/application/letter_controller.dart';
 import '../features/letter/data/letter_repository.dart';
 import '../features/letter/domain/letter_models.dart';
 import '../features/letter/presentation/letter_screen.dart';
+import '../features/legal/domain/legal_disclosures.dart';
 import '../features/moderation/data/content_moderation_repository.dart';
 import '../features/notification/application/notification_controller.dart';
 import '../features/notification/data/notification_repository.dart';
@@ -310,6 +311,7 @@ class _MaumOnMobileAppState extends State<MaumOnMobileApp>
             ),
       AuthenticatedRoute.settings => SettingsScreen(
           controller: _settingsControllerFor(memberId),
+          supportContactInfo: _supportContactInfo(),
           onBack: _returnHome,
         ),
       AuthenticatedRoute.letter => _buildLetterRoute(memberId),
@@ -676,8 +678,8 @@ class _MaumOnMobileAppState extends State<MaumOnMobileApp>
     _disposeNotificationController(unregisterPushToken: true);
     _notificationMemberId = memberId;
     return _notificationController = NotificationController(
-      repository:
-          widget.notificationRepository ?? _buildDefaultNotificationRepository(),
+      repository: widget.notificationRepository ??
+          _buildDefaultNotificationRepository(),
       pushPermissionClient: _pushNotificationClient,
       onUnauthorized: _handleControllerSessionInvalidated,
     );
@@ -701,9 +703,8 @@ class _MaumOnMobileAppState extends State<MaumOnMobileApp>
 
   Future<void> _unregisterCurrentPushToken() async {
     try {
-      final token = (await _pushNotificationClient.getPermissionStatus())
-          .token
-          ?.trim();
+      final token =
+          (await _pushNotificationClient.getPermissionStatus()).token?.trim();
       if (token == null || token.isEmpty) {
         return;
       }
@@ -952,6 +953,24 @@ class _MaumOnMobileAppState extends State<MaumOnMobileApp>
         'OBSERVABILITY_TOOL_URL',
         defaultValue: '',
       ),
+    );
+  }
+
+  SupportContactInfo _supportContactInfo() {
+    return SupportContactInfo(
+      supportEmail: LegalDisclosures.supportEmail,
+      privacyEmail: LegalDisclosures.privacyEmail,
+      supportUrl: LegalDisclosures.supportUrl,
+      incidentNoticeUrl: LegalDisclosures.incidentNoticeUrl,
+      appVersion: const String.fromEnvironment(
+        'APP_VERSION',
+        defaultValue: '0.1.0',
+      ),
+      buildNumber: const String.fromEnvironment(
+        'APP_BUILD_NUMBER',
+        defaultValue: '1',
+      ),
+      platform: _platformLabel(defaultTargetPlatform),
     );
   }
 

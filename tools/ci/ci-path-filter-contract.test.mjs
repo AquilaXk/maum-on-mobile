@@ -402,6 +402,18 @@ test("path classifier enables mobile ops observability checks for ops contracts"
   assert.equal(outputs.javascript, "false");
 });
 
+test("path classifier enables release support checks for support contracts", async () => {
+  const outputs = await classifyChangedFiles(["contracts/support/release-support-readiness.json"]);
+
+  assert.equal(outputs.docs_only, "false");
+  assert.equal(outputs.backend, "true");
+  assert.equal(outputs.frontend, "true");
+  assert.equal(outputs.repository, "true");
+  assert.equal(outputs.android, "true");
+  assert.equal(outputs.ios, "true");
+  assert.equal(outputs.javascript, "false");
+});
+
 test("path classifier enables production deploy checks for infra contracts", async () => {
   const outputs = await classifyChangedFiles(["contracts/infra/production-deploy-readiness.json"]);
 

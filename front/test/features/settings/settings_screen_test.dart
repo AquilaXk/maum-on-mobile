@@ -4,6 +4,7 @@ import 'package:maum_on_mobile_front/features/settings/application/settings_cont
 import 'package:maum_on_mobile_front/features/settings/data/settings_repository.dart';
 import 'package:maum_on_mobile_front/features/settings/domain/settings_models.dart';
 import 'package:maum_on_mobile_front/features/settings/presentation/settings_screen.dart';
+import 'package:maum_on_mobile_front/features/legal/domain/legal_disclosures.dart';
 
 void main() {
   testWidgets('renders settings and submits account changes', (tester) async {
@@ -136,6 +137,87 @@ void main() {
     expect(find.textContaining('내 데이터'), findsWidgets);
     expect(find.byKey(const ValueKey('settings-request-withdraw')),
         findsOneWidget);
+  });
+
+  testWidgets('opens support contacts and copies sanitized diagnostics',
+      (tester) async {
+    final repository = _FakeSettingsRepository();
+    final controller = SettingsController(repository: repository);
+    final openedUris = <Uri>[];
+    final copiedDiagnostics = <String>[];
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: SettingsScreen(
+          controller: controller,
+          onBack: () {},
+          supportContactInfo: const SupportContactInfo(
+            supportEmail: 'support@maum-on.app',
+            privacyEmail: 'privacy@maum-on.app',
+            supportUrl: 'https://maum-on.app/support',
+            incidentNoticeUrl: 'https://maum-on.app/status',
+            appVersion: '1.2.3',
+            buildNumber: '45',
+            platform: 'Android',
+          ),
+          onOpenExternalUri: (uri) async {
+            openedUris.add(uri);
+            return true;
+          },
+          onCopyDiagnostics: (value) async {
+            copiedDiagnostics.add(value);
+          },
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.ensureVisible(
+      find.byKey(const ValueKey('settings-support-contact-button')),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('고객지원'), findsWidgets);
+    expect(find.text('개인정보 문의'), findsOneWidget);
+    expect(find.text('장애 공지'), findsOneWidget);
+    expect(find.text('앱 버전'), findsOneWidget);
+    expect(find.bySemanticsLabel('앱 버전, 1.2.3'), findsOneWidget);
+    expect(find.text('빌드 번호'), findsOneWidget);
+    expect(find.bySemanticsLabel('빌드 번호, 45'), findsOneWidget);
+    expect(find.text('플랫폼'), findsOneWidget);
+    expect(find.bySemanticsLabel('플랫폼, Android'), findsOneWidget);
+    expect(find.text('locale'), findsOneWidget);
+    expect(find.bySemanticsLabel('locale, ko-KR'), findsOneWidget);
+
+    await tester
+        .tap(find.byKey(const ValueKey('settings-support-contact-button')));
+    await tester.pumpAndSettle();
+    await tester
+        .tap(find.byKey(const ValueKey('settings-privacy-contact-button')));
+    await tester.pumpAndSettle();
+    await tester
+        .tap(find.byKey(const ValueKey('settings-incident-notice-button')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('settings-copy-diagnostics')));
+    await tester.pumpAndSettle();
+
+    expect(openedUris[0].scheme, 'mailto');
+    expect(openedUris[0].path, 'support@maum-on.app');
+    expect(openedUris[0].queryParameters['body'], contains('appVersion=1.2.3'));
+    expect(openedUris[0].queryParameters['body'], contains('buildNumber=45'));
+    expect(openedUris[0].queryParameters['body'], contains('platform=Android'));
+    expect(openedUris[0].queryParameters['body'], contains('locale=ko-KR'));
+    expect(openedUris[0].queryParameters['body'],
+        isNot(contains('me@example.com')));
+    expect(openedUris[1].path, 'privacy@maum-on.app');
+    expect(openedUris[2].toString(), 'https://maum-on.app/status');
+    expect(copiedDiagnostics.single, contains('appVersion=1.2.3'));
+    expect(copiedDiagnostics.single, contains('buildNumber=45'));
+    expect(copiedDiagnostics.single, contains('platform=Android'));
+    expect(copiedDiagnostics.single, contains('locale=ko-KR'));
+    expect(copiedDiagnostics.single, isNot(contains('me@example.com')));
+    expect(copiedDiagnostics.single, isNot(contains('memberId')));
+    expect(copiedDiagnostics.single, isNot(contains('token')));
   });
 }
 

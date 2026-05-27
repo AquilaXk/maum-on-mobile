@@ -111,6 +111,13 @@ while IFS= read -r file; do
       ios=true
       repository=true
       ;;
+    contracts/support/**)
+      android=true
+      backend=true
+      frontend=true
+      ios=true
+      repository=true
+      ;;
     contracts/infra/**)
       android=true
       backend=true

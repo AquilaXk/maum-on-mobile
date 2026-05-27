@@ -1,6 +1,8 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../../shared/ui/app_design_system.dart';
 import '../../legal/domain/legal_disclosures.dart';
@@ -12,13 +14,17 @@ class SettingsScreen extends StatefulWidget {
   const SettingsScreen({
     required this.controller,
     required this.onBack,
+    this.supportContactInfo = LegalDisclosures.defaultSupportContact,
     this.onOpenExternalUri,
+    this.onCopyDiagnostics,
     super.key,
   });
 
   final SettingsController controller;
   final VoidCallback onBack;
+  final SupportContactInfo supportContactInfo;
   final Future<bool> Function(Uri uri)? onOpenExternalUri;
+  final Future<void> Function(String value)? onCopyDiagnostics;
 
   @override
   State<SettingsScreen> createState() => _SettingsScreenState();
@@ -213,6 +219,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                 onOpenExternalUri: widget.onOpenExternalUri,
                               ),
                               const SizedBox(height: AppSpacing.lg),
+                              _SupportContactSection(
+                                contactInfo: widget.supportContactInfo,
+                                onOpenExternalUri: widget.onOpenExternalUri,
+                                onCopyDiagnostics: widget.onCopyDiagnostics,
+                              ),
+                              const SizedBox(height: AppSpacing.lg),
                               _WithdrawalSection(
                                 state: state,
                                 withdrawPasswordController:
@@ -259,6 +271,113 @@ class _PrivacyDisclosureSection extends StatelessWidget {
           showAccountDeletionGuidance: false,
         ),
       ],
+    );
+  }
+}
+
+class _SupportContactSection extends StatelessWidget {
+  const _SupportContactSection({
+    required this.contactInfo,
+    this.onOpenExternalUri,
+    this.onCopyDiagnostics,
+  });
+
+  final SupportContactInfo contactInfo;
+  final Future<bool> Function(Uri uri)? onOpenExternalUri;
+  final Future<void> Function(String value)? onCopyDiagnostics;
+
+  @override
+  Widget build(BuildContext context) {
+    final diagnostics = contactInfo.diagnostics();
+
+    return _SettingsSection(
+      title: '고객지원',
+      children: [
+        const Text('문의에는 앱 버전, 빌드 번호, 플랫폼, locale 진단 정보만 포함됩니다.'),
+        const SizedBox(height: AppSpacing.md),
+        AppDetailRow(label: '앱 버전', value: diagnostics.appVersion),
+        AppDetailRow(label: '빌드 번호', value: diagnostics.buildNumber),
+        AppDetailRow(label: '플랫폼', value: diagnostics.platform),
+        AppDetailRow(label: 'locale', value: diagnostics.locale),
+        const SizedBox(height: AppSpacing.md),
+        _SupportActionButtons(
+          contactInfo: contactInfo,
+          diagnostics: diagnostics,
+          onOpenExternalUri: onOpenExternalUri,
+          onCopyDiagnostics: onCopyDiagnostics,
+        ),
+      ],
+    );
+  }
+}
+
+class _SupportActionButtons extends StatelessWidget {
+  const _SupportActionButtons({
+    required this.contactInfo,
+    required this.diagnostics,
+    this.onOpenExternalUri,
+    this.onCopyDiagnostics,
+  });
+
+  final SupportContactInfo contactInfo;
+  final SupportDiagnosticInfo diagnostics;
+  final Future<bool> Function(Uri uri)? onOpenExternalUri;
+  final Future<void> Function(String value)? onCopyDiagnostics;
+
+  @override
+  Widget build(BuildContext context) {
+    return Wrap(
+      spacing: AppSpacing.xs,
+      runSpacing: AppSpacing.xs,
+      alignment: WrapAlignment.end,
+      children: [
+        FilledButton.icon(
+          key: const ValueKey('settings-support-contact-button'),
+          onPressed: () => _open(contactInfo.supportMailUri()),
+          icon: const Icon(Icons.support_agent_outlined),
+          label: const Text('고객지원'),
+        ),
+        OutlinedButton.icon(
+          key: const ValueKey('settings-privacy-contact-button'),
+          onPressed: () => _open(contactInfo.privacyMailUri()),
+          icon: const Icon(Icons.privacy_tip_outlined),
+          label: const Text('개인정보 문의'),
+        ),
+        OutlinedButton.icon(
+          key: const ValueKey('settings-incident-notice-button'),
+          onPressed: () => _open(contactInfo.incidentNoticeUri),
+          icon: const Icon(Icons.campaign_outlined),
+          label: const Text('장애 공지'),
+        ),
+        OutlinedButton.icon(
+          key: const ValueKey('settings-copy-diagnostics'),
+          onPressed: () => _copyDiagnostics(context),
+          icon: const Icon(Icons.copy_outlined),
+          label: const Text('진단 정보 복사'),
+        ),
+      ],
+    );
+  }
+
+  Future<void> _open(Uri uri) async {
+    final opener = onOpenExternalUri ??
+        (Uri target) => launchUrl(
+              target,
+              mode: LaunchMode.externalApplication,
+            );
+    await opener(uri);
+  }
+
+  Future<void> _copyDiagnostics(BuildContext context) async {
+    final text = diagnostics.toClipboardText();
+    final copier = onCopyDiagnostics ??
+        (String value) => Clipboard.setData(ClipboardData(text: value));
+    await copier(text);
+    if (!context.mounted) {
+      return;
+    }
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('진단 정보를 복사했습니다.')),
     );
   }
 }

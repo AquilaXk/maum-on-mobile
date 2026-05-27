@@ -441,6 +441,26 @@ void main() {
     expect(find.bySemanticsLabel('앱 버전, 0.1.0'), findsOneWidget);
     expect(find.bySemanticsLabel('플랫폼, Android'), findsOneWidget);
     expect(find.text('관측 도구 연결됨'), findsWidgets);
+    expect(
+      find.byKey(const ValueKey('operations-review-support-card')),
+      findsOneWidget,
+    );
+    expect(find.text('심사 대응'), findsOneWidget);
+    expect(find.text('App Store review'), findsOneWidget);
+    expect(find.text('Google Play review'), findsOneWidget);
+    expect(
+      find.bySemanticsLabel('지원 연락처, support@maum-on.app'),
+      findsOneWidget,
+    );
+    expect(
+      find.bySemanticsLabel('개인정보 연락처, privacy@maum-on.app'),
+      findsOneWidget,
+    );
+    expect(
+      find.bySemanticsLabel('장애 공지, https://maum-on.app/status'),
+      findsOneWidget,
+    );
+    expect(find.bySemanticsLabel('응답 SLA, 24시간 이내'), findsOneWidget);
 
     final openButton = find.byKey(
       const ValueKey('operations-system-open-observability-button'),
