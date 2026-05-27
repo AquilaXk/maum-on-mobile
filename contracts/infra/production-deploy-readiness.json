@@ -1,0 +1,296 @@
+{
+  "version": 1,
+  "releaseBlockers": [
+    "missing_required_env",
+    "unsafe_env_value",
+    "missing_required_evidence",
+    "missing_runtime_evidence",
+    "runtime_smoke_failed",
+    "compatibility_mismatch"
+  ],
+  "commonRequiredVariables": [
+    {
+      "name": "MAUMON_OBJECT_STORAGE_BUCKET",
+      "kind": "non_empty"
+    },
+    {
+      "name": "MAUMON_OBJECT_STORAGE_ENDPOINT",
+      "kind": "url"
+    },
+    {
+      "name": "MAUMON_OBJECT_STORAGE_ACCESS_KEY",
+      "kind": "secret"
+    },
+    {
+      "name": "MAUMON_OBJECT_STORAGE_SECRET_KEY",
+      "kind": "secret"
+    },
+    {
+      "name": "MAUMON_PUSH_FCM_PROJECT_ID",
+      "kind": "non_empty"
+    },
+    {
+      "name": "MAUMON_PUSH_FCM_ACCESS_TOKEN",
+      "kind": "secret"
+    },
+    {
+      "name": "MAUMON_PUSH_APNS_TOPIC",
+      "kind": "non_empty"
+    },
+    {
+      "name": "MAUMON_PUSH_APNS_AUTHORIZATION_TOKEN",
+      "kind": "secret"
+    },
+    {
+      "name": "MAUMON_GOOGLE_CLOUD_PROJECT_ID",
+      "kind": "non_empty"
+    },
+    {
+      "name": "MAUMON_GOOGLE_APPLICATION_CREDENTIALS",
+      "kind": "path"
+    },
+    {
+      "name": "MAUMON_AI_CONSULTATION_ENDPOINT",
+      "kind": "url"
+    },
+    {
+      "name": "MAUMON_AI_CONSULTATION_AUTHORIZATION_TOKEN",
+      "kind": "secret"
+    },
+    {
+      "name": "MAUMON_AI_MODERATION_ENDPOINT",
+      "kind": "url"
+    },
+    {
+      "name": "MAUMON_AI_MODERATION_AUTHORIZATION_TOKEN",
+      "kind": "secret"
+    },
+    {
+      "name": "MAUMON_APP_JWT_SECRET",
+      "kind": "secret",
+      "minLength": 32
+    },
+    {
+      "name": "MAUMON_BACKEND_DEPLOY_VERSION",
+      "kind": "version"
+    },
+    {
+      "name": "MAUMON_ANDROID_APP_VERSION",
+      "kind": "mobile_version"
+    },
+    {
+      "name": "MAUMON_IOS_APP_VERSION",
+      "kind": "mobile_version"
+    },
+    {
+      "name": "MAUMON_API_CONTRACT_VERSION",
+      "kind": "contract_version"
+    }
+  ],
+  "environments": [
+    {
+      "id": "production",
+      "requiredProfiles": ["production", "object-storage"],
+      "requiredVariables": [
+        {
+          "name": "MAUMON_PROD_SPRING_PROFILES_ACTIVE",
+          "kind": "profile_list",
+          "requiredTokens": ["production", "object-storage"]
+        },
+        {
+          "name": "MAUMON_PROD_DB_URL",
+          "kind": "jdbc_url"
+        },
+        {
+          "name": "MAUMON_PROD_DB_USERNAME",
+          "kind": "non_empty"
+        },
+        {
+          "name": "MAUMON_PROD_DB_PASSWORD",
+          "kind": "secret"
+        }
+      ]
+    },
+    {
+      "id": "staging",
+      "requiredProfiles": ["staging", "object-storage"],
+      "requiredVariables": [
+        {
+          "name": "MAUMON_STAGING_SPRING_PROFILES_ACTIVE",
+          "kind": "profile_list",
+          "requiredTokens": ["staging", "object-storage"]
+        },
+        {
+          "name": "MAUMON_STAGING_DB_URL",
+          "kind": "jdbc_url"
+        },
+        {
+          "name": "MAUMON_STAGING_DB_USERNAME",
+          "kind": "non_empty"
+        },
+        {
+          "name": "MAUMON_STAGING_DB_PASSWORD",
+          "kind": "secret"
+        }
+      ]
+    }
+  ],
+  "gates": [
+    {
+      "id": "environment",
+      "requiredScenarios": [
+        "production_env_present",
+        "staging_env_present",
+        "secret_rotation_window_confirmed"
+      ]
+    },
+    {
+      "id": "migration_rollback",
+      "requiredScenarios": [
+        "flyway_migration_dry_run",
+        "pre_migration_api_smoke",
+        "post_migration_api_smoke",
+        "rollback_decision_recorded"
+      ]
+    },
+    {
+      "id": "backup_restore",
+      "requiredScenarios": [
+        "db_backup_created",
+        "test_db_restore_smoke",
+        "core_query_after_restore"
+      ]
+    },
+    {
+      "id": "object_storage",
+      "requiredScenarios": [
+        "object_upload_smoke",
+        "object_download_smoke",
+        "object_delete_smoke"
+      ]
+    },
+    {
+      "id": "app_backend_compatibility",
+      "requiredScenarios": [
+        "android_backend_compatible",
+        "ios_backend_compatible",
+        "backend_version_recorded"
+      ]
+    }
+  ],
+  "compatibility": {
+    "apiContractVariable": "MAUMON_API_CONTRACT_VERSION",
+    "backendVersionVariable": "MAUMON_BACKEND_DEPLOY_VERSION",
+    "androidVersionVariable": "MAUMON_ANDROID_APP_VERSION",
+    "iosVersionVariable": "MAUMON_IOS_APP_VERSION",
+    "requiredContractPrefix": "mobile-api-v"
+  },
+  "staticEvidence": [
+    {
+      "id": "backend-runtime-env",
+      "file": "back/src/main/resources/application.yml",
+      "patterns": [
+        "url: \\$\\{DB_URL\\}",
+        "username: \\$\\{DB_USERNAME\\}",
+        "password: \\$\\{DB_PASSWORD:",
+        "secret: \\$\\{APP_JWT_SECRET\\}",
+        "PUSH_FCM_PROJECT_ID",
+        "PUSH_APNS_AUTHORIZATION_TOKEN",
+        "GOOGLE_APPLICATION_CREDENTIALS"
+      ]
+    },
+    {
+      "id": "flyway-migrations",
+      "file": "back/src/main/resources/application.yml",
+      "patterns": ["flyway:", "enabled: true", "classpath:db/migration"]
+    },
+    {
+      "id": "migration-schema-present",
+      "file": "back/src/main/resources/db/migration/V2__mobile_persistence.sql",
+      "patterns": ["create table", "auth_members", "letters"]
+    },
+    {
+      "id": "object-storage-profile",
+      "file": "back/src/main/kotlin/com/maumonmobile/adapter/out/storage/image/ObjectImageStorage.kt",
+      "patterns": ["@Profile\\(\"object-storage\"\\)", "ImageStoragePort"]
+    },
+    {
+      "id": "mobile-app-version-source",
+      "file": "front/pubspec.yaml",
+      "patterns": ["^version:\\s*\\d+\\.\\d+\\.\\d+\\+\\d+"]
+    },
+    {
+      "id": "mobile-runtime-version-source",
+      "file": "front/lib/app/maum_on_mobile_app.dart",
+      "patterns": ["String.fromEnvironment\\(\\s*'APP_VERSION'", "String.fromEnvironment\\(\\s*'APP_BUILD_NUMBER'"]
+    },
+    {
+      "id": "backend-deploy-version-source",
+      "file": "back/build.gradle.kts",
+      "patterns": ["version = \".+\""]
+    },
+    {
+      "id": "mobile-api-contract-snapshots",
+      "file": "contracts/mobile-api/response-snapshots.json",
+      "patterns": ["\"version\": 1", "\"endpoints\""]
+    }
+  ],
+  "runtimeEvidence": {
+    "defaultDirectory": "contracts/infra/runtime-evidence",
+    "requiredFiles": [
+      {
+        "id": "deploy-env-validation",
+        "filename": "deploy-env-validation-results.json",
+        "requiredScenarios": [
+          "production_env_present",
+          "staging_env_present",
+          "secret_rotation_window_confirmed"
+        ]
+      },
+      {
+        "id": "migration-rollback",
+        "filename": "migration-rollback-results.json",
+        "requiredScenarios": [
+          "flyway_migration_dry_run",
+          "pre_migration_api_smoke",
+          "post_migration_api_smoke",
+          "rollback_decision_recorded"
+        ],
+        "requiredScenarioFields": {
+          "rollback_decision_recorded": ["rollbackDecision"]
+        }
+      },
+      {
+        "id": "backup-restore",
+        "filename": "backup-restore-results.json",
+        "requiredScenarios": [
+          "db_backup_created",
+          "test_db_restore_smoke",
+          "core_query_after_restore"
+        ],
+        "requiredScenarioFields": {
+          "db_backup_created": ["backupArtifact"]
+        }
+      },
+      {
+        "id": "object-storage",
+        "filename": "object-storage-results.json",
+        "requiredScenarios": [
+          "object_upload_smoke",
+          "object_download_smoke",
+          "object_delete_smoke"
+        ]
+      },
+      {
+        "id": "app-backend-compatibility",
+        "filename": "app-backend-compatibility-results.json",
+        "requiredScenarios": [
+          "android_backend_compatible",
+          "ios_backend_compatible",
+          "backend_version_recorded"
+        ],
+        "requiredTopLevelFields": ["apiContractVersion"]
+      }
+    ]
+  }
+}
