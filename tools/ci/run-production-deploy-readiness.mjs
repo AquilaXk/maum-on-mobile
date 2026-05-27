@@ -455,6 +455,7 @@ function validateRuntimeEvidence(config) {
 function loadEnvironment(envFile) {
   const values = new Map(Object.entries(process.env).map(([key, value]) => [key, value ?? ""]));
   if (!envFile) {
+    applyCompatibilityManifest(values);
     return values;
   }
 
@@ -473,7 +474,30 @@ function loadEnvironment(envFile) {
     const value = normalized.slice(equalsIndex + 1).trim().replace(/^['"]|['"]$/g, "");
     values.set(key, value);
   }
+  applyCompatibilityManifest(values);
   return values;
+}
+
+function applyCompatibilityManifest(values) {
+  const rawManifest = values.get("MAUMON_DEPLOY_COMPATIBILITY_MANIFEST")?.trim() ?? "";
+  if (!rawManifest) {
+    return;
+  }
+
+  const manifest = JSON.parse(rawManifest);
+  const fields = [
+    ["backendVersion", "MAUMON_BACKEND_DEPLOY_VERSION"],
+    ["androidVersion", "MAUMON_ANDROID_APP_VERSION"],
+    ["iosVersion", "MAUMON_IOS_APP_VERSION"],
+    ["apiContractVersion", "MAUMON_API_CONTRACT_VERSION"],
+  ];
+
+  for (const [manifestKey, envName] of fields) {
+    const value = manifest[manifestKey];
+    if (typeof value === "string" && value.trim().length > 0) {
+      values.set(envName, value.trim());
+    }
+  }
 }
 
 function isUnsafeValue(value) {

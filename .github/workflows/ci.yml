@@ -161,20 +161,8 @@ on:
         required: true
         default: contracts/infra/runtime-evidence
         type: string
-      release_backend_version:
-        description: "Backend deploy version recorded for release compatibility"
-        required: false
-        type: string
-      release_android_app_version:
-        description: "Android app versionName+versionCode, for example 1.0.0+100"
-        required: false
-        type: string
-      release_ios_app_version:
-        description: "iOS app version+build number, for example 1.0.0+100"
-        required: false
-        type: string
-      release_api_contract_version:
-        description: "Mobile API contract version for app/backend compatibility"
+      release_deploy_compatibility_manifest:
+        description: "JSON with backendVersion, androidVersion, iosVersion, apiContractVersion"
         required: false
         type: string
 
@@ -935,10 +923,11 @@ jobs:
           MAUMON_AI_MODERATION_ENDPOINT: ${{ secrets.MAUMON_AI_MODERATION_ENDPOINT }}
           MAUMON_AI_MODERATION_AUTHORIZATION_TOKEN: ${{ secrets.MAUMON_AI_MODERATION_AUTHORIZATION_TOKEN }}
           MAUMON_APP_JWT_SECRET: ${{ secrets.MAUMON_APP_JWT_SECRET }}
-          MAUMON_BACKEND_DEPLOY_VERSION: ${{ github.event_name == 'workflow_dispatch' && inputs.release_backend_version || github.sha }}
-          MAUMON_ANDROID_APP_VERSION: ${{ github.event_name == 'workflow_dispatch' && inputs.release_android_app_version || secrets.MAUMON_ANDROID_APP_VERSION }}
-          MAUMON_IOS_APP_VERSION: ${{ github.event_name == 'workflow_dispatch' && inputs.release_ios_app_version || secrets.MAUMON_IOS_APP_VERSION }}
-          MAUMON_API_CONTRACT_VERSION: ${{ github.event_name == 'workflow_dispatch' && inputs.release_api_contract_version || secrets.MAUMON_API_CONTRACT_VERSION }}
+          MAUMON_DEPLOY_COMPATIBILITY_MANIFEST: ${{ github.event_name == 'workflow_dispatch' && inputs.release_deploy_compatibility_manifest || '' }}
+          MAUMON_BACKEND_DEPLOY_VERSION: ${{ github.sha }}
+          MAUMON_ANDROID_APP_VERSION: ${{ secrets.MAUMON_ANDROID_APP_VERSION }}
+          MAUMON_IOS_APP_VERSION: ${{ secrets.MAUMON_IOS_APP_VERSION }}
+          MAUMON_API_CONTRACT_VERSION: ${{ secrets.MAUMON_API_CONTRACT_VERSION }}
         run: |
           set -euo pipefail
           node tools/ci/run-production-deploy-readiness.mjs \

@@ -85,6 +85,41 @@ test("production deploy readiness runner validates env files and writes reports"
   assert.match(markdown, /Runtime Evidence/);
 });
 
+test("production deploy readiness runner accepts compatibility manifest env", async () => {
+  const reportDir = await mkdtemp(path.join(tmpdir(), "maum-production-readiness-manifest-"));
+  const envFile = await writeEnvFixture({
+    MAUMON_BACKEND_DEPLOY_VERSION: "",
+    MAUMON_ANDROID_APP_VERSION: "",
+    MAUMON_IOS_APP_VERSION: "",
+    MAUMON_API_CONTRACT_VERSION: "",
+  });
+
+  await execFileAsync(
+    "node",
+    [
+      path.join(root, runnerPath),
+      "--report-dir",
+      reportDir,
+      "--env-file",
+      envFile,
+    ],
+    {
+      env: {
+        ...process.env,
+        MAUMON_DEPLOY_COMPATIBILITY_MANIFEST: JSON.stringify({
+          backendVersion: "2026.05.27+ba48b8b",
+          androidVersion: "1.0.0+100",
+          iosVersion: "1.0.0+100",
+          apiContractVersion: "mobile-api-v1",
+        }),
+      },
+    },
+  );
+
+  const report = JSON.parse(await readFile(path.join(reportDir, "production-deploy-readiness-report.json"), "utf8"));
+  assert.equal(report.compatibility.status, "pass");
+});
+
 test("production deploy readiness runner fails when required env is missing", async () => {
   const reportDir = await mkdtemp(path.join(tmpdir(), "maum-production-readiness-missing-env-"));
   const envFile = await writeEnvFixture({
@@ -209,10 +244,7 @@ test("ci runs production deploy readiness gate only for release candidate flows"
 
   assert.match(workflow, /release_candidate_deploy_gate_mode:/);
   assert.match(workflow, /release_deploy_evidence_results_dir:/);
-  assert.match(workflow, /release_backend_version:/);
-  assert.match(workflow, /release_android_app_version:/);
-  assert.match(workflow, /release_ios_app_version:/);
-  assert.match(workflow, /release_api_contract_version:/);
+  assert.match(workflow, /release_deploy_compatibility_manifest:/);
   assert.match(releaseDeployReadiness, /needs: changes/);
   assert.match(releaseDeployReadiness, /github\.event_name == 'workflow_dispatch'/);
   assert.match(releaseDeployReadiness, /startsWith\(github\.head_ref, 'release\/'\)/);
@@ -223,6 +255,19 @@ test("ci runs production deploy readiness gate only for release candidate flows"
   assert.match(releaseDeployReadiness, /--require-runtime-evidence/);
   assert.match(releaseDeployReadiness, /MAUMON_PROD_DB_URL/);
   assert.match(releaseDeployReadiness, /actions\/upload-artifact@[a-f0-9]{40}/);
+});
+
+test("ci keeps workflow dispatch inputs within GitHub Actions limits", () => {
+  const workflow = read(".github/workflows/ci.yml");
+  const workflowDispatch = workflow.match(/  workflow_dispatch:\n    inputs:\n(?<body>[\s\S]*?)\n\npermissions:/);
+  assert.ok(workflowDispatch?.groups?.body, "workflow_dispatch inputs block must exist");
+
+  const inputNames = Array.from(
+    workflowDispatch.groups.body.matchAll(/^      ([a-zA-Z0-9_-]+):$/gm),
+    (match) => match[1],
+  );
+
+  assert.ok(inputNames.length <= 25, `workflow_dispatch inputs exceed 25: ${inputNames.length}`);
 });
 
 async function writeEnvFixture(overrides = {}) {
