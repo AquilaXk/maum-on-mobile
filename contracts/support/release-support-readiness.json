@@ -1,0 +1,143 @@
+{
+  "version": 1,
+  "storeListingContract": "contracts/store-listing/store-listing.json",
+  "storePrivacyContract": "contracts/store-privacy/data-safety.json",
+  "releaseBlockers": [
+    "missing_support_contact",
+    "support_contact_mismatch",
+    "missing_static_evidence",
+    "missing_runtime_evidence",
+    "runtime_support_flow_failed"
+  ],
+  "contacts": {
+    "supportEmail": "support@maum-on.app",
+    "privacyEmail": "privacy@maum-on.app",
+    "supportUrl": "https://maum-on.app/support",
+    "privacyPolicyUrl": "https://maum-on.app/privacy",
+    "termsUrl": "https://maum-on.app/terms",
+    "incidentNoticeUrl": "https://maum-on.app/status"
+  },
+  "reviewResponse": {
+    "owner": "mobile-release-owner",
+    "contactEmail": "support@maum-on.app",
+    "responseSlaHours": 24,
+    "appStoreReviewStatus": "ready",
+    "googlePlayReviewStatus": "ready",
+    "incidentNoticeRequired": true
+  },
+  "diagnostics": {
+    "requiredFields": [
+      "appVersion",
+      "buildNumber",
+      "platform",
+      "locale"
+    ],
+    "forbiddenFields": [
+      "email",
+      "memberId",
+      "token",
+      "password",
+      "authorization",
+      "consultation",
+      "diary",
+      "letterContent"
+    ]
+  },
+  "staticEvidence": [
+    {
+      "id": "legal-support-contact-source",
+      "file": "front/lib/features/legal/domain/legal_disclosures.dart",
+      "patterns": [
+        "supportEmail = 'support@maum-on.app'",
+        "privacyEmail = 'privacy@maum-on.app'",
+        "incidentNoticeUrl = 'https://maum-on.app/status'",
+        "SupportDiagnosticInfo",
+        "ReviewSupportStatus"
+      ]
+    },
+    {
+      "id": "settings-support-ui",
+      "file": "front/lib/features/settings/presentation/settings_screen.dart",
+      "patterns": [
+        "settings-support-contact-button",
+        "settings-privacy-contact-button",
+        "settings-incident-notice-button",
+        "settings-copy-diagnostics",
+        "SupportDiagnosticInfo"
+      ]
+    },
+    {
+      "id": "settings-support-ui-test",
+      "file": "front/test/features/settings/settings_screen_test.dart",
+      "patterns": [
+        "opens support contacts and copies sanitized diagnostics",
+        "isNot\\(contains\\('me@example.com'\\)\\)",
+        "settings-copy-diagnostics"
+      ]
+    },
+    {
+      "id": "support-diagnostics-test",
+      "file": "front/test/features/settings/support_contact_info_test.dart",
+      "patterns": [
+        "toSafePayload",
+        "isNot\\(contains\\('email'\\)\\)",
+        "supportMailUri",
+        "privacyMailUri"
+      ]
+    },
+    {
+      "id": "operations-review-support",
+      "file": "front/lib/features/operations/presentation/operations_screen.dart",
+      "patterns": [
+        "operations-review-support-card",
+        "심사 대응",
+        "App Store review",
+        "Google Play review"
+      ]
+    },
+    {
+      "id": "operations-review-support-test",
+      "file": "front/test/features/operations/operations_screen_test.dart",
+      "patterns": [
+        "operations-review-support-card",
+        "support@maum-on.app",
+        "privacy@maum-on.app",
+        "https://maum-on.app/status"
+      ]
+    },
+    {
+      "id": "app-release-support-env",
+      "file": "front/lib/app/maum_on_mobile_app.dart",
+      "patterns": [
+        "String.fromEnvironment\\(\\s*'APP_VERSION'",
+        "String.fromEnvironment\\(\\s*'APP_BUILD_NUMBER'",
+        "_supportContactInfo",
+        "_platformLabel"
+      ]
+    }
+  ],
+  "runtimeEvidence": {
+    "defaultDirectory": "contracts/support/runtime-evidence",
+    "requiredFiles": [
+      {
+        "id": "support-inquiry-flow",
+        "filename": "support-inquiry-flow-results.json",
+        "requiredScenarios": [
+          "settings_support_email_opened",
+          "settings_privacy_email_opened",
+          "settings_diagnostics_copy_sanitized",
+          "incident_notice_opened"
+        ]
+      },
+      {
+        "id": "review-response",
+        "filename": "review-response-results.json",
+        "requiredScenarios": [
+          "app_store_review_contact_verified",
+          "google_play_review_contact_verified",
+          "incident_notice_ready"
+        ]
+      }
+    ]
+  }
+}

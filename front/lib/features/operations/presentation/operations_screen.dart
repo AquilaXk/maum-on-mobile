@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../../shared/ui/app_design_system.dart';
+import '../../legal/domain/legal_disclosures.dart';
 import '../domain/operations_models.dart';
 import '../../report/domain/report_models.dart';
 import '../application/operations_controller.dart';
@@ -509,6 +510,10 @@ class _SystemToolsView extends StatelessWidget {
           onRefresh: onRefresh,
         ),
         const SizedBox(height: AppSpacing.md),
+        const _ReviewSupportCard(
+          status: LegalDisclosures.reviewSupportStatus,
+        ),
+        const SizedBox(height: AppSpacing.md),
         _SystemActionPanel(
           state: state,
           onRefresh: onRefresh,
@@ -532,6 +537,55 @@ class _SystemToolsView extends StatelessWidget {
         const SnackBar(content: Text('관측 도구를 열지 못했습니다.')),
       );
     }
+  }
+}
+
+class _ReviewSupportCard extends StatelessWidget {
+  const _ReviewSupportCard({required this.status});
+
+  final ReviewSupportStatus status;
+
+  @override
+  Widget build(BuildContext context) {
+    return AppSectionCard(
+      key: const ValueKey('operations-review-support-card'),
+      title: '심사 대응',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Wrap(
+            spacing: AppSpacing.xs,
+            runSpacing: AppSpacing.xs,
+            children: [
+              AppStatusPill(
+                label:
+                    'App Store ${_reviewStatusLabel(status.appStoreReviewStatus)}',
+                tone: _reviewStatusTone(status.appStoreReviewStatus),
+              ),
+              AppStatusPill(
+                label:
+                    'Google Play ${_reviewStatusLabel(status.googlePlayReviewStatus)}',
+                tone: _reviewStatusTone(status.googlePlayReviewStatus),
+              ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.md),
+          AppDetailRow(label: '담당자', value: status.owner),
+          AppDetailRow(label: '지원 연락처', value: status.contactEmail),
+          AppDetailRow(label: '개인정보 연락처', value: status.privacyEmail),
+          AppDetailRow(label: '장애 공지', value: status.incidentNoticeUrl),
+          AppDetailRow(label: '응답 SLA', value: status.responseSlaLabel),
+          AppDetailRow(
+            label: 'App Store review',
+            value: _reviewStatusLabel(status.appStoreReviewStatus),
+          ),
+          AppDetailRow(
+            label: 'Google Play review',
+            value: _reviewStatusLabel(status.googlePlayReviewStatus),
+          ),
+        ],
+      ),
+    );
   }
 }
 
@@ -562,7 +616,8 @@ class _AdminAccountCard extends StatelessWidget {
           AppDetailRow(label: '닉네임', value: profile.nickname),
           AppDetailRow(label: '이메일', value: profile.email),
           AppDetailRow(label: '역할', value: _memberRoleLabel(profile.role)),
-          AppDetailRow(label: '계정 상태', value: _memberStatusLabel(profile.status)),
+          AppDetailRow(
+              label: '계정 상태', value: _memberStatusLabel(profile.status)),
         ],
       ),
     );
@@ -741,9 +796,8 @@ class _ObservabilityView extends StatelessWidget {
         onAction: () {
           onRefresh();
         },
-        semanticLabel: state.isMetricsPermissionError
-            ? '운영 관측 지표 권한 오류'
-            : '운영 관측 지표 오류',
+        semanticLabel:
+            state.isMetricsPermissionError ? '운영 관측 지표 권한 오류' : '운영 관측 지표 오류',
       );
     }
 
@@ -973,7 +1027,8 @@ class _EndpointMetricRow extends StatelessWidget {
               crossAxisAlignment: WrapCrossAlignment.center,
               children: [
                 ConstrainedBox(
-                  constraints: const BoxConstraints(minWidth: 180, maxWidth: 360),
+                  constraints:
+                      const BoxConstraints(minWidth: 180, maxWidth: 360),
                   child: Text(
                     _softBreakMetric(endpoint.endpoint),
                     maxLines: 3,
@@ -1342,8 +1397,7 @@ class _LetterList extends StatelessWidget {
           AppListRow(
             rowKey: ValueKey('operations-letter-${letter.id}'),
             title: letter.title.isEmpty ? '제목 없는 편지' : letter.title,
-            subtitle:
-                '발신 ${_adminMemberLabel(letter.sender)} · '
+            subtitle: '발신 ${_adminMemberLabel(letter.sender)} · '
                 '수신 ${_adminMemberLabel(letter.receiver)} · '
                 '조치 ${letter.actionCount} · ${letter.createdAt}',
             statusLabel: _letterStatusLabel(letter.status),
@@ -1556,8 +1610,7 @@ class _LetterReceiverCandidates extends StatelessWidget {
           AppListRow(
             rowKey: ValueKey('operations-letter-receiver-${member.id}'),
             title: '${member.nickname} · ${member.email}',
-            subtitle:
-                '${_memberStatusLabel(member.status)} · '
+            subtitle: '${_memberStatusLabel(member.status)} · '
                 '${_memberRoleLabel(member.role)} · '
                 '수신 ${member.randomReceiveAllowed ? '가능' : '불가'}',
             statusLabel: state.selectedLetterReceiverId == member.id
@@ -1709,8 +1762,7 @@ class _MemberList extends StatelessWidget {
           AppListRow(
             rowKey: ValueKey('operations-member-${member.id}'),
             title: '${member.nickname} · ${member.email}',
-            subtitle:
-                '${_memberStatusLabel(member.status)} · '
+            subtitle: '${_memberStatusLabel(member.status)} · '
                 '${_memberRoleLabel(member.role)} · '
                 '${_socialAccountLabel(member.socialAccount)} · '
                 '신고 ${member.reportCount}',
@@ -1771,8 +1823,7 @@ class _MemberDetail extends StatelessWidget {
         ? controller.unblockSelectedMember
         : controller.blockSelectedMember;
     final blockLabel = member.status == 'BLOCKED' ? '차단 해제' : '회원 차단';
-    final blockTitle =
-        member.status == 'BLOCKED' ? '차단 해제 확인' : '회원 차단 확인';
+    final blockTitle = member.status == 'BLOCKED' ? '차단 해제 확인' : '회원 차단 확인';
     final roleAction = member.role == 'ADMIN'
         ? controller.demoteSelectedMember
         : controller.promoteSelectedMember;
@@ -1829,7 +1880,8 @@ class _MemberDetail extends StatelessWidget {
                 icon: const Icon(Icons.block),
                 label: blockLabel,
                 confirmTitle: blockTitle,
-                confirmMessage: '${member.nickname} 회원에게 $blockLabel 조치를 저장합니다.',
+                confirmMessage:
+                    '${member.nickname} 회원에게 $blockLabel 조치를 저장합니다.',
                 confirmButtonLabel: '저장',
                 onConfirmed: blockAction,
               ),
@@ -1905,8 +1957,7 @@ class _ContentSection extends StatelessWidget {
             for (final content in contents)
               AppDetailRow(
                 label: content.title,
-                value:
-                    '${content.status ?? '-'} · ${content.createdAt}',
+                value: '${content.status ?? '-'} · ${content.createdAt}',
               ),
           ],
         ],
@@ -2245,6 +2296,24 @@ String _dashboardPriorityMessage(OperationsDashboard dashboard) {
 
 Future<bool> _launchExternalUri(Uri uri) {
   return launchUrl(uri, mode: LaunchMode.externalApplication);
+}
+
+String _reviewStatusLabel(String status) {
+  return switch (status) {
+    'ready' => '준비됨',
+    'blocked' => '차단됨',
+    'watch' => '확인 필요',
+    _ => status,
+  };
+}
+
+AppStatusTone _reviewStatusTone(String status) {
+  return switch (status) {
+    'ready' => AppStatusTone.success,
+    'blocked' => AppStatusTone.danger,
+    'watch' => AppStatusTone.warning,
+    _ => AppStatusTone.neutral,
+  };
 }
 
 String _systemStatusLabel(OperationsSystemStatusKind kind) {
