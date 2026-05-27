@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { existsSync, readFileSync, statSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, statSync } from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 
@@ -182,6 +183,11 @@ test("CI exposes manual Android and iOS release build preflights", () => {
   assert.match(workflow, /workflow_dispatch:/);
   assert.match(workflow, /android_release_mode:/);
   assert.match(workflow, /default: skip/);
+  assert.match(workflow, /android_track_submit_mode:/);
+  assert.match(workflow, /android_play_track:/);
+  assert.match(workflow, /android_play_track_kind:/);
+  assert.match(workflow, /android_play_release_notes:/);
+  assert.match(workflow, /android_play_release_status:/);
   assert.match(workflow, /ios_release_mode:/);
   assert.match(workflow, /dry-run/);
   assert.match(workflow, /archive/);
@@ -191,6 +197,11 @@ test("CI exposes manual Android and iOS release build preflights", () => {
   assert.match(workflow, /inputs\.android_release_mode != 'skip'/);
   assert.match(workflow, /MAUMON_ANDROID_RELEASE_DRY_RUN: \$\{\{ inputs\.android_release_mode == 'dry-run' \}\}/);
   assert.match(workflow, /bash tools\/ci\/run-android-release-appbundle\.sh/);
+  assert.match(workflow, /Require Android appbundle for Play submit/);
+  assert.match(workflow, /inputs\.android_track_submit_mode == 'submit'/);
+  assert.match(workflow, /node tools\/ci\/run-android-play-track-submit\.mjs/);
+  assert.match(workflow, /MAUMON_PLAY_SERVICE_ACCOUNT_JSON_BASE64/);
+  assert.match(workflow, /MAUMON_PLAY_RELEASE_DRY_RUN: \$\{\{ inputs\.android_track_submit_mode == 'dry-run' \}\}/);
   assert.match(workflow, /gem install bundler -v 2\.4\.22 --no-document/);
   assert.match(workflow, /bundle _2\.4\.22_ config set --local path vendor\/bundle/);
   assert.match(workflow, /bundle _2\.4\.22_ install --jobs 4 --retry 3/);
@@ -263,11 +274,10 @@ test("Android release appbundle script fails clearly without signing and Firebas
 
 test("Android release appbundle script supports a signed dry run before building", () => {
   const script = path.join(root, "tools/ci/run-android-release-appbundle.sh");
-  const output = execFileSync("bash", [script], {
+  const output = execFileSync("bash", [script, "--dry-run"], {
     cwd: root,
     env: {
       ...process.env,
-      MAUMON_ANDROID_RELEASE_DRY_RUN: "true",
       MAUMON_ANDROID_KEYSTORE_BASE64: "ZmFrZS1rZXlzdG9yZQ==",
       MAUMON_ANDROID_KEYSTORE_PASSWORD: "password",
       MAUMON_ANDROID_KEY_ALIAS: "maumon",
@@ -282,6 +292,96 @@ test("Android release appbundle script supports a signed dry run before building
 
   assert.match(output, /Android release appbundle dry run ok/);
   assert.match(output, /flutter build appbundle --release/);
+});
+
+test("Android Play track submit script validates track inputs and writes closed-test evidence in dry run", () => {
+  const script = path.join(root, "tools/ci/run-android-play-track-submit.mjs");
+  const tempDir = mkdtempSync(path.join(os.tmpdir(), "maumon-play-track-"));
+  const reportPath = path.join(tempDir, "evidence.json");
+  const serviceAccount = Buffer.from(JSON.stringify({
+    client_email: "play-submit@example.iam.gserviceaccount.com",
+    private_key: "-----BEGIN PRIVATE KEY-----\\nfake\\n-----END PRIVATE KEY-----\\n",
+    token_uri: "https://oauth2.googleapis.com/token",
+  })).toString("base64");
+
+  assert.ok(existsSync(script));
+  assert.ok((statSync(script).mode & 0o111) !== 0, "Android Play submit script must be executable");
+
+  const output = execFileSync("node", [script, "--dry-run"], {
+    cwd: root,
+    env: {
+      ...process.env,
+      MAUMON_PLAY_SERVICE_ACCOUNT_JSON_BASE64: serviceAccount,
+      MAUMON_PLAY_PACKAGE_NAME: "com.aquilaxk.maumonmobile",
+      MAUMON_PLAY_TRACK: "alpha",
+      MAUMON_PLAY_TRACK_KIND: "closed",
+      MAUMON_PLAY_RELEASE_STATUS: "draft",
+      MAUMON_PLAY_RELEASE_NOTES: "Closed testing build",
+      MAUMON_PLAY_RELEASE_NOTES_LANGUAGE: "ko-KR",
+      MAUMON_PLAY_TESTER_GROUPS: "maumon-closed-testers@example.com",
+      MAUMON_PLAY_TESTER_EMAILS: "tester1@example.com,tester2@example.com",
+      MAUMON_PLAY_CLOSED_TEST_START_DATE: "2020-01-01",
+      MAUMON_PLAY_CLOSED_TEST_PARTICIPANT_COUNT: "12",
+      MAUMON_PLAY_CLOSED_TEST_FEEDBACK_URL: "https://example.com/feedback",
+      MAUMON_PLAY_PRODUCTION_ACCESS_STATUS: "not_requested",
+      MAUMON_PLAY_REPORT_PATH: reportPath,
+    },
+    encoding: "utf8",
+  });
+
+  assert.match(output, /Android Play track submit dry run ok/);
+  assert.match(output, /track: alpha/);
+  assert.match(output, /trackKind: closed/);
+  assert.match(output, /releaseStatus: draft/);
+  assert.match(output, /testerGroups: maumon-closed-testers@example\.com/);
+  assert.match(output, /email tester list is evidence-only/);
+  assert.ok(existsSync(reportPath), "Play track dry-run evidence report must be written");
+
+  const report = JSON.parse(readFileSync(reportPath, "utf8"));
+  assert.equal(report.packageName, "com.aquilaxk.maumonmobile");
+  assert.equal(report.track, "alpha");
+  assert.equal(report.trackKind, "closed");
+  assert.equal(report.closedTest.requiredParticipants, 12);
+  assert.equal(report.closedTest.participantCount, 12);
+  assert.equal(report.closedTest.meetsParticipantRequirement, true);
+  assert.equal(report.closedTest.requiredDays, 14);
+  assert.equal(report.closedTest.meetsDurationRequirement, true);
+  assert.equal(report.productionAccessStatus, "not_requested");
+  assert.equal(report.emailListApiSupport, "unsupported");
+});
+
+test("Android Play track submit script fails clearly without Play inputs", () => {
+  const script = path.join(root, "tools/ci/run-android-play-track-submit.mjs");
+
+  let output = "";
+  try {
+    execFileSync("node", [script, "--dry-run"], {
+      cwd: root,
+      env: {
+        ...process.env,
+        MAUMON_PLAY_SERVICE_ACCOUNT_JSON_BASE64: "",
+        MAUMON_PLAY_PACKAGE_NAME: "",
+        MAUMON_PLAY_TRACK: "",
+        MAUMON_PLAY_RELEASE_STATUS: "",
+        MAUMON_PLAY_RELEASE_NOTES: "",
+      },
+      encoding: "utf8",
+      stdio: "pipe",
+    });
+    assert.fail("Expected Android Play submit script to fail without required inputs.");
+  } catch (error) {
+    output = `${error.stdout ?? ""}${error.stderr ?? ""}`;
+  }
+
+  for (const name of [
+    "MAUMON_PLAY_SERVICE_ACCOUNT_JSON_BASE64",
+    "MAUMON_PLAY_PACKAGE_NAME",
+    "MAUMON_PLAY_TRACK",
+    "MAUMON_PLAY_RELEASE_STATUS",
+    "MAUMON_PLAY_RELEASE_NOTES",
+  ]) {
+    assert.match(output, new RegExp(name), `Missing clear failure for ${name}`);
+  }
 });
 
 test("iOS TestFlight archive script fails clearly without signing and upload inputs", () => {
