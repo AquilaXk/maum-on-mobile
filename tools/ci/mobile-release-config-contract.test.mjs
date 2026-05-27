@@ -195,6 +195,11 @@ test("CI exposes manual Android and iOS release build preflights", () => {
   assert.match(workflow, /ios_release_mode != 'dry-run'/);
   assert.match(workflow, /steps\.xcode\.outputs\.xcode26 != 'true'/);
   assert.match(workflow, /xcodebuild -version/);
+  assert.doesNotMatch(
+    workflow,
+    /xcodebuild"?\s+-version\s*\|\s*head/,
+    "Xcode version detection must not pipe xcodebuild into head because hosted macOS can abort on a broken pipe"
+  );
   assert.match(workflow, /MAUMON_IOS_DEVELOPMENT_TEAM/);
   assert.match(workflow, /MAUMON_IOS_EXPORT_OPTIONS_PLIST_BASE64/);
   assert.match(workflow, /MAUMON_IOS_PROVISIONING_PROFILE_BASE64/);

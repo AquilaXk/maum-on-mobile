@@ -393,7 +393,8 @@ jobs:
           selected=""
           for developer_dir in "${candidates[@]}"; do
             if [[ -x "${developer_dir}/usr/bin/xcodebuild" ]]; then
-              version="$("${developer_dir}/usr/bin/xcodebuild" -version | head -n 1)"
+              version_output="$("${developer_dir}/usr/bin/xcodebuild" -version)"
+              version="$(printf '%s\n' "${version_output}" | sed -n '1p')"
               if [[ "${version}" == Xcode\ 26* ]]; then
                 sudo xcode-select -s "${developer_dir}"
                 selected="${developer_dir}"
@@ -406,7 +407,8 @@ jobs:
             echo "::warning::Xcode 26 is required for iOS archive/upload builds, but it is not installed on this runner."
           fi
 
-          selected_version="$(xcodebuild -version | head -n 1 || true)"
+          selected_version_output="$(xcodebuild -version || true)"
+          selected_version="$(printf '%s\n' "${selected_version_output}" | sed -n '1p')"
           echo "version=${selected_version}" >> "${GITHUB_OUTPUT}"
           if [[ "${selected_version}" == Xcode\ 26* ]]; then
             echo "xcode26=true" >> "${GITHUB_OUTPUT}"
@@ -414,7 +416,7 @@ jobs:
             echo "xcode26=false" >> "${GITHUB_OUTPUT}"
           fi
 
-          xcodebuild -version
+          printf '%s\n' "${selected_version_output}"
           xcrun --sdk iphoneos --show-sdk-version || true
 
       - name: Require Xcode 26 for iOS archive or upload
