@@ -1,8 +1,12 @@
 enum MobileTelemetryEventType {
   appStart,
+  firstInteractive,
   routeChange,
   listScroll,
+  mediaAttachment,
   consultationReply,
+  networkRecovery,
+  duplicatePrevention,
   apiError,
   crash,
 }
@@ -27,27 +31,69 @@ class MobilePerformanceBudgets {
     owner: 'frontend',
     maxDurationMs: 1800,
   );
+  static const firstInteractive = MobilePerformanceBudget(
+    name: 'first_interactive',
+    owner: 'frontend',
+    maxDurationMs: 2200,
+  );
   static const primaryTabSwitch = MobilePerformanceBudget(
     name: 'primary_tab_switch',
     owner: 'frontend',
     maxDurationMs: 250,
+  );
+  static const primaryScreenTransition = MobilePerformanceBudget(
+    name: 'primary_screen_transition',
+    owner: 'frontend',
+    maxDurationMs: 350,
   );
   static const listScrollFrame = MobilePerformanceBudget(
     name: 'list_scroll_frame',
     owner: 'frontend',
     maxDurationMs: 16,
   );
+  static const feedScrollJank = MobilePerformanceBudget(
+    name: 'feed_scroll_jank',
+    owner: 'frontend',
+    maxDurationMs: 3,
+  );
+  static const imageAttachmentReady = MobilePerformanceBudget(
+    name: 'image_attachment_ready',
+    owner: 'frontend',
+    maxDurationMs: 1500,
+  );
   static const consultationReplyVisible = MobilePerformanceBudget(
     name: 'consultation_reply_visible',
     owner: 'frontend/backend',
     maxDurationMs: 1200,
   );
+  static const consultationStreamRecovery = MobilePerformanceBudget(
+    name: 'consultation_stream_recovery',
+    owner: 'frontend/backend',
+    maxDurationMs: 2500,
+  );
+  static const slowNetworkRecovery = MobilePerformanceBudget(
+    name: 'slow_network_recovery',
+    owner: 'frontend/backend',
+    maxDurationMs: 5000,
+  );
+  static const duplicateRetryPrevention = MobilePerformanceBudget(
+    name: 'duplicate_retry_prevention',
+    owner: 'frontend/backend',
+    maxDurationMs: 0,
+  );
 
   static const all = [
     appStart,
+    firstInteractive,
     primaryTabSwitch,
+    primaryScreenTransition,
     listScrollFrame,
+    feedScrollJank,
+    imageAttachmentReady,
     consultationReplyVisible,
+    consultationStreamRecovery,
+    slowNetworkRecovery,
+    duplicateRetryPrevention,
   ];
 }
 

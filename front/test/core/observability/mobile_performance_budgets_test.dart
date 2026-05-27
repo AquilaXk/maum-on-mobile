@@ -7,14 +7,49 @@ void main() {
       MobilePerformanceBudgets.all.map((budget) => budget.name),
       containsAll([
         'app_start',
+        'first_interactive',
         'primary_tab_switch',
+        'primary_screen_transition',
         'list_scroll_frame',
+        'feed_scroll_jank',
+        'image_attachment_ready',
         'consultation_reply_visible',
+        'consultation_stream_recovery',
+        'slow_network_recovery',
+        'duplicate_retry_prevention',
       ]),
     );
     expect(MobilePerformanceBudgets.appStart.maxDurationMs, lessThanOrEqualTo(1800));
+    expect(
+      MobilePerformanceBudgets.firstInteractive.maxDurationMs,
+      lessThanOrEqualTo(2200),
+    );
     expect(MobilePerformanceBudgets.primaryTabSwitch.maxDurationMs, lessThanOrEqualTo(250));
+    expect(
+      MobilePerformanceBudgets.primaryScreenTransition.maxDurationMs,
+      lessThanOrEqualTo(350),
+    );
     expect(MobilePerformanceBudgets.listScrollFrame.maxDurationMs, lessThanOrEqualTo(16));
+    expect(
+      MobilePerformanceBudgets.feedScrollJank.maxDurationMs,
+      lessThanOrEqualTo(3),
+    );
+    expect(
+      MobilePerformanceBudgets.imageAttachmentReady.maxDurationMs,
+      lessThanOrEqualTo(1500),
+    );
+    expect(
+      MobilePerformanceBudgets.consultationStreamRecovery.maxDurationMs,
+      lessThanOrEqualTo(2500),
+    );
+    expect(
+      MobilePerformanceBudgets.slowNetworkRecovery.maxDurationMs,
+      lessThanOrEqualTo(5000),
+    );
+    expect(
+      MobilePerformanceBudgets.duplicateRetryPrevention.maxDurationMs,
+      lessThanOrEqualTo(0),
+    );
   });
 
   test('sanitizes telemetry payloads before collection', () {
