@@ -180,12 +180,16 @@ test("CI exposes manual Android and iOS release build preflights", () => {
   const workflow = read(".github/workflows/ci.yml");
 
   assert.match(workflow, /workflow_dispatch:/);
+  assert.match(workflow, /android_release_mode:/);
+  assert.match(workflow, /default: skip/);
   assert.match(workflow, /ios_release_mode:/);
   assert.match(workflow, /dry-run/);
   assert.match(workflow, /archive/);
   assert.match(workflow, /upload/);
   assert.match(workflow, /node --test tools\/ci\/mobile-release-config-contract\.test\.mjs/);
   assert.match(workflow, /MAUMON_ANDROID_KEYSTORE_BASE64/);
+  assert.match(workflow, /inputs\.android_release_mode != 'skip'/);
+  assert.match(workflow, /MAUMON_ANDROID_RELEASE_DRY_RUN: \$\{\{ inputs\.android_release_mode == 'dry-run' \}\}/);
   assert.match(workflow, /bash tools\/ci\/run-android-release-appbundle\.sh/);
   assert.match(workflow, /gem install bundler -v 2\.4\.22 --no-document/);
   assert.match(workflow, /bundle _2\.4\.22_ config set --local path vendor\/bundle/);

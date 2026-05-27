@@ -9,6 +9,15 @@ on:
       - main
   workflow_dispatch:
     inputs:
+      android_release_mode:
+        description: "Android release pipeline mode"
+        required: true
+        default: skip
+        type: choice
+        options:
+          - skip
+          - dry-run
+          - appbundle
       ios_release_mode:
         description: "iOS release pipeline mode"
         required: true
@@ -331,8 +340,9 @@ jobs:
         run: node tools/ci/run-mobile-quality-gate.mjs --platform android --report-dir build/reports/mobile-quality
 
       - name: Build Flutter Android release appbundle
-        if: ${{ github.event_name == 'workflow_dispatch' && steps.scaffold.outputs.present == 'true' && steps.scaffold.outputs.stack == 'flutter' }}
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.android_release_mode != 'skip' && steps.scaffold.outputs.present == 'true' && steps.scaffold.outputs.stack == 'flutter' }}
         env:
+          MAUMON_ANDROID_RELEASE_DRY_RUN: ${{ inputs.android_release_mode == 'dry-run' }}
           MAUMON_ANDROID_KEYSTORE_BASE64: ${{ secrets.MAUMON_ANDROID_KEYSTORE_BASE64 }}
           MAUMON_ANDROID_KEYSTORE_PASSWORD: ${{ secrets.MAUMON_ANDROID_KEYSTORE_PASSWORD }}
           MAUMON_ANDROID_KEY_ALIAS: ${{ secrets.MAUMON_ANDROID_KEY_ALIAS }}
