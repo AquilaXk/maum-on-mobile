@@ -180,13 +180,38 @@ test("CI exposes manual Android and iOS release build preflights", () => {
   const workflow = read(".github/workflows/ci.yml");
 
   assert.match(workflow, /workflow_dispatch:/);
+  assert.match(workflow, /android_release_mode:/);
+  assert.match(workflow, /default: skip/);
+  assert.match(workflow, /ios_release_mode:/);
+  assert.match(workflow, /dry-run/);
+  assert.match(workflow, /archive/);
+  assert.match(workflow, /upload/);
   assert.match(workflow, /node --test tools\/ci\/mobile-release-config-contract\.test\.mjs/);
   assert.match(workflow, /MAUMON_ANDROID_KEYSTORE_BASE64/);
+  assert.match(workflow, /inputs\.android_release_mode != 'skip'/);
+  assert.match(workflow, /MAUMON_ANDROID_RELEASE_DRY_RUN: \$\{\{ inputs\.android_release_mode == 'dry-run' \}\}/);
   assert.match(workflow, /bash tools\/ci\/run-android-release-appbundle\.sh/);
   assert.match(workflow, /gem install bundler -v 2\.4\.22 --no-document/);
   assert.match(workflow, /bundle _2\.4\.22_ config set --local path vendor\/bundle/);
   assert.match(workflow, /bundle _2\.4\.22_ install --jobs 4 --retry 3/);
-  assert.match(workflow, /\.\.\/tools\/flutterw build ios --no-codesign/);
+  assert.match(workflow, /Select Xcode 26/);
+  assert.match(workflow, /Require Xcode 26 for iOS archive or upload/);
+  assert.match(workflow, /ios_release_mode != 'dry-run'/);
+  assert.match(workflow, /steps\.xcode\.outputs\.xcode26 != 'true'/);
+  assert.match(workflow, /xcodebuild -version/);
+  assert.doesNotMatch(
+    workflow,
+    /xcodebuild"?\s+-version\s*\|\s*head/,
+    "Xcode version detection must not pipe xcodebuild into head because hosted macOS can abort on a broken pipe"
+  );
+  assert.match(workflow, /MAUMON_IOS_DEVELOPMENT_TEAM/);
+  assert.match(workflow, /MAUMON_IOS_EXPORT_OPTIONS_PLIST_BASE64/);
+  assert.match(workflow, /MAUMON_IOS_PROVISIONING_PROFILE_BASE64/);
+  assert.match(workflow, /MAUMON_IOS_CERTIFICATE_P12_BASE64/);
+  assert.match(workflow, /MAUMON_APP_STORE_CONNECT_API_KEY_P8_BASE64/);
+  assert.match(workflow, /MAUMON_IOS_RELEASE_DRY_RUN/);
+  assert.match(workflow, /MAUMON_IOS_TESTFLIGHT_UPLOAD/);
+  assert.match(workflow, /bash tools\/ci\/run-ios-testflight-archive\.sh/);
   assert.match(read("tools/ci/run-mobile-release-preflight.sh"), /DEVELOPER_DIR/);
 });
 
@@ -257,4 +282,74 @@ test("Android release appbundle script supports a signed dry run before building
 
   assert.match(output, /Android release appbundle dry run ok/);
   assert.match(output, /flutter build appbundle --release/);
+});
+
+test("iOS TestFlight archive script fails clearly without signing and upload inputs", () => {
+  const script = path.join(root, "tools/ci/run-ios-testflight-archive.sh");
+  const scriptContents = read("tools/ci/run-ios-testflight-archive.sh");
+
+  assert.ok(existsSync(script));
+  assert.ok((statSync(script).mode & 0o111) !== 0, "iOS TestFlight archive script must be executable");
+  assert.match(scriptContents, /tools\/flutterw/, "iOS archive script must use the repository Flutter wrapper");
+  assert.match(scriptContents, /xcodebuild -version/, "iOS archive script must report the selected Xcode version");
+  assert.match(scriptContents, /Xcode\\ 26\*/, "iOS archive script must enforce Xcode 26 for real archive/export");
+  assert.match(scriptContents, /flutter build ipa --release/, "iOS archive script must produce an IPA");
+  assert.match(scriptContents, /xcrun altool --upload-app/, "iOS archive script must support TestFlight upload");
+
+  let output = "";
+  try {
+    execFileSync("bash", [script], {
+      cwd: root,
+      env: {
+        ...process.env,
+        MAUMON_IOS_RELEASE_DRY_RUN: "false",
+        MAUMON_IOS_TESTFLIGHT_UPLOAD: "true",
+        MAUMON_IOS_DEVELOPMENT_TEAM: "",
+        MAUMON_IOS_EXPORT_OPTIONS_PLIST_BASE64: "",
+        MAUMON_IOS_PROVISIONING_PROFILE_BASE64: "",
+        MAUMON_IOS_CERTIFICATE_P12_BASE64: "",
+        MAUMON_IOS_CERTIFICATE_PASSWORD: "",
+        MAUMON_IOS_KEYCHAIN_PASSWORD: "",
+        MAUMON_APP_STORE_CONNECT_API_KEY_ID: "",
+        MAUMON_APP_STORE_CONNECT_API_ISSUER_ID: "",
+        MAUMON_APP_STORE_CONNECT_API_KEY_P8_BASE64: "",
+      },
+      encoding: "utf8",
+      stdio: "pipe",
+    });
+    assert.fail("Expected iOS TestFlight archive script to fail without required inputs.");
+  } catch (error) {
+    output = `${error.stdout ?? ""}${error.stderr ?? ""}`;
+  }
+
+  for (const name of [
+    "MAUMON_IOS_DEVELOPMENT_TEAM",
+    "MAUMON_IOS_EXPORT_OPTIONS_PLIST_BASE64",
+    "MAUMON_IOS_PROVISIONING_PROFILE_BASE64",
+    "MAUMON_IOS_CERTIFICATE_P12_BASE64",
+    "MAUMON_IOS_CERTIFICATE_PASSWORD",
+    "MAUMON_IOS_KEYCHAIN_PASSWORD",
+    "MAUMON_APP_STORE_CONNECT_API_KEY_ID",
+    "MAUMON_APP_STORE_CONNECT_API_ISSUER_ID",
+    "MAUMON_APP_STORE_CONNECT_API_KEY_P8_BASE64",
+  ]) {
+    assert.match(output, new RegExp(name), `Missing clear failure for ${name}`);
+  }
+});
+
+test("iOS TestFlight archive script supports dry-run before archive and upload", () => {
+  const script = path.join(root, "tools/ci/run-ios-testflight-archive.sh");
+  const output = execFileSync("bash", [script], {
+    cwd: root,
+    env: {
+      ...process.env,
+      MAUMON_IOS_RELEASE_DRY_RUN: "true",
+      MAUMON_IOS_TESTFLIGHT_UPLOAD: "true",
+    },
+    encoding: "utf8",
+  });
+
+  assert.match(output, /iOS TestFlight archive dry run ok/);
+  assert.match(output, /flutter build ipa --release/);
+  assert.match(output, /TestFlight upload dry run/);
 });

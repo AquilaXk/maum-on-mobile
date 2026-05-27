@@ -8,6 +8,25 @@ on:
     branches:
       - main
   workflow_dispatch:
+    inputs:
+      android_release_mode:
+        description: "Android release pipeline mode"
+        required: true
+        default: skip
+        type: choice
+        options:
+          - skip
+          - dry-run
+          - appbundle
+      ios_release_mode:
+        description: "iOS release pipeline mode"
+        required: true
+        default: dry-run
+        type: choice
+        options:
+          - dry-run
+          - archive
+          - upload
 
 permissions:
   contents: read
@@ -321,8 +340,9 @@ jobs:
         run: node tools/ci/run-mobile-quality-gate.mjs --platform android --report-dir build/reports/mobile-quality
 
       - name: Build Flutter Android release appbundle
-        if: ${{ github.event_name == 'workflow_dispatch' && steps.scaffold.outputs.present == 'true' && steps.scaffold.outputs.stack == 'flutter' }}
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.android_release_mode != 'skip' && steps.scaffold.outputs.present == 'true' && steps.scaffold.outputs.stack == 'flutter' }}
         env:
+          MAUMON_ANDROID_RELEASE_DRY_RUN: ${{ inputs.android_release_mode == 'dry-run' }}
           MAUMON_ANDROID_KEYSTORE_BASE64: ${{ secrets.MAUMON_ANDROID_KEYSTORE_BASE64 }}
           MAUMON_ANDROID_KEYSTORE_PASSWORD: ${{ secrets.MAUMON_ANDROID_KEYSTORE_PASSWORD }}
           MAUMON_ANDROID_KEY_ALIAS: ${{ secrets.MAUMON_ANDROID_KEY_ALIAS }}
@@ -343,7 +363,7 @@ jobs:
     name: iOS
     runs-on: macos-latest
     needs: changes
-    if: ${{ needs.changes.outputs.ios == 'true' }}
+    if: ${{ needs.changes.outputs.ios == 'true' || github.event_name == 'workflow_dispatch' }}
 
     steps:
       - name: Checkout
@@ -366,6 +386,56 @@ jobs:
             echo "present=false" >> "${GITHUB_OUTPUT}"
             echo "iOS scaffold not found; skipping iOS checks."
           fi
+
+      - name: Select Xcode 26
+        id: xcode
+        if: ${{ steps.scaffold.outputs.present == 'true' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          candidates=(
+            "/Applications/Xcode_26.5.app/Contents/Developer"
+            "/Applications/Xcode_26.4.app/Contents/Developer"
+            "/Applications/Xcode_26.app/Contents/Developer"
+            "/Applications/Xcode.app/Contents/Developer"
+          )
+
+          selected=""
+          for developer_dir in "${candidates[@]}"; do
+            if [[ -x "${developer_dir}/usr/bin/xcodebuild" ]]; then
+              version_output="$("${developer_dir}/usr/bin/xcodebuild" -version)"
+              version="$(printf '%s\n' "${version_output}" | sed -n '1p')"
+              if [[ "${version}" == Xcode\ 26* ]]; then
+                sudo xcode-select -s "${developer_dir}"
+                selected="${developer_dir}"
+                break
+              fi
+            fi
+          done
+
+          if [[ -z "${selected}" ]]; then
+            echo "::warning::Xcode 26 is required for iOS archive/upload builds, but it is not installed on this runner."
+          fi
+
+          selected_version_output="$(xcodebuild -version || true)"
+          selected_version="$(printf '%s\n' "${selected_version_output}" | sed -n '1p')"
+          echo "version=${selected_version}" >> "${GITHUB_OUTPUT}"
+          if [[ "${selected_version}" == Xcode\ 26* ]]; then
+            echo "xcode26=true" >> "${GITHUB_OUTPUT}"
+          else
+            echo "xcode26=false" >> "${GITHUB_OUTPUT}"
+          fi
+
+          printf '%s\n' "${selected_version_output}"
+          xcrun --sdk iphoneos --show-sdk-version || true
+
+      - name: Require Xcode 26 for iOS archive or upload
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.ios_release_mode != 'dry-run' && steps.xcode.outputs.xcode26 != 'true' }}
+        shell: bash
+        run: |
+          echo "Xcode 26 is required for iOS archive/upload builds."
+          echo "Selected Xcode: ${{ steps.xcode.outputs.version }}"
+          exit 1
 
       - name: Set up Flutter
         if: ${{ steps.scaffold.outputs.present == 'true' && steps.scaffold.outputs.stack == 'flutter' }}
@@ -411,13 +481,22 @@ jobs:
         if: ${{ steps.scaffold.outputs.present == 'true' && steps.scaffold.outputs.stack == 'flutter' }}
         run: node tools/ci/run-mobile-quality-gate.mjs --platform ios --report-dir build/reports/mobile-quality
 
-      - name: Build Flutter iOS release without code signing
+      - name: Build iOS TestFlight archive or dry run
         if: ${{ github.event_name == 'workflow_dispatch' && steps.scaffold.outputs.present == 'true' && steps.scaffold.outputs.stack == 'flutter' }}
-        working-directory: front
+        env:
+          MAUMON_IOS_RELEASE_DRY_RUN: ${{ inputs.ios_release_mode == 'dry-run' }}
+          MAUMON_IOS_TESTFLIGHT_UPLOAD: ${{ inputs.ios_release_mode == 'upload' }}
+          MAUMON_IOS_DEVELOPMENT_TEAM: ${{ secrets.MAUMON_IOS_DEVELOPMENT_TEAM }}
+          MAUMON_IOS_EXPORT_OPTIONS_PLIST_BASE64: ${{ secrets.MAUMON_IOS_EXPORT_OPTIONS_PLIST_BASE64 }}
+          MAUMON_IOS_PROVISIONING_PROFILE_BASE64: ${{ secrets.MAUMON_IOS_PROVISIONING_PROFILE_BASE64 }}
+          MAUMON_IOS_CERTIFICATE_P12_BASE64: ${{ secrets.MAUMON_IOS_CERTIFICATE_P12_BASE64 }}
+          MAUMON_IOS_CERTIFICATE_PASSWORD: ${{ secrets.MAUMON_IOS_CERTIFICATE_PASSWORD }}
+          MAUMON_IOS_KEYCHAIN_PASSWORD: ${{ secrets.MAUMON_IOS_KEYCHAIN_PASSWORD }}
+          MAUMON_APP_STORE_CONNECT_API_KEY_ID: ${{ secrets.MAUMON_APP_STORE_CONNECT_API_KEY_ID }}
+          MAUMON_APP_STORE_CONNECT_API_ISSUER_ID: ${{ secrets.MAUMON_APP_STORE_CONNECT_API_ISSUER_ID }}
+          MAUMON_APP_STORE_CONNECT_API_KEY_P8_BASE64: ${{ secrets.MAUMON_APP_STORE_CONNECT_API_KEY_P8_BASE64 }}
         shell: bash
-        run: |
-          set -euo pipefail
-          ../tools/flutterw build ios --no-codesign
+        run: bash tools/ci/run-ios-testflight-archive.sh
 
       - name: Validate iOS project metadata
         if: ${{ steps.scaffold.outputs.present == 'true' && steps.scaffold.outputs.stack == 'xcode' }}
