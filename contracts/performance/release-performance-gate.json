@@ -1,0 +1,442 @@
+{
+  "version": 1,
+  "backendSmokeContract": "tools/ci/mobile-performance-gate.json",
+  "releaseLinking": {
+    "sameReleaseNumber": true,
+    "requiredFields": [
+      "releaseNumber",
+      "backendBuildNumber",
+      "androidBuildNumber",
+      "iosBuildNumber",
+      "apiContractVersion"
+    ]
+  },
+  "runtimeEvidence": {
+    "defaultDirectory": "contracts/performance/runtime-evidence",
+    "requiredFiles": [
+      "release-performance-release.json",
+      "release-performance-android-results.json",
+      "release-performance-ios-results.json",
+      "release-performance-backend-results.json"
+    ]
+  },
+  "backend": {
+    "requiredResultFields": [
+      "status",
+      "releaseNumber",
+      "buildNumber",
+      "evidence",
+      "notes"
+    ]
+  },
+  "platforms": {
+    "android": {
+      "deviceProfiles": [
+        {
+          "id": "android-physical-primary",
+          "deviceType": "physical",
+          "required": true,
+          "description": "Primary Android physical release candidate device"
+        }
+      ],
+      "requiredResultFields": [
+        "status",
+        "releaseNumber",
+        "buildNumber",
+        "deviceModel",
+        "osVersion",
+        "evidence",
+        "notes"
+      ]
+    },
+    "ios": {
+      "deviceProfiles": [
+        {
+          "id": "ios-physical-primary",
+          "deviceType": "physical",
+          "required": true,
+          "description": "Primary iOS physical release candidate device"
+        }
+      ],
+      "requiredResultFields": [
+        "status",
+        "releaseNumber",
+        "buildNumber",
+        "deviceModel",
+        "osVersion",
+        "evidence",
+        "notes"
+      ]
+    }
+  },
+  "scenarios": [
+    {
+      "id": "app.cold-start",
+      "priority": "P0",
+      "platforms": [
+        "android",
+        "ios"
+      ],
+      "budget": {
+        "thresholds": [
+          {
+            "metric": "coldStartMs",
+            "max": 1800
+          },
+          {
+            "metric": "firstFrameMs",
+            "max": 1200
+          }
+        ]
+      },
+      "passCriteria": [
+        "Cold start stays under the app start budget on each physical release device.",
+        "First frame evidence includes the build number and device OS."
+      ],
+      "evidenceRequired": [
+        "physical-device trace",
+        "release build identifier"
+      ]
+    },
+    {
+      "id": "app.first-interactive",
+      "priority": "P0",
+      "platforms": [
+        "android",
+        "ios"
+      ],
+      "budget": {
+        "thresholds": [
+          {
+            "metric": "firstInteractiveMs",
+            "max": 2200
+          }
+        ]
+      },
+      "passCriteria": [
+        "Home screen is usable within the first interactive budget.",
+        "Input readiness is measured after auth/session restoration."
+      ],
+      "evidenceRequired": [
+        "timeline trace",
+        "home ready marker"
+      ]
+    },
+    {
+      "id": "navigation.primary-screen-transition",
+      "priority": "P1",
+      "platforms": [
+        "android",
+        "ios"
+      ],
+      "budget": {
+        "thresholds": [
+          {
+            "metric": "transitionMs",
+            "max": 350
+          }
+        ]
+      },
+      "passCriteria": [
+        "Primary tab and core route transitions stay within budget.",
+        "No transition measurement uses debug-only instrumentation."
+      ],
+      "evidenceRequired": [
+        "navigation timing report"
+      ]
+    },
+    {
+      "id": "scroll.feed-jank",
+      "priority": "P0",
+      "platforms": [
+        "android",
+        "ios"
+      ],
+      "budget": {
+        "thresholds": [
+          {
+            "metric": "jankPercent",
+            "max": 3
+          },
+          {
+            "metric": "p95FrameMs",
+            "max": 16.7
+          },
+          {
+            "metric": "memoryGrowthMb",
+            "max": 40
+          }
+        ]
+      },
+      "passCriteria": [
+        "Feed scrolling stays below the jank budget.",
+        "Memory growth after repeated scroll loops stays bounded."
+      ],
+      "evidenceRequired": [
+        "scroll performance trace",
+        "memory sample"
+      ]
+    },
+    {
+      "id": "media.image-attachment",
+      "priority": "P1",
+      "platforms": [
+        "android",
+        "ios"
+      ],
+      "budget": {
+        "thresholds": [
+          {
+            "metric": "imageAttachMs",
+            "max": 1500
+          },
+          {
+            "metric": "memoryGrowthMb",
+            "max": 48
+          }
+        ]
+      },
+      "passCriteria": [
+        "Diary image attachment preview appears within budget.",
+        "Image attach failure can be retried without losing the draft."
+      ],
+      "evidenceRequired": [
+        "image attachment timing",
+        "retry state screenshot or log"
+      ]
+    },
+    {
+      "id": "consultation.stream",
+      "priority": "P0",
+      "platforms": [
+        "android",
+        "ios"
+      ],
+      "budget": {
+        "thresholds": [
+          {
+            "metric": "firstChunkMs",
+            "max": 1500
+          },
+          {
+            "metric": "streamRecoveryMs",
+            "max": 2500
+          }
+        ]
+      },
+      "passCriteria": [
+        "First consultation stream chunk is visible within budget.",
+        "Interrupted stream recovery does not duplicate the pending message."
+      ],
+      "evidenceRequired": [
+        "stream timing log",
+        "retry result log"
+      ]
+    },
+    {
+      "id": "network.slow-3g-recovery",
+      "priority": "P0",
+      "platforms": [
+        "android",
+        "ios"
+      ],
+      "budget": {
+        "thresholds": [
+          {
+            "metric": "recoveryMs",
+            "max": 5000
+          },
+          {
+            "metric": "duplicateWrites",
+            "max": 0,
+            "message": "duplicate writes must be zero"
+          }
+        ]
+      },
+      "passCriteria": [
+        "Slow 3G save, consultation, and notification flows recover within budget.",
+        "Retries do not create duplicate writes."
+      ],
+      "evidenceRequired": [
+        "slow network profile trace",
+        "duplicate write counter"
+      ]
+    },
+    {
+      "id": "network.packet-loss-retry",
+      "priority": "P1",
+      "platforms": [
+        "android",
+        "ios"
+      ],
+      "budget": {
+        "thresholds": [
+          {
+            "metric": "recoveryMs",
+            "max": 5000
+          },
+          {
+            "metric": "duplicateWrites",
+            "max": 0,
+            "message": "duplicate writes must be zero"
+          }
+        ]
+      },
+      "passCriteria": [
+        "Packet loss retry recovers without stale loading state.",
+        "Retry operations keep idempotency guarantees."
+      ],
+      "evidenceRequired": [
+        "packet loss profile trace",
+        "retry counter"
+      ]
+    },
+    {
+      "id": "network.offline-recovery",
+      "priority": "P0",
+      "platforms": [
+        "android",
+        "ios"
+      ],
+      "budget": {
+        "thresholds": [
+          {
+            "metric": "recoveryMs",
+            "max": 5000
+          },
+          {
+            "metric": "duplicateWrites",
+            "max": 0,
+            "message": "duplicate writes must be zero"
+          }
+        ]
+      },
+      "passCriteria": [
+        "Offline return recovers save, consultation, and notification flows.",
+        "Recovered operations do not duplicate user content."
+      ],
+      "evidenceRequired": [
+        "offline return trace",
+        "operation idempotency log"
+      ]
+    },
+    {
+      "id": "write.duplicate-prevention",
+      "priority": "P0",
+      "platforms": [
+        "android",
+        "ios"
+      ],
+      "budget": {
+        "thresholds": [
+          {
+            "metric": "duplicateWrites",
+            "max": 0,
+            "message": "duplicate writes must be zero"
+          },
+          {
+            "metric": "idempotencyHits",
+            "min": 1
+          }
+        ]
+      },
+      "passCriteria": [
+        "Repeated retry taps are collapsed by client and server idempotency.",
+        "Duplicate prevention metrics are emitted for the release build."
+      ],
+      "evidenceRequired": [
+        "idempotency hit log",
+        "write recovery metric"
+      ]
+    },
+    {
+      "id": "backend.api-p95",
+      "priority": "P0",
+      "platforms": [
+        "backend"
+      ],
+      "budget": {
+        "thresholds": [
+          {
+            "metric": "p95LatencyMs",
+            "max": 2500
+          },
+          {
+            "metric": "errorRate",
+            "max": 0.01
+          },
+          {
+            "metric": "successRate",
+            "min": 0.99
+          }
+        ]
+      },
+      "passCriteria": [
+        "Backend API p95 stays below the smoke budget for the same release number.",
+        "Backend error rate and success rate stay within the mobile smoke contract."
+      ],
+      "evidenceRequired": [
+        "mobile-performance-smoke.json"
+      ]
+    }
+  ],
+  "staticEvidence": [
+    {
+      "id": "flutter-performance-budgets",
+      "file": "front/lib/core/observability/mobile_performance_budgets.dart",
+      "patterns": [
+        "appStart",
+        "firstInteractive",
+        "primaryScreenTransition",
+        "feedScrollJank",
+        "imageAttachmentReady",
+        "consultationStreamRecovery",
+        "slowNetworkRecovery",
+        "duplicateRetryPrevention"
+      ]
+    },
+    {
+      "id": "backend-performance-smoke-script",
+      "file": "tools/ci/run-mobile-performance-smoke.sh",
+      "patterns": [
+        "MOBILE_PERFORMANCE_P95_BUDGET_MS",
+        "MOBILE_PERFORMANCE_ERROR_RATE_BUDGET",
+        "mobile-performance-smoke\\.json"
+      ]
+    },
+    {
+      "id": "backend-performance-smoke-contract",
+      "file": "tools/ci/mobile-performance-gate.json",
+      "patterns": [
+        "p95LatencyMs",
+        "maxErrorRate",
+        "minSuccessRate"
+      ]
+    },
+    {
+      "id": "diary-image-retry-state",
+      "file": "front/lib/features/diary/application/diary_controller.dart",
+      "patterns": [
+        "retryImageBlockUpload",
+        "DiaryImageBlockUploadStatus\\.failed"
+      ]
+    },
+    {
+      "id": "consultation-stream-retry-state",
+      "file": "front/lib/features/consultation/application/consultation_controller.dart",
+      "patterns": [
+        "retryFailedMessage",
+        "ConsultationFailedMessage"
+      ]
+    },
+    {
+      "id": "server-write-idempotency",
+      "file": "back/src/main/kotlin/com/maumonmobile/application/service/WriteIdempotencyService.kt",
+      "patterns": [
+        "executeLong",
+        "idempotencyKey",
+        "findByKey"
+      ]
+    }
+  ]
+}
