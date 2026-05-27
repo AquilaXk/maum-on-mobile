@@ -60,3 +60,13 @@ app:
       max-attempts: ${AI_MODERATION_MAX_ATTEMPTS:2}
       max-input-chars: ${AI_MODERATION_MAX_INPUT_CHARS:2000}
       recent-message-limit: 0
+  store-review:
+    seed:
+      enabled: ${MAUMON_STORE_REVIEW_SEED_ENABLED:false}
+      secret: ${MAUMON_STORE_REVIEW_SEED_SECRET:}
+      reviewer:
+        email: ${MAUMON_REVIEW_ACCOUNT_EMAIL:}
+        password: ${MAUMON_REVIEW_ACCOUNT_PASSWORD:}
+      operations:
+        email: ${MAUMON_REVIEW_OPERATIONS_EMAIL:}
+        password: ${MAUMON_REVIEW_OPERATIONS_PASSWORD:}

@@ -294,6 +294,18 @@ test("path classifier enables frontend, iOS, and repository checks for store rev
   assert.equal(outputs.javascript, "false");
 });
 
+test("path classifier enables backend checks for store review seed contracts", async () => {
+  const outputs = await classifyChangedFiles(["contracts/store-review/review-seed.json"]);
+
+  assert.equal(outputs.docs_only, "false");
+  assert.equal(outputs.backend, "true");
+  assert.equal(outputs.frontend, "true");
+  assert.equal(outputs.repository, "true");
+  assert.equal(outputs.android, "false");
+  assert.equal(outputs.ios, "true");
+  assert.equal(outputs.javascript, "false");
+});
+
 test("path classifier enables store listing platform checks", async () => {
   const outputs = await classifyChangedFiles(["contracts/store-listing/store-listing.json"]);
 

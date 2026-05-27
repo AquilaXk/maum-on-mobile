@@ -1,0 +1,76 @@
+{
+  "version": 1,
+  "profile": "store-review-seed",
+  "credentialsCommitted": false,
+  "secretOptIn": {
+    "required": true,
+    "enabledProperty": "app.store-review.seed.enabled",
+    "headerName": "X-Maumon-Review-Seed-Secret",
+    "secretNames": [
+      "MAUMON_STORE_REVIEW_SEED_SECRET",
+      "MAUMON_REVIEW_ACCOUNT_EMAIL",
+      "MAUMON_REVIEW_ACCOUNT_PASSWORD",
+      "MAUMON_REVIEW_OPERATIONS_EMAIL",
+      "MAUMON_REVIEW_OPERATIONS_PASSWORD"
+    ]
+  },
+  "reviewNotes": {
+    "inputLocation": "App Store Connect and Play Console review notes",
+    "credentialPolicy": "Enter credential values only in store review notes and deployment secrets. Do not commit credential values.",
+    "dryRunEndpoint": "POST /api/v1/store-review/test-data/seed {\"dryRun\":true}",
+    "seedEndpoint": "POST /api/v1/store-review/test-data/seed {\"dryRun\":false}"
+  },
+  "accounts": [
+    {
+      "id": "reviewer",
+      "role": "USER",
+      "emailSecretName": "MAUMON_REVIEW_ACCOUNT_EMAIL",
+      "passwordSecretName": "MAUMON_REVIEW_ACCOUNT_PASSWORD",
+      "accessPaths": [
+        "auth.login",
+        "home",
+        "diary.create_delete",
+        "story.create_comment",
+        "letter.send_receive",
+        "consultation.chat",
+        "notifications.open",
+        "report.submit",
+        "settings.data_export",
+        "settings.member_withdrawal"
+      ]
+    },
+    {
+      "id": "operations",
+      "role": "ADMIN",
+      "emailSecretName": "MAUMON_REVIEW_OPERATIONS_EMAIL",
+      "passwordSecretName": "MAUMON_REVIEW_OPERATIONS_PASSWORD",
+      "accessPaths": [
+        "admin.members",
+        "admin.reports",
+        "admin.letters"
+      ]
+    }
+  ],
+  "testDataScope": [
+    "diary.create_delete",
+    "story.create_comment",
+    "letter.send_receive",
+    "consultation.chat",
+    "notifications.open",
+    "report.submit",
+    "settings.data_export",
+    "settings.member_withdrawal"
+  ],
+  "idempotency": {
+    "accountKey": "email",
+    "contentKey": "review-seed stable titles and contents",
+    "actualUserDataIsolation": "Only configured review accounts are upserted. Existing records are reused by stable seed titles and contents."
+  },
+  "qualityGate": {
+    "commands": [
+      "tools/ci/run-store-review-seed-dry-run.sh",
+      "./back/gradlew check --no-daemon",
+      "tools/ci/run-local-mobile-checks.sh"
+    ]
+  }
+}

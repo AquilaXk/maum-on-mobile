@@ -38,6 +38,11 @@ class SecurityConfig(
                         .requestMatchers("/api/v1/performance/**")
                         .permitAll()
                 }
+                if (environment.acceptsProfiles(Profiles.of("store-review-seed"))) {
+                    authorize
+                        .requestMatchers("/api/v1/store-review/test-data/**")
+                        .permitAll()
+                }
                 authorize
                     .requestMatchers(
                         HttpMethod.GET,
