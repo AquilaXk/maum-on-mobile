@@ -457,7 +457,12 @@ class AuthService(
 
     private fun oidcClientIdFor(provider: String): String {
         if (provider == APPLE_PROVIDER) {
-            return appleClientId.trim().ifEmpty { oidcClientId }
+            return appleClientId
+                .trim()
+                .takeIf(String::isNotEmpty)
+                ?: throw IllegalStateException(
+                    "app.auth.oidc.apple.client-id is required for Apple OIDC login.",
+                )
         }
 
         return oidcClientId
