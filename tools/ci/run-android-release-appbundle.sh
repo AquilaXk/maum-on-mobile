@@ -14,6 +14,26 @@ required_env=(
   MAUMON_FIREBASE_SENDER_ID
 )
 missing_env=()
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --dry-run)
+      export MAUMON_ANDROID_RELEASE_DRY_RUN=true
+      shift
+      ;;
+    -h|--help)
+      cat <<'EOF'
+Usage: tools/ci/run-android-release-appbundle.sh [--dry-run]
+
+Builds the signed Android App Bundle, or validates inputs without building when --dry-run is set.
+EOF
+      exit 0
+      ;;
+    *)
+      echo "Unknown argument: $1" >&2
+      exit 2
+      ;;
+  esac
+done
 
 for name in "${required_env[@]}"; do
   if [[ -z "${!name:-}" ]]; then

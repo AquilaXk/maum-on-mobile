@@ -18,6 +18,73 @@ on:
           - skip
           - dry-run
           - appbundle
+      android_track_submit_mode:
+        description: "Android Play testing track submit mode"
+        required: true
+        default: skip
+        type: choice
+        options:
+          - skip
+          - dry-run
+          - submit
+      android_play_package_name:
+        description: "Android package name for Play track submission"
+        required: true
+        default: com.aquilaxk.maumonmobile
+        type: string
+      android_play_track:
+        description: "Play track id such as internal or alpha"
+        required: true
+        default: internal
+        type: string
+      android_play_track_kind:
+        description: "Testing track kind"
+        required: true
+        default: internal
+        type: choice
+        options:
+          - internal
+          - closed
+      android_play_release_status:
+        description: "Play release status"
+        required: true
+        default: draft
+        type: choice
+        options:
+          - draft
+          - completed
+          - inProgress
+          - halted
+      android_play_release_notes:
+        description: "Play release notes text"
+        required: true
+        default: Internal testing build
+        type: string
+      android_play_tester_groups:
+        description: "Comma-separated Google Groups for testing tracks"
+        required: false
+        type: string
+      android_play_tester_emails:
+        description: "Comma-separated tester emails for evidence"
+        required: false
+        type: string
+      android_play_closed_test_start_date:
+        description: "Closed test start date in YYYY-MM-DD"
+        required: false
+        type: string
+      android_play_closed_test_participant_count:
+        description: "Closed test participant count"
+        required: false
+        type: string
+      android_play_closed_test_feedback_url:
+        description: "Closed test feedback collection URL"
+        required: false
+        type: string
+      android_play_production_access_status:
+        description: "Production access request status"
+        required: false
+        default: not_requested
+        type: string
       ios_release_mode:
         description: "iOS release pipeline mode"
         required: true
@@ -353,6 +420,31 @@ jobs:
           MAUMON_FIREBASE_SENDER_ID: ${{ secrets.MAUMON_FIREBASE_SENDER_ID }}
         shell: bash
         run: bash tools/ci/run-android-release-appbundle.sh
+
+      - name: Require Android appbundle for Play submit
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.android_track_submit_mode == 'submit' && inputs.android_release_mode != 'appbundle' }}
+        shell: bash
+        run: |
+          echo "Android Play submit mode requires android_release_mode=appbundle so a signed AAB exists."
+          exit 1
+
+      - name: Submit Android Play testing track or dry run
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.android_track_submit_mode != 'skip' && steps.scaffold.outputs.present == 'true' && steps.scaffold.outputs.stack == 'flutter' }}
+        env:
+          MAUMON_PLAY_RELEASE_DRY_RUN: ${{ inputs.android_track_submit_mode == 'dry-run' }}
+          MAUMON_PLAY_SERVICE_ACCOUNT_JSON_BASE64: ${{ secrets.MAUMON_PLAY_SERVICE_ACCOUNT_JSON_BASE64 }}
+          MAUMON_PLAY_PACKAGE_NAME: ${{ inputs.android_play_package_name }}
+          MAUMON_PLAY_TRACK: ${{ inputs.android_play_track }}
+          MAUMON_PLAY_TRACK_KIND: ${{ inputs.android_play_track_kind }}
+          MAUMON_PLAY_RELEASE_STATUS: ${{ inputs.android_play_release_status }}
+          MAUMON_PLAY_RELEASE_NOTES: ${{ inputs.android_play_release_notes }}
+          MAUMON_PLAY_TESTER_GROUPS: ${{ inputs.android_play_tester_groups }}
+          MAUMON_PLAY_TESTER_EMAILS: ${{ inputs.android_play_tester_emails }}
+          MAUMON_PLAY_CLOSED_TEST_START_DATE: ${{ inputs.android_play_closed_test_start_date }}
+          MAUMON_PLAY_CLOSED_TEST_PARTICIPANT_COUNT: ${{ inputs.android_play_closed_test_participant_count }}
+          MAUMON_PLAY_CLOSED_TEST_FEEDBACK_URL: ${{ inputs.android_play_closed_test_feedback_url }}
+          MAUMON_PLAY_PRODUCTION_ACCESS_STATUS: ${{ inputs.android_play_production_access_status }}
+        run: node tools/ci/run-android-play-track-submit.mjs
 
       - name: Run Android checks
         if: ${{ steps.scaffold.outputs.present == 'true' && steps.scaffold.outputs.stack == 'gradle' }}
