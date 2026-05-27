@@ -79,16 +79,16 @@ class MemberDataExportService(
     }
 
     override fun get(user: AuthenticatedUser, exportId: Long): MemberDataExportJobResult {
-        val memberId = user.memberId()
-        val job = findOwnedJob(exportId, memberId)
+        val member = findActiveMember(user)
+        val job = findOwnedJob(exportId, member.id)
         return MemberDataExportJobResult.from(job, Instant.now(clock))
     }
 
     @Transactional
     override fun download(user: AuthenticatedUser, exportId: Long): MemberDataExportFileResult {
-        val memberId = user.memberId()
+        val member = findActiveMember(user)
         val now = Instant.now(clock)
-        val job = findOwnedJob(exportId, memberId)
+        val job = findOwnedJob(exportId, member.id)
         val status = job.statusAt(now)
         if (status == MemberDataExportStatus.EXPIRED) {
             throw ApiException(ErrorCode.EXPIRED, "내보내기 파일이 만료되었습니다. 다시 요청해 주세요.")
