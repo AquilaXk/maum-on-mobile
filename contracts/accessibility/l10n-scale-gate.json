@@ -1,0 +1,334 @@
+{
+  "version": 1,
+  "appName": "Maum On",
+  "locale": "ko-KR",
+  "storeListingContract": "contracts/store-listing/store-listing.json",
+  "usabilityContract": "tools/ci/mobile-usability-release-criteria.json",
+  "releaseBlockers": [
+    "missing_accessibility_answer",
+    "missing_static_evidence",
+    "term_mismatch",
+    "missing_runtime_evidence",
+    "runtime_accessibility_smoke_failed"
+  ],
+  "screens": [
+    {
+      "id": "home",
+      "routeKey": "home",
+      "screenshotCandidate": true,
+      "semanticLabels": ["홈 임시 저장 내용을 확인하는 중", "홈 공개 스토리 목록 비어 있음"],
+      "evidenceItems": [
+        {
+          "id": "home-semantics",
+          "file": "front/lib/features/home/home_screen.dart",
+          "patterns": ["semanticLabel:", "홈 임시 저장", "홈 공개 스토리"]
+        }
+      ]
+    },
+    {
+      "id": "diary",
+      "routeKey": "diary",
+      "screenshotCandidate": true,
+      "semanticLabels": ["선택한 날짜 기록 비어 있음", "공개 기록 목록 오류"],
+      "evidenceItems": [
+        {
+          "id": "diary-semantics",
+          "file": "front/lib/features/diary/presentation/diary_screen.dart",
+          "patterns": ["semanticLabel:", "선택한 날짜 기록", "권한 설정 열기"]
+        }
+      ]
+    },
+    {
+      "id": "story",
+      "routeKey": "story",
+      "screenshotCandidate": true,
+      "semanticLabels": ["스토리 목록을 불러오는 중", "스토리 댓글 비어 있음"],
+      "evidenceItems": [
+        {
+          "id": "story-semantics-touch",
+          "file": "front/test/features/story/story_screen_test.dart",
+          "patterns": ["comment action controls keep mobile touch targets", "greaterThanOrEqualTo\\(48\\)"]
+        }
+      ]
+    },
+    {
+      "id": "letter",
+      "routeKey": "letter",
+      "screenshotCandidate": true,
+      "semanticLabels": ["편지함을 불러오는 중", "편지 상세 선택 필요"],
+      "evidenceItems": [
+        {
+          "id": "letter-semantics",
+          "file": "front/lib/features/letter/presentation/letter_screen.dart",
+          "patterns": ["semanticLabel:", "편지함을 불러오는 중", "편지 상세 선택 필요"]
+        }
+      ]
+    },
+    {
+      "id": "consultation",
+      "routeKey": "consultation",
+      "screenshotCandidate": true,
+      "semanticLabels": ["상담 위험 상황 도움 안내", "119 긴급 구조 요청"],
+      "evidenceItems": [
+        {
+          "id": "consultation-semantics",
+          "file": "front/lib/features/consultation/presentation/consultation_screen.dart",
+          "patterns": ["상담 위험 상황 도움 안내", "119 긴급 구조 요청", "1388 청소년 상담 연결"]
+        }
+      ]
+    },
+    {
+      "id": "notifications",
+      "routeKey": "notifications",
+      "screenshotCandidate": true,
+      "semanticLabels": ["알림 목록을 불러오는 중", "푸시 알림 권한 거부됨"],
+      "evidenceItems": [
+        {
+          "id": "notification-semantics",
+          "file": "front/test/features/notification/notification_report_screen_test.dart",
+          "patterns": ["ensureSemantics", "find.bySemanticsLabel", "읽은 알림.*편지"]
+        }
+      ]
+    },
+    {
+      "id": "settings",
+      "routeKey": "settings",
+      "screenshotCandidate": true,
+      "semanticLabels": ["계정 설정을 불러오는 중", "계정 설정 로드 실패"],
+      "evidenceItems": [
+        {
+          "id": "settings-semantics",
+          "file": "front/lib/features/settings/presentation/settings_screen.dart",
+          "patterns": ["semanticLabel:", "계정 설정을 불러오는 중", "개인정보"]
+        }
+      ]
+    },
+    {
+      "id": "operations",
+      "routeKey": "operations",
+      "screenshotCandidate": true,
+      "semanticLabels": ["운영 대시보드를 불러오는 중", "운영 조치 저장"],
+      "evidenceItems": [
+        {
+          "id": "operations-semantics-scale",
+          "file": "front/lib/features/operations/presentation/operations_screen.dart",
+          "patterns": ["semanticLabel:", "운영 조치 저장", "조치 저장 확인"]
+        }
+      ]
+    }
+  ],
+  "criteria": {
+    "screenReader": {
+      "owner": "mobile-qa",
+      "rule": "핵심 화면의 주요 버튼, 입력, 상태 메시지는 목적이 드러나는 semantic label을 가진다.",
+      "evidenceItems": [
+        {
+          "id": "design-system-state-semantics",
+          "file": "front/test/theme/app_design_system_test.dart",
+          "patterns": ["state views expose journey semantics", "find.bySemanticsLabel", "공통 권한 상태"]
+        }
+      ]
+    },
+    "textScale": {
+      "owner": "mobile-qa",
+      "requiredScales": [1, 1.5, 2],
+      "rule": "Android/iOS text scale 100%, 150%, 200%에서 CTA와 오류 문구가 잘리지 않는다.",
+      "evidenceItems": [
+        {
+          "id": "quality-text-scale",
+          "file": "front/test/quality/mobile_quality_gate_test.dart",
+          "patterns": ["small-screen-large-text", "textScale: 1.35", "tester.takeException\\(\\), isNull"]
+        },
+        {
+          "id": "moderation-large-text",
+          "file": "front/test/features/moderation/content_moderation_feedback_panel_test.dart",
+          "patterns": ["TextScaler.linear\\(1.8\\)", "콘텐츠 검수 차단 안내"]
+        }
+      ]
+    },
+    "contrast": {
+      "owner": "design-system",
+      "minimumNormalTextRatio": 4.5,
+      "minimumLargeTextRatio": 3,
+      "rule": "오류, 성공, 경고, 위험 상태 색상은 라이트/다크 모드에서 충분한 대비를 유지한다.",
+      "evidenceItems": [
+        {
+          "id": "theme-dark-mode",
+          "file": "front/test/quality/mobile_quality_gate_test.dart",
+          "patterns": ["dark-mode", "buildDarkAppTheme", "AppNoticeTone.success"]
+        },
+        {
+          "id": "state-tone-colors",
+          "file": "front/lib/shared/ui/app_design_system.dart",
+          "patterns": ["errorContainer", "_stateColors", "_noticeColors"]
+        }
+      ]
+    },
+    "touchTarget": {
+      "owner": "design-system",
+      "minimumDp": 48,
+      "rule": "탭 가능한 컨트롤은 최소 48dp 터치 영역을 가진다.",
+      "evidenceItems": [
+        {
+          "id": "theme-minimum-size",
+          "file": "front/lib/theme/app_theme.dart",
+          "patterns": ["minimumSize: const Size\\(48, 52\\)", "minimumSize: const Size\\(48, 48\\)"]
+        },
+        {
+          "id": "story-touch-target",
+          "file": "front/test/features/story/story_screen_test.dart",
+          "patterns": ["comment action controls keep mobile touch targets", "greaterThanOrEqualTo\\(48\\)"]
+        }
+      ]
+    },
+    "keyboardAutofill": {
+      "owner": "mobile-qa",
+      "rule": "로그인, 가입, 비밀번호 재설정 입력은 키보드 타입, autofill, 완료 액션을 명시한다.",
+      "evidenceItems": [
+        {
+          "id": "auth-autofill",
+          "file": "front/lib/features/auth/presentation/auth_screen.dart",
+          "patterns": ["AutofillHints.email", "AutofillHints.password", "TextInputAction.done"]
+        }
+      ]
+    }
+  },
+  "terminology": [
+    {
+      "id": "home",
+      "canonical": "홈",
+      "evidenceItems": [
+        {"id": "store-home", "file": "contracts/store-listing/store-listing.json", "patterns": ["\"routeKey\": \"home\""]},
+        {"id": "app-home", "file": "front/lib/app/app_routes.dart", "patterns": ["key: 'home'", "title: '홈'"]}
+      ]
+    },
+    {
+      "id": "diary",
+      "canonical": "기록",
+      "evidenceItems": [
+        {"id": "store-diary", "file": "contracts/store-listing/store-listing.json", "patterns": ["\"routeKey\": \"diary\"", "감정 기록"]},
+        {"id": "app-diary", "file": "front/lib/app/app_routes.dart", "patterns": ["key: 'diary'", "title: '기록'"]}
+      ]
+    },
+    {
+      "id": "story",
+      "canonical": "스토리",
+      "evidenceItems": [
+        {"id": "store-story", "file": "contracts/store-listing/store-listing.json", "patterns": ["\"routeKey\": \"story\"", "스토리"]},
+        {"id": "app-story", "file": "front/lib/app/app_routes.dart", "patterns": ["key: 'story'", "title: '스토리'"]}
+      ]
+    },
+    {
+      "id": "letter",
+      "canonical": "편지",
+      "evidenceItems": [
+        {"id": "store-letter", "file": "contracts/store-listing/store-listing.json", "patterns": ["\"routeKey\": \"letter\"", "편지"]},
+        {"id": "app-letter", "file": "front/lib/app/app_routes.dart", "patterns": ["key: 'letter'", "title: '편지'"]}
+      ]
+    },
+    {
+      "id": "consultation",
+      "canonical": "상담",
+      "evidenceItems": [
+        {"id": "store-consultation", "file": "contracts/store-listing/store-listing.json", "patterns": ["\"routeKey\": \"consultation\"", "상담"]},
+        {"id": "app-consultation", "file": "front/lib/app/app_routes.dart", "patterns": ["key: 'consultation'", "title: '상담'"]}
+      ]
+    },
+    {
+      "id": "notifications",
+      "canonical": "알림",
+      "evidenceItems": [
+        {"id": "store-notifications", "file": "contracts/store-listing/store-listing.json", "patterns": ["\"routeKey\": \"notifications\"", "알림"]},
+        {"id": "app-notifications", "file": "front/lib/app/app_routes.dart", "patterns": ["key: 'notifications'", "navLabel: '알림'"]}
+      ]
+    },
+    {
+      "id": "settings",
+      "canonical": "설정",
+      "evidenceItems": [
+        {"id": "store-settings", "file": "contracts/store-listing/store-listing.json", "patterns": ["\"routeKey\": \"settings\"", "설정"]},
+        {"id": "app-settings", "file": "front/lib/app/app_routes.dart", "patterns": ["key: 'settings'", "title: '설정'"]}
+      ]
+    },
+    {
+      "id": "operations",
+      "canonical": "운영",
+      "evidenceItems": [
+        {"id": "operations-screen", "file": "front/lib/features/operations/presentation/operations_screen.dart", "patterns": ["운영", "운영 조치 저장"]},
+        {"id": "app-operations", "file": "front/lib/app/app_routes.dart", "patterns": ["key: 'operations'", "navLabel: '운영'"]}
+      ]
+    },
+    {
+      "id": "privacy",
+      "canonical": "개인정보",
+      "evidenceItems": [
+        {"id": "store-privacy", "file": "contracts/store-listing/store-listing.json", "patterns": ["개인정보", "privacyPolicyUrl"]},
+        {"id": "app-privacy", "file": "front/lib/features/legal/domain/legal_disclosures.dart", "patterns": ["개인정보 처리방침", "privacyPolicyUrl"]}
+      ]
+    }
+  ],
+  "staticEvidence": [
+    {
+      "id": "usability-contract",
+      "owner": "mobile-qa",
+      "evidenceItems": [
+        {
+          "id": "existing-usability-accessibility",
+          "file": "tools/ci/mobile-usability-release-criteria.json",
+          "patterns": ["\"largeText\"", "\"screenReader\"", "\"touchTarget\"", "\"darkMode\""]
+        }
+      ]
+    },
+    {
+      "id": "store-screenshot-routes",
+      "owner": "mobile-release",
+      "evidenceItems": [
+        {
+          "id": "store-screenshot-captures",
+          "file": "contracts/store-listing/store-listing.json",
+          "patterns": [
+            "\"routeKey\": \"home\"",
+            "\"routeKey\": \"diary\"",
+            "\"routeKey\": \"notifications\"",
+            "\"routeKey\": \"settings\""
+          ]
+        }
+      ]
+    }
+  ],
+  "runtimeEvidence": {
+    "defaultDirectory": "contracts/accessibility/runtime-evidence",
+    "requiredFiles": [
+      {
+        "id": "text-scale",
+        "filename": "accessibility-text-scale-results.json",
+        "requiredScenarios": [
+          "android_text_scale_100",
+          "android_text_scale_150",
+          "android_text_scale_200",
+          "ios_text_scale_100",
+          "ios_text_scale_150",
+          "ios_text_scale_200"
+        ]
+      },
+      {
+        "id": "screen-reader",
+        "filename": "accessibility-screen-reader-results.json",
+        "requiredScenarios": [
+          "talkback_core_flow",
+          "voiceover_core_flow",
+          "focus_order_store_screenshots"
+        ]
+      },
+      {
+        "id": "visual",
+        "filename": "accessibility-visual-results.json",
+        "requiredScenarios": [
+          "contrast_smoke",
+          "touch_target_smoke",
+          "screenshot_candidate_terms"
+        ]
+      }
+    ]
+  }
+}

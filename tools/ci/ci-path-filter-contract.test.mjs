@@ -270,6 +270,18 @@ test("path classifier enables backend, frontend, and repository checks for share
   assert.equal(outputs.javascript, "false");
 });
 
+test("path classifier enables mobile accessibility checks for accessibility contracts", async () => {
+  const outputs = await classifyChangedFiles(["contracts/accessibility/l10n-scale-gate.json"]);
+
+  assert.equal(outputs.docs_only, "false");
+  assert.equal(outputs.backend, "false");
+  assert.equal(outputs.frontend, "true");
+  assert.equal(outputs.repository, "true");
+  assert.equal(outputs.android, "true");
+  assert.equal(outputs.ios, "true");
+  assert.equal(outputs.javascript, "false");
+});
+
 test("path classifier enables frontend and repository checks for store privacy contracts", async () => {
   const outputs = await classifyChangedFiles(["contracts/store-privacy/data-safety.json"]);
 

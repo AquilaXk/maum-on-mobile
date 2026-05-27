@@ -42,6 +42,12 @@ while IFS= read -r file; do
       frontend=true
       repository=true
       ;;
+    contracts/accessibility/**)
+      android=true
+      frontend=true
+      ios=true
+      repository=true
+      ;;
     contracts/store-privacy/**)
       frontend=true
       repository=true
