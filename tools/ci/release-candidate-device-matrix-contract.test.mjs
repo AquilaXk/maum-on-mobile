@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
-import { mkdtemp, readFile } from "node:fs/promises";
+import { mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
@@ -119,3 +119,164 @@ test("release candidate device matrix report script writes PR-ready checklist", 
   assert.match(markdown, /permissions\.notifications\.allow-deny/);
   assert.match(markdown, /network\.slow-connection/);
 });
+
+test("release candidate device matrix gate fails when required physical evidence is missing", async () => {
+  const reportDir = await mkdtemp(path.join(tmpdir(), "maum-release-device-matrix-missing-"));
+
+  await assert.rejects(
+    execFileAsync("node", [
+      path.join(root, "tools/ci/run-release-device-matrix.mjs"),
+      "--platform",
+      "android",
+      "--report-dir",
+      reportDir,
+      "--require-results",
+    ]),
+    (error) => {
+      assert.equal(error.code, 1);
+      assert.match(error.stderr, /Missing release candidate device results/);
+      return true;
+    },
+  );
+
+  const report = JSON.parse(
+    await readFile(path.join(reportDir, "release-device-matrix-android.json"), "utf8"),
+  );
+
+  assert.equal(report.status, "blocked");
+  assert.ok(report.summary.pending > 0);
+  assert.ok(report.failures.some((failure) => failure.reason === "missing_results"));
+});
+
+test("release candidate device matrix gate accepts pass and approved not applicable results", async () => {
+  const reportDir = await mkdtemp(path.join(tmpdir(), "maum-release-device-matrix-pass-"));
+  const resultsPath = path.join(reportDir, "android-results.json");
+  const resultDocument = buildPhysicalResultDocument("android");
+  const notApplicable = resultDocument.results.find(
+    (result) => result.scenario === "accessibility.screen-reader" && result.networkProfile === "slow-3g",
+  );
+  notApplicable.status = "not_applicable";
+  notApplicable.notApplicableReason = "Screen reader verification is duplicated by the wifi run for the same physical build.";
+  notApplicable.notApplicableApprovedBy = "release-manager@example.com";
+
+  await writeFile(resultsPath, `${JSON.stringify(resultDocument, null, 2)}\n`);
+
+  await execFileAsync("node", [
+    path.join(root, "tools/ci/run-release-device-matrix.mjs"),
+    "--platform",
+    "android",
+    "--report-dir",
+    reportDir,
+    "--results",
+    resultsPath,
+    "--require-results",
+  ]);
+
+  const report = JSON.parse(
+    await readFile(path.join(reportDir, "release-device-matrix-android.json"), "utf8"),
+  );
+  const markdown = await readFile(path.join(reportDir, "release-device-matrix-android.md"), "utf8");
+
+  assert.equal(report.status, "pass");
+  assert.equal(report.summary.fail, 0);
+  assert.equal(report.summary.blocked, 0);
+  assert.equal(report.summary.pending, 0);
+  assert.ok(report.summary.not_applicable >= 1);
+  assert.ok(report.scenarios.every((scenario) => ["pass", "not_applicable"].includes(scenario.status)));
+  assert.match(markdown, /\| status \| pass \|/);
+  assert.match(markdown, /release-manager@example\.com/);
+});
+
+test("release candidate device matrix gate requires issue links and retest flags for blocked results", async () => {
+  const reportDir = await mkdtemp(path.join(tmpdir(), "maum-release-device-matrix-blocked-"));
+  const resultsPath = path.join(reportDir, "ios-results.json");
+  const resultDocument = buildPhysicalResultDocument("ios");
+  const blocked = resultDocument.results.find(
+    (result) => result.scenario === "push.foreground-background-cold-start" && result.networkProfile === "wifi",
+  );
+  blocked.status = "blocked";
+  blocked.issue = "";
+  blocked.needsRetest = false;
+
+  await writeFile(resultsPath, `${JSON.stringify(resultDocument, null, 2)}\n`);
+
+  await assert.rejects(
+    execFileAsync("node", [
+      path.join(root, "tools/ci/run-release-device-matrix.mjs"),
+      "--platform",
+      "ios",
+      "--report-dir",
+      reportDir,
+      "--results",
+      resultsPath,
+      "--require-results",
+    ]),
+    (error) => {
+      assert.equal(error.code, 1);
+      assert.match(error.stderr, /blocked results require issue and needsRetest=true/);
+      return true;
+    },
+  );
+});
+
+test("ci runs physical device evidence gate only for release candidate flows", async () => {
+  const workflow = read(".github/workflows/ci.yml");
+  const releaseDeviceMatrix = jobBlock(workflow, "release-device-matrix");
+
+  assert.match(releaseDeviceMatrix, /needs: changes/);
+  assert.match(releaseDeviceMatrix, /github\.event_name == 'workflow_dispatch'/);
+  assert.match(releaseDeviceMatrix, /startsWith\(github\.head_ref, 'release\/'\)/);
+  assert.match(releaseDeviceMatrix, /startsWith\(github\.head_ref, 'rc\/'\)/);
+  assert.match(releaseDeviceMatrix, /startsWith\(github\.ref, 'refs\/tags\/rc-'\)/);
+  assert.match(releaseDeviceMatrix, /--require-results/);
+  assert.match(releaseDeviceMatrix, /actions\/upload-artifact@[a-f0-9]{40}/);
+});
+
+function buildPhysicalResultDocument(platform) {
+  const matrix = readContract();
+  const platformConfig = matrix.platforms[platform];
+  const deviceProfiles = platformConfig.deviceProfiles.filter((profile) => profile.required);
+  const scenarios = matrix.scenarios.filter((scenario) => scenario.platforms.includes(platform));
+  const results = [];
+
+  for (const scenario of scenarios) {
+    for (const profile of deviceProfiles) {
+      for (const networkProfile of profile.networkProfiles) {
+        results.push({
+          platform,
+          deviceProfile: profile.id,
+          scenario: scenario.id,
+          status: "pass",
+          evidence: [`evidence/${platform}/${profile.id}/${networkProfile}/${scenario.id}.png`],
+          notes: `${scenario.name} checked on ${profile.id}`,
+          tester: "qa@example.com",
+          buildNumber: `${platform}-release-42`,
+          deviceModel: platform === "android" ? "Pixel 9" : "iPhone 16",
+          osVersion: platform === "android" ? "Android 15" : "iOS 26.0",
+          networkProfile,
+          issue: "",
+          needsRetest: false,
+        });
+      }
+    }
+  }
+
+  return {
+    platform,
+    generatedAt: "2026-05-27T00:00:00.000Z",
+    results,
+  };
+}
+
+function jobBlock(workflow, jobId) {
+  const expression = new RegExp(`\\n  ${escapeRegExp(jobId)}:\\n([\\s\\S]*?)(?=\\n  [a-zA-Z0-9_-]+:\\n|\\n*$)`);
+  const match = workflow.match(expression);
+
+  assert.ok(match, `Expected job '${jobId}' to exist`);
+
+  return match[1];
+}
+
+function escapeRegExp(value) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
