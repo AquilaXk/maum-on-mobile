@@ -1,0 +1,585 @@
+{
+  "version": 1,
+  "appName": "Maum On",
+  "locale": "ko-KR",
+  "storePrivacyContract": "contracts/store-privacy/data-safety.json",
+  "storeListingContract": "contracts/store-listing/store-listing.json",
+  "releaseBlockers": [
+    "missing_store_answer",
+    "missing_store_owner",
+    "permission_manifest_mismatch",
+    "missing_policy_evidence",
+    "missing_runtime_evidence",
+    "runtime_policy_smoke_failed"
+  ],
+  "playConsole": {
+    "owner": "mobile-release",
+    "requiredSections": [
+      "app_access",
+      "data_safety",
+      "permissions",
+      "target_audience",
+      "ads",
+      "user_generated_content",
+      "content_rating"
+    ],
+    "answers": [
+      {
+        "id": "play_app_access_login",
+        "section": "app_access",
+        "question": "App access",
+        "owner": "mobile-release",
+        "answer": {
+          "loginRequired": true,
+          "reviewAccountAvailable": true,
+          "reviewAccountStorage": "store_review_notes",
+          "reviewSeedContract": "contracts/store-review/review-seed.json"
+        },
+        "evidence": [
+          {
+            "id": "review-seed-contract",
+            "file": "contracts/store-review/review-seed.json",
+            "patterns": [
+              "\"profile\": \"store-review-seed\"",
+              "\"credentialsCommitted\": false",
+              "\"reviewer\""
+            ]
+          }
+        ]
+      },
+      {
+        "id": "play_data_safety_collected_data",
+        "section": "data_safety",
+        "question": "Data safety",
+        "owner": "privacy-owner",
+        "answer": {
+          "collected": true,
+          "shared": false,
+          "deleteAvailable": true,
+          "privacyPolicyUrl": "https://maum-on.app/privacy"
+        },
+        "evidence": [
+          {
+            "id": "data-safety-contract",
+            "file": "contracts/store-privacy/data-safety.json",
+            "patterns": [
+              "\"user_generated_content\"",
+              "\"sensitive_info\"",
+              "\"shared\": false"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "play_permissions_camera_photos_notifications",
+        "section": "permissions",
+        "question": "App permissions",
+        "owner": "mobile-release",
+        "answer": {
+          "camera": "Diary image capture only",
+          "photos": "Diary image attachment only",
+          "notifications": "Letter, consultation, and report status notices"
+        },
+        "evidence": [
+          {
+            "id": "android-manifest-permissions",
+            "file": "front/android/app/src/main/AndroidManifest.xml",
+            "patterns": [
+              "android.permission.CAMERA",
+              "android.permission.READ_MEDIA_IMAGES",
+              "android.permission.POST_NOTIFICATIONS"
+            ]
+          },
+          {
+            "id": "permission-recovery-ui",
+            "file": "front/lib/features/diary/presentation/diary_screen.dart",
+            "patterns": [
+              "DiaryImagePickStatus.permissionDenied",
+              "diary-image-settings-button",
+              "권한 설정 열기"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "play_target_audience_adults",
+        "section": "target_audience",
+        "question": "Target audience and content",
+        "owner": "product-owner",
+        "answer": {
+          "targetAgeGroup": "18+",
+          "childDirected": false,
+          "wellbeingContent": true
+        },
+        "evidence": [
+          {
+            "id": "store-listing-content-rating",
+            "file": "contracts/store-listing/store-listing.json",
+            "patterns": [
+              "\"targetAudience\": \"adults\"",
+              "\"containsSensitiveTopics\": true",
+              "\"containsMedicalAdvice\": false"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "play_ads_declaration",
+        "section": "ads",
+        "question": "Ads",
+        "owner": "product-owner",
+        "answer": {
+          "containsAds": false
+        },
+        "evidence": [
+          {
+            "id": "store-listing-no-ads-copy",
+            "file": "contracts/store-listing/store-listing.json",
+            "patterns": [
+              "\"Health & Fitness\"",
+              "\"supportEmail\""
+            ]
+          }
+        ]
+      },
+      {
+        "id": "play_ugc_report_block_moderation",
+        "section": "user_generated_content",
+        "question": "User-generated content",
+        "owner": "safety-owner",
+        "answer": {
+          "enabled": true,
+          "prePublishModeration": true,
+          "reporting": true,
+          "operationsAction": true,
+          "blocking": true
+        },
+        "evidence": [
+          {
+            "id": "report-controller-submit",
+            "file": "front/lib/features/report/application/report_controller.dart",
+            "patterns": [
+              "_ensureModerationAllowed",
+              "createReport",
+              "신고가 접수되었습니다."
+            ]
+          },
+          {
+            "id": "admin-operations-block",
+            "file": "back/src/main/kotlin/com/maumonmobile/application/service/AdminOperationsService.kt",
+            "patterns": [
+              "blockLetterSender",
+              "blockedMemberCount"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "play_content_rating_wellbeing",
+        "section": "content_rating",
+        "question": "Content rating questionnaire",
+        "owner": "product-owner",
+        "answer": {
+          "medicalAdvice": false,
+          "emergencySupport": false,
+          "ugc": true,
+          "sensitiveEmotionalRecords": true
+        },
+        "evidence": [
+          {
+            "id": "store-listing-health-content",
+            "file": "contracts/store-listing/store-listing.json",
+            "patterns": [
+              "\"containsUserGeneratedContent\": true",
+              "\"containsMedicalAdvice\": false",
+              "의료 진단이나 응급 상담을 대신하지 않습니다"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "appStoreConnect": {
+    "owner": "mobile-release",
+    "requiredSections": [
+      "app_information",
+      "age_rating",
+      "encryption",
+      "privacy",
+      "app_review_information",
+      "user_generated_content"
+    ],
+    "answers": [
+      {
+        "id": "asc_app_information",
+        "section": "app_information",
+        "question": "App Information",
+        "owner": "mobile-release",
+        "answer": {
+          "bundleId": "com.aquilaxk.maumonmobile",
+          "category": "Health & Fitness",
+          "supportUrl": "https://maum-on.app/support",
+          "marketingUrl": "https://maum-on.app"
+        },
+        "evidence": [
+          {
+            "id": "app-store-listing",
+            "file": "contracts/store-listing/store-listing.json",
+            "patterns": [
+              "\"bundleId\": \"com.aquilaxk.maumonmobile\"",
+              "\"supportUrl\": \"https://maum-on.app/support\"",
+              "\"privacyPolicyUrl\": \"https://maum-on.app/privacy\""
+            ]
+          }
+        ]
+      },
+      {
+        "id": "asc_age_rating",
+        "section": "age_rating",
+        "question": "Age Rating",
+        "owner": "product-owner",
+        "answer": {
+          "userGeneratedContent": true,
+          "medicalTreatmentInformation": false,
+          "unrestrictedWebAccess": false,
+          "matureThemes": false
+        },
+        "evidence": [
+          {
+            "id": "age-rating-contract",
+            "file": "contracts/store-listing/store-listing.json",
+            "patterns": [
+              "\"userGeneratedContent\": true",
+              "\"medicalTreatmentInformation\": false",
+              "\"unrestrictedWebAccess\": false"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "asc_encryption",
+        "section": "encryption",
+        "question": "Export Compliance",
+        "owner": "security-owner",
+        "answer": {
+          "usesEncryption": true,
+          "usesStandardEncryptionOnly": true,
+          "customCryptography": false,
+          "exportComplianceExempt": true
+        },
+        "evidence": [
+          {
+            "id": "ios-ats-default",
+            "file": "front/ios/Runner/Info.plist",
+            "patterns": [
+              "NSAppTransportSecurity",
+              "NSAllowsLocalNetworking"
+            ]
+          },
+          {
+            "id": "network-client-https",
+            "file": "front/lib/core/network/api_client.dart",
+            "patterns": [
+              "ApiRequest",
+              "transport.send"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "asc_privacy_nutrition",
+        "section": "privacy",
+        "question": "Privacy Nutrition Labels",
+        "owner": "privacy-owner",
+        "answer": {
+          "privacyPolicyUrl": "https://maum-on.app/privacy",
+          "dataSafetyContract": "contracts/store-privacy/data-safety.json"
+        },
+        "evidence": [
+          {
+            "id": "privacy-contract",
+            "file": "contracts/store-privacy/data-safety.json",
+            "patterns": [
+              "\"appStoreDataTypes\"",
+              "\"NSPrivacyCollectedDataTypeSensitiveInfo\"",
+              "\"privacyPolicyUrl\": \"https://maum-on.app/privacy\""
+            ]
+          }
+        ]
+      },
+      {
+        "id": "asc_app_review_information",
+        "section": "app_review_information",
+        "question": "App Review Information",
+        "owner": "mobile-release",
+        "answer": {
+          "reviewAccountRequired": true,
+          "credentialsCommitted": false,
+          "contactEmail": "support@maum-on.app"
+        },
+        "evidence": [
+          {
+            "id": "ios-login-review",
+            "file": "contracts/store-review/ios-login-review.json",
+            "patterns": [
+              "\"reviewAccount\"",
+              "\"credentialsCommitted\": false",
+              "\"sign_in_with_apple_available\""
+            ]
+          }
+        ]
+      },
+      {
+        "id": "asc_ugc_report_block_moderation",
+        "section": "user_generated_content",
+        "question": "User-generated content moderation",
+        "owner": "safety-owner",
+        "answer": {
+          "enabled": true,
+          "reporting": true,
+          "moderation": true,
+          "operationsReview": true
+        },
+        "evidence": [
+          {
+            "id": "moderation-feedback-panel",
+            "file": "front/lib/features/moderation/presentation/content_moderation_feedback_panel.dart",
+            "patterns": [
+              "콘텐츠 검수 차단 안내",
+              "Icons.policy_outlined"
+            ]
+          },
+          {
+            "id": "report-status-action",
+            "file": "back/src/main/kotlin/com/maumonmobile/application/service/ReportService.kt",
+            "patterns": [
+              "REPORT_STATUS_CHANGE",
+              "신고 처리 결과가 등록되었습니다"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "permissionDeclarations": [
+    {
+      "id": "camera",
+      "label": "Camera",
+      "privacyPermissionId": "camera",
+      "androidPermissions": ["android.permission.CAMERA"],
+      "iosUsageDescriptionKeys": ["NSCameraUsageDescription"],
+      "storeAnswerIds": {
+        "playConsole": ["play_permissions_camera_photos_notifications"],
+        "appStoreConnect": ["asc_privacy_nutrition"]
+      },
+      "usageRationale": "Diary image capture only.",
+      "userFacingNotice": "일기 이미지 첨부를 위해 촬영 권한을 요청합니다.",
+      "recoveryEvidence": [
+        {
+          "id": "diary-camera-denied-settings",
+          "file": "front/lib/features/diary/presentation/diary_screen.dart",
+          "patterns": [
+            "DiaryImagePickStatus.permissionDenied",
+            "_openImageSettings",
+            "diary-image-settings-button"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "photos",
+      "label": "Photos",
+      "privacyPermissionId": "photos",
+      "androidPermissions": ["android.permission.READ_MEDIA_IMAGES"],
+      "legacyAndroidPermissions": [
+        {
+          "name": "android.permission.READ_EXTERNAL_STORAGE",
+          "maxSdkVersion": "32"
+        }
+      ],
+      "iosUsageDescriptionKeys": ["NSPhotoLibraryUsageDescription"],
+      "storeAnswerIds": {
+        "playConsole": ["play_permissions_camera_photos_notifications"],
+        "appStoreConnect": ["asc_privacy_nutrition"]
+      },
+      "usageRationale": "Diary image attachment only.",
+      "userFacingNotice": "일기 이미지 첨부를 위해 사진 접근 권한을 요청합니다.",
+      "recoveryEvidence": [
+        {
+          "id": "diary-photos-denied-settings",
+          "file": "front/lib/features/diary/presentation/diary_screen.dart",
+          "patterns": [
+            "DiaryImageSource.gallery",
+            "DiaryImagePickStatus.permissionDenied",
+            "권한 설정 열기"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "push_notifications",
+      "label": "Push Notifications",
+      "privacyPermissionId": "push_notifications",
+      "androidPermissions": ["android.permission.POST_NOTIFICATIONS"],
+      "iosUsageDescriptionKeys": [],
+      "iosRemoteNotificationBackgroundModeRequired": true,
+      "storeAnswerIds": {
+        "playConsole": ["play_permissions_camera_photos_notifications"],
+        "appStoreConnect": ["asc_privacy_nutrition"]
+      },
+      "usageRationale": "Letter, consultation, and report status notices.",
+      "userFacingNotice": "편지, 상담, 신고 처리 결과 안내를 위해 알림 권한을 요청합니다.",
+      "recoveryEvidence": [
+        {
+          "id": "notification-denied-settings",
+          "file": "front/lib/features/notification/presentation/notification_report_screen.dart",
+          "patterns": [
+            "PushNotificationState.denied",
+            "actionLabel: canOpenPushSettings",
+            "설정 열기",
+            "푸시 알림 권한이 꺼져 있습니다"
+          ]
+        },
+        {
+          "id": "notification-open-settings",
+          "file": "front/lib/features/notification/application/notification_controller.dart",
+          "patterns": [
+            "openPushNotificationSettings",
+            "client.openSettings",
+            "설정에서 알림 권한을 확인해 주세요"
+          ]
+        }
+      ]
+    }
+  ],
+  "policyEvidence": [
+    {
+      "id": "ugc-report-submit",
+      "label": "UGC report submission",
+      "owner": "safety-owner",
+      "evidenceItems": [
+        {
+          "id": "frontend-report-form",
+          "file": "front/lib/features/report/application/report_controller.dart",
+          "patterns": [
+            "_ensureModerationAllowed",
+            "createReport",
+            "신고가 접수되었습니다"
+          ]
+        },
+        {
+          "id": "backend-report-service",
+          "file": "back/src/main/kotlin/com/maumonmobile/application/service/ReportService.kt",
+          "patterns": [
+            "contentModerationService.ensureAllowed",
+            "reportRepository.save",
+            "작성한 콘텐츠에 신고가 접수되었습니다"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "operations-report-action",
+      "label": "Operations report action",
+      "owner": "safety-owner",
+      "evidenceItems": [
+        {
+          "id": "report-status-change",
+          "file": "back/src/main/kotlin/com/maumonmobile/application/service/ReportService.kt",
+          "patterns": [
+            "updateStatus",
+            "REPORT_STATUS_CHANGE",
+            "신고 처리 사유"
+          ]
+        },
+        {
+          "id": "operations-dashboard",
+          "file": "back/src/main/kotlin/com/maumonmobile/application/service/AdminOperationsService.kt",
+          "patterns": [
+            "openReportCount",
+            "processedReportCount",
+            "blockedMemberCount"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "member-blocking",
+      "label": "Member blocking",
+      "owner": "safety-owner",
+      "evidenceItems": [
+        {
+          "id": "letter-sender-block",
+          "file": "back/src/main/kotlin/com/maumonmobile/application/service/AdminOperationsService.kt",
+          "patterns": [
+            "blockLetterSender",
+            "BLOCKED",
+            "운영 조치"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "safety-filter",
+      "label": "Safety filter",
+      "owner": "safety-owner",
+      "evidenceItems": [
+        {
+          "id": "backend-moderation-filter",
+          "file": "back/src/main/kotlin/com/maumonmobile/application/service/ContentModerationService.kt",
+          "patterns": [
+            "ContentModerationClassification.safeFallback",
+            "auditRepository.save",
+            "recordContentModeration"
+          ]
+        },
+        {
+          "id": "frontend-moderation-feedback",
+          "file": "front/lib/features/moderation/presentation/content_moderation_feedback_panel.dart",
+          "patterns": [
+            "콘텐츠 검수 차단 안내",
+            "feedback.guidanceItems",
+            "Icons.policy_outlined"
+          ]
+        }
+      ]
+    }
+  ],
+  "runtimeEvidence": {
+    "defaultDirectory": "contracts/store-content/runtime-evidence",
+    "requiredFiles": [
+      {
+        "id": "store-survey-review",
+        "filename": "store-content-survey-results.json",
+        "requiredScenarios": [
+          "play_app_content_reviewed",
+          "app_store_reviewed",
+          "permission_answers_matched",
+          "ugc_policy_reviewed"
+        ]
+      },
+      {
+        "id": "permission-recovery",
+        "filename": "permission-recovery-results.json",
+        "requiredScenarios": [
+          "android_camera_denied_settings",
+          "android_photos_denied_settings",
+          "android_notifications_denied_settings",
+          "ios_camera_denied_settings",
+          "ios_photos_denied_settings",
+          "ios_notifications_denied_settings"
+        ]
+      },
+      {
+        "id": "ugc-policy-smoke",
+        "filename": "ugc-policy-results.json",
+        "requiredScenarios": [
+          "report_submit_smoke",
+          "admin_report_action_smoke",
+          "block_member_smoke",
+          "moderation_filter_smoke"
+        ]
+      }
+    ]
+  }
+}

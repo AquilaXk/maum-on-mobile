@@ -282,6 +282,18 @@ test("path classifier enables frontend and repository checks for store privacy c
   assert.equal(outputs.javascript, "false");
 });
 
+test("path classifier enables mobile policy checks for store content contracts", async () => {
+  const outputs = await classifyChangedFiles(["contracts/store-content/app-content-permissions.json"]);
+
+  assert.equal(outputs.docs_only, "false");
+  assert.equal(outputs.backend, "true");
+  assert.equal(outputs.frontend, "true");
+  assert.equal(outputs.repository, "true");
+  assert.equal(outputs.android, "true");
+  assert.equal(outputs.ios, "true");
+  assert.equal(outputs.javascript, "false");
+});
+
 test("path classifier enables frontend, iOS, and repository checks for store review contracts", async () => {
   const outputs = await classifyChangedFiles(["contracts/store-review/ios-login-review.json"]);
 
