@@ -1,0 +1,285 @@
+{
+  "version": 1,
+  "appName": "Maum On",
+  "locale": "ko-KR",
+  "links": {
+    "privacyPolicyUrl": "https://maum-on.app/privacy",
+    "termsUrl": "https://maum-on.app/terms",
+    "supportUrl": "https://maum-on.app/support",
+    "marketingUrl": "https://maum-on.app",
+    "supportEmail": "support@maum-on.app"
+  },
+  "devicePolicy": {
+    "android": {
+      "devices": ["phone"],
+      "orientations": ["portrait"]
+    },
+    "ios": {
+      "devices": ["iphone", "ipad"],
+      "orientations": ["portrait"],
+      "targetedDeviceFamily": "1,2"
+    }
+  },
+  "googlePlay": {
+    "packageName": "com.aquilaxk.maumonmobile",
+    "appName": "Maum On",
+    "category": "Health & Fitness",
+    "tags": ["mental health", "journal", "self care", "counseling"],
+    "supportEmail": "support@maum-on.app",
+    "privacyPolicyUrl": "https://maum-on.app/privacy",
+    "termsUrl": "https://maum-on.app/terms",
+    "shortDescription": "감정 기록, 편지, 상담으로 마음 상태를 정리하는 모바일 앱",
+    "longDescription": "Maum On은 하루의 감정과 생각을 기록하고, 스토리와 편지로 마음을 정리하며, 상담 흐름과 알림으로 필요한 순간을 놓치지 않도록 돕는 모바일 앱입니다.\n\n주요 기능\n- 홈에서 오늘의 마음 상태와 이어서 할 일을 확인합니다.\n- 기록 화면에서 감정, 생각, 이미지를 남기고 나중에 다시 돌아볼 수 있습니다.\n- 스토리와 편지 화면에서 나의 경험과 응답을 차분히 정리합니다.\n- 상담 화면에서 대화를 이어가고 응답 상태를 확인합니다.\n- 알림과 설정 화면에서 권한, 개인정보, 계정 관리를 확인합니다.\n\n개인정보 처리방침과 지원 문의는 앱 설정과 스토어 등록 정보에서 동일한 경로로 제공합니다.",
+    "contentRating": {
+      "targetAudience": "adults",
+      "containsUserGeneratedContent": true,
+      "containsSensitiveTopics": true,
+      "containsMedicalAdvice": false,
+      "requiresModeration": true,
+      "notes": "감정 기록과 상담 메시지를 다루지만 의료 진단이나 응급 상담을 제공하지 않습니다."
+    }
+  },
+  "appStore": {
+    "bundleId": "com.aquilaxk.maumonmobile",
+    "appName": "Maum On",
+    "subtitle": "감정 기록과 마음 돌봄",
+    "description": "Maum On은 감정 기록, 스토리, 편지, 상담 흐름을 한곳에서 정리하는 모바일 앱입니다.\n\n하루의 마음 상태를 기록하고, 필요한 내용을 편지처럼 남기며, 상담 대화와 알림을 통해 다음 행동을 놓치지 않도록 돕습니다. 설정 화면에서는 개인정보 처리방침, 이용약관, 지원 문의, 계정 관리 경로를 확인할 수 있습니다.\n\n주요 기능\n- 홈: 오늘의 상태와 이어서 할 일을 확인\n- 기록: 감정, 생각, 이미지 첨부 기록\n- 스토리: 경험과 응답 흐름 정리\n- 편지: 나에게 남기는 메시지 관리\n- 상담: 대화 상태와 응답 확인\n- 알림: 편지, 상담, 신고 처리 알림 확인\n- 설정: 계정, 개인정보, 지원 경로 관리\n\nMaum On은 의료 진단이나 응급 상담을 대신하지 않습니다. 위급한 상황에서는 지역 긴급 연락처 또는 전문 기관에 즉시 도움을 요청해야 합니다.",
+    "keywords": "마음,일기,감정,상담,편지,기록",
+    "supportUrl": "https://maum-on.app/support",
+    "marketingUrl": "https://maum-on.app",
+    "privacyPolicyUrl": "https://maum-on.app/privacy",
+    "ageRating": {
+      "unrestrictedWebAccess": false,
+      "medicalTreatmentInformation": false,
+      "userGeneratedContent": true,
+      "matureThemes": false,
+      "violence": "none",
+      "sexualContent": "none",
+      "gambling": "none",
+      "alcoholTobaccoOrDrugUse": "none"
+    },
+    "reviewNotes": "Use test account credentials from the review account contract. The app handles sensitive emotional records but does not provide medical diagnosis, emergency support, or regulated treatment."
+  },
+  "featureGraphic": {
+    "path": "store-assets/google-play/ko-KR/feature-graphic-1024x500.png",
+    "format": "png",
+    "alpha": false,
+    "dimensions": {
+      "width": 1024,
+      "height": 500
+    },
+    "altText": "Maum On 홈 화면과 감정 기록 흐름을 보여주는 Google Play feature graphic"
+  },
+  "screenshots": [
+    {
+      "id": "android_phone",
+      "platform": "google-play",
+      "deviceType": "phone",
+      "orientation": "portrait",
+      "minCount": 4,
+      "maxCount": 8,
+      "dimensions": {
+        "width": 1080,
+        "height": 1920
+      },
+      "captures": [
+        {
+          "order": 1,
+          "routeKey": "home",
+          "title": "오늘의 마음 홈",
+          "path": "store-assets/google-play/ko-KR/android_phone/01-home-1080x1920.png",
+          "actualAppScreen": true,
+          "altText": "오늘의 마음 상태와 이어서 할 일을 보여주는 홈 화면"
+        },
+        {
+          "order": 2,
+          "routeKey": "diary",
+          "title": "감정 기록",
+          "path": "store-assets/google-play/ko-KR/android_phone/02-diary-1080x1920.png",
+          "actualAppScreen": true,
+          "altText": "감정과 생각을 남기는 기록 화면"
+        },
+        {
+          "order": 3,
+          "routeKey": "story",
+          "title": "스토리",
+          "path": "store-assets/google-play/ko-KR/android_phone/03-story-1080x1920.png",
+          "actualAppScreen": true,
+          "altText": "경험과 응답 흐름을 정리하는 스토리 화면"
+        },
+        {
+          "order": 4,
+          "routeKey": "letter",
+          "title": "편지",
+          "path": "store-assets/google-play/ko-KR/android_phone/04-letter-1080x1920.png",
+          "actualAppScreen": true,
+          "altText": "나에게 남긴 편지를 확인하는 화면"
+        },
+        {
+          "order": 5,
+          "routeKey": "consultation",
+          "title": "상담",
+          "path": "store-assets/google-play/ko-KR/android_phone/05-consultation-1080x1920.png",
+          "actualAppScreen": true,
+          "altText": "상담 대화와 응답 상태를 확인하는 화면"
+        },
+        {
+          "order": 6,
+          "routeKey": "notifications",
+          "title": "알림",
+          "path": "store-assets/google-play/ko-KR/android_phone/06-notifications-1080x1920.png",
+          "actualAppScreen": true,
+          "altText": "편지와 상담 알림을 모아 보는 화면"
+        },
+        {
+          "order": 7,
+          "routeKey": "settings",
+          "title": "설정",
+          "path": "store-assets/google-play/ko-KR/android_phone/07-settings-1080x1920.png",
+          "actualAppScreen": true,
+          "altText": "계정과 개인정보 링크를 관리하는 설정 화면"
+        }
+      ]
+    },
+    {
+      "id": "iphone_6_9",
+      "platform": "app-store",
+      "deviceType": "iphone",
+      "orientation": "portrait",
+      "minCount": 1,
+      "maxCount": 10,
+      "dimensions": {
+        "width": 1320,
+        "height": 2868
+      },
+      "captures": [
+        {
+          "order": 1,
+          "routeKey": "home",
+          "title": "오늘의 마음 홈",
+          "path": "store-assets/app-store/ko-KR/iphone_6_9/01-home-1320x2868.png",
+          "actualAppScreen": true,
+          "altText": "오늘의 마음 상태와 이어서 할 일을 보여주는 iPhone 홈 화면"
+        },
+        {
+          "order": 2,
+          "routeKey": "diary",
+          "title": "감정 기록",
+          "path": "store-assets/app-store/ko-KR/iphone_6_9/02-diary-1320x2868.png",
+          "actualAppScreen": true,
+          "altText": "감정과 생각을 남기는 iPhone 기록 화면"
+        },
+        {
+          "order": 3,
+          "routeKey": "story",
+          "title": "스토리",
+          "path": "store-assets/app-store/ko-KR/iphone_6_9/03-story-1320x2868.png",
+          "actualAppScreen": true,
+          "altText": "경험과 응답 흐름을 정리하는 iPhone 스토리 화면"
+        },
+        {
+          "order": 4,
+          "routeKey": "letter",
+          "title": "편지",
+          "path": "store-assets/app-store/ko-KR/iphone_6_9/04-letter-1320x2868.png",
+          "actualAppScreen": true,
+          "altText": "나에게 남긴 편지를 확인하는 iPhone 화면"
+        },
+        {
+          "order": 5,
+          "routeKey": "consultation",
+          "title": "상담",
+          "path": "store-assets/app-store/ko-KR/iphone_6_9/05-consultation-1320x2868.png",
+          "actualAppScreen": true,
+          "altText": "상담 대화와 응답 상태를 확인하는 iPhone 화면"
+        },
+        {
+          "order": 6,
+          "routeKey": "notifications",
+          "title": "알림",
+          "path": "store-assets/app-store/ko-KR/iphone_6_9/06-notifications-1320x2868.png",
+          "actualAppScreen": true,
+          "altText": "편지와 상담 알림을 모아 보는 iPhone 화면"
+        },
+        {
+          "order": 7,
+          "routeKey": "settings",
+          "title": "설정",
+          "path": "store-assets/app-store/ko-KR/iphone_6_9/07-settings-1320x2868.png",
+          "actualAppScreen": true,
+          "altText": "계정과 개인정보 링크를 관리하는 iPhone 설정 화면"
+        }
+      ]
+    },
+    {
+      "id": "ipad_13",
+      "platform": "app-store",
+      "deviceType": "ipad",
+      "orientation": "portrait",
+      "minCount": 1,
+      "maxCount": 10,
+      "dimensions": {
+        "width": 2064,
+        "height": 2752
+      },
+      "captures": [
+        {
+          "order": 1,
+          "routeKey": "home",
+          "title": "오늘의 마음 홈",
+          "path": "store-assets/app-store/ko-KR/ipad_13/01-home-2064x2752.png",
+          "actualAppScreen": true,
+          "altText": "오늘의 마음 상태와 이어서 할 일을 보여주는 iPad 홈 화면"
+        },
+        {
+          "order": 2,
+          "routeKey": "diary",
+          "title": "감정 기록",
+          "path": "store-assets/app-store/ko-KR/ipad_13/02-diary-2064x2752.png",
+          "actualAppScreen": true,
+          "altText": "감정과 생각을 남기는 iPad 기록 화면"
+        },
+        {
+          "order": 3,
+          "routeKey": "story",
+          "title": "스토리",
+          "path": "store-assets/app-store/ko-KR/ipad_13/03-story-2064x2752.png",
+          "actualAppScreen": true,
+          "altText": "경험과 응답 흐름을 정리하는 iPad 스토리 화면"
+        },
+        {
+          "order": 4,
+          "routeKey": "letter",
+          "title": "편지",
+          "path": "store-assets/app-store/ko-KR/ipad_13/04-letter-2064x2752.png",
+          "actualAppScreen": true,
+          "altText": "나에게 남긴 편지를 확인하는 iPad 화면"
+        },
+        {
+          "order": 5,
+          "routeKey": "consultation",
+          "title": "상담",
+          "path": "store-assets/app-store/ko-KR/ipad_13/05-consultation-2064x2752.png",
+          "actualAppScreen": true,
+          "altText": "상담 대화와 응답 상태를 확인하는 iPad 화면"
+        },
+        {
+          "order": 6,
+          "routeKey": "notifications",
+          "title": "알림",
+          "path": "store-assets/app-store/ko-KR/ipad_13/06-notifications-2064x2752.png",
+          "actualAppScreen": true,
+          "altText": "편지와 상담 알림을 모아 보는 iPad 화면"
+        },
+        {
+          "order": 7,
+          "routeKey": "settings",
+          "title": "설정",
+          "path": "store-assets/app-store/ko-KR/ipad_13/07-settings-2064x2752.png",
+          "actualAppScreen": true,
+          "altText": "계정과 개인정보 링크를 관리하는 iPad 설정 화면"
+        }
+      ]
+    }
+  ]
+}
