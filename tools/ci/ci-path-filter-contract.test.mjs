@@ -414,6 +414,18 @@ test("path classifier enables release support checks for support contracts", asy
   assert.equal(outputs.javascript, "false");
 });
 
+test("path classifier enables release manifest approval checks for release manifest contracts", async () => {
+  const outputs = await classifyChangedFiles(["contracts/release-manifest/manifest-gate.json"]);
+
+  assert.equal(outputs.docs_only, "false");
+  assert.equal(outputs.backend, "true");
+  assert.equal(outputs.frontend, "true");
+  assert.equal(outputs.repository, "true");
+  assert.equal(outputs.android, "true");
+  assert.equal(outputs.ios, "true");
+  assert.equal(outputs.javascript, "false");
+});
+
 test("path classifier enables production deploy checks for infra contracts", async () => {
   const outputs = await classifyChangedFiles(["contracts/infra/production-deploy-readiness.json"]);
 

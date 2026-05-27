@@ -1,0 +1,110 @@
+{
+  "version": 1,
+  "defaultManifestPath": "contracts/release-manifest/current-release.json",
+  "releaseBlockers": [
+    "missing_release_manifest",
+    "invalid_release_manifest",
+    "release_version_mismatch",
+    "release_notes_missing",
+    "release_approval_missing",
+    "duplicate_build_number",
+    "backend_compatibility_missing",
+    "rollback_condition_missing",
+    "missing_static_evidence"
+  ],
+  "versionSources": {
+    "platforms": ["android", "ios", "backend"],
+    "mobilePubspec": "front/pubspec.yaml",
+    "androidNative": "front/android/app/build.gradle.kts",
+    "iosNative": "front/ios/Runner/Info.plist",
+    "backendGradle": "back/build.gradle.kts",
+    "apiContract": "contracts/mobile-api/response-snapshots.json"
+  },
+  "manifestSchema": {
+    "requiredTopLevelFields": [
+      "releaseNumber",
+      "releaseName",
+      "android",
+      "ios",
+      "backend",
+      "apiContractVersion",
+      "storeReleaseNotes",
+      "testerNotes",
+      "backendMigrationSummary",
+      "knownIssues",
+      "rollback",
+      "approval"
+    ],
+    "requiredPlatformFields": {
+      "android": ["versionName", "versionCode"],
+      "ios": ["shortVersion", "buildNumber"],
+      "backend": ["version"]
+    },
+    "requiredApprovalFields": ["approver", "changeScope", "deployWindow.start", "deployWindow.end"],
+    "requiredRollbackFields": ["owner", "conditions"],
+    "requiredStoreNoteFields": ["googlePlay", "appStore"]
+  },
+  "staticEvidence": [
+    {
+      "id": "mobile-version-source",
+      "file": "front/pubspec.yaml",
+      "patterns": ["^version:\\s*\\d+\\.\\d+\\.\\d+\\+\\d+"]
+    },
+    {
+      "id": "android-version-source",
+      "file": "front/android/app/build.gradle.kts",
+      "patterns": [
+        "versionCode\\s*=\\s*flutter\\.versionCode",
+        "versionName\\s*=\\s*flutter\\.versionName"
+      ]
+    },
+    {
+      "id": "ios-version-source",
+      "file": "front/ios/Runner/Info.plist",
+      "patterns": [
+        "<key>CFBundleShortVersionString</key>\\s*<string>\\$\\(FLUTTER_BUILD_NAME\\)</string>",
+        "<key>CFBundleVersion</key>\\s*<string>\\$\\(FLUTTER_BUILD_NUMBER\\)</string>"
+      ]
+    },
+    {
+      "id": "backend-version-source",
+      "file": "back/build.gradle.kts",
+      "patterns": ["version = \".+\""]
+    },
+    {
+      "id": "mobile-api-contract-version-source",
+      "file": "contracts/mobile-api/response-snapshots.json",
+      "patterns": ["\"version\": 1", "\"endpoints\""]
+    },
+    {
+      "id": "android-store-notes-source",
+      "file": "tools/ci/run-android-play-track-submit.mjs",
+      "patterns": [
+        "MAUMON_RELEASE_MANIFEST_PATH",
+        "storeReleaseNotes",
+        "googlePlay",
+        "MAUMON_PLAY_RELEASE_NOTES"
+      ]
+    },
+    {
+      "id": "ios-store-notes-source",
+      "file": "tools/ci/run-ios-testflight-archive.sh",
+      "patterns": [
+        "MAUMON_RELEASE_MANIFEST_PATH",
+        "MAUMON_IOS_RELEASE_NOTES",
+        "MAUMON_IOS_TESTER_NOTES",
+        "storeReleaseNotes.appStore"
+      ]
+    },
+    {
+      "id": "ci-release-manifest-gate",
+      "file": ".github/workflows/ci.yml",
+      "patterns": [
+        "release-manifest-approval",
+        "run-release-manifest-gate.mjs",
+        "--require-manifest",
+        "MAUMON_RELEASE_MANIFEST_PATH: contracts/release-manifest/current-release.json"
+      ]
+    }
+  ]
+}

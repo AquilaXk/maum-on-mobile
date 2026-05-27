@@ -36,11 +36,51 @@ function env(name, fallback = "") {
   return process.env[name]?.trim() || fallback;
 }
 
+function stringValue(value) {
+  if (value === undefined || value === null) {
+    return "";
+  }
+  return String(value).trim();
+}
+
 function splitList(value) {
   return value
     .split(",")
     .map((item) => item.trim())
     .filter(Boolean);
+}
+
+function relativeDisplayPath(filePath) {
+  const relativePath = path.relative(repoRoot, filePath);
+  return relativePath.startsWith("..") ? filePath : relativePath;
+}
+
+function loadReleaseManifest() {
+  const configuredPath = env("MAUMON_RELEASE_MANIFEST_PATH");
+  if (!configuredPath) {
+    return {
+      path: "",
+      document: null,
+    };
+  }
+
+  const manifestPath = path.resolve(repoRoot, configuredPath);
+  if (!existsSync(manifestPath)) {
+    return {
+      path: manifestPath,
+      document: null,
+    };
+  }
+
+  try {
+    return {
+      path: manifestPath,
+      document: JSON.parse(readFileSync(manifestPath, "utf8")),
+    };
+  } catch (error) {
+    console.error(`MAUMON_RELEASE_MANIFEST_PATH must point to valid JSON: ${relativeDisplayPath(manifestPath)} (${error.message})`);
+    process.exit(1);
+  }
 }
 
 function failMissing(names) {
@@ -126,13 +166,20 @@ function closedTestEvidence(trackKind, testerGroups, testerEmails) {
 }
 
 function validateInputs() {
+  const releaseManifest = loadReleaseManifest();
+  const manifestReleaseNotes = stringValue(releaseManifest.document?.storeReleaseNotes?.googlePlay);
+  const manifestReleaseName = stringValue(releaseManifest.document?.releaseName);
+  const manifestTesterNotes = stringValue(releaseManifest.document?.testerNotes);
+  const releaseNotes = manifestReleaseNotes || env("MAUMON_PLAY_RELEASE_NOTES");
   const required = [
     "MAUMON_PLAY_SERVICE_ACCOUNT_JSON_BASE64",
     "MAUMON_PLAY_PACKAGE_NAME",
     "MAUMON_PLAY_TRACK",
     "MAUMON_PLAY_RELEASE_STATUS",
-    "MAUMON_PLAY_RELEASE_NOTES",
   ];
+  if (!releaseNotes) {
+    required.push("MAUMON_PLAY_RELEASE_NOTES");
+  }
   failMissing(required.filter((name) => !env(name)));
 
   const releaseStatus = env("MAUMON_PLAY_RELEASE_STATUS");
@@ -163,9 +210,12 @@ function validateInputs() {
     track: env("MAUMON_PLAY_TRACK"),
     trackKind,
     releaseStatus,
-    releaseNotes: env("MAUMON_PLAY_RELEASE_NOTES"),
+    releaseNotes,
     releaseNotesLanguage: env("MAUMON_PLAY_RELEASE_NOTES_LANGUAGE", "ko-KR"),
-    releaseName: env("MAUMON_PLAY_RELEASE_NAME"),
+    releaseName: manifestReleaseName || env("MAUMON_PLAY_RELEASE_NAME"),
+    testerNotes: manifestTesterNotes,
+    releaseManifestPath: releaseManifest.path ? relativeDisplayPath(releaseManifest.path) : "",
+    releaseManifestPresent: releaseManifest.document !== null,
     userFraction: env("MAUMON_PLAY_USER_FRACTION"),
     aabPath,
     testerGroups,
@@ -187,6 +237,13 @@ function writeEvidence(config, result = {}) {
     releaseNotes: {
       language: config.releaseNotesLanguage,
       textLength: config.releaseNotes.length,
+    },
+    testerNotes: {
+      textLength: config.testerNotes.length,
+    },
+    releaseManifest: {
+      path: config.releaseManifestPath || null,
+      present: config.releaseManifestPresent,
     },
     versionCode: result.versionCode?.toString() ?? pubspecVersionCode(),
     aabPath: config.aabPath,
@@ -341,6 +398,9 @@ if (dryRun) {
   console.log(`trackKind: ${config.trackKind}`);
   console.log(`releaseStatus: ${config.releaseStatus}`);
   console.log(`versionCode: ${evidence.versionCode}`);
+  console.log(`releaseManifest: ${config.releaseManifestPath || "none"}`);
+  console.log(`releaseNotesLength: ${config.releaseNotes.length}`);
+  console.log(`testerNotesLength: ${config.testerNotes.length}`);
   console.log(`testerGroups: ${config.testerGroups.join(",") || "none"}`);
   if (config.testerEmails.length > 0) {
     console.log("email tester list is evidence-only; Android Publisher testers API supports Google Groups only");
