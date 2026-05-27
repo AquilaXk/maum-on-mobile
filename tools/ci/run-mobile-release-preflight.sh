@@ -166,15 +166,29 @@ check_android() {
 check_ios() {
   local pod_detail
   local pod_output
+  local sdk_output
   local xcode_output
+  local xcode_version
 
   echo "== iOS release preflight =="
   check_flutter
 
   if xcode_output="$(xcodebuild -version 2>&1)"; then
-    record "Xcode" "ok" "$(printf '%s\n' "${xcode_output}" | head -n 1)"
+    xcode_version="$(printf '%s\n' "${xcode_output}" | head -n 1)"
+    record "Xcode" "ok" "${xcode_version}"
+    if [[ "${xcode_version}" == Xcode\ 26* ]]; then
+      record "Xcode 26" "ok" "${xcode_version}"
+    else
+      record "Xcode 26" "missing" "selected ${xcode_version}; Xcode 26 is required"
+    fi
   else
     record "Xcode" "missing" "${xcode_output//$'\n'/ }"
+  fi
+
+  if sdk_output="$(xcrun --sdk iphoneos --show-sdk-version 2>&1)"; then
+    record "iphoneos SDK" "ok" "${sdk_output}"
+  else
+    record "iphoneos SDK" "missing" "${sdk_output//$'\n'/ }"
   fi
 
   if pod_output="$("${pod}" --version 2>&1)"; then

@@ -350,6 +350,13 @@ function assertJobGate(workflow, jobId, outputName) {
   const block = jobBlock(workflow, jobId);
 
   assert.match(block, /needs: changes/);
+  if (jobId === "ios") {
+    assert.match(
+      block,
+      /if: \$\{\{ needs\.changes\.outputs\.ios == 'true' \|\| github\.event_name == 'workflow_dispatch' \}\}/
+    );
+    return;
+  }
   assert.match(block, new RegExp(`if: \\$\\{\\{ needs\\.changes\\.outputs\\.${outputName} == 'true' \\}\\}`));
 }
 
