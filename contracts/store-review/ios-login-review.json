@@ -3,11 +3,11 @@
   "platform": "ios",
   "submissionPolicy": {
     "emailLoginRequired": true,
-    "externalProviderHandling": "disabled_until_sign_in_with_apple_is_available",
+    "externalProviderHandling": "sign_in_with_apple_available",
     "signInWithApple": {
       "requiredWhenThirdPartyProviderEnabled": true,
-      "currentStatus": "not_enabled",
-      "releaseGate": "iOS must not display third-party social login until Sign in with Apple is available."
+      "currentStatus": "enabled",
+      "releaseGate": "Sign in with Apple is available on iOS while Android keeps its existing external login path."
     }
   },
   "loginOptions": [
@@ -16,6 +16,12 @@
       "platforms": ["android", "ios"],
       "reviewState": "primary",
       "testKeys": ["login-email-field", "login-password-field"]
+    },
+    {
+      "id": "apple",
+      "platforms": ["ios"],
+      "reviewState": "primary",
+      "testKeys": ["external-login-apple-button"]
     },
     {
       "id": "kakao",

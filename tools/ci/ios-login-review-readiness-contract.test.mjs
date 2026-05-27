@@ -22,25 +22,30 @@ test("iOS login review contract fixes App Review sign-in policy", () => {
   assert.equal(contract.submissionPolicy.emailLoginRequired, true);
   assert.equal(
     contract.submissionPolicy.externalProviderHandling,
-    "disabled_until_sign_in_with_apple_is_available",
+    "sign_in_with_apple_available",
   );
   assert.equal(
     contract.submissionPolicy.signInWithApple.requiredWhenThirdPartyProviderEnabled,
     true,
   );
-  assert.equal(contract.submissionPolicy.signInWithApple.currentStatus, "not_enabled");
+  assert.equal(contract.submissionPolicy.signInWithApple.currentStatus, "enabled");
   assert.match(
     contract.submissionPolicy.signInWithApple.releaseGate,
-    /iOS.*third-party.*Sign in with Apple/i,
+    /Sign in with Apple is available/i,
   );
 
   const email = contract.loginOptions.find((option) => option.id === "email");
+  const apple = contract.loginOptions.find((option) => option.id === "apple");
   const kakao = contract.loginOptions.find((option) => option.id === "kakao");
   assert.ok(email, "email login option must be declared");
+  assert.ok(apple, "apple login option must be declared");
   assert.ok(kakao, "kakao login option must be declared");
   assert.ok(email.platforms.includes("ios"));
   assert.ok(email.testKeys.includes("login-email-field"));
   assert.ok(email.testKeys.includes("login-password-field"));
+  assert.deepEqual(apple.platforms, ["ios"]);
+  assert.equal(apple.reviewState, "primary");
+  assert.ok(apple.testKeys.includes("external-login-apple-button"));
   assert.deepEqual(kakao.platforms, ["android"]);
   assert.ok(!kakao.platforms.includes("ios"));
   assert.equal(kakao.iosReviewState, "hidden");
@@ -71,7 +76,14 @@ test("iOS login review contract is wired to automated checks", () => {
     "flutter test test/features/auth/auth_screen_test.dart",
     "node --test tools/ci/ios-login-review-readiness-contract.test.mjs",
   ]);
+  assert.match(authScreenTest, /external-login-apple-button/);
   assert.match(authScreenTest, /external-login-kakao-button/);
-  assert.match(authScreenTest, /ios-review-email-login-guidance/);
   assert.match(pathFilterTest, /contracts\/store-review\/ios-login-review\.json/);
+});
+
+test("iOS entitlements declare Sign in with Apple capability", () => {
+  const entitlements = read("front/ios/Runner/Runner.entitlements");
+
+  assert.match(entitlements, /com\.apple\.developer\.applesignin/);
+  assert.match(entitlements, /<string>Default<\/string>/);
 });

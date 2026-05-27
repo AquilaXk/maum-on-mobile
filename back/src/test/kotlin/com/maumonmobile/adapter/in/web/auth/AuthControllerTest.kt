@@ -28,7 +28,11 @@ import org.springframework.test.web.servlet.get
 import org.springframework.test.web.servlet.post
 import java.net.URI
 
-@SpringBootTest
+@SpringBootTest(
+    properties = [
+        "app.auth.oidc.apple.client-id=maum-on-ios",
+    ],
+)
 @AutoConfigureMockMvc
 @ActiveProfiles("test")
 class AuthControllerTest @Autowired constructor(
@@ -323,6 +327,30 @@ class AuthControllerTest @Autowired constructor(
         assertThat(query["response_type"]).isEqualTo("code")
         assertThat(query["client_id"]).isEqualTo("maum-on-mobile")
         assertThat(query["redirect_uri"]).isEqualTo("maumon://auth/callback?provider=kakao")
+        assertThat(query["state"]).hasSizeGreaterThanOrEqualTo(24)
+        assertThat(query["nonce"]).hasSizeGreaterThanOrEqualTo(24)
+        assertThat(query["code_challenge"]).hasSizeGreaterThanOrEqualTo(24)
+        assertThat(query["code_challenge_method"]).isEqualTo("S256")
+    }
+
+    @Test
+    fun oidcAuthorizeUsesAppleEndpointAndClientIdForAppleProvider() {
+        val result = mockMvc.get("/api/v1/auth/oidc/authorize/apple") {
+            param("redirect_uri", "maumon://auth/callback?provider=apple")
+        }
+            .andExpect {
+                status { is3xxRedirection() }
+            }
+            .andReturn()
+
+        val location = URI(result.response.getHeader("Location")!!)
+        val query = location.queryParameters()
+
+        assertThat(location.host).isEqualTo("appleid.apple.com")
+        assertThat(location.path).isEqualTo("/auth/authorize")
+        assertThat(query["response_type"]).isEqualTo("code")
+        assertThat(query["client_id"]).isEqualTo("maum-on-ios")
+        assertThat(query["redirect_uri"]).isEqualTo("maumon://auth/callback?provider=apple")
         assertThat(query["state"]).hasSizeGreaterThanOrEqualTo(24)
         assertThat(query["nonce"]).hasSizeGreaterThanOrEqualTo(24)
         assertThat(query["code_challenge"]).hasSizeGreaterThanOrEqualTo(24)
