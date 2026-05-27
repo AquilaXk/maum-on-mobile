@@ -216,6 +216,110 @@ class MobileApiMetricsSnapshot {
   int get apiErrorCount => client.eventCount('API_ERROR');
 
   int get writeRecoveryEventCount => client.eventCount('WRITE_RECOVERY');
+
+  List<OperationsIncidentReason> get incidentReasons {
+    final reasons = <OperationsIncidentReason>[];
+
+    for (final endpoint in endpoints) {
+      if (endpoint.errorRate >= 0.05) {
+        reasons.add(
+          OperationsIncidentReason(
+            label: 'API error rate',
+            detail:
+                '${endpoint.endpoint} · ${_formatPercentValue(endpoint.errorRate)} error',
+            severity: OperationsIncidentSeverity.danger,
+          ),
+        );
+      } else if (endpoint.p95LatencyMs >= 1200) {
+        reasons.add(
+          OperationsIncidentReason(
+            label: 'API p95 latency',
+            detail: '${endpoint.endpoint} · ${endpoint.p95LatencyMs}ms',
+            severity: OperationsIncidentSeverity.danger,
+          ),
+        );
+      }
+    }
+
+    _addEventReason(
+      reasons,
+      eventType: 'CRASH_SIGNAL',
+      label: 'Crash signal',
+    );
+    _addEventReason(
+      reasons,
+      eventType: 'ANR_SIGNAL',
+      label: 'ANR signal',
+    );
+    _addEventReason(
+      reasons,
+      eventType: 'API_ERROR',
+      label: 'Client API error',
+      severity: OperationsIncidentSeverity.warning,
+    );
+
+    for (final entry in notifications.pushDelivery.entries) {
+      if (entry.value > 0 &&
+          entry.key.toLowerCase().contains('permanent_failure')) {
+        reasons.add(
+          OperationsIncidentReason(
+            label: 'Push permanent failure',
+            detail: '${entry.key} · ${entry.value}',
+            severity: OperationsIncidentSeverity.danger,
+          ),
+        );
+      }
+    }
+
+    for (final entry in ai.model.entries) {
+      final key = entry.key.toLowerCase();
+      if (entry.value > 0 &&
+          (key.contains('fallback') || key.contains('timeout'))) {
+        reasons.add(
+          OperationsIncidentReason(
+            label: 'AI fallback',
+            detail: '${entry.key} · ${entry.value}',
+            severity: OperationsIncidentSeverity.warning,
+          ),
+        );
+      }
+    }
+
+    return reasons;
+  }
+
+  void _addEventReason(
+    List<OperationsIncidentReason> reasons, {
+    required String eventType,
+    required String label,
+    OperationsIncidentSeverity severity = OperationsIncidentSeverity.danger,
+  }) {
+    final count = client.eventCount(eventType);
+    if (count <= 0) {
+      return;
+    }
+    reasons.add(
+      OperationsIncidentReason(
+        label: label,
+        detail: '$eventType · $count',
+        severity: severity,
+      ),
+    );
+  }
+}
+
+enum OperationsIncidentSeverity { warning, danger }
+
+class OperationsIncidentReason {
+  const OperationsIncidentReason({
+    required this.label,
+    required this.detail,
+    required this.severity,
+  });
+
+  final String label;
+  final String detail;
+  final OperationsIncidentSeverity severity;
 }
 
 class MobileApiEndpointMetrics {
@@ -826,4 +930,8 @@ Map<String, int> _countMap(Object? json) {
 
 int _sumCounts(Map<String, int> values) {
   return values.values.fold(0, (total, value) => total + value);
+}
+
+String _formatPercentValue(double value) {
+  return '${(value * 100).toStringAsFixed(value < 0.1 ? 1 : 0)}%';
 }

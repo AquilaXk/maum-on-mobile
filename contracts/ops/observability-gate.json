@@ -1,0 +1,210 @@
+{
+  "version": 1,
+  "releaseBlockers": [
+    "missing_required_evidence",
+    "alert_policy_missing",
+    "missing_runtime_evidence",
+    "runtime_alert_failed"
+  ],
+  "releaseTracking": {
+    "releaseNumberSource": "front/lib/app/maum_on_mobile_app.dart",
+    "platforms": [
+      "android_vitals",
+      "app_store_crash",
+      "backend_metrics"
+    ],
+    "requiredContext": [
+      "appVersion",
+      "buildNumber",
+      "platform",
+      "endpoint",
+      "userAction"
+    ]
+  },
+  "alertPolicies": [
+    {
+      "id": "primary-release-ops",
+      "receiver": "ops-release-primary",
+      "severity": "page",
+      "escalationOwner": "mobile-release-owner",
+      "silencePolicy": "Only silence with linked incident and expiry under 2h"
+    },
+    {
+      "id": "secondary-release-ops",
+      "receiver": "ops-release-secondary",
+      "severity": "ticket",
+      "escalationOwner": "backend-release-owner",
+      "silencePolicy": "Maintenance silence requires release manager approval"
+    }
+  ],
+  "alertRules": [
+    {
+      "id": "fatal_crash",
+      "signal": "client.events.CRASH_SIGNAL",
+      "threshold": "count > 0",
+      "severity": "page",
+      "runtimeScenario": "fatal_crash_alert",
+      "evidenceItems": [
+        {
+          "id": "backend-crash-signal-event",
+          "file": "back/src/main/kotlin/com/maumonmobile/domain/telemetry/MobileClientTelemetry.kt",
+          "patterns": ["CRASH_SIGNAL"]
+        },
+        {
+          "id": "ui-crash-incident-reason",
+          "file": "front/lib/features/operations/domain/operations_models.dart",
+          "patterns": ["Crash signal", "CRASH_SIGNAL"]
+        }
+      ]
+    },
+    {
+      "id": "android_anr",
+      "signal": "client.events.ANR_SIGNAL",
+      "threshold": "count > 0",
+      "severity": "page",
+      "runtimeScenario": "anr_alert",
+      "evidenceItems": [
+        {
+          "id": "backend-anr-signal-event",
+          "file": "back/src/main/kotlin/com/maumonmobile/domain/telemetry/MobileClientTelemetry.kt",
+          "patterns": ["ANR_SIGNAL"]
+        },
+        {
+          "id": "backend-anr-signal-test",
+          "file": "back/src/test/kotlin/com/maumonmobile/application/service/MobileTelemetryServiceTest.kt",
+          "patterns": ["anr_signal", "ANR_SIGNAL", "doesNotContain\\(\"leak@example.com\"\\)"]
+        }
+      ]
+    },
+    {
+      "id": "api_p95_latency",
+      "signal": "endpoints.p95LatencyMs",
+      "threshold": "p95 >= 1200ms",
+      "severity": "page",
+      "runtimeScenario": "api_p95_alert",
+      "evidenceItems": [
+        {
+          "id": "backend-api-p95-snapshot",
+          "file": "back/src/main/kotlin/com/maumonmobile/global/observability/MobileApiMetricsRegistry.kt",
+          "patterns": ["p95LatencyMs", "percentile\\("]
+        },
+        {
+          "id": "ui-api-p95-risk",
+          "file": "front/lib/features/operations/presentation/operations_screen.dart",
+          "patterns": ["p95 최대", "p95 \\$\\{_formatDuration\\(endpoint.p95LatencyMs\\)\\}"]
+        }
+      ]
+    },
+    {
+      "id": "api_error_rate",
+      "signal": "endpoints.successRate",
+      "threshold": "errorRate >= 0.05",
+      "severity": "page",
+      "runtimeScenario": "api_error_rate_alert",
+      "evidenceItems": [
+        {
+          "id": "backend-error-rate-snapshot",
+          "file": "back/src/main/kotlin/com/maumonmobile/global/observability/MobileApiMetricsRegistry.kt",
+          "patterns": ["successRate", "errorCodes"]
+        },
+        {
+          "id": "ui-api-error-risk",
+          "file": "front/lib/features/operations/domain/operations_models.dart",
+          "patterns": ["errorRate", "API error rate"]
+        }
+      ]
+    },
+    {
+      "id": "push_permanent_failure",
+      "signal": "notifications.pushDelivery.*.permanent_failure",
+      "threshold": "count > 0",
+      "severity": "page",
+      "runtimeScenario": "push_permanent_failure_alert",
+      "evidenceItems": [
+        {
+          "id": "backend-push-permanent-failure",
+          "file": "back/src/main/kotlin/com/maumonmobile/application/service/NotificationDeliveryService.kt",
+          "patterns": ["PERMANENT_FAILURE", "recordPushDelivery\\(deviceToken.platform.name, \"permanent_failure\"\\)"]
+        },
+        {
+          "id": "ui-push-incident-reason",
+          "file": "front/lib/features/operations/domain/operations_models.dart",
+          "patterns": ["Push permanent failure", "permanent_failure"]
+        }
+      ]
+    },
+    {
+      "id": "ai_fallback_rate",
+      "signal": "ai.model.*.fallback",
+      "threshold": "count > 0",
+      "severity": "ticket",
+      "runtimeScenario": "ai_fallback_alert",
+      "evidenceItems": [
+        {
+          "id": "backend-ai-fallback-metric",
+          "file": "back/src/main/kotlin/com/maumonmobile/application/service/ConsultationService.kt",
+          "patterns": ["recordAiModel\\(\"consultation\", \"fallback\"\\)", "recordAiModel\\(\"consultation\", \"timeout\"\\)"]
+        },
+        {
+          "id": "ui-ai-incident-reason",
+          "file": "front/lib/features/operations/domain/operations_models.dart",
+          "patterns": ["AI fallback", "fallback", "timeout"]
+        }
+      ]
+    }
+  ],
+  "staticEvidence": [
+    {
+      "id": "operations-metrics-endpoint",
+      "file": "back/src/main/kotlin/com/maumonmobile/adapter/in/web/observability/MobileObservabilityController.kt",
+      "patterns": ["@RequestMapping\\(\"/api/v1/observability\"\\)", "@GetMapping\\(\"/api-metrics\"\\)", "ensureAdmin"]
+    },
+    {
+      "id": "operations-ui-release-context",
+      "file": "front/lib/features/operations/presentation/operations_screen.dart",
+      "patterns": ["앱 버전", "빌드 번호", "플랫폼", "API endpoint"]
+    },
+    {
+      "id": "app-release-context-source",
+      "file": "front/lib/app/maum_on_mobile_app.dart",
+      "patterns": ["String.fromEnvironment\\(\\s*'APP_VERSION'", "String.fromEnvironment\\(\\s*'APP_BUILD_NUMBER'", "_platformLabel"]
+    },
+    {
+      "id": "telemetry-sensitive-sanitization",
+      "file": "back/src/main/kotlin/com/maumonmobile/application/service/MobileTelemetryService.kt",
+      "patterns": ["containsSensitiveValue", "SENSITIVE_KEYS", "sanitizeRoute", "sanitizeAppVersion"]
+    },
+    {
+      "id": "mobile-performance-smoke-script",
+      "file": "tools/ci/run-mobile-performance-smoke.sh",
+      "patterns": ["MOBILE_PERFORMANCE_P95_BUDGET_MS", "MOBILE_PERFORMANCE_ERROR_RATE_BUDGET", "MOBILE_PERFORMANCE_MIN_SUCCESS_RATE"]
+    }
+  ],
+  "runtimeEvidence": {
+    "defaultDirectory": "contracts/ops/runtime-evidence",
+    "requiredFiles": [
+      {
+        "id": "alert-routing",
+        "filename": "ops-alert-routing-results.json",
+        "requiredScenarios": [
+          "fatal_crash_alert",
+          "anr_alert",
+          "api_p95_alert",
+          "api_error_rate_alert",
+          "push_permanent_failure_alert",
+          "ai_fallback_alert"
+        ]
+      },
+      {
+        "id": "release-health",
+        "filename": "ops-release-health-results.json",
+        "requiredScenarios": [
+          "android_vitals_release_linked",
+          "app_store_crash_release_linked",
+          "backend_metrics_release_linked",
+          "alert_receiver_configured"
+        ]
+      }
+    ]
+  }
+}
