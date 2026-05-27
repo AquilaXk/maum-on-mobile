@@ -21,7 +21,7 @@ failures.push(...gates.failures);
 const compatibility = validateCompatibility(contract.compatibility ?? {}, envValues, environment.status);
 failures.push(...compatibility.failures);
 
-const runtimeEvidence = validateRuntimeEvidence(contract.runtimeEvidence ?? {});
+const runtimeEvidence = validateRuntimeEvidence(contract.runtimeEvidence ?? {}, contract.compatibility ?? {}, envValues);
 failures.push(...runtimeEvidence.failures);
 
 const report = {
@@ -347,7 +347,7 @@ function validateEvidenceItem(groupId, item) {
   };
 }
 
-function validateRuntimeEvidence(config) {
+function validateRuntimeEvidence(config, compatibilityConfig, envValues) {
   const runtimeDir = resolvePath(args.runtimeEvidenceDir ?? config.defaultDirectory ?? "contracts/infra/runtime-evidence");
   const requireRuntimeEvidence = args.requireRuntimeEvidence === true;
 
@@ -390,13 +390,26 @@ function validateRuntimeEvidence(config) {
     const fileFailures = [];
 
     for (const field of requiredFile.requiredTopLevelFields ?? []) {
-      if (!evidence[field] || evidence[field].toString().trim().length === 0) {
+      const value = evidence[field]?.toString().trim() ?? "";
+      if (!value) {
         fileFailures.push({
           reason: "missing_runtime_evidence",
           message: `Runtime evidence file '${requiredFile.filename}' is missing top-level field '${field}'.`,
           file: requiredFile.filename,
           field,
         });
+      } else if (field === "apiContractVersion") {
+        const expected = envValues.get(compatibilityConfig.apiContractVariable)?.trim() ?? "";
+        if (expected && value !== expected) {
+          fileFailures.push({
+            reason: "compatibility_mismatch",
+            message: `Runtime evidence file '${requiredFile.filename}' apiContractVersion '${value}' does not match expected '${expected}'.`,
+            file: requiredFile.filename,
+            field,
+            expected,
+            actual: value,
+          });
+        }
       }
     }
 

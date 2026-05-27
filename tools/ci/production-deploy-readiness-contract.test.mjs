@@ -194,6 +194,32 @@ test("production deploy readiness runner fails failed recovery smoke scenarios",
   );
 });
 
+test("production deploy readiness runner fails mismatched runtime API contract evidence", async () => {
+  const reportDir = await mkdtemp(path.join(tmpdir(), "maum-production-readiness-contract-mismatch-"));
+  const runtimeDir = await writeRuntimeEvidenceFixtures({
+    apiContractVersion: "mobile-api-v2",
+  });
+  const envFile = await writeEnvFixture();
+
+  await assert.rejects(
+    execFileAsync("node", [
+      path.join(root, runnerPath),
+      "--report-dir",
+      reportDir,
+      "--env-file",
+      envFile,
+      "--runtime-evidence-dir",
+      runtimeDir,
+      "--require-runtime-evidence",
+    ]),
+    (error) => {
+      assert.equal(error.code, 1);
+      assert.match(error.stderr, /compatibility_mismatch/);
+      return true;
+    },
+  );
+});
+
 test("production deploy readiness runner accepts complete runtime evidence", async () => {
   const reportDir = await mkdtemp(path.join(tmpdir(), "maum-production-readiness-runtime-pass-"));
   const runtimeDir = await writeRuntimeEvidenceFixtures();
@@ -376,7 +402,7 @@ async function writeRuntimeEvidenceFixtures(options = {}) {
         passScenario("ios_backend_compatible"),
         passScenario("backend_version_recorded"),
       ],
-      apiContractVersion: "mobile-api-v1",
+      apiContractVersion: options.apiContractVersion ?? "mobile-api-v1",
     }, null, 2)}\n`,
   );
 
