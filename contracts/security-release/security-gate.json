@@ -1,0 +1,169 @@
+{
+  "version": 1,
+  "auditInputs": {
+    "directory": "contracts/security-release/audits",
+    "filePattern": "<ecosystem>-audit.json",
+    "severityThreshold": "high",
+    "acceptedSeverities": ["low", "moderate", "medium", "high", "critical"]
+  },
+  "ecosystems": [
+    {
+      "id": "flutter",
+      "name": "Flutter pub",
+      "manifest": "front/pubspec.yaml",
+      "lockfile": "front/pubspec.lock",
+      "auditRequiredWhenPresent": true
+    },
+    {
+      "id": "gradle",
+      "name": "Gradle",
+      "manifest": "back/build.gradle.kts",
+      "additionalManifests": ["front/android/app/build.gradle.kts"],
+      "auditRequiredWhenPresent": true
+    },
+    {
+      "id": "ruby",
+      "name": "Ruby Bundler",
+      "manifest": "front/ios/Gemfile",
+      "lockfile": "front/ios/Gemfile.lock",
+      "auditRequiredWhenPresent": true
+    },
+    {
+      "id": "node",
+      "name": "Node.js",
+      "manifest": "package.json",
+      "lockfile": "package-lock.json",
+      "auditRequiredWhenPresent": true
+    }
+  ],
+  "releaseBlockers": [
+    "high_or_higher_vulnerability",
+    "secret_exposure",
+    "binary_artifact_committed",
+    "unapproved_license",
+    "ios_privacy_manifest_missing",
+    "android_cleartext_traffic_allowed",
+    "weak_jwt_secret_policy"
+  ],
+  "licenseAllowList": [
+    "Apache-2.0",
+    "BSD-3-Clause",
+    "MIT",
+    "MPL-2.0"
+  ],
+  "licenseOverrides": {
+    "flutter": {
+      "app_links": "BSD-3-Clause",
+      "dio": "MIT",
+      "file_picker": "MIT",
+      "flutter": "BSD-3-Clause",
+      "flutter_lints": "BSD-3-Clause",
+      "flutter_secure_storage": "BSD-3-Clause",
+      "flutter_test": "BSD-3-Clause",
+      "url_launcher": "BSD-3-Clause"
+    },
+    "gradle": {
+      "androidx.core:core": "Apache-2.0",
+      "com.google.api-client:google-api-client": "Apache-2.0",
+      "com.google.firebase:firebase-messaging": "Apache-2.0",
+      "com.google.http-client:google-http-client-gson": "Apache-2.0",
+      "com.h2database:h2": "MPL-2.0",
+      "org.jetbrains.kotlin:kotlin-reflect": "Apache-2.0",
+      "org.junit.platform:junit-platform-launcher": "Apache-2.0",
+      "org.springframework.boot:spring-boot-starter-actuator": "Apache-2.0",
+      "org.springframework.boot:spring-boot-starter-flyway": "Apache-2.0",
+      "org.springframework.boot:spring-boot-starter-jackson": "Apache-2.0",
+      "org.springframework.boot:spring-boot-starter-jdbc": "Apache-2.0",
+      "org.springframework.boot:spring-boot-starter-security": "Apache-2.0",
+      "org.springframework.boot:spring-boot-starter-security-test": "Apache-2.0",
+      "org.springframework.boot:spring-boot-starter-validation": "Apache-2.0",
+      "org.springframework.boot:spring-boot-starter-webmvc": "Apache-2.0",
+      "org.springframework.boot:spring-boot-starter-webmvc-test": "Apache-2.0",
+      "org.springframework.security:spring-security-oauth2-jose": "Apache-2.0"
+    },
+    "ruby": {
+      "cocoapods": "MIT",
+      "ffi": "BSD-3-Clause",
+      "logger": "MIT"
+    },
+    "node": {}
+  },
+  "secretScan": {
+    "trackedTextExtensions": [
+      ".dart",
+      ".gradle",
+      ".json",
+      ".kt",
+      ".kts",
+      ".lock",
+      ".mjs",
+      ".plist",
+      ".properties",
+      ".rb",
+      ".sh",
+      ".swift",
+      ".xcprivacy",
+      ".xml",
+      ".yaml",
+      ".yml"
+    ],
+    "denyPatterns": [
+      {
+        "id": "private_key",
+        "regex": "-----BEGIN (?:RSA |DSA |EC |OPENSSH )?PRIVATE KEY-----"
+      },
+      {
+        "id": "github_pat",
+        "regex": "ghp_[A-Za-z0-9_]{36,}"
+      },
+      {
+        "id": "aws_access_key",
+        "regex": "AKIA[0-9A-Z]{16}"
+      },
+      {
+        "id": "google_api_key",
+        "regex": "AIza[0-9A-Za-z_-]{35}"
+      }
+    ],
+    "allowedFindings": [
+      {
+        "file": "tools/ci/mobile-release-config-contract.test.mjs",
+        "patternId": "private_key",
+        "reason": "fixture uses an intentionally fake key string for dry-run validation"
+      }
+    ]
+  },
+  "binaryArtifactScan": {
+    "forbiddenTrackedExtensions": [
+      ".aab",
+      ".apk",
+      ".cer",
+      ".crt",
+      ".ipa",
+      ".jks",
+      ".key",
+      ".keystore",
+      ".mobileprovision",
+      ".p12",
+      ".pem",
+      ".xcarchive"
+    ]
+  },
+  "mobileSecurity": {
+    "androidManifest": "front/android/app/src/main/AndroidManifest.xml",
+    "androidAllowedExtraPermissions": [
+      "android.permission.INTERNET",
+      "android.permission.READ_EXTERNAL_STORAGE"
+    ],
+    "storePrivacyContract": "contracts/store-privacy/data-safety.json",
+    "iosInfoPlist": "front/ios/Runner/Info.plist",
+    "iosPrivacyManifest": "front/ios/Runner/PrivacyInfo.xcprivacy",
+    "iosPodLockfile": "front/ios/Podfile.lock",
+    "iosAllowedPodsWithoutPrivacyManifest": ["Flutter"]
+  },
+  "backendSecurity": {
+    "applicationConfig": "back/src/main/resources/application.yml",
+    "jwtProperties": "back/src/main/kotlin/com/maumonmobile/global/security/JwtProperties.kt",
+    "minimumJwtSecretLength": 32
+  }
+}
