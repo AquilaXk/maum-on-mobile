@@ -50,3 +50,4 @@ jobs:
           name: mobile-performance-smoke
           path: build/reports/mobile-performance/mobile-performance-smoke.json
           if-no-files-found: error
+          retention-days: 3

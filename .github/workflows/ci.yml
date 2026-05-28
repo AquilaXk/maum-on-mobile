@@ -325,6 +325,7 @@ jobs:
           name: mobile-performance-smoke
           path: build/reports/mobile-performance/mobile-performance-smoke.json
           if-no-files-found: error
+          retention-days: 3
 
   frontend:
     name: Frontend
@@ -787,6 +788,7 @@ jobs:
           name: release-device-matrix
           path: build/reports/release-device-matrix
           if-no-files-found: error
+          retention-days: 3
 
   release-accessibility-l10n-scale:
     name: Release Accessibility L10n Scale
@@ -820,6 +822,7 @@ jobs:
           name: accessibility-l10n-scale
           path: build/reports/accessibility-l10n-scale
           if-no-files-found: error
+          retention-days: 3
 
   release-performance-gate:
     name: Release Performance Gate
@@ -853,6 +856,7 @@ jobs:
           name: release-performance
           path: build/reports/release-performance
           if-no-files-found: error
+          retention-days: 3
 
   release-security-gate:
     name: Release Security Gate
@@ -887,6 +891,7 @@ jobs:
           name: release-security
           path: build/reports/release-security
           if-no-files-found: error
+          retention-days: 3
 
   release-privacy-lifecycle:
     name: Release Privacy Lifecycle
@@ -921,6 +926,7 @@ jobs:
           name: privacy-lifecycle
           path: build/reports/privacy-lifecycle
           if-no-files-found: error
+          retention-days: 3
 
   release-ops-observability:
     name: Release Ops Observability
@@ -955,6 +961,7 @@ jobs:
           name: ops-observability
           path: build/reports/ops-observability
           if-no-files-found: error
+          retention-days: 3
 
   release-support-readiness:
     name: Release Support Readiness
@@ -987,6 +994,7 @@ jobs:
           name: support-readiness
           path: build/reports/support-readiness
           if-no-files-found: error
+          retention-days: 3
 
   release-store-content-policy:
     name: Release Store Content Policy
@@ -1020,6 +1028,7 @@ jobs:
           name: store-content-policy
           path: build/reports/store-content-policy
           if-no-files-found: error
+          retention-days: 3
 
   release-manifest-approval:
     name: Release Manifest Approval
@@ -1053,6 +1062,7 @@ jobs:
           name: release-manifest
           path: build/reports/release-manifest
           if-no-files-found: error
+          retention-days: 3
 
   release-deploy-readiness:
     name: Release Deploy Readiness
@@ -1117,3 +1127,4 @@ jobs:
           name: production-deploy-readiness
           path: build/reports/production-deploy-readiness
           if-no-files-found: error
+          retention-days: 3
