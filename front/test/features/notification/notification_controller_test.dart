@@ -105,9 +105,40 @@ void main() {
       expect(repository.connectTickets, ['ticket-1']);
       expect(controller.state.connectionState,
           NotificationConnectionState.connecting);
-      expect(controller.state.notifications.first.content,
-          '새로운 랜덤 편지가 도착했습니다!');
+      expect(
+          controller.state.notifications.first.content, '새로운 랜덤 편지가 도착했습니다!');
       expect(controller.state.notifications.last.content, '상대방이 편지를 읽었습니다.');
+    });
+
+    test('keeps local streamed events when a silent refresh returns server ids',
+        () async {
+      const serverNotification = NotificationItem(
+        id: 1,
+        content: '상대방이 편지를 읽었습니다.',
+        isRead: false,
+        createdAt: '2026-05-24T09:00:00',
+      );
+      final repository = _FakeNotificationRepository(
+        notificationsQueue: [
+          [serverNotification],
+          [serverNotification],
+        ],
+      );
+      final controller = NotificationController(repository: repository);
+
+      await controller.load();
+      await controller.connect();
+      repository.emit(
+        const NotificationStreamEvent.replyArrival(
+          '보낸 편지에 답장이 도착했습니다!',
+        ),
+      );
+      await Future<void>.delayed(Duration.zero);
+
+      expect(controller.state.notifications, hasLength(2));
+      expect(
+          controller.state.notifications.first.content, '보낸 편지에 답장이 도착했습니다!');
+      expect(controller.state.notifications.last.id, 1);
     });
 
     test('prepends report processing events from the notification stream',
@@ -201,7 +232,8 @@ void main() {
 
       expect(repository.markReadIds, [3]);
       expect(repository.markAllReadCount, 1);
-      expect(controller.state.notifications.every((item) => item.isRead), isTrue);
+      expect(
+          controller.state.notifications.every((item) => item.isRead), isTrue);
     });
 
     test('opens unread notifications by marking read once before navigation',
@@ -426,7 +458,8 @@ void main() {
       controller.handleLifecycleState(AppLifecycleState.paused);
 
       expect(repository.cancelCount, 1);
-      expect(controller.state.connectionState, NotificationConnectionState.idle);
+      expect(
+          controller.state.connectionState, NotificationConnectionState.idle);
 
       controller.handleLifecycleState(AppLifecycleState.resumed);
       await Future<void>.delayed(Duration.zero);
@@ -542,7 +575,8 @@ class _FakeNotificationRepository implements NotificationRepository {
   @override
   Future<bool> unregisterDeviceToken(String token) async {
     unregisteredTokens.add(token);
-    registeredTokens.removeWhere((registered) => registered.endsWith(':$token'));
+    registeredTokens
+        .removeWhere((registered) => registered.endsWith(':$token'));
     return true;
   }
 

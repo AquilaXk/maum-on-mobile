@@ -7,6 +7,39 @@ import 'package:maum_on_mobile_front/features/settings/presentation/settings_scr
 import 'package:maum_on_mobile_front/features/legal/domain/legal_disclosures.dart';
 
 void main() {
+  testWidgets('shows compact account status on a phone viewport',
+      (tester) async {
+    tester.view.physicalSize = const Size(390, 640);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    final repository = _FakeSettingsRepository();
+    final controller = SettingsController(repository: repository);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: SettingsScreen(
+          controller: controller,
+          onBack: () {},
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(
+      find.byKey(const ValueKey('settings-account-toolbar')),
+      findsOneWidget,
+    );
+    expect(find.text('이메일 계정'), findsOneWidget);
+    expect(find.text('랜덤 편지 수신 중'), findsOneWidget);
+    expect(find.text('내보내기 요청 가능'), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('settings-profile-section')),
+      findsOneWidget,
+    );
+  });
+
   testWidgets('renders settings and submits account changes', (tester) async {
     final repository = _FakeSettingsRepository();
     final controller = SettingsController(repository: repository);
@@ -22,14 +55,22 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('설정'), findsOneWidget);
-    expect(find.byKey(const ValueKey('settings-flow-panel')), findsOneWidget);
-    expect(find.text('설정 관리 흐름'), findsOneWidget);
-    expect(find.text('계정 상태를 확인하고 필요한 변경을 순서대로 처리하세요.'), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('settings-account-toolbar')),
+      findsOneWidget,
+    );
+    expect(find.text('랜덤 편지 수신 중'), findsOneWidget);
     expect(
         find.byKey(const ValueKey('settings-account-section')), findsOneWidget);
     expect(
         find.byKey(const ValueKey('settings-profile-section')), findsOneWidget);
-    expect(find.text('me@example.com'), findsOneWidget);
+    expect(
+      find.descendant(
+        of: find.byKey(const ValueKey('settings-account-toolbar')),
+        matching: find.text('me@example.com'),
+      ),
+      findsOneWidget,
+    );
 
     await tester.enterText(
       find.byKey(const ValueKey('settings-nickname-field')),

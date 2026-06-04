@@ -11,6 +11,45 @@ import 'package:maum_on_mobile_front/features/report/data/report_repository.dart
 import 'package:maum_on_mobile_front/features/report/domain/report_models.dart';
 
 void main() {
+  testWidgets('shows compact notification status on a phone viewport',
+      (tester) async {
+    tester.view.physicalSize = const Size(390, 640);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    final notificationRepository = _FakeNotificationRepository();
+    final reportRepository = _FakeReportRepository();
+    final notificationController = NotificationController(
+      repository: notificationRepository,
+    );
+    final reportController = ReportController(repository: reportRepository);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: NotificationReportScreen(
+          notificationController: notificationController,
+          reportController: reportController,
+          onBack: () {},
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    notificationRepository.emit(
+      const NotificationStreamEvent.replyArrival('상담 답변이 도착했습니다.'),
+    );
+    await tester.pumpAndSettle();
+
+    expect(
+      find.byKey(const ValueKey('notification-status-toolbar')),
+      findsOneWidget,
+    );
+    expect(find.text('읽지 않음 2개'), findsOneWidget);
+    expect(find.text('바로 이동 2개'), findsOneWidget);
+    expect(find.text('푸시 권한 확인'), findsOneWidget);
+    expect(find.byKey(const ValueKey('notification-list')), findsOneWidget);
+  });
+
   testWidgets('renders notifications and submits a report', (tester) async {
     final semantics = tester.ensureSemantics();
     try {
@@ -39,26 +78,23 @@ void main() {
           ),
         ),
       );
-      await tester.pump();
+      await tester.pumpAndSettle();
       notificationRepository.emit(
         const NotificationStreamEvent.replyArrival('보낸 편지에 답장이 도착했습니다!'),
       );
-      await tester.pump();
+      await tester.pumpAndSettle();
 
       expect(find.text('알림/신고'), findsOneWidget);
       expect(
-        find.byKey(const ValueKey('notification-report-flow-panel')),
+        find.byKey(const ValueKey('notification-status-toolbar')),
         findsOneWidget,
       );
-      expect(find.text('알림과 신고 흐름'), findsOneWidget);
-      expect(find.text('알림을 확인하고 필요한 신고까지 이어서 처리하세요.'), findsOneWidget);
       expect(
         find.byKey(const ValueKey('notification-result-section')),
         findsOneWidget,
       );
-      expect(find.text('읽지 않음'), findsOneWidget);
-      expect(find.text('바로 이동'), findsOneWidget);
-      expect(find.text('실시간 상태'), findsOneWidget);
+      expect(find.text('읽지 않음 2개'), findsOneWidget);
+      expect(find.text('바로 이동 2개'), findsOneWidget);
       expect(find.text('상대방이 편지를 읽었습니다.'), findsOneWidget);
       expect(find.text('보낸 편지에 답장이 도착했습니다!'), findsWidgets);
       expect(find.text('새 알림'), findsWidgets);

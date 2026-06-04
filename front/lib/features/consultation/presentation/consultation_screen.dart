@@ -94,9 +94,7 @@ class _ConsultationScreenState extends State<ConsultationScreen>
               children: [
                 _ConsultationHeader(
                   connectionState: state.connectionState,
-                  isStreaming: state.isStreaming,
                   onBack: widget.onBack,
-                  onReconnect: widget.controller.reconnect,
                 ),
                 if (state.errorMessage != null)
                   AppNotice(
@@ -115,19 +113,16 @@ class _ConsultationScreenState extends State<ConsultationScreen>
                     onRetry: widget.controller.retryFailedMessage,
                     onDelete: widget.controller.deleteFailedMessage,
                   ),
-                const Padding(
-                  padding: EdgeInsets.fromLTRB(
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(
                     AppSpacing.md,
                     0,
                     AppSpacing.md,
                     AppSpacing.sm,
                   ),
-                  child: AppFlowPanel(
-                    key: ValueKey('consultation-flow-panel'),
-                    icon: Icons.support_agent_outlined,
-                    title: '상담 연결 흐름',
-                    message: '연결 상태를 확인하고 메시지를 주고받으세요.',
-                    steps: ['연결 확인', '메시지 입력', '응답 확인'],
+                  child: _ConsultationStatusToolbar(
+                    state: state,
+                    onReconnect: widget.controller.reconnect,
                   ),
                 ),
                 Expanded(
@@ -363,27 +358,14 @@ class _EmergencyActionButton extends StatelessWidget {
 class _ConsultationHeader extends StatelessWidget {
   const _ConsultationHeader({
     required this.connectionState,
-    required this.isStreaming,
     required this.onBack,
-    required this.onReconnect,
   });
 
   final ConsultationConnectionState connectionState;
-  final bool isStreaming;
   final VoidCallback onBack;
-  final Future<void> Function() onReconnect;
 
   @override
   Widget build(BuildContext context) {
-    final statusText = switch (connectionState) {
-      ConsultationConnectionState.idle => '상담 연결 대기',
-      ConsultationConnectionState.connecting => '자동 연결 중',
-      ConsultationConnectionState.connected when isStreaming => '답변 작성 중',
-      ConsultationConnectionState.connected => '상담 연결됨',
-      ConsultationConnectionState.reconnecting => '자동 재연결 중',
-      ConsultationConnectionState.error => '재연결 필요',
-    };
-
     return Padding(
       padding: const EdgeInsets.fromLTRB(
         AppSpacing.md,
@@ -393,20 +375,143 @@ class _ConsultationHeader extends StatelessWidget {
       ),
       child: AppScreenHeader(
         title: '실시간 상담',
-        subtitle: statusText,
+        eyebrow: _consultationHeaderEyebrow(connectionState),
         onBack: onBack,
-        actions: [
-          if (connectionState == ConsultationConnectionState.error)
-            IconButton.filledTonal(
-              key: const ValueKey('consultation-reconnect-button'),
-              tooltip: '상담 다시 연결',
-              onPressed: () => onReconnect(),
-              icon: const Icon(Icons.refresh),
-            ),
-        ],
       ),
     );
   }
+}
+
+class _ConsultationStatusToolbar extends StatelessWidget {
+  const _ConsultationStatusToolbar({
+    required this.state,
+    required this.onReconnect,
+  });
+
+  final ConsultationState state;
+  final Future<void> Function() onReconnect;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final statusText = _consultationStatusText(
+      state.connectionState,
+      state.isStreaming,
+    );
+    final inputLabel = state.inputBlockedBySafety
+        ? '안전 확인 필요'
+        : state.isSending
+            ? '전송 중'
+            : state.isStreaming
+                ? '응답 대기'
+                : state.connectionState == ConsultationConnectionState.connected
+                    ? '입력 가능'
+                    : '입력 대기';
+
+    return Card(
+      key: const ValueKey('consultation-status-toolbar'),
+      margin: EdgeInsets.zero,
+      color: colorScheme.primaryContainer.withValues(alpha: 0.62),
+      child: Padding(
+        padding: const EdgeInsets.all(AppSpacing.md),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(
+                  Icons.support_agent_outlined,
+                  color: colorScheme.onPrimaryContainer,
+                  size: 22,
+                ),
+                const SizedBox(width: AppSpacing.xs),
+                Expanded(
+                  child: Text(
+                    '상담 상태',
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      color: colorScheme.onPrimaryContainer,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
+                if (state.connectionState == ConsultationConnectionState.error)
+                  IconButton.filledTonal(
+                    key: const ValueKey('consultation-reconnect-button'),
+                    tooltip: '상담 다시 연결',
+                    onPressed: () => onReconnect(),
+                    icon: const Icon(Icons.refresh),
+                  ),
+              ],
+            ),
+            const SizedBox(height: AppSpacing.xs),
+            Wrap(
+              spacing: AppSpacing.xs,
+              runSpacing: AppSpacing.xs,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              children: [
+                AppStatusPill(
+                  label: statusText,
+                  tone: _consultationStatusTone(state.connectionState),
+                ),
+                AppStatusPill(label: '메시지 ${state.messages.length}개'),
+                AppStatusPill(
+                  label: inputLabel,
+                  tone: state.inputBlockedBySafety
+                      ? AppStatusTone.danger
+                      : state.connectionState ==
+                              ConsultationConnectionState.connected
+                          ? AppStatusTone.success
+                          : AppStatusTone.warning,
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+String _consultationStatusText(
+  ConsultationConnectionState connectionState,
+  bool isStreaming,
+) {
+  return switch (connectionState) {
+    ConsultationConnectionState.idle => '상담 연결 대기',
+    ConsultationConnectionState.connecting => '자동 연결 중',
+    ConsultationConnectionState.connected when isStreaming => '답변 작성 중',
+    ConsultationConnectionState.connected => '상담 연결됨',
+    ConsultationConnectionState.reconnecting => '자동 재연결 중',
+    ConsultationConnectionState.error => '재연결 필요',
+  };
+}
+
+AppStatusTone _consultationStatusTone(
+  ConsultationConnectionState connectionState,
+) {
+  return switch (connectionState) {
+    ConsultationConnectionState.connected => AppStatusTone.success,
+    ConsultationConnectionState.connecting ||
+    ConsultationConnectionState.reconnecting =>
+      AppStatusTone.warning,
+    ConsultationConnectionState.error => AppStatusTone.danger,
+    ConsultationConnectionState.idle => AppStatusTone.neutral,
+  };
+}
+
+String _consultationHeaderEyebrow(
+  ConsultationConnectionState connectionState,
+) {
+  return switch (connectionState) {
+    ConsultationConnectionState.connected => '상담',
+    ConsultationConnectionState.connecting ||
+    ConsultationConnectionState.reconnecting =>
+      '연결 확인',
+    ConsultationConnectionState.error => '연결 확인',
+    ConsultationConnectionState.idle => '상담',
+  };
 }
 
 class _MessageBubble extends StatelessWidget {
