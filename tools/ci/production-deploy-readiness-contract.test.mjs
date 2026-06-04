@@ -252,6 +252,7 @@ test("repository exposes deployment, migration, storage, and compatibility evide
   const backendBuild = read("back/build.gradle.kts");
 
   assert.match(applicationConfig, /url: \$\{DB_URL\}/);
+  assert.match(applicationConfig, /driver-class-name: \$\{DB_DRIVER:org\.postgresql\.Driver\}/);
   assert.match(applicationConfig, /secret: \$\{APP_JWT_SECRET\}/);
   assert.match(applicationConfig, /flyway:[\s\S]*enabled: true/);
   assert.match(applicationConfig, /PUSH_FCM_PROJECT_ID/);
