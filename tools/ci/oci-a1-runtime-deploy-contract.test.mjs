@@ -36,6 +36,9 @@ test("OCI runtime deploy script is safe, idempotent, and verifies health", () =>
 
   assert.match(script, /^set -euo pipefail$/m);
   assert.match(script, /required_vars=\(/);
+  assert.match(script, /deploy_transport="\$\{MAUMON_DEPLOY_TRANSPORT:-ssh\}"/);
+  assert.match(script, /Invalid MAUMON_DEPLOY_TRANSPORT/);
+  assert.match(script, /ssh_required_vars=\(/);
   assert.match(script, /OCI_A1_SSH_HOST/);
   assert.match(script, /OCI_A1_BACKEND_ENV_B64/);
   assert.match(script, /OCI_A1_VERTEX_KEY_JSON_B64/);
@@ -56,13 +59,17 @@ test("OCI runtime deploy script is safe, idempotent, and verifies health", () =>
   assert.match(script, /docker build -t "\$\{image_tag\}" -f "\$\{release_dir\}\/Dockerfile" "\$\{release_dir\}"/);
   assert.match(script, /container_uid="10001"/);
   assert.match(script, /chown "\$\{container_uid\}:\$\{container_gid\}" "\$\{vertex_key_file\}"/);
-  assert.match(
-    script,
-    /MAUMON_DOCKER_NETWORK='\$\{docker_network\}' MAUMON_APP_DATA_DIR='\$\{app_data_dir\}'/,
-  );
-  assert.match(script, /MAUMON_DEPLOY_HEALTH_TIMEOUT_SECONDS='\$\{deploy_health_timeout_seconds\}'/);
-  assert.match(script, /MAUMON_HOST_HTTP_PORT='\$\{host_http_port\}'/);
+  assert.match(script, /"MAUMON_DOCKER_NETWORK=\$\{docker_network\}"/);
+  assert.match(script, /"MAUMON_APP_DATA_DIR=\$\{app_data_dir\}"/);
+  assert.match(script, /"MAUMON_DEPLOY_HEALTH_TIMEOUT_SECONDS=\$\{deploy_health_timeout_seconds\}"/);
+  assert.match(script, /"MAUMON_HOST_HTTP_PORT=\$\{host_http_port\}"/);
   assert.match(script, /remote_staging="\/tmp\/maum-on-mobile-deploy-\$\{deploy_run_id\}-\$\{deploy_run_attempt\}"/);
+  assert.match(script, /remote_script="\$\{tmp_dir\}\/remote-deploy\.sh"/);
+  assert.match(script, /cat >"\$\{remote_script\}" <<'REMOTE'/);
+  assert.match(script, /prepare_remote_staging\(\)/);
+  assert.match(script, /run_remote_deploy\(\)/);
+  assert.match(script, /if \[\[ "\$\{deploy_transport\}" == "local" \]\]/);
+  assert.match(script, /bash "\$\{remote_script\}"/);
   assert.match(script, /\ninstall_runtime\n[\s\S]*\nprepare_runtime_resources\nallow_host_http_ingress\nprepare_managed_postgres\n\nsudo docker build/);
   assert.match(script, /container_name="maum-on-mobile-back"/);
   assert.match(script, /previous_container_name="maum-on-mobile-back-previous"/);
@@ -101,7 +108,7 @@ test("OCI runtime deploy script is safe, idempotent, and verifies health", () =>
   assert.doesNotMatch(script, /set -x/);
 });
 
-test("manual GitHub Actions deploy workflow builds jar, bundles it, and deploys over SSH", () => {
+test("manual GitHub Actions deploy workflow builds jar, bundles it, and deploys on the server runner", () => {
   const workflowPath = ".github/workflows/deploy-oci-a1.yml";
 
   assert.ok(existsSync(path.join(root, workflowPath)), `${workflowPath} must exist`);
@@ -112,6 +119,7 @@ test("manual GitHub Actions deploy workflow builds jar, bundles it, and deploys 
   assert.match(workflow, /workflow_dispatch:/);
   assert.match(workflow, /environment:/);
   assert.match(workflow, /name: \$\{\{ inputs\.environment \}\}/);
+  assert.match(workflow, /runs-on:\n\s+- self-hosted\n\s+- Linux\n\s+- ARM64\n\s+- oci-a1-deploy/);
   assert.match(workflow, /permissions:\n  contents: read/);
   assert.match(workflow, /concurrency:/);
   assert.match(workflow, /uses: actions\/checkout@[a-f0-9]{40}/);
@@ -126,13 +134,9 @@ test("manual GitHub Actions deploy workflow builds jar, bundles it, and deploys 
   assert.match(workflow, /append_or_replace_env\(\)/);
   assert.match(workflow, /OCI_A1_BACKEND_ENV_B64_COMPOSED/);
   assert.match(workflow, /bash tools\/deploy\/deploy-oci-a1-backend\.sh/);
+  assert.match(workflow, /MAUMON_DEPLOY_TRANSPORT: local/);
 
   for (const secret of [
-    "OCI_A1_SSH_HOST",
-    "OCI_A1_SSH_PORT",
-    "OCI_A1_SSH_USER",
-    "OCI_A1_SSH_PRIVATE_KEY_B64",
-    "OCI_A1_SSH_KNOWN_HOSTS_B64",
     "OCI_A1_BACKEND_ENV_B64",
     "OCI_A1_VERTEX_KEY_JSON_B64",
     "SPRING__MAIL__HOST",

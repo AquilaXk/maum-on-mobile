@@ -26,7 +26,11 @@ concurrency:
 jobs:
   deploy:
     name: Deploy backend runtime
-    runs-on: ubuntu-latest
+    runs-on:
+      - self-hosted
+      - Linux
+      - ARM64
+      - oci-a1-deploy
     environment:
       name: ${{ inputs.environment }}
 
@@ -131,14 +135,10 @@ jobs:
             echo "EOF"
           } >>"${GITHUB_ENV}"
 
-      - name: Deploy over SSH
+      - name: Deploy on server runner
         shell: bash
         env:
-          OCI_A1_SSH_HOST: ${{ secrets.OCI_A1_SSH_HOST }}
-          OCI_A1_SSH_PORT: ${{ secrets.OCI_A1_SSH_PORT }}
-          OCI_A1_SSH_USER: ${{ secrets.OCI_A1_SSH_USER }}
-          OCI_A1_SSH_PRIVATE_KEY_B64: ${{ secrets.OCI_A1_SSH_PRIVATE_KEY_B64 }}
-          OCI_A1_SSH_KNOWN_HOSTS_B64: ${{ secrets.OCI_A1_SSH_KNOWN_HOSTS_B64 }}
+          MAUMON_DEPLOY_TRANSPORT: local
           OCI_A1_BACKEND_ENV_B64: ${{ env.OCI_A1_BACKEND_ENV_B64_COMPOSED }}
           OCI_A1_VERTEX_KEY_JSON_B64: ${{ secrets.OCI_A1_VERTEX_KEY_JSON_B64 }}
           MAUMON_BACKEND_BUNDLE_PATH: build/maum-on-mobile-backend-bundle.tar.gz
