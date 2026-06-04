@@ -56,6 +56,9 @@ postgres_data_volume="${MAUMON_POSTGRES_DATA_VOLUME:-maum-on-mobile-postgres-dat
 postgres_image_tag="${MAUMON_POSTGRES_IMAGE_TAG:-postgres:16-alpine}"
 deploy_managed_postgres="${MAUMON_DEPLOY_MANAGED_POSTGRES:-auto}"
 host_http_port="${MAUMON_HOST_HTTP_PORT:-80}"
+host_http_rate_limit="${MAUMON_HOST_HTTP_RATE_LIMIT:-60/second}"
+host_http_rate_limit_burst="${MAUMON_HOST_HTTP_RATE_LIMIT_BURST:-120}"
+host_http_conn_limit="${MAUMON_HOST_HTTP_CONN_LIMIT:-80}"
 deploy_health_timeout_seconds="${MAUMON_DEPLOY_HEALTH_TIMEOUT_SECONDS:-90}"
 deploy_run_id="${GITHUB_RUN_ID:-local}"
 deploy_run_attempt="${GITHUB_RUN_ATTEMPT:-0}"
@@ -92,6 +95,23 @@ fi
 
 if [[ ! "${host_http_port}" =~ ^[0-9]+$ ]] || (( host_http_port < 1 || host_http_port > 65535 )); then
   echo "Invalid MAUMON_HOST_HTTP_PORT: ${host_http_port}" >&2
+  exit 1
+fi
+
+if [[ ! "${host_http_rate_limit}" =~ ^[0-9]+/(second|minute|hour|day)$ ]]; then
+  echo "Invalid MAUMON_HOST_HTTP_RATE_LIMIT: ${host_http_rate_limit}" >&2
+  exit 1
+fi
+
+if [[ ! "${host_http_rate_limit_burst}" =~ ^[0-9]+$ ]] ||
+  (( host_http_rate_limit_burst < 1 || host_http_rate_limit_burst > 100000 )); then
+  echo "Invalid MAUMON_HOST_HTTP_RATE_LIMIT_BURST: ${host_http_rate_limit_burst}" >&2
+  exit 1
+fi
+
+if [[ ! "${host_http_conn_limit}" =~ ^[0-9]+$ ]] ||
+  (( host_http_conn_limit < 1 || host_http_conn_limit > 100000 )); then
+  echo "Invalid MAUMON_HOST_HTTP_CONN_LIMIT: ${host_http_conn_limit}" >&2
   exit 1
 fi
 
@@ -143,6 +163,10 @@ previous_container_name="maum-on-mobile-back-previous"
 image_tag="${MAUMON_BACKEND_IMAGE_TAG}"
 health_timeout_seconds="${MAUMON_DEPLOY_HEALTH_TIMEOUT_SECONDS}"
 host_http_port="${MAUMON_HOST_HTTP_PORT:-80}"
+host_http_rate_limit="${MAUMON_HOST_HTTP_RATE_LIMIT:-60/second}"
+host_http_rate_limit_burst="${MAUMON_HOST_HTTP_RATE_LIMIT_BURST:-120}"
+host_http_conn_limit="${MAUMON_HOST_HTTP_CONN_LIMIT:-80}"
+http_rate_limit_chain="MAUMON_HTTP_RATE_LIMIT"
 network_name="${MAUMON_DOCKER_NETWORK:-maum-on-mobile}"
 app_data_dir="${MAUMON_APP_DATA_DIR:-/var/lib/maumon-data/app}"
 postgres_container_name="${MAUMON_POSTGRES_CONTAINER_NAME:-maum-on-mobile-postgres}"
@@ -251,9 +275,36 @@ allow_host_http_ingress() {
     exit 1
   fi
 
-  # OCI Ubuntu 기본 INPUT reject보다 앞에 HTTP 허용 규칙을 둔다.
-  if ! sudo iptables -C INPUT -p tcp --dport "${host_http_port}" -j ACCEPT >/dev/null 2>&1; then
-    sudo iptables -I INPUT 1 -p tcp --dport "${host_http_port}" -j ACCEPT
+  if [[ ! "${host_http_rate_limit}" =~ ^[0-9]+/(second|minute|hour|day)$ ]]; then
+    echo "Invalid MAUMON_HOST_HTTP_RATE_LIMIT: ${host_http_rate_limit}" >&2
+    exit 1
+  fi
+
+  if [[ ! "${host_http_rate_limit_burst}" =~ ^[0-9]+$ ]] ||
+    (( host_http_rate_limit_burst < 1 || host_http_rate_limit_burst > 100000 )); then
+    echo "Invalid MAUMON_HOST_HTTP_RATE_LIMIT_BURST: ${host_http_rate_limit_burst}" >&2
+    exit 1
+  fi
+
+  if [[ ! "${host_http_conn_limit}" =~ ^[0-9]+$ ]] ||
+    (( host_http_conn_limit < 1 || host_http_conn_limit > 100000 )); then
+    echo "Invalid MAUMON_HOST_HTTP_CONN_LIMIT: ${host_http_conn_limit}" >&2
+    exit 1
+  fi
+
+  sudo iptables -N "${http_rate_limit_chain}" >/dev/null 2>&1 || true
+  sudo iptables -F "${http_rate_limit_chain}"
+  sudo iptables -A "${http_rate_limit_chain}" -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT
+  sudo iptables -A "${http_rate_limit_chain}" -p tcp --syn \
+    -m connlimit --connlimit-above "${host_http_conn_limit}" --connlimit-mask 32 -j DROP
+  sudo iptables -A "${http_rate_limit_chain}" \
+    -m hashlimit --hashlimit-name maumon-http --hashlimit-mode srcip \
+    --hashlimit-upto "${host_http_rate_limit}" --hashlimit-burst "${host_http_rate_limit_burst}" -j ACCEPT
+  sudo iptables -A "${http_rate_limit_chain}" -j DROP
+
+  # OCI Ubuntu 기본 INPUT reject보다 앞에 HTTP rate-limit 체인을 둔다.
+  if ! sudo iptables -C INPUT -p tcp --dport "${host_http_port}" -j "${http_rate_limit_chain}" >/dev/null 2>&1; then
+    sudo iptables -I INPUT 1 -p tcp --dport "${host_http_port}" -j "${http_rate_limit_chain}"
   fi
 }
 
@@ -419,6 +470,9 @@ remote_env=(
   "MAUMON_BACKEND_IMAGE_TAG=${MAUMON_BACKEND_IMAGE_TAG}"
   "MAUMON_DEPLOY_HEALTH_TIMEOUT_SECONDS=${deploy_health_timeout_seconds}"
   "MAUMON_HOST_HTTP_PORT=${host_http_port}"
+  "MAUMON_HOST_HTTP_RATE_LIMIT=${host_http_rate_limit}"
+  "MAUMON_HOST_HTTP_RATE_LIMIT_BURST=${host_http_rate_limit_burst}"
+  "MAUMON_HOST_HTTP_CONN_LIMIT=${host_http_conn_limit}"
   "MAUMON_DOCKER_NETWORK=${docker_network}"
   "MAUMON_APP_DATA_DIR=${app_data_dir}"
   "MAUMON_POSTGRES_CONTAINER_NAME=${postgres_container_name}"

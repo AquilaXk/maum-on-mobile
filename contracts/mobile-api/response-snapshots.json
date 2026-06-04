@@ -78,6 +78,7 @@
         "FORBIDDEN",
         "NOT_FOUND",
         "CONFLICT",
+        "TOO_MANY_REQUESTS",
         "EXPIRED",
         "INTERNAL_SERVER_ERROR"
       ]
