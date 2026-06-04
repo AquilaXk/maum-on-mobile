@@ -3,9 +3,9 @@ create table if not exists admin_audit_events (
     target_member_id bigint not null,
     actor_member_id bigint not null,
     action varchar(60) not null,
-    previous_value clob not null,
-    new_value clob not null,
-    reason clob not null,
+    previous_value text not null,
+    new_value text not null,
+    reason text not null,
     created_at varchar(40) not null,
     constraint fk_admin_audit_target_member
         foreign key (target_member_id) references auth_members(id)

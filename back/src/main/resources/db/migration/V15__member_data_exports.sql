@@ -7,7 +7,7 @@ create table if not exists member_data_exports (
     expires_at varchar(40),
     downloaded_at varchar(40),
     failure_reason varchar(500),
-    content_json clob,
+    content_json text,
     constraint fk_member_data_export_member
         foreign key (member_id) references auth_members(id)
         on delete cascade

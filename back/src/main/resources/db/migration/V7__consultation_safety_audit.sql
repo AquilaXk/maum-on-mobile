@@ -16,7 +16,7 @@ create table if not exists consultation_safety_audit_events (
     category varchar(40) not null,
     severity varchar(40) not null,
     action_policy varchar(40) not null,
-    message_preview clob not null,
+    message_preview text not null,
     created_at varchar(40) not null,
     constraint fk_consultation_safety_audit_member
         foreign key (member_id) references auth_members(id)

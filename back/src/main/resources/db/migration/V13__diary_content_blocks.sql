@@ -4,7 +4,7 @@ create table if not exists diary_content_blocks (
     client_block_id varchar(120) not null,
     block_type varchar(20) not null,
     display_order integer not null,
-    text_content clob,
+    text_content text,
     image_url varchar(1000),
     filename varchar(255),
     byte_size bigint,
