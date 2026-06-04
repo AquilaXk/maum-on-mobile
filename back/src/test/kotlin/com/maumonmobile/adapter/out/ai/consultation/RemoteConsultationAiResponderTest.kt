@@ -126,6 +126,52 @@ class RemoteConsultationAiResponderTest {
     }
 
     @Test
+    fun rejectsInsecureDedicatedConsultationEndpoint() {
+        val properties = aiProperties().apply {
+            consultation.endpoint = "http://ai.example.com/v1/consultation:generateContent"
+            consultation.authorizationToken = "consultation-token"
+        }
+
+        assertThatThrownBy {
+            RemoteConsultationAiResponder(
+                properties = properties,
+                objectMapper = ObjectMapper(),
+                accessTokenProvider = { "vertex-token" },
+                generateContentClient = RecordingVertexAiGenerateContentClient(),
+            )
+        }.isInstanceOf(IllegalArgumentException::class.java)
+            .hasMessageContaining("https")
+    }
+
+    @Test
+    fun doesNotTreatLookalikeVertexHostAsVertexEndpoint() {
+        val client = RecordingVertexAiGenerateContentClient(
+            responseBody = vertexResponse("""{"chunks":["괜찮아요."]}"""),
+        )
+        val properties = aiProperties().apply {
+            consultation.endpoint = "https://aiplatform.googleapis.com.evil.example/v1/consultation:generateContent"
+            consultation.authorizationToken = "consultation-token"
+        }
+        val responder = RemoteConsultationAiResponder(
+            properties = properties,
+            objectMapper = ObjectMapper(),
+            accessTokenProvider = { "vertex-token" },
+            generateContentClient = client,
+        )
+
+        responder.generate(
+            ConsultationAiRequest(
+                memberId = 5L,
+                message = "마음이 무거워요.",
+                recentMessages = emptyList(),
+                timeout = Duration.ofSeconds(2),
+            ),
+        )
+
+        assertThat(client.accessToken).isEqualTo("consultation-token")
+    }
+
+    @Test
     fun opensCircuitAfterRepeatedModelFailures() {
         val client = RecordingVertexAiGenerateContentClient(failure = IllegalStateException("busy"))
         val properties = aiProperties().apply {

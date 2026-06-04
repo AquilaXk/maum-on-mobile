@@ -40,10 +40,13 @@ class RemoteConsultationAiResponder internal constructor(
 
     private val endpoint: RemoteAiEndpointProperties = properties.consultation
     private val circuitBreaker = RemoteModelCircuitBreaker(properties.circuitBreaker)
+    private val configuredEndpointUri: URI? = endpoint.endpoint
+        .trim()
+        .takeIf(String::isNotBlank)
+        ?.toValidatedEndpointUri()
 
     init {
-        val configuredEndpoint = endpoint.endpoint.trim()
-        if (configuredEndpoint.isBlank() || configuredEndpoint.isVertexAiEndpoint()) {
+        if (configuredEndpointUri == null || configuredEndpointUri.isVertexAiEndpoint()) {
             properties.vertex.validate()
         } else {
             require(endpoint.authorizationToken.isNotBlank()) {
@@ -117,16 +120,11 @@ class RemoteConsultationAiResponder internal constructor(
     }
 
     private fun consultationEndpoint(): URI {
-        return endpoint.endpoint
-            .takeIf(String::isNotBlank)
-            ?.trim()
-            ?.let(URI::create)
-            ?: properties.vertex.generateContentEndpoint()
+        return configuredEndpointUri ?: properties.vertex.generateContentEndpoint()
     }
 
     private fun consultationAccessToken(): String {
-        val configuredEndpoint = endpoint.endpoint.trim()
-        return if (configuredEndpoint.isNotBlank() && !configuredEndpoint.isVertexAiEndpoint()) {
+        return if (configuredEndpointUri != null && !configuredEndpointUri.isVertexAiEndpoint()) {
             endpoint.authorizationToken.trim()
         } else {
             accessTokenProvider.accessToken()
@@ -185,7 +183,24 @@ class RemoteConsultationAiResponder internal constructor(
         return if (left <= right) left else right
     }
 
-    private fun String.isVertexAiEndpoint(): Boolean {
-        return contains("aiplatform.googleapis.com", ignoreCase = true)
+    private fun String.toValidatedEndpointUri(): URI {
+        val uri = runCatching { URI.create(this) }
+            .getOrElse { failure ->
+                throw IllegalArgumentException("app.ai.consultation.endpoint must be a valid URI.", failure)
+            }
+        require(uri.scheme.equals("https", ignoreCase = true)) {
+            "app.ai.consultation.endpoint must use https."
+        }
+        require(!uri.host.isNullOrBlank()) {
+            "app.ai.consultation.endpoint host is required."
+        }
+        return uri
+    }
+
+    private fun URI.isVertexAiEndpoint(): Boolean {
+        val normalizedHost = host?.lowercase() ?: return false
+        return normalizedHost == "aiplatform.googleapis.com" ||
+            normalizedHost.endsWith(".aiplatform.googleapis.com") ||
+            normalizedHost.endsWith("-aiplatform.googleapis.com")
     }
 }
