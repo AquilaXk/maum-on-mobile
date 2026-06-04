@@ -31,7 +31,7 @@ class SecurityConfig(
             }
             .authorizeHttpRequests { authorize ->
                 authorize
-                    .requestMatchers("/api/health", "/actuator/health")
+                    .requestMatchers("/api/health", "/actuator/health", "/error")
                     .permitAll()
                 if (environment.acceptsProfiles(Profiles.of("performance"))) {
                     authorize

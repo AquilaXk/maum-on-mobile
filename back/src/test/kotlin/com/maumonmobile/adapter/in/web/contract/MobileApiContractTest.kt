@@ -64,6 +64,14 @@ class MobileApiContractTest @Autowired constructor(
     }
 
     @Test
+    fun frameworkErrorEndpointDoesNotRequireAuthentication() {
+        mockMvc.get("/error")
+            .andExpect {
+                status { isInternalServerError() }
+            }
+    }
+
+    @Test
     fun imageUploadRequiresAuth() {
         mockMvc.perform(
             multipart("/api/v1/images/upload")

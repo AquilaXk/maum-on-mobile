@@ -16,6 +16,7 @@ import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.context.annotation.Profile
 import org.springframework.stereotype.Component
 import tools.jackson.databind.ObjectMapper
+import java.net.URI
 import java.time.Duration
 
 @Component
@@ -39,9 +40,19 @@ class RemoteConsultationAiResponder internal constructor(
 
     private val endpoint: RemoteAiEndpointProperties = properties.consultation
     private val circuitBreaker = RemoteModelCircuitBreaker(properties.circuitBreaker)
+    private val configuredEndpointUri: URI? = endpoint.endpoint
+        .trim()
+        .takeIf(String::isNotBlank)
+        ?.toValidatedEndpointUri()
 
     init {
-        properties.vertex.validate()
+        if (configuredEndpointUri == null || configuredEndpointUri.isVertexAiEndpoint()) {
+            properties.vertex.validate()
+        } else {
+            require(endpoint.authorizationToken.isNotBlank()) {
+                "app.ai.consultation.authorization-token is required when endpoint is configured."
+            }
+        }
         endpoint.validate("consultation")
         properties.circuitBreaker.validate()
     }
@@ -55,8 +66,8 @@ class RemoteConsultationAiResponder internal constructor(
         repeat(endpoint.maxAttempts) {
             runCatching {
                 val responseBody = generateContentClient.generateContent(
-                    endpoint = properties.vertex.generateContentEndpoint(),
-                    accessToken = accessTokenProvider.accessToken(),
+                    endpoint = consultationEndpoint(),
+                    accessToken = consultationAccessToken(),
                     requestBody = requestBody(request),
                     timeout = minTimeout(request.timeout, endpoint.requestTimeout),
                 )
@@ -96,14 +107,28 @@ class RemoteConsultationAiResponder internal constructor(
                 "${message.sender.toModelRole()}: ${message.content.take(endpoint.maxInputChars)}"
             }
         return """
-            You are Maum On's safe mobile consultation assistant.
+            너는 익명 상담 서비스 '마음 온'의 다정하고 따뜻한 공감 상담사야.
+            사용자의 고민에 먼저 공감하고, 부담스럽지 않은 작은 다음 행동을 제안해.
+            답변은 한국어 3~4문장 안에서 정중하고 따뜻하게 작성해.
+            의학적 진단, 단정적인 판단, 위험한 지시는 하지 마.
             Return JSON only. Use this shape: {"chunks":["short Korean response part"]}.
-            Keep the answer warm, concise, and non-diagnostic.
             memberId: ${request.memberId}
             recentMessages:
             $recentMessages
             userMessage: ${request.message.take(endpoint.maxInputChars)}
         """.trimIndent()
+    }
+
+    private fun consultationEndpoint(): URI {
+        return configuredEndpointUri ?: properties.vertex.generateContentEndpoint()
+    }
+
+    private fun consultationAccessToken(): String {
+        return if (configuredEndpointUri != null && !configuredEndpointUri.isVertexAiEndpoint()) {
+            endpoint.authorizationToken.trim()
+        } else {
+            accessTokenProvider.accessToken()
+        }
     }
 
     private fun parseResponse(body: String): ConsultationAiResponse {
@@ -156,5 +181,26 @@ class RemoteConsultationAiResponder internal constructor(
 
     private fun minTimeout(left: Duration, right: Duration): Duration {
         return if (left <= right) left else right
+    }
+
+    private fun String.toValidatedEndpointUri(): URI {
+        val uri = runCatching { URI.create(this) }
+            .getOrElse { failure ->
+                throw IllegalArgumentException("app.ai.consultation.endpoint must be a valid URI.", failure)
+            }
+        require(uri.scheme.equals("https", ignoreCase = true)) {
+            "app.ai.consultation.endpoint must use https."
+        }
+        require(!uri.host.isNullOrBlank()) {
+            "app.ai.consultation.endpoint host is required."
+        }
+        return uri
+    }
+
+    private fun URI.isVertexAiEndpoint(): Boolean {
+        val normalizedHost = host?.lowercase() ?: return false
+        return normalizedHost == "aiplatform.googleapis.com" ||
+            normalizedHost.endsWith(".aiplatform.googleapis.com") ||
+            normalizedHost.endsWith("-aiplatform.googleapis.com")
     }
 }
