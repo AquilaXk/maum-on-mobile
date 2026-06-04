@@ -33,7 +33,7 @@ create table if not exists sse_stream_events (
     stream_type varchar(40) not null,
     member_id bigint not null,
     event_name varchar(120) not null,
-    data clob not null,
+    data text not null,
     created_at varchar(40) not null,
     constraint fk_sse_stream_event_member
         foreign key (member_id) references auth_members(id)

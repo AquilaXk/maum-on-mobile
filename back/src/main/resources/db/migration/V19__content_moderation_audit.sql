@@ -4,12 +4,12 @@ create table if not exists content_moderation_audit_events (
     target varchar(40) not null,
     allowed boolean not null,
     risk_level varchar(40) not null,
-    categories clob not null,
+    categories text not null,
     model_status varchar(40) not null,
     latency_ms bigint not null,
     text_hash varchar(64) not null,
     text_length integer not null,
-    content_summary clob not null,
+    content_summary text not null,
     created_at varchar(40) not null,
     constraint fk_content_moderation_audit_member
         foreign key (member_id) references auth_members(id)

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -250,6 +250,8 @@ test("repository exposes deployment, migration, storage, and compatibility evide
   const pubspec = read("front/pubspec.yaml");
   const app = read("front/lib/app/maum_on_mobile_app.dart");
   const backendBuild = read("back/build.gradle.kts");
+  const migrationFiles = readdirSync(path.join(root, "back/src/main/resources/db/migration"))
+    .filter((file) => file.endsWith(".sql"));
 
   assert.match(applicationConfig, /url: \$\{DB_URL\}/);
   assert.match(applicationConfig, /driver-class-name: \$\{DB_DRIVER:org\.postgresql\.Driver\}/);
@@ -265,6 +267,10 @@ test("repository exposes deployment, migration, storage, and compatibility evide
   assert.match(backendBuild, /version = ".+"/);
   assert.match(backendBuild, /runtimeOnly\("org\.postgresql:postgresql"\)/);
   assert.match(backendBuild, /runtimeOnly\("org\.flywaydb:flyway-database-postgresql"\)/);
+  for (const file of migrationFiles) {
+    const migrationSql = read(path.join("back/src/main/resources/db/migration", file));
+    assert.doesNotMatch(migrationSql, /\bclob\b/i, `${file} must use PostgreSQL-compatible text types`);
+  }
 });
 
 test("ci runs production deploy readiness gate only for release candidate flows", () => {

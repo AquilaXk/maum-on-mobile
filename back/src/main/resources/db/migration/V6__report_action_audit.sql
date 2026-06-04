@@ -1,5 +1,5 @@
 alter table reports
-    add column if not exists action_reason clob;
+    add column if not exists action_reason text;
 
 alter table reports
     add column if not exists handled_by bigint;
