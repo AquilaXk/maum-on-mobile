@@ -253,6 +253,18 @@ test("path classifier keeps front package changes in frontend gate", async () =>
   assert.equal(outputs.javascript, "false");
 });
 
+test("path classifier enables backend and repository checks for runtime deploy changes", async () => {
+  const outputs = await classifyChangedFiles(["tools/deploy/deploy-oci-a1-backend.sh"]);
+
+  assert.equal(outputs.docs_only, "false");
+  assert.equal(outputs.backend, "true");
+  assert.equal(outputs.repository, "true");
+  assert.equal(outputs.ci, "false");
+  assert.equal(outputs.frontend, "false");
+  assert.equal(outputs.android, "false");
+  assert.equal(outputs.ios, "false");
+});
+
 test("path classifier keeps back Gradle changes in backend gate", async () => {
   const outputs = await classifyChangedFiles(["back/build.gradle.kts", "back/gradlew"]);
 

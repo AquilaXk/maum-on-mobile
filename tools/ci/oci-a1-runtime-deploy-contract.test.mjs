@@ -1,0 +1,100 @@
+import assert from "node:assert/strict";
+import { existsSync, readFileSync } from "node:fs";
+import path from "node:path";
+import test from "node:test";
+
+const root = process.cwd();
+
+function read(relativePath) {
+  return readFileSync(path.join(root, relativePath), "utf8");
+}
+
+test("backend runtime image is built from a tracked Dockerfile", () => {
+  const dockerfilePath = "back/Dockerfile";
+
+  assert.ok(existsSync(path.join(root, dockerfilePath)), "back/Dockerfile must exist");
+
+  const dockerfile = read(dockerfilePath);
+
+  assert.match(dockerfile, /^FROM eclipse-temurin:21-jre-jammy$/m);
+  assert.match(dockerfile, /groupadd --system --gid 10001 maumon/);
+  assert.match(dockerfile, /useradd --system --uid 10001 --gid maumon/);
+  assert.match(dockerfile, /^USER maumon$/m);
+  assert.match(dockerfile, /^HEALTHCHECK --interval=30s --timeout=5s --start-period=40s --retries=5/m);
+  assert.match(dockerfile, /\/actuator\/health/);
+  assert.match(dockerfile, /^ENTRYPOINT \["java", "-jar", "\/app\/maum-on-mobile-back\.jar"\]$/m);
+  assert.doesNotMatch(dockerfile, /COPY .*\.env/);
+  assert.doesNotMatch(dockerfile, /BEGIN [A-Z ]*PRIVATE KEY/);
+});
+
+test("OCI runtime deploy script is safe, idempotent, and verifies health", () => {
+  const scriptPath = "tools/deploy/deploy-oci-a1-backend.sh";
+
+  assert.ok(existsSync(path.join(root, scriptPath)), `${scriptPath} must exist`);
+
+  const script = read(scriptPath);
+
+  assert.match(script, /^set -euo pipefail$/m);
+  assert.match(script, /required_vars=\(/);
+  assert.match(script, /OCI_A1_SSH_HOST/);
+  assert.match(script, /OCI_A1_BACKEND_ENV_B64/);
+  assert.match(script, /OCI_A1_VERTEX_KEY_JSON_B64/);
+  assert.match(script, /Invalid MAUMON_BACKEND_IMAGE_TAG/);
+  assert.match(script, /tar -xzf "\$\{bundle_path\}" -C "\$\{release_dir\}"/);
+  assert.match(script, /docker build -t "\$\{image_tag\}" -f "\$\{release_dir\}\/Dockerfile" "\$\{release_dir\}"/);
+  assert.match(script, /container_uid="10001"/);
+  assert.match(script, /chown "\$\{container_uid\}:\$\{container_gid\}" "\$\{vertex_key_file\}"/);
+  assert.match(script, /container_name="maum-on-mobile-back"/);
+  assert.match(script, /previous_container_name="maum-on-mobile-back-previous"/);
+  assert.match(script, /docker stop "\$\{container_name\}"/);
+  assert.match(script, /--env-file "\$\{env_file\}"/);
+  assert.match(script, /--mount type=bind,source="\$\{vertex_key_file\}",target=\/run\/secrets\/vertex-key\.json,readonly/);
+  assert.match(script, /--health-cmd 'curl -fsS http:\/\/127\.0\.0\.1:8080\/actuator\/health \|\| exit 1'/);
+  assert.match(script, /curl -fsS "http:\/\/127\.0\.0\.1:8080\/actuator\/health"/);
+  assert.match(script, /docker rm "\$\{previous_container_name\}"/);
+  assert.match(script, /install -d -m 0700 '\$\{remote_staging\}'/);
+  assert.match(script, /cleanup_remote_staging\(\)/);
+  assert.match(script, /rm -f "\$\{staging_dir\}\/backend\.env" "\$\{staging_dir\}\/vertex-key\.json" "\$\{bundle_path\}"/);
+  assert.match(script, /trap cleanup_remote_staging EXIT/);
+  assert.match(script, /if ! sudo docker run/);
+  assert.match(script, /rollback/);
+  assert.doesNotMatch(script, /set -x/);
+});
+
+test("manual GitHub Actions deploy workflow builds jar, bundles it, and deploys over SSH", () => {
+  const workflowPath = ".github/workflows/deploy-oci-a1.yml";
+
+  assert.ok(existsSync(path.join(root, workflowPath)), `${workflowPath} must exist`);
+
+  const workflow = read(workflowPath);
+
+  assert.match(workflow, /^name: Deploy OCI A1 Backend$/m);
+  assert.match(workflow, /workflow_dispatch:/);
+  assert.match(workflow, /environment:/);
+  assert.match(workflow, /name: \$\{\{ inputs\.environment \}\}/);
+  assert.match(workflow, /permissions:\n  contents: read/);
+  assert.match(workflow, /concurrency:/);
+  assert.match(workflow, /uses: actions\/checkout@[a-f0-9]{40}/);
+  assert.match(workflow, /persist-credentials: false/);
+  assert.match(workflow, /uses: actions\/setup-java@[a-f0-9]{40}/);
+  assert.match(workflow, /java-version: "21"/);
+  assert.match(workflow, /working-directory: back/);
+  assert.match(workflow, /\.\/gradlew --no-daemon test bootJar/);
+  assert.match(workflow, /cp back\/Dockerfile build\/deploy-oci-a1\/Dockerfile/);
+  assert.match(workflow, /tar -czf build\/maum-on-mobile-backend-bundle\.tar\.gz -C build\/deploy-oci-a1 \./);
+  assert.match(workflow, /bash tools\/deploy\/deploy-oci-a1-backend\.sh/);
+
+  for (const secret of [
+    "OCI_A1_SSH_HOST",
+    "OCI_A1_SSH_PORT",
+    "OCI_A1_SSH_USER",
+    "OCI_A1_SSH_PRIVATE_KEY_B64",
+    "OCI_A1_SSH_KNOWN_HOSTS_B64",
+    "OCI_A1_BACKEND_ENV_B64",
+    "OCI_A1_VERTEX_KEY_JSON_B64",
+  ]) {
+    assert.match(workflow, new RegExp(`secrets\\.${secret}`));
+  }
+
+  assert.doesNotMatch(workflow, /@v\d/);
+});

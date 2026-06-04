@@ -1,0 +1,81 @@
+name: Deploy OCI A1 Backend
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "GitHub deployment environment"
+        required: true
+        default: staging
+        type: choice
+        options:
+          - staging
+          - production
+      image_tag_suffix:
+        description: "Optional image tag suffix"
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-oci-a1-backend-${{ inputs.environment }}
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Deploy backend runtime
+    runs-on: ubuntu-latest
+    environment:
+      name: ${{ inputs.environment }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          persist-credentials: false
+
+      - name: Set up Java
+        uses: actions/setup-java@be666c2fcd27ec809703dec50e508c2fdc7f6654
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: gradle
+
+      - name: Build backend jar
+        working-directory: back
+        shell: bash
+        run: |
+          set -euo pipefail
+          chmod +x ./gradlew
+          ./gradlew --no-daemon test bootJar
+
+      - name: Package deployment bundle
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf build/deploy-oci-a1
+          mkdir -p build/deploy-oci-a1
+          boot_jar="$(find back/build/libs -maxdepth 1 -type f -name '*.jar' ! -name '*-plain.jar' | sort | tail -n 1)"
+          if [[ -z "${boot_jar}" ]]; then
+            echo "Backend boot jar not found" >&2
+            exit 1
+          fi
+          cp "${boot_jar}" build/deploy-oci-a1/maum-on-mobile-back.jar
+          cp back/Dockerfile build/deploy-oci-a1/Dockerfile
+          tar -czf build/maum-on-mobile-backend-bundle.tar.gz -C build/deploy-oci-a1 .
+
+      - name: Deploy over SSH
+        shell: bash
+        env:
+          OCI_A1_SSH_HOST: ${{ secrets.OCI_A1_SSH_HOST }}
+          OCI_A1_SSH_PORT: ${{ secrets.OCI_A1_SSH_PORT }}
+          OCI_A1_SSH_USER: ${{ secrets.OCI_A1_SSH_USER }}
+          OCI_A1_SSH_PRIVATE_KEY_B64: ${{ secrets.OCI_A1_SSH_PRIVATE_KEY_B64 }}
+          OCI_A1_SSH_KNOWN_HOSTS_B64: ${{ secrets.OCI_A1_SSH_KNOWN_HOSTS_B64 }}
+          OCI_A1_BACKEND_ENV_B64: ${{ secrets.OCI_A1_BACKEND_ENV_B64 }}
+          OCI_A1_VERTEX_KEY_JSON_B64: ${{ secrets.OCI_A1_VERTEX_KEY_JSON_B64 }}
+          MAUMON_BACKEND_BUNDLE_PATH: build/maum-on-mobile-backend-bundle.tar.gz
+          MAUMON_BACKEND_IMAGE_TAG: maum-on-mobile-back:${{ github.sha }}${{ inputs.image_tag_suffix }}
+        run: bash tools/deploy/deploy-oci-a1-backend.sh
