@@ -74,13 +74,14 @@ remote_staging="/tmp/maum-on-mobile-deploy-${GITHUB_RUN_ID:-local}-${GITHUB_RUN_
 "${scp_base[@]}" "${bundle_copy}" "${backend_env}" "${vertex_key}" "${OCI_A1_SSH_USER}@${OCI_A1_SSH_HOST}:${remote_staging}/"
 
 "${ssh_base[@]}" \
-  "MAUMON_BACKEND_IMAGE_TAG='${MAUMON_BACKEND_IMAGE_TAG}' MAUMON_DEPLOY_HEALTH_TIMEOUT_SECONDS='${MAUMON_DEPLOY_HEALTH_TIMEOUT_SECONDS:-90}' REMOTE_STAGING='${remote_staging}' bash -s" <<'REMOTE'
+  "MAUMON_BACKEND_IMAGE_TAG='${MAUMON_BACKEND_IMAGE_TAG}' MAUMON_DEPLOY_HEALTH_TIMEOUT_SECONDS='${MAUMON_DEPLOY_HEALTH_TIMEOUT_SECONDS:-90}' MAUMON_HOST_HTTP_PORT='${MAUMON_HOST_HTTP_PORT:-80}' REMOTE_STAGING='${remote_staging}' bash -s" <<'REMOTE'
 set -euo pipefail
 
 container_name="maum-on-mobile-back"
 previous_container_name="maum-on-mobile-back-previous"
 image_tag="${MAUMON_BACKEND_IMAGE_TAG}"
 health_timeout_seconds="${MAUMON_DEPLOY_HEALTH_TIMEOUT_SECONDS}"
+host_http_port="${MAUMON_HOST_HTTP_PORT:-80}"
 container_uid="10001"
 container_gid="10001"
 staging_dir="${REMOTE_STAGING}"
@@ -166,7 +167,7 @@ if ! sudo docker run \
   --detach \
   --name "${container_name}" \
   --restart unless-stopped \
-  --publish 8080:8080 \
+  --publish "${host_http_port}:8080" \
   --env-file "${env_file}" \
   --mount type=bind,source="${vertex_key_file}",target=/run/secrets/vertex-key.json,readonly \
   --health-cmd 'curl -fsS http://127.0.0.1:8080/actuator/health || exit 1' \
