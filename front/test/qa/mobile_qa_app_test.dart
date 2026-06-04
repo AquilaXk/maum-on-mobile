@@ -1,3 +1,4 @@
+import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:maum_on_mobile_front/qa/mobile_qa_app.dart';
 
@@ -10,6 +11,14 @@ void main() {
     expect(find.text('홈'), findsOneWidget);
     expect(find.textContaining('오늘의 마음'), findsWidgets);
 
+    await tester.ensureVisible(
+      find.byKey(const ValueKey('home-category-daily')),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('home-category-daily')));
+    await tester.pumpAndSettle();
+    expect(find.text('일상 QA 스토리'), findsOneWidget);
+
     await tester.tap(find.byKey(mobileQaRouteKey('consultation')));
     await tester.pumpAndSettle();
     expect(find.text('실시간 상담'), findsOneWidget);
@@ -17,9 +26,10 @@ void main() {
 
     await tester.tap(find.byKey(mobileQaRouteKey('home')));
     await tester.pumpAndSettle();
-    await tester.ensureVisible(find.text('설정'));
+    await tester
+        .ensureVisible(find.byKey(const ValueKey('home-action-settings')));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('설정'));
+    await tester.tap(find.byKey(const ValueKey('home-action-settings')));
     await tester.pumpAndSettle();
     expect(find.text('계정 설정'), findsOneWidget);
   });

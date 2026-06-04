@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import '../app/maum_on_mobile_app.dart';
@@ -150,21 +151,76 @@ class _QaHomeRepository implements HomeRepository {
   Future<HomeStoryPage> fetchStories({
     HomeStoryCategory category = HomeStoryCategory.all,
   }) async {
-    return const HomeStoryPage(
-      items: [
-        HomeStory(
-          id: 1,
-          title: '관계를 천천히 회복하는 방법',
-          summary: '답답했던 하루를 정리하고 다시 대화를 준비하는 이야기',
-          authorNickname: '마음이',
-          category: HomeStoryCategory.worry,
-          createdAt: '2026-06-05T09:00:00',
-          viewCount: 32,
-        ),
-      ],
+    final items = category == HomeStoryCategory.all
+        ? const [
+            HomeStory(
+              id: 1,
+              title: '관계를 천천히 회복하는 방법',
+              summary: '답답했던 하루를 정리하고 다시 대화를 준비하는 이야기',
+              authorNickname: '마음이',
+              category: HomeStoryCategory.worry,
+              createdAt: '2026-06-05T09:00:00',
+              viewCount: 32,
+            ),
+            HomeStory(
+              id: 2,
+              title: '일상 QA 스토리',
+              summary: '평범한 하루에서 찾은 회복의 장면',
+              authorNickname: '온기',
+              category: HomeStoryCategory.daily,
+              createdAt: '2026-06-05T10:00:00',
+              viewCount: 18,
+            ),
+            HomeStory(
+              id: 3,
+              title: '질문 QA 스토리',
+              summary: '다른 사람의 관점을 묻고 답을 기다리는 이야기',
+              authorNickname: '물음표',
+              category: HomeStoryCategory.question,
+              createdAt: '2026-06-05T11:00:00',
+              viewCount: 11,
+            ),
+          ]
+        : [_qaHomeStory(category)];
+
+    return HomeStoryPage(
+      items: items,
       last: true,
     );
   }
+}
+
+HomeStory _qaHomeStory(HomeStoryCategory category) {
+  return switch (category) {
+    HomeStoryCategory.worry => const HomeStory(
+        id: 11,
+        title: '고민 QA 스토리',
+        summary: '복잡한 마음을 안전하게 꺼내 보는 이야기',
+        authorNickname: '마음이',
+        category: HomeStoryCategory.worry,
+        createdAt: '2026-06-05T09:30:00',
+        viewCount: 21,
+      ),
+    HomeStoryCategory.daily => const HomeStory(
+        id: 12,
+        title: '일상 QA 스토리',
+        summary: '평범한 하루에서 찾은 회복의 장면',
+        authorNickname: '온기',
+        category: HomeStoryCategory.daily,
+        createdAt: '2026-06-05T10:30:00',
+        viewCount: 18,
+      ),
+    HomeStoryCategory.question => const HomeStory(
+        id: 13,
+        title: '질문 QA 스토리',
+        summary: '다른 사람의 관점을 묻고 답을 기다리는 이야기',
+        authorNickname: '물음표',
+        category: HomeStoryCategory.question,
+        createdAt: '2026-06-05T11:30:00',
+        viewCount: 11,
+      ),
+    HomeStoryCategory.all => _qaHomeStory(HomeStoryCategory.worry),
+  };
 }
 
 class _QaDiaryRepository implements DiaryRepository {
@@ -561,18 +617,18 @@ class _QaPushPermissionClient implements PushNotificationPermissionClient {
 
   @override
   Future<PushNotificationPermissionResult> requestPermission() async {
-    return const PushNotificationPermissionResult(
+    return PushNotificationPermissionResult(
       granted: true,
-      platform: NotificationDevicePlatform.ios,
+      platform: _qaNotificationPlatform(),
       token: 'qa-token',
     );
   }
 
   @override
   Future<PushNotificationPermissionResult> getPermissionStatus() async {
-    return const PushNotificationPermissionResult(
+    return PushNotificationPermissionResult(
       granted: true,
-      platform: NotificationDevicePlatform.ios,
+      platform: _qaNotificationPlatform(),
       token: 'qa-token',
     );
   }
@@ -585,6 +641,14 @@ class _QaPushPermissionClient implements PushNotificationPermissionClient {
 
   @override
   Stream<NotificationTapPayload> get notificationTaps => const Stream.empty();
+}
+
+NotificationDevicePlatform _qaNotificationPlatform() {
+  return switch (defaultTargetPlatform) {
+    TargetPlatform.android => NotificationDevicePlatform.android,
+    TargetPlatform.iOS => NotificationDevicePlatform.ios,
+    _ => NotificationDevicePlatform.ios,
+  };
 }
 
 class _QaReportRepository implements ReportRepository {
