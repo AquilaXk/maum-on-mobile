@@ -46,8 +46,10 @@ test("OCI runtime deploy script is safe, idempotent, and verifies health", () =>
   assert.match(script, /chown "\$\{container_uid\}:\$\{container_gid\}" "\$\{vertex_key_file\}"/);
   assert.match(script, /container_name="maum-on-mobile-back"/);
   assert.match(script, /previous_container_name="maum-on-mobile-back-previous"/);
+  assert.match(script, /host_http_port="\$\{MAUMON_HOST_HTTP_PORT:-80\}"/);
   assert.match(script, /docker stop "\$\{container_name\}"/);
   assert.match(script, /--env-file "\$\{env_file\}"/);
+  assert.match(script, /--publish "\$\{host_http_port\}:8080"/);
   assert.match(script, /--mount type=bind,source="\$\{vertex_key_file\}",target=\/run\/secrets\/vertex-key\.json,readonly/);
   assert.match(script, /--health-cmd 'curl -fsS http:\/\/127\.0\.0\.1:8080\/actuator\/health \|\| exit 1'/);
   assert.match(script, /curl -fsS "http:\/\/127\.0\.0\.1:8080\/actuator\/health"/);
