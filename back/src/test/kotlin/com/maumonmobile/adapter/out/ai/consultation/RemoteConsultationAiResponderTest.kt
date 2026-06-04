@@ -58,6 +58,74 @@ class RemoteConsultationAiResponderTest {
     }
 
     @Test
+    fun usesConfiguredVertexConsultationEndpointWithServiceAccountToken() {
+        val client = RecordingVertexAiGenerateContentClient(
+            responseBody = vertexResponse("""{"chunks":["괜찮아요."]}"""),
+        )
+        val properties = aiProperties().apply {
+            consultation.endpoint =
+                "https://asia-northeast3-aiplatform.googleapis.com/v1/projects/maum-on-mobile-prod" +
+                "/locations/asia-northeast3/publishers/google/models/gemini-2.5-flash:generateContent"
+            consultation.authorizationToken = "not-an-oauth-token"
+        }
+        val responder = RemoteConsultationAiResponder(
+            properties = properties,
+            objectMapper = ObjectMapper(),
+            accessTokenProvider = { "vertex-token" },
+            generateContentClient = client,
+        )
+
+        responder.generate(
+            ConsultationAiRequest(
+                memberId = 3L,
+                message = "요즘 마음이 지쳤어요.",
+                recentMessages = emptyList(),
+                timeout = Duration.ofSeconds(2),
+            ),
+        )
+
+        assertThat(client.endpoint).isEqualTo(
+            URI.create(
+                "https://asia-northeast3-aiplatform.googleapis.com/v1/projects/maum-on-mobile-prod" +
+                    "/locations/asia-northeast3/publishers/google/models/gemini-2.5-flash:generateContent",
+            ),
+        )
+        assertThat(client.accessToken).isEqualTo("vertex-token")
+        val requestJson = ObjectMapper().readTree(client.requestBody!!)
+        assertThat(requestJson["contents"].toString())
+            .contains("마음 온", "다정하고 따뜻한 공감 상담사", "요즘 마음이 지쳤어요.")
+    }
+
+    @Test
+    fun usesDedicatedConsultationTokenForNonVertexEndpoint() {
+        val client = RecordingVertexAiGenerateContentClient(
+            responseBody = vertexResponse("""{"chunks":["괜찮아요."]}"""),
+        )
+        val properties = aiProperties().apply {
+            consultation.endpoint = "https://ai.example.com/v1/consultation:generateContent"
+            consultation.authorizationToken = "consultation-token"
+        }
+        val responder = RemoteConsultationAiResponder(
+            properties = properties,
+            objectMapper = ObjectMapper(),
+            accessTokenProvider = { "vertex-token" },
+            generateContentClient = client,
+        )
+
+        responder.generate(
+            ConsultationAiRequest(
+                memberId = 4L,
+                message = "괜찮아지고 싶어요.",
+                recentMessages = emptyList(),
+                timeout = Duration.ofSeconds(2),
+            ),
+        )
+
+        assertThat(client.endpoint).isEqualTo(URI.create("https://ai.example.com/v1/consultation:generateContent"))
+        assertThat(client.accessToken).isEqualTo("consultation-token")
+    }
+
+    @Test
     fun opensCircuitAfterRepeatedModelFailures() {
         val client = RecordingVertexAiGenerateContentClient(failure = IllegalStateException("busy"))
         val properties = aiProperties().apply {
