@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../shared/ui/brand_identity.dart';
+
 ThemeData buildAppTheme() {
   return _buildTheme(Brightness.light);
 }
@@ -9,11 +11,32 @@ ThemeData buildDarkAppTheme() {
 }
 
 ThemeData _buildTheme(Brightness brightness) {
-  const seedColor = Color(0xFF2F6F5E);
   final isDark = brightness == Brightness.dark;
-  final colorScheme = ColorScheme.fromSeed(
-    seedColor: seedColor,
+  final baseColorScheme = ColorScheme.fromSeed(
+    seedColor: AppBrandColors.primaryBlue,
     brightness: brightness,
+  );
+  final colorScheme = baseColorScheme.copyWith(
+    primary: AppBrandColors.primaryBlue,
+    onPrimary: Colors.white,
+    secondary: AppBrandColors.iconBlue,
+    onSecondary: Colors.white,
+    primaryContainer:
+        isDark ? const Color(0xFF173B71) : const Color(0xFFDCEBFF),
+    onPrimaryContainer:
+        isDark ? const Color(0xFFDCEBFF) : const Color(0xFF1F3150),
+    secondaryContainer:
+        isDark ? const Color(0xFF0B3A52) : const Color(0xFFEAF6FF),
+    onSecondaryContainer:
+        isDark ? const Color(0xFFEAF6FF) : const Color(0xFF1F3150),
+    surface: isDark ? const Color(0xFF111827) : AppBrandColors.surface,
+    onSurface: isDark ? const Color(0xFFE8EEF8) : AppBrandColors.foreground,
+    surfaceContainerHighest:
+        isDark ? const Color(0xFF1E293B) : AppBrandColors.surfaceStrong,
+    onSurfaceVariant:
+        isDark ? const Color(0xFFC5D2E4) : AppBrandColors.mutedForeground,
+    outlineVariant:
+        isDark ? const Color(0xFF324154) : AppBrandColors.borderSoft,
   );
   final textTheme = const TextTheme(
     displaySmall: TextStyle(
@@ -61,16 +84,16 @@ ThemeData _buildTheme(Brightness brightness) {
     useMaterial3: true,
     colorScheme: colorScheme,
     scaffoldBackgroundColor:
-        isDark ? const Color(0xFF101814) : const Color(0xFFF7F8F5),
+        isDark ? const Color(0xFF0F172A) : AppBrandColors.backgroundBlue,
     textTheme: textTheme,
     dividerColor: colorScheme.outlineVariant,
     cardTheme: CardThemeData(
       elevation: 0,
-      color: isDark ? const Color(0xFF17211C) : Colors.white,
+      color: isDark ? const Color(0xFF111827) : AppBrandColors.surface,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(8),
         side: BorderSide(
-          color: isDark ? const Color(0xFF33463D) : const Color(0xFFDCE3DD),
+          color: isDark ? const Color(0xFF324154) : AppBrandColors.borderSoft,
         ),
       ),
     ),
@@ -89,7 +112,7 @@ ThemeData _buildTheme(Brightness brightness) {
     ),
     inputDecorationTheme: InputDecorationTheme(
       filled: true,
-      fillColor: isDark ? const Color(0xFF17211C) : Colors.white,
+      fillColor: isDark ? const Color(0xFF111827) : AppBrandColors.surface,
       border: inputBorder,
       enabledBorder: inputBorder.copyWith(
         borderSide: BorderSide(color: colorScheme.outlineVariant),

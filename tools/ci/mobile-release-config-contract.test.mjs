@@ -63,7 +63,13 @@ test("Android store-facing metadata stays release ready", () => {
   assert.ok(existsSync(path.join(root, "front/android/app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml")));
   assert.ok(existsSync(path.join(root, "front/android/app/src/main/res/mipmap-anydpi-v26/ic_launcher_round.xml")));
   assert.ok(existsSync(path.join(root, "front/android/app/src/main/res/drawable/ic_launcher_foreground.xml")));
-  assert.match(read("front/android/app/src/main/res/values/colors.xml"), /ic_launcher_background/);
+  const launcherColors = read("front/android/app/src/main/res/values/colors.xml");
+  const launcherForeground = read("front/android/app/src/main/res/drawable/ic_launcher_foreground.xml");
+  assert.match(launcherColors, /<color name="ic_launcher_background">#18A9ED<\/color>/);
+  assert.match(launcherForeground, /android:strokeColor="#FFFFFF"/);
+  assert.match(launcherForeground, /android:strokeLineCap="round"/);
+  assert.doesNotMatch(launcherForeground, /#10B981/);
+  assert.doesNotMatch(launcherForeground, /heart|M64\.3,43\.3/i);
   assert.ok(existsSync(path.join(root, "front/android/app/src/main/res/drawable/launch_background.xml")));
   assert.ok(existsSync(path.join(root, "front/android/app/src/main/res/drawable-v21/launch_background.xml")));
   assert.match(read("front/android/app/src/main/res/xml/diary_image_paths.xml"), /<cache-path[\s\S]*path="diary_images\/"/);

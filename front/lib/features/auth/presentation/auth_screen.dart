@@ -4,6 +4,7 @@ import '../application/auth_controller.dart';
 import '../deeplink/external_login.dart';
 import '../domain/login_provider_policy.dart';
 import '../../legal/presentation/legal_disclosure_links.dart';
+import '../../../shared/ui/brand_identity.dart';
 
 enum AuthFormMode {
   login,
@@ -66,10 +67,7 @@ class _AuthScreenState extends State<AuthScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Text(
-                    'Maum On',
-                    style: theme.textTheme.displaySmall,
-                  ),
+                  const MaumOnBrandWordmark(height: 40),
                   const SizedBox(height: 8),
                   Text(
                     _subtitle,
