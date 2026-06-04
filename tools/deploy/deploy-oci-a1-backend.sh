@@ -36,6 +36,10 @@ postgres_container_name="${MAUMON_POSTGRES_CONTAINER_NAME:-maum-on-mobile-postgr
 postgres_data_volume="${MAUMON_POSTGRES_DATA_VOLUME:-maum-on-mobile-postgres-data}"
 postgres_image_tag="${MAUMON_POSTGRES_IMAGE_TAG:-postgres:16-alpine}"
 deploy_managed_postgres="${MAUMON_DEPLOY_MANAGED_POSTGRES:-auto}"
+host_http_port="${MAUMON_HOST_HTTP_PORT:-80}"
+deploy_health_timeout_seconds="${MAUMON_DEPLOY_HEALTH_TIMEOUT_SECONDS:-90}"
+deploy_run_id="${GITHUB_RUN_ID:-local}"
+deploy_run_attempt="${GITHUB_RUN_ATTEMPT:-0}"
 
 if [[ ! "${docker_network}" =~ ^[A-Za-z0-9][A-Za-z0-9_.-]{0,62}$ ]]; then
   echo "Invalid MAUMON_DOCKER_NETWORK: ${docker_network}" >&2
@@ -64,6 +68,26 @@ fi
 
 if [[ ! "${deploy_managed_postgres}" =~ ^(auto|true|false)$ ]]; then
   echo "Invalid MAUMON_DEPLOY_MANAGED_POSTGRES: ${deploy_managed_postgres}" >&2
+  exit 1
+fi
+
+if [[ ! "${host_http_port}" =~ ^[0-9]+$ ]] || (( host_http_port < 1 || host_http_port > 65535 )); then
+  echo "Invalid MAUMON_HOST_HTTP_PORT: ${host_http_port}" >&2
+  exit 1
+fi
+
+if [[ ! "${deploy_health_timeout_seconds}" =~ ^[0-9]+$ ]] || (( deploy_health_timeout_seconds < 1 || deploy_health_timeout_seconds > 3600 )); then
+  echo "Invalid MAUMON_DEPLOY_HEALTH_TIMEOUT_SECONDS: ${deploy_health_timeout_seconds}" >&2
+  exit 1
+fi
+
+if [[ ! "${deploy_run_id}" =~ ^[A-Za-z0-9_.-]+$ ]]; then
+  echo "Invalid GITHUB_RUN_ID: ${deploy_run_id}" >&2
+  exit 1
+fi
+
+if [[ ! "${deploy_run_attempt}" =~ ^[0-9]+$ ]]; then
+  echo "Invalid GITHUB_RUN_ATTEMPT: ${deploy_run_attempt}" >&2
   exit 1
 fi
 
@@ -105,13 +129,13 @@ scp_base=(
   -o UserKnownHostsFile="${known_hosts}"
 )
 
-remote_staging="/tmp/maum-on-mobile-deploy-${GITHUB_RUN_ID:-local}-${GITHUB_RUN_ATTEMPT:-0}"
+remote_staging="/tmp/maum-on-mobile-deploy-${deploy_run_id}-${deploy_run_attempt}"
 
 "${ssh_base[@]}" "install -d -m 0700 '${remote_staging}'"
 "${scp_base[@]}" "${bundle_copy}" "${backend_env}" "${vertex_key}" "${OCI_A1_SSH_USER}@${OCI_A1_SSH_HOST}:${remote_staging}/"
 
 "${ssh_base[@]}" \
-  "MAUMON_BACKEND_IMAGE_TAG='${MAUMON_BACKEND_IMAGE_TAG}' MAUMON_DEPLOY_HEALTH_TIMEOUT_SECONDS='${MAUMON_DEPLOY_HEALTH_TIMEOUT_SECONDS:-90}' MAUMON_HOST_HTTP_PORT='${MAUMON_HOST_HTTP_PORT:-80}' MAUMON_DOCKER_NETWORK='${docker_network}' MAUMON_APP_DATA_DIR='${app_data_dir}' MAUMON_POSTGRES_CONTAINER_NAME='${postgres_container_name}' MAUMON_POSTGRES_DATA_VOLUME='${postgres_data_volume}' MAUMON_POSTGRES_IMAGE_TAG='${postgres_image_tag}' MAUMON_DEPLOY_MANAGED_POSTGRES='${deploy_managed_postgres}' REMOTE_STAGING='${remote_staging}' bash -s" <<'REMOTE'
+  "MAUMON_BACKEND_IMAGE_TAG='${MAUMON_BACKEND_IMAGE_TAG}' MAUMON_DEPLOY_HEALTH_TIMEOUT_SECONDS='${deploy_health_timeout_seconds}' MAUMON_HOST_HTTP_PORT='${host_http_port}' MAUMON_DOCKER_NETWORK='${docker_network}' MAUMON_APP_DATA_DIR='${app_data_dir}' MAUMON_POSTGRES_CONTAINER_NAME='${postgres_container_name}' MAUMON_POSTGRES_DATA_VOLUME='${postgres_data_volume}' MAUMON_POSTGRES_IMAGE_TAG='${postgres_image_tag}' MAUMON_DEPLOY_MANAGED_POSTGRES='${deploy_managed_postgres}' REMOTE_STAGING='${remote_staging}' bash -s" <<'REMOTE'
 set -euo pipefail
 
 container_name="maum-on-mobile-back"
@@ -133,6 +157,11 @@ release_dir="${release_root}/${image_tag//[^A-Za-z0-9_.-]/-}"
 env_file="/etc/maum-on-mobile/backend.env"
 vertex_key_file="/etc/maum-on-mobile/vertex-key.json"
 bundle_path="${staging_dir}/maum-on-mobile-backend-bundle.tar.gz"
+
+if [[ ! "${health_timeout_seconds}" =~ ^[0-9]+$ ]] || (( health_timeout_seconds < 1 || health_timeout_seconds > 3600 )); then
+  echo "Invalid MAUMON_DEPLOY_HEALTH_TIMEOUT_SECONDS: ${health_timeout_seconds}" >&2
+  exit 1
+fi
 
 cleanup_remote_staging() {
   rm -f "${staging_dir}/backend.env" "${staging_dir}/vertex-key.json" "${bundle_path}" >/dev/null 2>&1 || true
@@ -209,6 +238,23 @@ prepare_runtime_resources() {
   fi
 
   sudo install -d -m 0750 -o "${container_uid}" -g "${container_gid}" "${app_data_dir}"
+}
+
+allow_host_http_ingress() {
+  if [[ ! "${host_http_port}" =~ ^[0-9]+$ ]] || (( host_http_port < 1 || host_http_port > 65535 )); then
+    echo "Invalid MAUMON_HOST_HTTP_PORT: ${host_http_port}" >&2
+    exit 1
+  fi
+
+  if ! command -v iptables >/dev/null 2>&1; then
+    echo "iptables is required to allow host HTTP ingress" >&2
+    exit 1
+  fi
+
+  # OCI Ubuntu 기본 INPUT reject보다 앞에 HTTP 허용 규칙을 둔다.
+  if ! sudo iptables -C INPUT -p tcp --dport "${host_http_port}" -j ACCEPT >/dev/null 2>&1; then
+    sudo iptables -I INPUT 1 -p tcp --dport "${host_http_port}" -j ACCEPT
+  fi
 }
 
 wait_for_postgres() {
@@ -310,6 +356,7 @@ sudo install -m 0400 "${staging_dir}/vertex-key.json" "${vertex_key_file}"
 sudo chown "${container_uid}:${container_gid}" "${vertex_key_file}"
 
 prepare_runtime_resources
+allow_host_http_ingress
 prepare_managed_postgres
 
 sudo docker build -t "${image_tag}" -f "${release_dir}/Dockerfile" "${release_dir}"
