@@ -72,6 +72,7 @@ test("OCI runtime deploy script is safe, idempotent, and verifies health", () =>
   assert.match(script, /--network-alias postgres/);
   assert.match(script, /POSTGRES_DB="\$\{db_name\}"/);
   assert.match(script, /pg_isready -U "\$\{db_username\}" -d "\$\{db_name\}"/);
+  assert.match(script, /sudo awk -v key="\$\{key\}"/);
   assert.match(script, /docker stop "\$\{container_name\}"/);
   assert.match(script, /--network "\$\{network_name\}"/);
   assert.match(script, /--env-file "\$\{env_file\}"/);

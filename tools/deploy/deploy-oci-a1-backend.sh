@@ -161,7 +161,8 @@ require_remote_file() {
 
 env_value() {
   local key="$1"
-  awk -v key="${key}" 'index($0, key "=") == 1 { print substr($0, length(key) + 2); exit }' "${env_file}"
+  # backend.env는 root 전용 권한으로 보관하므로 값 조회도 sudo로 수행한다.
+  sudo awk -v key="${key}" 'index($0, key "=") == 1 { print substr($0, length(key) + 2); exit }' "${env_file}"
 }
 
 postgres_url_host() {
