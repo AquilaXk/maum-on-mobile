@@ -47,7 +47,7 @@ void main() {
 
     await tester.pumpAndSettle();
 
-    expect(find.text('홈'), findsOneWidget);
+    expect(find.byKey(const ValueKey('route-tab-home')), findsOneWidget);
     expect(find.text('마음이님, 오늘의 마음을 이어가세요.'), findsOneWidget);
     expect(find.text('로그아웃'), findsOneWidget);
   });
@@ -156,7 +156,7 @@ void main() {
     );
 
     await tester.pumpAndSettle();
-    expect(find.text('홈'), findsOneWidget);
+    expect(find.byKey(const ValueKey('route-tab-home')), findsOneWidget);
     expect(find.text('마음이님, 오늘의 마음을 이어가세요.'), findsOneWidget);
 
     await _tapVisibleText(tester, '다이어리 쓰기');
@@ -164,7 +164,7 @@ void main() {
     await _returnHome(tester);
 
     await _tapVisibleText(tester, '스토리 보기');
-    expect(find.text('스토리'), findsOneWidget);
+    expect(find.byKey(const ValueKey('story-create-button')), findsOneWidget);
     expect(find.text('오늘의 스토리'), findsOneWidget);
     await _returnHome(tester);
 
@@ -216,11 +216,23 @@ void main() {
 
     await tester.pumpAndSettle();
 
-    expect(find.byType(NavigationBar), findsOneWidget);
+    final navigationBar = tester.widget<NavigationBar>(
+      find.byType(NavigationBar),
+    );
+    expect(
+      navigationBar.labelBehavior,
+      NavigationDestinationLabelBehavior.alwaysShow,
+    );
+    expect(
+      navigationBar.destinations
+          .whereType<NavigationDestination>()
+          .map((destination) => destination.label),
+      ['홈', '기록', '스토리', '편지', '상담'],
+    );
 
     await tester.tap(find.byKey(const ValueKey('route-tab-story')));
     await tester.pumpAndSettle();
-    expect(find.text('스토리'), findsOneWidget);
+    expect(find.byKey(const ValueKey('story-create-button')), findsOneWidget);
 
     await tester.tap(find.byKey(const ValueKey('route-tab-letter')));
     await tester.pumpAndSettle();
@@ -277,7 +289,6 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(handled, isTrue);
-    expect(find.text('홈'), findsOneWidget);
     expect(find.text('마음이님, 오늘의 마음을 이어가세요.'), findsOneWidget);
     expect(find.text('나의 기록'), findsNothing);
   });
@@ -537,7 +548,6 @@ void main() {
     await tester.pump(const Duration(milliseconds: 100));
 
     expect(storyRepository.fetchedStoryIds, [5]);
-    expect(find.text('스토리'), findsOneWidget);
     expect(find.text('알림으로 연 스토리'), findsOneWidget);
   });
 
@@ -733,7 +743,7 @@ void main() {
     await tester.tap(find.text('스토리 보기'));
     await tester.pumpAndSettle();
 
-    expect(find.text('스토리'), findsOneWidget);
+    expect(find.byKey(const ValueKey('story-create-button')), findsOneWidget);
     expect(find.text('오늘의 스토리'), findsOneWidget);
   });
 
@@ -792,7 +802,7 @@ Future<void> _returnHome(WidgetTester tester) async {
   await tester.pumpAndSettle();
 
   expect(handled, isTrue);
-  expect(find.text('홈'), findsOneWidget);
+  expect(find.text('마음이님, 오늘의 마음을 이어가세요.'), findsOneWidget);
 }
 
 class _FakeHomeRepository implements HomeRepository {

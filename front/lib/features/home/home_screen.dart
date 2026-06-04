@@ -187,34 +187,66 @@ class _StatsSection extends StatelessWidget {
           ),
           const SizedBox(height: AppSpacing.xs),
         ],
-        Wrap(
-          spacing: AppSpacing.xs,
-          runSpacing: AppSpacing.xs,
-          children: [
-            AppMetricTile(
-              label: '오늘의 기록',
-              value: _formatStatValue(
-                stats?.todayDiaryCount,
-                state.isStatsLoading,
+        LayoutBuilder(
+          builder: (context, constraints) {
+            final items = [
+              _HomeMetricData(
+                label: '오늘의 기록',
+                value: _formatStatValue(
+                  stats?.todayDiaryCount,
+                  state.isStatsLoading,
+                ),
+                tone: AppStatusTone.warning,
               ),
-              tone: AppStatusTone.warning,
-            ),
-            AppMetricTile(
-              label: '전달된 비밀 편지',
-              value: _formatStatValue(
-                stats?.todayLetterCount,
-                state.isStatsLoading,
+              _HomeMetricData(
+                label: '전달된 비밀 편지',
+                value: _formatStatValue(
+                  stats?.todayLetterCount,
+                  state.isStatsLoading,
+                ),
               ),
-            ),
-            AppMetricTile(
-              label: '오늘 올라온 고민',
-              value: _formatStatValue(
-                stats?.todayWorryCount,
-                state.isStatsLoading,
+              _HomeMetricData(
+                label: '오늘 올라온 고민',
+                value: _formatStatValue(
+                  stats?.todayWorryCount,
+                  state.isStatsLoading,
+                ),
+                tone: AppStatusTone.success,
               ),
-              tone: AppStatusTone.success,
-            ),
-          ],
+            ];
+
+            if (constraints.maxWidth < 460) {
+              return Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  for (var index = 0; index < items.length; index++) ...[
+                    Expanded(
+                      child: _CompactHomeMetricTile(
+                        label: items[index].label,
+                        value: items[index].value,
+                        tone: items[index].tone,
+                      ),
+                    ),
+                    if (index != items.length - 1)
+                      const SizedBox(width: AppSpacing.xs),
+                  ],
+                ],
+              );
+            }
+
+            return Wrap(
+              spacing: AppSpacing.xs,
+              runSpacing: AppSpacing.xs,
+              children: [
+                for (final item in items)
+                  AppMetricTile(
+                    label: item.label,
+                    value: item.value,
+                    tone: item.tone,
+                  ),
+              ],
+            );
+          },
         ),
       ],
     );
@@ -226,6 +258,80 @@ class _StatsSection extends StatelessWidget {
     }
 
     return (value ?? 0).toString();
+  }
+}
+
+class _HomeMetricData {
+  const _HomeMetricData({
+    required this.label,
+    required this.value,
+    this.tone = AppStatusTone.neutral,
+  });
+
+  final String label;
+  final String value;
+  final AppStatusTone tone;
+}
+
+class _CompactHomeMetricTile extends StatelessWidget {
+  const _CompactHomeMetricTile({
+    required this.label,
+    required this.value,
+    required this.tone,
+  });
+
+  final String label;
+  final String value;
+  final AppStatusTone tone;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colors = _homeActionColors(theme.colorScheme, tone);
+
+    return Semantics(
+      label: '$label $value',
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: colors.background,
+          borderRadius: AppRadii.card,
+          border: Border.all(
+            color: colors.foreground.withValues(alpha: 0.16),
+          ),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.xs,
+            vertical: AppSpacing.sm,
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                label,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: theme.textTheme.labelSmall?.copyWith(
+                  color: colors.foreground.withValues(alpha: 0.78),
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              const SizedBox(height: AppSpacing.xxs),
+              Text(
+                value,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: theme.textTheme.titleLarge?.copyWith(
+                  color: colors.foreground,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 }
 
@@ -536,7 +642,7 @@ class _ActionGrid extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final width = MediaQuery.sizeOf(context).width;
-    final cardAspectRatio = width < 390 ? 1.28 : 1.5;
+    final cardAspectRatio = width < 390 ? 2.16 : 2.36;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -649,9 +755,8 @@ class _HomeActionCard extends StatelessWidget {
         borderRadius: AppRadii.card,
         onTap: onTap,
         child: Padding(
-          padding: const EdgeInsets.all(AppSpacing.md),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+          padding: const EdgeInsets.all(AppSpacing.sm),
+          child: Row(
             children: [
               DecoratedBox(
                 decoration: BoxDecoration(
@@ -663,24 +768,32 @@ class _HomeActionCard extends StatelessWidget {
                   child: Icon(icon, color: colors.foreground, size: 22),
                 ),
               ),
-              const Spacer(),
-              Text(
-                title,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: theme.textTheme.titleSmall?.copyWith(
-                  color: colors.foreground,
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-              const SizedBox(height: AppSpacing.xxs),
-              Text(
-                subtitle,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: colors.foreground.withValues(alpha: 0.78),
-                  fontWeight: FontWeight.w700,
+              const SizedBox(width: AppSpacing.xs),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.titleSmall?.copyWith(
+                        color: colors.foreground,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(height: AppSpacing.xxs),
+                    Text(
+                      subtitle,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: colors.foreground.withValues(alpha: 0.78),
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ],
