@@ -48,10 +48,17 @@ test("OCI runtime deploy script is safe, idempotent, and verifies health", () =>
   assert.match(script, /previous_container_name="maum-on-mobile-back-previous"/);
   assert.match(script, /network_name="\$\{MAUMON_DOCKER_NETWORK:-maum-on-mobile\}"/);
   assert.match(script, /app_data_dir="\$\{MAUMON_APP_DATA_DIR:-\/var\/lib\/maumon-data\/app\}"/);
+  assert.match(script, /postgres_container_name="\$\{MAUMON_POSTGRES_CONTAINER_NAME:-maum-on-mobile-postgres\}"/);
+  assert.match(script, /postgres_data_volume="\$\{MAUMON_POSTGRES_DATA_VOLUME:-maum-on-mobile-postgres-data\}"/);
+  assert.match(script, /postgres_image_tag="\$\{MAUMON_POSTGRES_IMAGE_TAG:-postgres:16-alpine\}"/);
   assert.match(script, /host_http_port="\$\{MAUMON_HOST_HTTP_PORT:-80\}"/);
   assert.match(script, /docker network inspect "\$\{network_name\}"/);
   assert.match(script, /docker network create "\$\{network_name\}"/);
   assert.match(script, /install -d -m 0750 -o "\$\{container_uid\}" -g "\$\{container_gid\}" "\$\{app_data_dir\}"/);
+  assert.match(script, /docker volume create "\$\{postgres_data_volume\}"/);
+  assert.match(script, /--network-alias postgres/);
+  assert.match(script, /POSTGRES_DB="\$\{db_name\}"/);
+  assert.match(script, /pg_isready -U "\$\{db_username\}" -d "\$\{db_name\}"/);
   assert.match(script, /docker stop "\$\{container_name\}"/);
   assert.match(script, /--network "\$\{network_name\}"/);
   assert.match(script, /--env-file "\$\{env_file\}"/);
