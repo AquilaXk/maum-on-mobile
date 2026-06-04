@@ -34,6 +34,8 @@ dependencies {
     testImplementation("org.springframework.boot:spring-boot-starter-security-test")
     testImplementation("org.springframework.boot:spring-boot-starter-webmvc-test")
     runtimeOnly("com.h2database:h2")
+    // Flyway 11은 PostgreSQL 지원 모듈을 런타임 classpath에서 별도로 로드한다.
+    runtimeOnly("org.flywaydb:flyway-database-postgresql")
     runtimeOnly("org.postgresql:postgresql")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 }
