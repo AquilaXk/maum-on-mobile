@@ -185,7 +185,7 @@ if ! wait_for_health; then
   exit 1
 fi
 
-curl -fsS "http://127.0.0.1:8080/actuator/health" >/dev/null
+curl -fsS "http://127.0.0.1:${host_http_port}/actuator/health" >/dev/null
 sudo docker rm "${previous_container_name}" >/dev/null 2>&1 || true
 echo "deployed ${image_tag}"
 REMOTE

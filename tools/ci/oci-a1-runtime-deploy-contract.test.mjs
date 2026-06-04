@@ -52,7 +52,7 @@ test("OCI runtime deploy script is safe, idempotent, and verifies health", () =>
   assert.match(script, /--publish "\$\{host_http_port\}:8080"/);
   assert.match(script, /--mount type=bind,source="\$\{vertex_key_file\}",target=\/run\/secrets\/vertex-key\.json,readonly/);
   assert.match(script, /--health-cmd 'curl -fsS http:\/\/127\.0\.0\.1:8080\/actuator\/health \|\| exit 1'/);
-  assert.match(script, /curl -fsS "http:\/\/127\.0\.0\.1:8080\/actuator\/health"/);
+  assert.match(script, /curl -fsS "http:\/\/127\.0\.0\.1:\$\{host_http_port\}\/actuator\/health"/);
   assert.match(script, /docker rm "\$\{previous_container_name\}"/);
   assert.match(script, /install -d -m 0700 '\$\{remote_staging\}'/);
   assert.match(script, /cleanup_remote_staging\(\)/);
