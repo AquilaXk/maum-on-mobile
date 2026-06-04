@@ -30,6 +30,19 @@ if [[ ! "${MAUMON_BACKEND_IMAGE_TAG}" =~ ^[a-z0-9][a-z0-9._/-]*:[A-Za-z0-9_.-]+$
   exit 1
 fi
 
+docker_network="${MAUMON_DOCKER_NETWORK:-maum-on-mobile}"
+app_data_dir="${MAUMON_APP_DATA_DIR:-/var/lib/maumon-data/app}"
+
+if [[ ! "${docker_network}" =~ ^[A-Za-z0-9][A-Za-z0-9_.-]{0,62}$ ]]; then
+  echo "Invalid MAUMON_DOCKER_NETWORK: ${docker_network}" >&2
+  exit 1
+fi
+
+if [[ ! "${app_data_dir}" =~ ^/[A-Za-z0-9._/-]+$ || "${app_data_dir}" == *".."* ]]; then
+  echo "Invalid MAUMON_APP_DATA_DIR: ${app_data_dir}" >&2
+  exit 1
+fi
+
 tmp_dir="$(mktemp -d)"
 cleanup() {
   rm -rf "${tmp_dir}"
@@ -74,7 +87,7 @@ remote_staging="/tmp/maum-on-mobile-deploy-${GITHUB_RUN_ID:-local}-${GITHUB_RUN_
 "${scp_base[@]}" "${bundle_copy}" "${backend_env}" "${vertex_key}" "${OCI_A1_SSH_USER}@${OCI_A1_SSH_HOST}:${remote_staging}/"
 
 "${ssh_base[@]}" \
-  "MAUMON_BACKEND_IMAGE_TAG='${MAUMON_BACKEND_IMAGE_TAG}' MAUMON_DEPLOY_HEALTH_TIMEOUT_SECONDS='${MAUMON_DEPLOY_HEALTH_TIMEOUT_SECONDS:-90}' MAUMON_HOST_HTTP_PORT='${MAUMON_HOST_HTTP_PORT:-80}' REMOTE_STAGING='${remote_staging}' bash -s" <<'REMOTE'
+  "MAUMON_BACKEND_IMAGE_TAG='${MAUMON_BACKEND_IMAGE_TAG}' MAUMON_DEPLOY_HEALTH_TIMEOUT_SECONDS='${MAUMON_DEPLOY_HEALTH_TIMEOUT_SECONDS:-90}' MAUMON_HOST_HTTP_PORT='${MAUMON_HOST_HTTP_PORT:-80}' MAUMON_DOCKER_NETWORK='${docker_network}' MAUMON_APP_DATA_DIR='${app_data_dir}' REMOTE_STAGING='${remote_staging}' bash -s" <<'REMOTE'
 set -euo pipefail
 
 container_name="maum-on-mobile-back"
@@ -82,6 +95,8 @@ previous_container_name="maum-on-mobile-back-previous"
 image_tag="${MAUMON_BACKEND_IMAGE_TAG}"
 health_timeout_seconds="${MAUMON_DEPLOY_HEALTH_TIMEOUT_SECONDS}"
 host_http_port="${MAUMON_HOST_HTTP_PORT:-80}"
+network_name="${MAUMON_DOCKER_NETWORK:-maum-on-mobile}"
+app_data_dir="${MAUMON_APP_DATA_DIR:-/var/lib/maumon-data/app}"
 container_uid="10001"
 container_gid="10001"
 staging_dir="${REMOTE_STAGING}"
@@ -130,6 +145,14 @@ install_runtime() {
   sudo systemctl enable --now docker
 }
 
+prepare_runtime_resources() {
+  if ! sudo docker network inspect "${network_name}" >/dev/null 2>&1; then
+    sudo docker network create "${network_name}" >/dev/null
+  fi
+
+  sudo install -d -m 0750 -o "${container_uid}" -g "${container_gid}" "${app_data_dir}"
+}
+
 wait_for_health() {
   local deadline=$((SECONDS + health_timeout_seconds))
   until sudo docker exec "${container_name}" curl -fsS "http://127.0.0.1:8080/actuator/health" >/dev/null; do
@@ -145,6 +168,7 @@ require_remote_file "${staging_dir}/backend.env"
 require_remote_file "${staging_dir}/vertex-key.json"
 
 install_runtime
+prepare_runtime_resources
 
 sudo install -d -m 0755 "${release_root}"
 sudo rm -rf "${release_dir}"
@@ -168,7 +192,9 @@ if ! sudo docker run \
   --name "${container_name}" \
   --restart unless-stopped \
   --publish "${host_http_port}:8080" \
+  --network "${network_name}" \
   --env-file "${env_file}" \
+  --mount type=bind,source="${app_data_dir}",target=/app/data \
   --mount type=bind,source="${vertex_key_file}",target=/run/secrets/vertex-key.json,readonly \
   --health-cmd 'curl -fsS http://127.0.0.1:8080/actuator/health || exit 1' \
   --health-interval 30s \

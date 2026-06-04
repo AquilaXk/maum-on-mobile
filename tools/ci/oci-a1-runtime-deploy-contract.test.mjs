@@ -46,10 +46,17 @@ test("OCI runtime deploy script is safe, idempotent, and verifies health", () =>
   assert.match(script, /chown "\$\{container_uid\}:\$\{container_gid\}" "\$\{vertex_key_file\}"/);
   assert.match(script, /container_name="maum-on-mobile-back"/);
   assert.match(script, /previous_container_name="maum-on-mobile-back-previous"/);
+  assert.match(script, /network_name="\$\{MAUMON_DOCKER_NETWORK:-maum-on-mobile\}"/);
+  assert.match(script, /app_data_dir="\$\{MAUMON_APP_DATA_DIR:-\/var\/lib\/maumon-data\/app\}"/);
   assert.match(script, /host_http_port="\$\{MAUMON_HOST_HTTP_PORT:-80\}"/);
+  assert.match(script, /docker network inspect "\$\{network_name\}"/);
+  assert.match(script, /docker network create "\$\{network_name\}"/);
+  assert.match(script, /install -d -m 0750 -o "\$\{container_uid\}" -g "\$\{container_gid\}" "\$\{app_data_dir\}"/);
   assert.match(script, /docker stop "\$\{container_name\}"/);
+  assert.match(script, /--network "\$\{network_name\}"/);
   assert.match(script, /--env-file "\$\{env_file\}"/);
   assert.match(script, /--publish "\$\{host_http_port\}:8080"/);
+  assert.match(script, /--mount type=bind,source="\$\{app_data_dir\}",target=\/app\/data/);
   assert.match(script, /--mount type=bind,source="\$\{vertex_key_file\}",target=\/run\/secrets\/vertex-key\.json,readonly/);
   assert.match(script, /--health-cmd 'curl -fsS http:\/\/127\.0\.0\.1:8080\/actuator\/health \|\| exit 1'/);
   assert.match(script, /curl -fsS "http:\/\/127\.0\.0\.1:\$\{host_http_port\}\/actuator\/health"/);
