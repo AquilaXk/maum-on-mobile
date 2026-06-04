@@ -104,6 +104,7 @@ test("ci pins GitHub Action references to immutable commits", async () => {
   assert.match(workflow, /actions\/setup-node@[a-f0-9]{40}/);
   assert.match(workflow, /actions\/setup-java@[a-f0-9]{40}/);
   assert.match(workflow, /subosito\/flutter-action@[a-f0-9]{40}/);
+  assert.match(workflow, /hashicorp\/setup-terraform@[a-f0-9]{40}/);
 });
 
 test("checkout steps do not persist GitHub credentials", async () => {
@@ -125,6 +126,8 @@ test("repository contracts preserve local docs and issue template policies", asy
   const repositoryContracts = jobBlock(workflow, "repository-contracts");
 
   assert.match(repositoryContracts, /git diff --check/);
+  assert.match(repositoryContracts, /hashicorp\/setup-terraform@[a-f0-9]{40}/);
+  assert.match(repositoryContracts, /terraform_version: "1\.14\.6"/);
   assert.match(repositoryContracts, /node --test tools\/ci\/\*\.test\.mjs/);
   assert.match(repositoryContracts, /ruby -e 'require "yaml"/);
   assert.match(repositoryContracts, /Unexpected tracked Markdown file/);
