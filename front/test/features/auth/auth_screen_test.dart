@@ -7,6 +7,21 @@ import 'package:maum_on_mobile_front/features/auth/domain/auth_models.dart';
 import 'package:maum_on_mobile_front/features/auth/presentation/auth_screen.dart';
 
 void main() {
+  testWidgets('renders the product brand wordmark in the existing header slot',
+      (tester) async {
+    final repository = _FakeAuthRepository();
+    await tester.pumpWidget(
+      _AuthScreenHarness(repository: repository),
+    );
+
+    expect(
+        find.byKey(const ValueKey('maum-on-brand-wordmark')), findsOneWidget);
+    expect(find.bySemanticsLabel('Maum On'), findsOneWidget);
+    expect(find.text('계정으로 마음 기록을 이어가세요.'), findsOneWidget);
+    expect(find.byKey(const ValueKey('login-email-field')), findsOneWidget);
+    expect(find.byKey(const ValueKey('login-submit-button')), findsOneWidget);
+  });
+
   testWidgets('signup validates fields before calling the repository',
       (tester) async {
     final repository = _FakeAuthRepository();

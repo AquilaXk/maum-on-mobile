@@ -4,6 +4,21 @@ import 'package:maum_on_mobile_front/shared/ui/app_design_system.dart';
 import 'package:maum_on_mobile_front/theme/app_theme.dart';
 
 void main() {
+  test('uses the product blue brand colors without changing component scale',
+      () {
+    final theme = buildAppTheme();
+
+    expect(theme.colorScheme.primary, const Color(0xFF4F8CF0));
+    expect(theme.colorScheme.secondary, const Color(0xFF18A9ED));
+    expect(theme.scaffoldBackgroundColor, const Color(0xFFEDF5FF));
+    expect(theme.cardTheme.color, Colors.white);
+    expect(theme.colorScheme.outlineVariant, const Color(0xFFDBE7FB));
+    expect(
+      theme.filledButtonTheme.style?.minimumSize?.resolve({}),
+      const Size(48, 52),
+    );
+  });
+
   testWidgets('keeps the mobile design shell stable with larger text',
       (tester) async {
     tester.view.physicalSize = const Size(360, 780);

@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import 'brand_identity.dart';
+
 abstract final class AppSpacing {
   static const double xxs = 4;
   static const double xs = 8;
@@ -58,9 +60,7 @@ class AppScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scrollView = SingleChildScrollView(
-      physics: onRefresh == null
-          ? null
-          : const AlwaysScrollableScrollPhysics(),
+      physics: onRefresh == null ? null : const AlwaysScrollableScrollPhysics(),
       padding: padding,
       child: Center(
         child: ConstrainedBox(
@@ -140,10 +140,13 @@ class AppScreenHeader extends StatelessWidget {
                 ),
                 const SizedBox(height: AppSpacing.xxs),
               ],
-              Text(
-                title,
-                style: theme.textTheme.headlineMedium,
-              ),
+              if (title == 'Maum On')
+                const MaumOnBrandWordmark(height: 36)
+              else
+                Text(
+                  title,
+                  style: theme.textTheme.headlineMedium,
+                ),
               if (subtitle != null) ...[
                 const SizedBox(height: AppSpacing.xs),
                 Text(
