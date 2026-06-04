@@ -285,6 +285,13 @@ class _FakeAuthRepository implements AuthRepository {
   final List<OidcSessionRequest> oidcSessionRequests = [];
 
   @override
+  Future<void> requestSignupEmailVerification(
+    SignupEmailVerificationRequest request,
+  ) {
+    throw UnimplementedError();
+  }
+
+  @override
   Future<AuthMember> signup(SignupRequest request) {
     throw UnimplementedError();
   }

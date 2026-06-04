@@ -36,17 +36,76 @@ void main() {
       find.byKey(const ValueKey('login-email-field')),
       'wrong-email',
     );
+    await tester.ensureVisible(
+      find.byKey(const ValueKey('signup-email-verification-request-button')),
+    );
+    await tester.tap(
+      find.byKey(const ValueKey('signup-email-verification-request-button')),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('올바른 이메일 주소를 입력해 주세요.'), findsOneWidget);
+    expect(repository.signupVerificationEmails, isEmpty);
+    expect(repository.signupRequests, isEmpty);
+  });
+
+  testWidgets('signup requests an email code before account details',
+      (tester) async {
+    final repository = _FakeAuthRepository();
+    await tester.pumpWidget(
+      _AuthScreenHarness(repository: repository),
+    );
+
+    await tester.tap(find.text('새 계정 만들기'));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const ValueKey('login-email-field')), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('signup-email-verification-code-field')),
+      findsNothing,
+    );
+    expect(find.byKey(const ValueKey('login-password-field')), findsNothing);
+    expect(find.byKey(const ValueKey('signup-nickname-field')), findsNothing);
+
+    await tester.enterText(
+      find.byKey(const ValueKey('login-email-field')),
+      '  me@example.com  ',
+    );
+    await tester.tap(
+      find.byKey(const ValueKey('signup-email-verification-request-button')),
+    );
+    await tester.pumpAndSettle();
+
+    expect(repository.signupVerificationEmails, ['me@example.com']);
+    expect(find.text('인증번호를 이메일로 보냈습니다.'), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('signup-email-verification-code-field')),
+      findsOneWidget,
+    );
+    expect(find.byKey(const ValueKey('login-password-field')), findsOneWidget);
+    expect(find.byKey(const ValueKey('signup-nickname-field')), findsOneWidget);
+
+    await tester.enterText(
+      find.byKey(const ValueKey('signup-email-verification-code-field')),
+      '123456',
+    );
     await tester.enterText(
       find.byKey(const ValueKey('login-password-field')),
-      'short',
+      'pass1234',
     );
     await tester.enterText(
       find.byKey(const ValueKey('signup-password-confirm-field')),
-      'different',
+      'pass1234',
     );
     await tester.enterText(
       find.byKey(const ValueKey('signup-nickname-field')),
-      'a',
+      ' 마음이 ',
+    );
+    await tester.ensureVisible(
+      find.byKey(const ValueKey('signup-required-terms-checkbox')),
+    );
+    await tester.tap(
+      find.byKey(const ValueKey('signup-required-terms-checkbox')),
     );
     await tester.ensureVisible(
       find.byKey(const ValueKey('signup-submit-button')),
@@ -54,15 +113,10 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('signup-submit-button')));
     await tester.pumpAndSettle();
 
-    expect(find.text('올바른 이메일 주소를 입력해 주세요.'), findsOneWidget);
-    expect(find.text('비밀번호는 8자 이상이어야 합니다.'), findsOneWidget);
-    expect(find.text('비밀번호가 서로 일치하지 않습니다.'), findsOneWidget);
-    expect(
-      find.text('닉네임은 2자 이상 20자 이하로 입력해 주세요.'),
-      findsOneWidget,
-    );
-    expect(find.text('필수 동의 항목을 확인해 주세요.'), findsOneWidget);
-    expect(repository.signupRequests, isEmpty);
+    expect(repository.signupRequests.single.email, 'me@example.com');
+    expect(repository.signupRequests.single.nickname, '마음이');
+    expect(repository.signupRequests.single.emailVerificationCode, '123456');
+    expect(find.byKey(const ValueKey('login-submit-button')), findsOneWidget);
   });
 
   testWidgets('password reset request and confirmation return to login',
@@ -142,13 +196,25 @@ void main() {
     await tester.tap(find.text('새 계정 만들기'));
     await tester.pumpAndSettle();
 
+    expect(find.text('필수 약관 및 개인정보 처리에 동의합니다.'), findsNothing);
+
+    await tester.enterText(
+      find.byKey(const ValueKey('login-email-field')),
+      'me@example.com',
+    );
+    await tester.tap(
+      find.byKey(const ValueKey('signup-email-verification-request-button')),
+    );
+    await tester.pumpAndSettle();
+
     expect(find.text('필수 약관 및 개인정보 처리에 동의합니다.'), findsOneWidget);
     expect(
         find.byKey(const ValueKey('auth-privacy-policy-link')), findsOneWidget);
     expect(find.byKey(const ValueKey('auth-terms-link')), findsOneWidget);
   });
 
-  testWidgets('shows Apple login and hides Kakao on iOS', (tester) async {
+  testWidgets('shows quick login icons and enables only Apple on iOS',
+      (tester) async {
     final repository = _FakeAuthRepository();
     final authController = AuthController(authRepository: repository);
     final launcher = _FakeExternalLoginLauncher();
@@ -170,14 +236,7 @@ void main() {
 
     expect(find.byKey(const ValueKey('login-email-field')), findsOneWidget);
     expect(find.byKey(const ValueKey('login-password-field')), findsOneWidget);
-    expect(
-      find.byKey(const ValueKey('external-login-apple-button')),
-      findsOneWidget,
-    );
-    expect(
-      find.byKey(const ValueKey('external-login-kakao-button')),
-      findsNothing,
-    );
+    _expectQuickLoginIcons();
     expect(
       find.byKey(const ValueKey('ios-review-email-login-guidance')),
       findsNothing,
@@ -185,6 +244,19 @@ void main() {
     expect(
       find.byKey(const ValueKey('auth-account-deletion-guidance')),
       findsOneWidget,
+    );
+
+    await tester.tap(find.byKey(const ValueKey('external-login-kakao-button')));
+    await tester.pumpAndSettle();
+    expect(launcher.launchedUris, isEmpty);
+
+    expect(
+      tester
+          .widget<Semantics>(
+              find.byKey(const ValueKey('external-login-apple-button')))
+          .properties
+          .enabled,
+      isTrue,
     );
 
     await tester.ensureVisible(
@@ -201,10 +273,11 @@ void main() {
     );
   });
 
-  testWidgets('keeps Kakao login available outside iOS review builds',
+  testWidgets('shows quick login icons and enables only Kakao on Android',
       (tester) async {
     final repository = _FakeAuthRepository();
     final authController = AuthController(authRepository: repository);
+    final launcher = _FakeExternalLoginLauncher();
 
     await tester.pumpWidget(
       _AuthScreenHarness(
@@ -213,7 +286,7 @@ void main() {
         platform: TargetPlatform.android,
         externalLoginController: ExternalLoginController(
           authController: authController,
-          launcher: _FakeExternalLoginLauncher(),
+          launcher: launcher,
           config: ExternalLoginConfig(
             apiBaseUrl: Uri.parse('https://api.example.com'),
           ),
@@ -221,19 +294,38 @@ void main() {
       ),
     );
 
-    expect(
-      find.byKey(const ValueKey('external-login-kakao-button')),
-      findsOneWidget,
-    );
-    expect(
-      find.byKey(const ValueKey('external-login-apple-button')),
-      findsNothing,
-    );
+    _expectQuickLoginIcons();
     expect(
       find.byKey(const ValueKey('ios-review-email-login-guidance')),
       findsNothing,
     );
+
+    await tester.tap(find.byKey(const ValueKey('external-login-apple-button')));
+    await tester.pumpAndSettle();
+    expect(launcher.launchedUris, isEmpty);
+
+    await tester.ensureVisible(
+      find.byKey(const ValueKey('external-login-kakao-button')),
+    );
+    await tester.tap(find.byKey(const ValueKey('external-login-kakao-button')));
+    await tester.pumpAndSettle();
+
+    final launchedUri = launcher.launchedUris.single;
+    expect(launchedUri.path, '/api/v1/auth/oidc/authorize/kakao');
+    expect(
+      launchedUri.queryParameters['redirect_uri'],
+      'maumon://auth/callback?provider=kakao',
+    );
   });
+}
+
+void _expectQuickLoginIcons() {
+  for (final provider in ['naver', 'kakao', 'facebook', 'google', 'apple']) {
+    expect(
+      find.byKey(ValueKey('external-login-$provider-button')),
+      findsOneWidget,
+    );
+  }
 }
 
 class _AuthScreenHarness extends StatelessWidget {
@@ -273,6 +365,7 @@ class _FakeExternalLoginLauncher implements ExternalLoginLauncher {
 
 class _FakeAuthRepository implements AuthRepository {
   final List<SignupRequest> signupRequests = [];
+  final List<String> signupVerificationEmails = [];
   final List<String> passwordResetEmails = [];
   final List<_PasswordResetConfirmation> passwordResetConfirmations = [];
 
@@ -286,6 +379,13 @@ class _FakeAuthRepository implements AuthRepository {
       role: 'USER',
       status: 'ACTIVE',
     );
+  }
+
+  @override
+  Future<void> requestSignupEmailVerification(
+    SignupEmailVerificationRequest request,
+  ) async {
+    signupVerificationEmails.add(request.email);
   }
 
   @override

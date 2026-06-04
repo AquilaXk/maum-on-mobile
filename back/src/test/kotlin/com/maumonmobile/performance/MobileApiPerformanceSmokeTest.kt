@@ -2,6 +2,7 @@ package com.maumonmobile.performance
 
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.jayway.jsonpath.JsonPath
+import com.maumonmobile.adapter.`in`.web.auth.signupVerifiedMember
 import org.assertj.core.api.Assertions.assertThat
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
@@ -113,10 +114,11 @@ class MobileApiPerformanceSmokeTest @Autowired constructor(
         val adminPassword = reset.response.readJsonString("$.data.password")
 
         val signup = measure("auth.signup", "auth.session", "POST /api/v1/auth/signup") {
-            mockMvc.post("/api/v1/auth/signup") {
-                contentType = MediaType.APPLICATION_JSON
-                content = """{"email":"$email","password":"pass1234","nickname":"스모크"}"""
-            }
+            mockMvc.signupVerifiedMember(
+                email = email,
+                password = "pass1234",
+                nickname = "스모크",
+            )
                 .andReturn()
                 .response
         }

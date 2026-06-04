@@ -6,6 +6,10 @@ spring:
     driver-class-name: org.h2.Driver
 
 app:
+  auth:
+    signup-email:
+      mail:
+        enabled: false
   images:
     local:
       root: ./data/images

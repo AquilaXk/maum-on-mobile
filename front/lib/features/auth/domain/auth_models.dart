@@ -82,17 +82,34 @@ class SignupRequest {
     required this.email,
     required this.password,
     required this.nickname,
+    required this.emailVerificationCode,
   });
 
   final String email;
   final String password;
   final String nickname;
+  final String emailVerificationCode;
 
   Map<String, Object?> toJson() {
     return {
       'email': email,
       'password': password,
       'nickname': nickname,
+      'emailVerificationCode': emailVerificationCode,
+    };
+  }
+}
+
+class SignupEmailVerificationRequest {
+  const SignupEmailVerificationRequest({
+    required this.email,
+  });
+
+  final String email;
+
+  Map<String, Object?> toJson() {
+    return {
+      'email': email,
     };
   }
 }

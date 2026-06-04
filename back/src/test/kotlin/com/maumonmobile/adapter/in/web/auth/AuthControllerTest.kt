@@ -39,14 +39,114 @@ class AuthControllerTest @Autowired constructor(
     private val mockMvc: MockMvc,
     private val authMemberRepository: AuthMemberRepository,
     private val passwordResetMailSender: RecordingPasswordResetMailSender,
+    private val signupEmailVerificationMailSender: RecordingSignupEmailVerificationMailSender,
 ) {
 
     @Test
-    fun signupLoginSessionRefreshMeAndLogoutUseMobileTokenContract() {
+    fun signupRequiresEmailVerificationCodeAndConsumesIt() {
+        signupEmailVerificationMailSender.clear()
+        val email = "verified-${System.nanoTime()}@example.com"
+
+        mockMvc.post("/api/v1/auth/signup/email-verifications") {
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"email":"$email"}"""
+        }
+            .andExpect {
+                status { isAccepted() }
+                jsonPath("$.success") { value(true) }
+                jsonPath("$.data.accepted") { value(true) }
+            }
+
+        val code = signupEmailVerificationMailSender.sent.single().code
+
         mockMvc.post("/api/v1/auth/signup") {
             contentType = MediaType.APPLICATION_JSON
-            content = """{"email":"mobile@example.com","password":"pass1234","nickname":"모바일"}"""
+            content =
+                """
+                {
+                  "email":"$email",
+                  "password":"pass1234",
+                  "nickname":"인증회원",
+                  "emailVerificationCode":"$code"
+                }
+                """.trimIndent()
         }
+            .andExpect {
+                status { isOk() }
+                jsonPath("$.success") { value(true) }
+                jsonPath("$.data.email") { value(email) }
+                jsonPath("$.data.nickname") { value("인증회원") }
+                jsonPath("$.data.role") { value("USER") }
+                jsonPath("$.data.status") { value("ACTIVE") }
+            }
+
+        mockMvc.post("/api/v1/auth/signup") {
+            contentType = MediaType.APPLICATION_JSON
+            content =
+                """
+                {
+                  "email":"$email",
+                  "password":"pass1234",
+                  "nickname":"재사용",
+                  "emailVerificationCode":"$code"
+                }
+                """.trimIndent()
+        }
+            .andExpect {
+                status { isBadRequest() }
+                jsonPath("$.success") { value(false) }
+                jsonPath("$.error.code") { value("INVALID_REQUEST") }
+            }
+    }
+
+    @Test
+    fun signupRejectsMissingOrWrongEmailVerificationCode() {
+        signupEmailVerificationMailSender.clear()
+
+        mockMvc.post("/api/v1/auth/signup") {
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"email":"missing-code@example.com","password":"pass1234","nickname":"미인증"}"""
+        }
+            .andExpect {
+                status { isBadRequest() }
+                jsonPath("$.success") { value(false) }
+            }
+
+        val email = "wrong-code-${System.nanoTime()}@example.com"
+        mockMvc.post("/api/v1/auth/signup/email-verifications") {
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"email":"$email"}"""
+        }
+            .andExpect {
+                status { isAccepted() }
+            }
+
+        mockMvc.post("/api/v1/auth/signup") {
+            contentType = MediaType.APPLICATION_JSON
+            content =
+                """
+                {
+                  "email":"$email",
+                  "password":"pass1234",
+                  "nickname":"오입력",
+                  "emailVerificationCode":"000000"
+                }
+                """.trimIndent()
+        }
+            .andExpect {
+                status { isBadRequest() }
+                jsonPath("$.success") { value(false) }
+                jsonPath("$.error.code") { value("INVALID_REQUEST") }
+            }
+    }
+
+    @Test
+    fun signupLoginSessionRefreshMeAndLogoutUseMobileTokenContract() {
+        mockMvc.signupVerifiedMember(
+            email = "mobile@example.com",
+            password = "pass1234",
+            nickname = "모바일",
+        )
             .andExpect {
                 status { isOk() }
                 jsonPath("$.success") { value(true) }
@@ -140,10 +240,11 @@ class AuthControllerTest @Autowired constructor(
     @Test
     fun blockedMemberSessionReturnsSessionInvalidationReason() {
         val email = "blocked-session-${System.nanoTime()}@example.com"
-        val loginResult = mockMvc.post("/api/v1/auth/signup") {
-            contentType = MediaType.APPLICATION_JSON
-            content = """{"email":"$email","password":"pass1234","nickname":"차단회원"}"""
-        }
+        val loginResult = mockMvc.signupVerifiedMember(
+            email = email,
+            password = "pass1234",
+            nickname = "차단회원",
+        )
             .andExpect {
                 status { isOk() }
             }
@@ -178,10 +279,11 @@ class AuthControllerTest @Autowired constructor(
     fun passwordResetDoesNotRevealUnknownEmailAndCanResetExistingPassword() {
         passwordResetMailSender.clear()
         val email = "reset-${System.nanoTime()}@example.com"
-        mockMvc.post("/api/v1/auth/signup") {
-            contentType = MediaType.APPLICATION_JSON
-            content = """{"email":"$email","password":"pass1234","nickname":"복구회원"}"""
-        }
+        mockMvc.signupVerifiedMember(
+            email = email,
+            password = "pass1234",
+            nickname = "복구회원",
+        )
             .andExpect {
                 status { isOk() }
             }
@@ -279,10 +381,11 @@ class AuthControllerTest @Autowired constructor(
     fun passwordResetRequestRejectsTooManyActiveTokensForSameEmail() {
         passwordResetMailSender.clear()
         val email = "reset-limit-${System.nanoTime()}@example.com"
-        mockMvc.post("/api/v1/auth/signup") {
-            contentType = MediaType.APPLICATION_JSON
-            content = """{"email":"$email","password":"pass1234","nickname":"제한회원"}"""
-        }
+        mockMvc.signupVerifiedMember(
+            email = email,
+            password = "pass1234",
+            nickname = "제한회원",
+        )
             .andExpect {
                 status { isOk() }
             }
@@ -512,6 +615,7 @@ class AuthControllerTest @Autowired constructor(
         fun passwordResetMailSender(): RecordingPasswordResetMailSender {
             return RecordingPasswordResetMailSender()
         }
+
     }
 }
 

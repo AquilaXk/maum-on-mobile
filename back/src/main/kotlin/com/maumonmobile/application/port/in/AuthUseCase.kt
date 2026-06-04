@@ -3,6 +3,8 @@ package com.maumonmobile.application.port.`in`
 import com.maumonmobile.global.security.AuthenticatedUser
 
 interface AuthUseCase {
+    fun requestSignupEmailVerification(command: SignupEmailVerificationRequestCommand): SignupEmailVerificationRequestResult
+
     fun signup(command: SignupCommand): AuthMemberResult
 
     fun login(command: LoginCommand): AuthSessionResult
@@ -30,6 +32,15 @@ data class SignupCommand(
     val email: String,
     val password: String,
     val nickname: String,
+    val emailVerificationCode: String,
+)
+
+data class SignupEmailVerificationRequestCommand(
+    val email: String,
+)
+
+data class SignupEmailVerificationRequestResult(
+    val accepted: Boolean,
 )
 
 data class LoginCommand(

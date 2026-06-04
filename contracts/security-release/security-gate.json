@@ -77,6 +77,7 @@
       "org.springframework.boot:spring-boot-starter-flyway": "Apache-2.0",
       "org.springframework.boot:spring-boot-starter-jackson": "Apache-2.0",
       "org.springframework.boot:spring-boot-starter-jdbc": "Apache-2.0",
+      "org.springframework.boot:spring-boot-starter-mail": "Apache-2.0",
       "org.springframework.boot:spring-boot-starter-security": "Apache-2.0",
       "org.springframework.boot:spring-boot-starter-security-test": "Apache-2.0",
       "org.springframework.boot:spring-boot-starter-validation": "Apache-2.0",

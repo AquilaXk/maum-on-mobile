@@ -66,6 +66,69 @@ jobs:
           cp back/Dockerfile build/deploy-oci-a1/Dockerfile
           tar -czf build/maum-on-mobile-backend-bundle.tar.gz -C build/deploy-oci-a1 .
 
+      - name: Compose backend env
+        shell: bash
+        env:
+          OCI_A1_BACKEND_ENV_B64: ${{ secrets.OCI_A1_BACKEND_ENV_B64 }}
+          SPRING__MAIL__HOST: ${{ secrets.SPRING__MAIL__HOST }}
+          SPRING__MAIL__PORT: ${{ secrets.SPRING__MAIL__PORT }}
+          SPRING__MAIL__USERNAME: ${{ secrets.SPRING__MAIL__USERNAME }}
+          SPRING__MAIL__PASSWORD: ${{ secrets.SPRING__MAIL__PASSWORD }}
+          SPRING__MAIL__PROPERTIES__MAIL__SMTP__AUTH: ${{ secrets.SPRING__MAIL__PROPERTIES__MAIL__SMTP__AUTH }}
+          SPRING__MAIL__PROPERTIES__MAIL__SMTP__STARTTLS__ENABLE: ${{ secrets.SPRING__MAIL__PROPERTIES__MAIL__SMTP__STARTTLS__ENABLE }}
+          CUSTOM__MEMBER__SIGNUP__MAIL_ENABLED: ${{ secrets.CUSTOM__MEMBER__SIGNUP__MAIL_ENABLED }}
+          CUSTOM__MEMBER__SIGNUP__MAIL_FROM: ${{ secrets.CUSTOM__MEMBER__SIGNUP__MAIL_FROM }}
+          CUSTOM__MEMBER__SIGNUP__MAIL_SUBJECT: ${{ secrets.CUSTOM__MEMBER__SIGNUP__MAIL_SUBJECT }}
+        run: |
+          set -euo pipefail
+
+          backend_env="${RUNNER_TEMP}/maum-on-mobile-backend.env"
+          printf '%s' "${OCI_A1_BACKEND_ENV_B64}" | base64 --decode >"${backend_env}"
+
+          if [[ -n "${SPRING__MAIL__HOST:-}" && -z "${CUSTOM__MEMBER__SIGNUP__MAIL_ENABLED:-}" ]]; then
+            CUSTOM__MEMBER__SIGNUP__MAIL_ENABLED=true
+          fi
+
+          append_or_replace_env() {
+            local key="$1"
+            local value="${!key:-}"
+            local tmp_env
+
+            if [[ -z "${value}" ]]; then
+              return
+            fi
+
+            tmp_env="$(mktemp)"
+            awk -v key="${key}" -v value="${value}" '
+              BEGIN { prefix = key "="; replaced = 0 }
+              index($0, prefix) == 1 { print key "=" value; replaced = 1; next }
+              { print }
+              END { if (replaced == 0) print key "=" value }
+            ' "${backend_env}" >"${tmp_env}"
+            mv "${tmp_env}" "${backend_env}"
+          }
+
+          for name in \
+            SPRING__MAIL__HOST \
+            SPRING__MAIL__PORT \
+            SPRING__MAIL__USERNAME \
+            SPRING__MAIL__PASSWORD \
+            SPRING__MAIL__PROPERTIES__MAIL__SMTP__AUTH \
+            SPRING__MAIL__PROPERTIES__MAIL__SMTP__STARTTLS__ENABLE \
+            CUSTOM__MEMBER__SIGNUP__MAIL_ENABLED \
+            CUSTOM__MEMBER__SIGNUP__MAIL_FROM \
+            CUSTOM__MEMBER__SIGNUP__MAIL_SUBJECT
+          do
+            append_or_replace_env "${name}"
+          done
+
+          {
+            echo "OCI_A1_BACKEND_ENV_B64_COMPOSED<<EOF"
+            base64 <"${backend_env}" | tr -d '\n'
+            echo
+            echo "EOF"
+          } >>"${GITHUB_ENV}"
+
       - name: Deploy over SSH
         shell: bash
         env:
@@ -74,7 +137,7 @@ jobs:
           OCI_A1_SSH_USER: ${{ secrets.OCI_A1_SSH_USER }}
           OCI_A1_SSH_PRIVATE_KEY_B64: ${{ secrets.OCI_A1_SSH_PRIVATE_KEY_B64 }}
           OCI_A1_SSH_KNOWN_HOSTS_B64: ${{ secrets.OCI_A1_SSH_KNOWN_HOSTS_B64 }}
-          OCI_A1_BACKEND_ENV_B64: ${{ secrets.OCI_A1_BACKEND_ENV_B64 }}
+          OCI_A1_BACKEND_ENV_B64: ${{ env.OCI_A1_BACKEND_ENV_B64_COMPOSED }}
           OCI_A1_VERTEX_KEY_JSON_B64: ${{ secrets.OCI_A1_VERTEX_KEY_JSON_B64 }}
           MAUMON_BACKEND_BUNDLE_PATH: build/maum-on-mobile-backend-bundle.tar.gz
           MAUMON_BACKEND_IMAGE_TAG: maum-on-mobile-back:${{ github.sha }}${{ inputs.image_tag_suffix }}

@@ -1,6 +1,7 @@
 package com.maumonmobile.adapter.`in`.web.notification
 
 import com.jayway.jsonpath.JsonPath
+import com.maumonmobile.adapter.`in`.web.auth.signupVerifiedMember
 import com.maumonmobile.application.port.out.AuthMemberRepository
 import com.maumonmobile.application.port.out.NotificationEventPublisher
 import com.maumonmobile.application.port.out.NotificationPushCommand
@@ -669,10 +670,11 @@ class NotificationReportControllerTest @Autowired constructor(
     }
 
     private fun signupAndLogin(email: String, nickname: String): TestMember {
-        val signupResult = mockMvc.post("/api/v1/auth/signup") {
-            contentType = MediaType.APPLICATION_JSON
-            content = """{"email":"$email","password":"pass1234","nickname":"$nickname"}"""
-        }
+        val signupResult = mockMvc.signupVerifiedMember(
+            email = email,
+            password = "pass1234",
+            nickname = nickname,
+        )
             .andExpect {
                 status { isOk() }
             }

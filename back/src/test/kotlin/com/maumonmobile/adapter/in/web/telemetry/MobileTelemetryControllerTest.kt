@@ -1,6 +1,7 @@
 package com.maumonmobile.adapter.`in`.web.telemetry
 
 import com.jayway.jsonpath.JsonPath
+import com.maumonmobile.adapter.`in`.web.auth.signupVerifiedMember
 import com.maumonmobile.application.port.out.AuthMemberRepository
 import com.maumonmobile.domain.auth.AuthMember
 import com.maumonmobile.domain.auth.AuthMemberRole
@@ -161,10 +162,11 @@ class MobileTelemetryControllerTest @Autowired constructor(
     }
 
     private fun signupAndLogin(email: String, nickname: String): LoggedInMember {
-        mockMvc.post("/api/v1/auth/signup") {
-            contentType = MediaType.APPLICATION_JSON
-            content = """{"email":"$email","password":"pass1234","nickname":"$nickname"}"""
-        }
+        mockMvc.signupVerifiedMember(
+            email = email,
+            password = "pass1234",
+            nickname = nickname,
+        )
             .andExpect {
                 status { isOk() }
             }

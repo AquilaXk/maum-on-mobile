@@ -14,11 +14,14 @@ import com.maumonmobile.application.port.`in`.PasswordResetRequestCommand
 import com.maumonmobile.application.port.`in`.PasswordResetRequestResult
 import com.maumonmobile.application.port.`in`.RefreshCommand
 import com.maumonmobile.application.port.`in`.SignupCommand
+import com.maumonmobile.application.port.`in`.SignupEmailVerificationRequestCommand
+import com.maumonmobile.application.port.`in`.SignupEmailVerificationRequestResult
 import com.maumonmobile.global.security.AuthenticatedUser
 import com.maumonmobile.global.web.ApiResponse
 import jakarta.validation.Valid
 import jakarta.validation.constraints.Email
 import jakarta.validation.constraints.NotBlank
+import jakarta.validation.constraints.Pattern
 import jakarta.validation.constraints.Size
 import org.springframework.security.core.Authentication
 import org.springframework.http.HttpHeaders
@@ -30,6 +33,7 @@ import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RequestParam
+import org.springframework.web.bind.annotation.ResponseStatus
 import org.springframework.web.bind.annotation.RestController
 import java.net.URI
 
@@ -38,6 +42,18 @@ import java.net.URI
 class AuthController(
     private val authUseCase: AuthUseCase,
 ) {
+
+    @PostMapping("/signup/email-verifications")
+    @ResponseStatus(HttpStatus.ACCEPTED)
+    fun requestSignupEmailVerification(
+        @Valid @RequestBody request: SignupEmailVerificationRequest,
+    ): ApiResponse<SignupEmailVerificationRequestResult> {
+        return ApiResponse.success(
+            authUseCase.requestSignupEmailVerification(
+                SignupEmailVerificationRequestCommand(email = request.email),
+            ),
+        )
+    }
 
     @PostMapping("/signup")
     fun signup(
@@ -49,6 +65,7 @@ class AuthController(
                     email = request.email,
                     password = request.password,
                     nickname = request.nickname,
+                    emailVerificationCode = request.emailVerificationCode.orEmpty(),
                 ),
             ),
         )
@@ -177,6 +194,12 @@ private fun redirect(location: String): ResponseEntity<Void> {
         .build()
 }
 
+data class SignupEmailVerificationRequest(
+    @field:NotBlank
+    @field:Email
+    val email: String,
+)
+
 data class SignupRequest(
     @field:NotBlank
     @field:Email
@@ -186,6 +209,9 @@ data class SignupRequest(
     val password: String,
     @field:NotBlank
     val nickname: String,
+    @field:NotBlank
+    @field:Pattern(regexp = "^\\d{6}$", message = "이메일 인증번호는 6자리 숫자여야 합니다.")
+    val emailVerificationCode: String? = null,
 )
 
 data class LoginRequest(

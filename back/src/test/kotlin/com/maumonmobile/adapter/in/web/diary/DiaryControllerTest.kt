@@ -1,6 +1,7 @@
 package com.maumonmobile.adapter.`in`.web.diary
 
 import com.jayway.jsonpath.JsonPath
+import com.maumonmobile.adapter.`in`.web.auth.signupVerifiedMember
 import com.maumonmobile.application.port.out.ImageAssetRepository
 import com.maumonmobile.domain.image.ImageAssetStatus
 import com.maumonmobile.domain.image.ImageTargetType
@@ -445,10 +446,11 @@ class DiaryControllerTest @Autowired constructor(
         email: String = "diary@example.com",
         nickname: String = "마음이",
     ): String {
-        mockMvc.post("/api/v1/auth/signup") {
-            contentType = MediaType.APPLICATION_JSON
-            content = """{"email":"$email","password":"pass1234","nickname":"$nickname"}"""
-        }
+        mockMvc.signupVerifiedMember(
+            email = email,
+            password = "pass1234",
+            nickname = nickname,
+        )
             .andExpect {
                 status { isOk() }
             }

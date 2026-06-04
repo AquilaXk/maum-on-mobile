@@ -4,6 +4,10 @@ import '../../../core/network/auth_token_store.dart';
 import '../domain/auth_models.dart';
 
 abstract interface class AuthRepository {
+  Future<void> requestSignupEmailVerification(
+    SignupEmailVerificationRequest request,
+  );
+
   Future<AuthMember> signup(SignupRequest request);
 
   Future<AuthSession> login(LoginRequest request);
@@ -38,6 +42,18 @@ class ApiAuthRepository implements AuthRepository {
 
   final ApiClient _apiClient;
   final AuthTokenStore _tokenStore;
+
+  @override
+  Future<void> requestSignupEmailVerification(
+    SignupEmailVerificationRequest request,
+  ) {
+    return _apiClient.postVoid(
+      '/api/v1/auth/signup/email-verifications',
+      body: request.toJson(),
+      requiresAuth: false,
+      retryOnUnauthorized: false,
+    );
+  }
 
   @override
   Future<AuthMember> signup(SignupRequest request) {
