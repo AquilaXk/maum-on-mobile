@@ -26,6 +26,16 @@ void main() {
 
     expect(repository.connectCount, 1);
     expect(find.text('상담 연결됨'), findsOneWidget);
+    expect(
+        find.byKey(const ValueKey('consultation-flow-panel')), findsOneWidget);
+    expect(find.text('상담 연결 흐름'), findsOneWidget);
+    expect(find.text('연결 상태를 확인하고 메시지를 주고받으세요.'), findsOneWidget);
+    expect(find.byKey(const ValueKey('consultation-chat-section')),
+        findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('consultation-composer-section')),
+      findsOneWidget,
+    );
 
     await tester.enterText(
       find.byKey(const ValueKey('consultation-message-field')),

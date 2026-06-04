@@ -162,6 +162,8 @@ class _OperationsScreenState extends State<OperationsScreen> {
               onSelected: widget.controller.selectView,
             ),
             const SizedBox(height: AppSpacing.lg),
+            _OperationsFlowPanel(view: state.view),
+            const SizedBox(height: AppSpacing.lg),
             switch (state.view) {
               OperationsView.dashboard => _DashboardView(
                   state: state,
@@ -219,6 +221,51 @@ class _OperationsScreenState extends State<OperationsScreen> {
             },
           ],
         );
+      },
+    );
+  }
+}
+
+class _OperationsFlowPanel extends StatelessWidget {
+  const _OperationsFlowPanel({required this.view});
+
+  final OperationsView view;
+
+  @override
+  Widget build(BuildContext context) {
+    return AppFlowPanel(
+      key: const ValueKey('operations-flow-panel'),
+      icon: switch (view) {
+        OperationsView.dashboard => Icons.dashboard_customize_outlined,
+        OperationsView.observability => Icons.monitor_heart_outlined,
+        OperationsView.system => Icons.admin_panel_settings_outlined,
+        OperationsView.members => Icons.manage_accounts_outlined,
+        OperationsView.letters => Icons.mark_email_read_outlined,
+        OperationsView.reports => Icons.report_outlined,
+      },
+      title: switch (view) {
+        OperationsView.dashboard => '운영 검수 흐름',
+        OperationsView.observability => '관측 지표 흐름',
+        OperationsView.system => '시스템 점검 흐름',
+        OperationsView.members => '회원 조치 흐름',
+        OperationsView.letters => '편지 검수 흐름',
+        OperationsView.reports => '신고 처리 흐름',
+      },
+      message: switch (view) {
+        OperationsView.dashboard => '상태를 먼저 보고 필요한 조치 화면으로 이동하세요.',
+        OperationsView.observability => '성능과 알림 지표를 확인하고 이상 구간을 추적하세요.',
+        OperationsView.system => '운영 계정과 외부 지원 채널 상태를 함께 확인하세요.',
+        OperationsView.members => '회원 상태를 찾고 사유를 남긴 뒤 조치를 확정하세요.',
+        OperationsView.letters => '편지 상태를 검수하고 재배정 또는 차단 조치를 진행하세요.',
+        OperationsView.reports => '신고 대상을 고르고 사유를 확인한 뒤 처리하세요.',
+      },
+      steps: switch (view) {
+        OperationsView.dashboard => ['우선순위', '대상 이동', '조치 확인'],
+        OperationsView.observability => ['지표 확인', '오류 구간', '재조회'],
+        OperationsView.system => ['권한', '연락 채널', '세션 관리'],
+        OperationsView.members => ['검색', '상세 확인', '조치 저장'],
+        OperationsView.letters => ['검수', '수신자 확인', '결정'],
+        OperationsView.reports => ['필터', '상세', '처리'],
       },
     );
   }

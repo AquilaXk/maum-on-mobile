@@ -46,6 +46,16 @@ void main() {
       await tester.pump();
 
       expect(find.text('알림/신고'), findsOneWidget);
+      expect(
+        find.byKey(const ValueKey('notification-report-flow-panel')),
+        findsOneWidget,
+      );
+      expect(find.text('알림과 신고 흐름'), findsOneWidget);
+      expect(find.text('알림을 확인하고 필요한 신고까지 이어서 처리하세요.'), findsOneWidget);
+      expect(
+        find.byKey(const ValueKey('notification-result-section')),
+        findsOneWidget,
+      );
       expect(find.text('읽지 않음'), findsOneWidget);
       expect(find.text('바로 이동'), findsOneWidget);
       expect(find.text('실시간 상태'), findsOneWidget);
@@ -54,6 +64,14 @@ void main() {
       expect(find.text('새 알림'), findsWidgets);
       expect(find.text('편지'), findsWidgets);
 
+      await tester.ensureVisible(
+        find.byKey(const ValueKey('notification-card-1')),
+      );
+      await tester.drag(
+        find.byKey(const ValueKey('notification-list')),
+        const Offset(0, -220),
+      );
+      await tester.pumpAndSettle();
       await tester.tap(find.byKey(const ValueKey('notification-card-1')));
       await tester.pumpAndSettle();
 
@@ -64,15 +82,24 @@ void main() {
 
       await tester.tap(find.text('신고'));
       await tester.pumpAndSettle();
+      await tester.ensureVisible(
+        find.byKey(const ValueKey('report-reason-spam')),
+      );
+      await tester.pumpAndSettle();
       await tester.tap(find.byKey(const ValueKey('report-reason-spam')));
       await tester.enterText(
         find.byKey(const ValueKey('report-content-field')),
         '반복 광고입니다.',
       );
       final submitButton = find.byKey(const ValueKey('report-submit-button'));
+      await tester.dragUntilVisible(
+        submitButton,
+        find.byKey(const ValueKey('report-form')),
+        const Offset(0, -120),
+      );
       await tester.drag(
         find.byKey(const ValueKey('report-form')),
-        const Offset(0, -1000),
+        const Offset(0, -160),
       );
       await tester.pumpAndSettle();
       await tester.tap(submitButton);

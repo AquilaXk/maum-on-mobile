@@ -161,6 +161,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                       semanticLabel: '계정 설정을 불러오는 중',
                                     )
                             else ...[
+                              const AppFlowPanel(
+                                key: ValueKey('settings-flow-panel'),
+                                icon: Icons.manage_accounts_outlined,
+                                title: '설정 관리 흐름',
+                                message: '계정 상태를 확인하고 필요한 변경을 순서대로 처리하세요.',
+                                steps: ['계정 확인', '앱 설정', '지원 요청'],
+                              ),
+                              const SizedBox(height: AppSpacing.lg),
                               _AccountSummary(
                                 email: settings.email,
                                 nickname: settings.nickname,
@@ -291,6 +299,7 @@ class _SupportContactSection extends StatelessWidget {
     final diagnostics = contactInfo.diagnostics();
 
     return _SettingsSection(
+      key: const ValueKey('settings-support-section'),
       title: '고객지원',
       children: [
         const Text('문의에는 앱 버전, 빌드 번호, 플랫폼, locale 진단 정보만 포함됩니다.'),
@@ -419,6 +428,7 @@ class _AccountSummary extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return AppSectionCard(
+      key: const ValueKey('settings-account-section'),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -450,6 +460,7 @@ class _ProfileSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return _SettingsSection(
+      key: const ValueKey('settings-profile-section'),
       title: '프로필',
       children: [
         TextField(
@@ -807,6 +818,7 @@ class _SettingsSection extends StatelessWidget {
   const _SettingsSection({
     required this.title,
     required this.children,
+    super.key,
   });
 
   final String title;
