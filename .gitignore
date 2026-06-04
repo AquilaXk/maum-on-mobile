@@ -52,6 +52,18 @@ tmp/
 temp/
 .cache/
 
+# Terraform local state and secrets
+**/.terraform/
+**/.terraform.lock.hcl
+**/*.tfstate
+**/*.tfstate.*
+**/*.tfplan
+**/terraform.tfvars
+**/terraform.tfvars.json
+**/*.auto.tfvars
+**/*.auto.tfvars.json
+!**/terraform.tfvars.example
+
 # Android / Gradle
 .gradle/
 android/.gradle/

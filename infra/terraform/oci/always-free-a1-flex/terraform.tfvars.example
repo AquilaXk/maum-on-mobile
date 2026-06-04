@@ -1,0 +1,37 @@
+tenancy_ocid     = "ocid1.tenancy.oc1..example"
+user_ocid        = "ocid1.user.oc1..example"
+fingerprint      = "00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00"
+private_key_path = "/absolute/path/to/oci_api_key.pem"
+region           = "ap-seoul-1"
+
+compartment_ocid    = "ocid1.compartment.oc1..example"
+availability_domain = "example:AP-SEOUL-1-AD-1"
+
+ssh_public_key   = "ssh-ed25519 example-public-key"
+ssh_ingress_cidr = "203.0.113.10/32"
+
+http_ingress_cidr  = "0.0.0.0/0"
+https_ingress_cidr = "0.0.0.0/0"
+
+name_prefix      = "maum-on-mobile-a1"
+hostname_label   = "maumona1"
+vcn_dns_label    = "maumonmobile"
+subnet_dns_label = "public"
+
+vcn_cidr    = "10.41.0.0/16"
+subnet_cidr = "10.41.1.0/24"
+
+instance_ocpus         = 4
+instance_memory_in_gbs = 24
+
+boot_volume_size_in_gbs = 50
+create_data_volume      = true
+data_volume_size_in_gbs = 50
+data_volume_vpus_per_gb = 0
+data_volume_device      = "/dev/oracleoci/oraclevdb"
+data_volume_mount_path  = "/var/lib/maumon-data"
+
+freeform_tags = {
+  Environment = "staging"
+  Owner       = "aquila"
+}
