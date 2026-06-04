@@ -48,6 +48,10 @@ test("OCI runtime deploy script is safe, idempotent, and verifies health", () =>
   assert.match(script, /Invalid MAUMON_POSTGRES_DATA_VOLUME/);
   assert.match(script, /Invalid MAUMON_POSTGRES_IMAGE_TAG/);
   assert.match(script, /Invalid MAUMON_DEPLOY_MANAGED_POSTGRES/);
+  assert.match(script, /Invalid MAUMON_HOST_HTTP_PORT/);
+  assert.match(script, /Invalid MAUMON_DEPLOY_HEALTH_TIMEOUT_SECONDS/);
+  assert.match(script, /Invalid GITHUB_RUN_ID/);
+  assert.match(script, /Invalid GITHUB_RUN_ATTEMPT/);
   assert.match(script, /tar -xzf "\$\{bundle_path\}" -C "\$\{release_dir\}"/);
   assert.match(script, /docker build -t "\$\{image_tag\}" -f "\$\{release_dir\}\/Dockerfile" "\$\{release_dir\}"/);
   assert.match(script, /container_uid="10001"/);
@@ -56,7 +60,10 @@ test("OCI runtime deploy script is safe, idempotent, and verifies health", () =>
     script,
     /MAUMON_DOCKER_NETWORK='\$\{docker_network\}' MAUMON_APP_DATA_DIR='\$\{app_data_dir\}'/,
   );
-  assert.match(script, /\ninstall_runtime\n[\s\S]*\nprepare_runtime_resources\nprepare_managed_postgres\n\nsudo docker build/);
+  assert.match(script, /MAUMON_DEPLOY_HEALTH_TIMEOUT_SECONDS='\$\{deploy_health_timeout_seconds\}'/);
+  assert.match(script, /MAUMON_HOST_HTTP_PORT='\$\{host_http_port\}'/);
+  assert.match(script, /remote_staging="\/tmp\/maum-on-mobile-deploy-\$\{deploy_run_id\}-\$\{deploy_run_attempt\}"/);
+  assert.match(script, /\ninstall_runtime\n[\s\S]*\nprepare_runtime_resources\nallow_host_http_ingress\nprepare_managed_postgres\n\nsudo docker build/);
   assert.match(script, /container_name="maum-on-mobile-back"/);
   assert.match(script, /previous_container_name="maum-on-mobile-back-previous"/);
   assert.match(script, /network_name="\$\{MAUMON_DOCKER_NETWORK:-maum-on-mobile\}"/);
@@ -68,6 +75,9 @@ test("OCI runtime deploy script is safe, idempotent, and verifies health", () =>
   assert.match(script, /docker network inspect "\$\{network_name\}"/);
   assert.match(script, /docker network create "\$\{network_name\}"/);
   assert.match(script, /install -d -m 0750 -o "\$\{container_uid\}" -g "\$\{container_gid\}" "\$\{app_data_dir\}"/);
+  assert.match(script, /allow_host_http_ingress/);
+  assert.match(script, /iptables -C INPUT -p tcp --dport "\$\{host_http_port\}" -j ACCEPT/);
+  assert.match(script, /iptables -I INPUT \d+ -p tcp --dport "\$\{host_http_port\}" -j ACCEPT/);
   assert.match(script, /docker volume create "\$\{postgres_data_volume\}"/);
   assert.match(script, /--network-alias postgres/);
   assert.match(script, /POSTGRES_DB="\$\{db_name\}"/);
