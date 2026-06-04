@@ -26,6 +26,8 @@ Run Flutter commands through the repository wrapper:
 - `tools/ci/run-local-mobile-checks.sh --doctor`: check local Flutter, Android SDK, Xcode, and CocoaPods state.
 - `tools/flutterw run -d android`: run the app on an Android emulator or device.
 - `tools/flutterw run -d ios`: run the app on an iOS simulator or device.
+- `cd front && ../tools/flutterw run -d android -t lib/qa/mobile_qa_app.dart`: run the authenticated QA target on Android with local fake data.
+- `cd front && ../tools/flutterw run -d ios -t lib/qa/mobile_qa_app.dart`: run the authenticated QA target on iOS with local fake data.
 - `tools/flutterw build apk --debug`: build the Android debug app without release signing.
 - `tools/flutterw build ios --simulator --no-codesign`: build the iOS simulator app without code signing.
 - `tools/ci/run-mobile-release-preflight.sh --platform android`: check Android release build tooling.
