@@ -92,10 +92,10 @@ class AuthController extends ChangeNotifier {
       final session = await _authRepository.restoreSession();
       _setAuthenticated(session.member, hasRestored: true);
     } on Object catch (error) {
-      final infoMessage =
-          error is ApiClientException && error.sessionInvalidated
-              ? error.message
-              : null;
+      final infoMessage = error is ApiClientException &&
+              _shouldShowRestoreFailureMessage(error.kind)
+          ? error.message
+          : null;
       _setState(
         AuthState(
           status: AuthStatus.unauthenticated,
@@ -105,6 +105,17 @@ class AuthController extends ChangeNotifier {
         ),
       );
     }
+  }
+
+  bool _shouldShowRestoreFailureMessage(ApiErrorKind kind) {
+    return switch (kind) {
+      ApiErrorKind.sessionExpired ||
+      ApiErrorKind.permissionChanged ||
+      ApiErrorKind.accountBlocked ||
+      ApiErrorKind.accountWithdrawn =>
+        true,
+      _ => false,
+    };
   }
 
   Future<void> login({

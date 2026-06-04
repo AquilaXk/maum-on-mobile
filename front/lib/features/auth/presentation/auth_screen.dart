@@ -396,15 +396,14 @@ class _AuthScreenState extends State<AuthScreen> {
             const _IosReviewEmailLoginGuidance(),
           );
         }
-        final activeProviders = LoginProviderPolicy.providersFor(
+        final providers = LoginProviderPolicy.providersFor(
           platform,
-        ).toSet();
-        if (widget.externalLoginController != null) {
+        );
+        if (widget.externalLoginController != null && providers.isNotEmpty) {
           actions.add(const SizedBox(height: 8));
           actions.add(
             _QuickLoginProviderRow(
-              providers: LoginProviderPolicy.allProviders,
-              activeProviders: activeProviders,
+              providers: providers,
               isStarting: externalLoginState?.isStarting == true,
               onStart: (provider) => widget.externalLoginController!.start(
                 provider: provider.providerId,
@@ -673,13 +672,11 @@ class _MessagePanel extends StatelessWidget {
 class _QuickLoginProviderRow extends StatelessWidget {
   const _QuickLoginProviderRow({
     required this.providers,
-    required this.activeProviders,
     required this.isStarting,
     required this.onStart,
   });
 
   final List<LoginProvider> providers;
-  final Set<LoginProvider> activeProviders;
   final bool isStarting;
   final ValueChanged<LoginProvider> onStart;
 
@@ -693,7 +690,6 @@ class _QuickLoginProviderRow extends StatelessWidget {
         for (final provider in providers)
           _QuickLoginProviderButton(
             provider: provider,
-            isActive: activeProviders.contains(provider),
             isStarting: isStarting,
             onPressed: () => onStart(provider),
           ),
@@ -705,21 +701,19 @@ class _QuickLoginProviderRow extends StatelessWidget {
 class _QuickLoginProviderButton extends StatelessWidget {
   const _QuickLoginProviderButton({
     required this.provider,
-    required this.isActive,
     required this.isStarting,
     required this.onPressed,
   });
 
   final LoginProvider provider;
-  final bool isActive;
   final bool isStarting;
   final VoidCallback onPressed;
 
   @override
   Widget build(BuildContext context) {
-    final enabled = isActive && !isStarting;
-    final opacity = enabled ? 1.0 : (isActive ? 0.55 : 0.32);
-    final label = isActive ? provider.label : '${provider.label} 준비 중';
+    final enabled = !isStarting;
+    final opacity = enabled ? 1.0 : 0.55;
+    final label = provider.label;
 
     return Semantics(
       key: ValueKey(provider.buttonKey),
