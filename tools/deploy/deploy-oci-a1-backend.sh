@@ -1,17 +1,27 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+deploy_transport="${MAUMON_DEPLOY_TRANSPORT:-ssh}"
+
 required_vars=(
-  OCI_A1_SSH_HOST
-  OCI_A1_SSH_PORT
-  OCI_A1_SSH_USER
-  OCI_A1_SSH_PRIVATE_KEY_B64
-  OCI_A1_SSH_KNOWN_HOSTS_B64
   OCI_A1_BACKEND_ENV_B64
   OCI_A1_VERTEX_KEY_JSON_B64
   MAUMON_BACKEND_BUNDLE_PATH
   MAUMON_BACKEND_IMAGE_TAG
 )
+
+ssh_required_vars=(
+  OCI_A1_SSH_HOST
+  OCI_A1_SSH_PORT
+  OCI_A1_SSH_USER
+  OCI_A1_SSH_PRIVATE_KEY_B64
+  OCI_A1_SSH_KNOWN_HOSTS_B64
+)
+
+if [[ ! "${deploy_transport}" =~ ^(ssh|local)$ ]]; then
+  echo "Invalid MAUMON_DEPLOY_TRANSPORT: ${deploy_transport}" >&2
+  exit 1
+fi
 
 for name in "${required_vars[@]}"; do
   if [[ -z "${!name:-}" ]]; then
@@ -19,6 +29,15 @@ for name in "${required_vars[@]}"; do
     exit 1
   fi
 done
+
+if [[ "${deploy_transport}" == "ssh" ]]; then
+  for name in "${ssh_required_vars[@]}"; do
+    if [[ -z "${!name:-}" ]]; then
+      echo "Missing required environment variable: ${name}" >&2
+      exit 1
+    fi
+  done
+fi
 
 if [[ ! -f "${MAUMON_BACKEND_BUNDLE_PATH}" ]]; then
   echo "Backend bundle not found: ${MAUMON_BACKEND_BUNDLE_PATH}" >&2
@@ -122,40 +141,21 @@ known_hosts="${tmp_dir}/known_hosts"
 backend_env="${tmp_dir}/backend.env"
 vertex_key="${tmp_dir}/vertex-key.json"
 bundle_copy="${tmp_dir}/maum-on-mobile-backend-bundle.tar.gz"
+remote_script="${tmp_dir}/remote-deploy.sh"
 
-printf '%s' "${OCI_A1_SSH_PRIVATE_KEY_B64}" | base64 --decode >"${ssh_key}"
-printf '%s' "${OCI_A1_SSH_KNOWN_HOSTS_B64}" | base64 --decode >"${known_hosts}"
 printf '%s' "${OCI_A1_BACKEND_ENV_B64}" | base64 --decode >"${backend_env}"
 printf '%s' "${OCI_A1_VERTEX_KEY_JSON_B64}" | base64 --decode >"${vertex_key}"
 cp "${MAUMON_BACKEND_BUNDLE_PATH}" "${bundle_copy}"
-chmod 600 "${ssh_key}"
-
-ssh_base=(
-  ssh
-  -i "${ssh_key}"
-  -p "${OCI_A1_SSH_PORT}"
-  -o BatchMode=yes
-  -o StrictHostKeyChecking=yes
-  -o UserKnownHostsFile="${known_hosts}"
-  "${OCI_A1_SSH_USER}@${OCI_A1_SSH_HOST}"
-)
-
-scp_base=(
-  scp
-  -i "${ssh_key}"
-  -P "${OCI_A1_SSH_PORT}"
-  -o BatchMode=yes
-  -o StrictHostKeyChecking=yes
-  -o UserKnownHostsFile="${known_hosts}"
-)
 
 remote_staging="/tmp/maum-on-mobile-deploy-${deploy_run_id}-${deploy_run_attempt}"
 
-"${ssh_base[@]}" "install -d -m 0700 '${remote_staging}'"
-"${scp_base[@]}" "${bundle_copy}" "${backend_env}" "${vertex_key}" "${OCI_A1_SSH_USER}@${OCI_A1_SSH_HOST}:${remote_staging}/"
+if [[ "${deploy_transport}" == "ssh" ]]; then
+  printf '%s' "${OCI_A1_SSH_PRIVATE_KEY_B64}" | base64 --decode >"${ssh_key}"
+  printf '%s' "${OCI_A1_SSH_KNOWN_HOSTS_B64}" | base64 --decode >"${known_hosts}"
+  chmod 600 "${ssh_key}"
+fi
 
-"${ssh_base[@]}" \
-  "MAUMON_BACKEND_IMAGE_TAG='${MAUMON_BACKEND_IMAGE_TAG}' MAUMON_DEPLOY_HEALTH_TIMEOUT_SECONDS='${deploy_health_timeout_seconds}' MAUMON_HOST_HTTP_PORT='${host_http_port}' MAUMON_HOST_HTTP_RATE_LIMIT='${host_http_rate_limit}' MAUMON_HOST_HTTP_RATE_LIMIT_BURST='${host_http_rate_limit_burst}' MAUMON_HOST_HTTP_CONN_LIMIT='${host_http_conn_limit}' MAUMON_DOCKER_NETWORK='${docker_network}' MAUMON_APP_DATA_DIR='${app_data_dir}' MAUMON_POSTGRES_CONTAINER_NAME='${postgres_container_name}' MAUMON_POSTGRES_DATA_VOLUME='${postgres_data_volume}' MAUMON_POSTGRES_IMAGE_TAG='${postgres_image_tag}' MAUMON_DEPLOY_MANAGED_POSTGRES='${deploy_managed_postgres}' REMOTE_STAGING='${remote_staging}' bash -s" <<'REMOTE'
+cat >"${remote_script}" <<'REMOTE'
 set -euo pipefail
 
 container_name="maum-on-mobile-back"
@@ -446,3 +446,66 @@ curl -fsS "http://127.0.0.1:${host_http_port}/actuator/health" >/dev/null
 sudo docker rm "${previous_container_name}" >/dev/null 2>&1 || true
 echo "deployed ${image_tag}"
 REMOTE
+
+ssh_base=(
+  ssh
+  -i "${ssh_key}"
+  -p "${OCI_A1_SSH_PORT:-22}"
+  -o BatchMode=yes
+  -o StrictHostKeyChecking=yes
+  -o UserKnownHostsFile="${known_hosts}"
+  "${OCI_A1_SSH_USER:-}@${OCI_A1_SSH_HOST:-}"
+)
+
+scp_base=(
+  scp
+  -i "${ssh_key}"
+  -P "${OCI_A1_SSH_PORT:-22}"
+  -o BatchMode=yes
+  -o StrictHostKeyChecking=yes
+  -o UserKnownHostsFile="${known_hosts}"
+)
+
+remote_env=(
+  "MAUMON_BACKEND_IMAGE_TAG=${MAUMON_BACKEND_IMAGE_TAG}"
+  "MAUMON_DEPLOY_HEALTH_TIMEOUT_SECONDS=${deploy_health_timeout_seconds}"
+  "MAUMON_HOST_HTTP_PORT=${host_http_port}"
+  "MAUMON_HOST_HTTP_RATE_LIMIT=${host_http_rate_limit}"
+  "MAUMON_HOST_HTTP_RATE_LIMIT_BURST=${host_http_rate_limit_burst}"
+  "MAUMON_HOST_HTTP_CONN_LIMIT=${host_http_conn_limit}"
+  "MAUMON_DOCKER_NETWORK=${docker_network}"
+  "MAUMON_APP_DATA_DIR=${app_data_dir}"
+  "MAUMON_POSTGRES_CONTAINER_NAME=${postgres_container_name}"
+  "MAUMON_POSTGRES_DATA_VOLUME=${postgres_data_volume}"
+  "MAUMON_POSTGRES_IMAGE_TAG=${postgres_image_tag}"
+  "MAUMON_DEPLOY_MANAGED_POSTGRES=${deploy_managed_postgres}"
+  "REMOTE_STAGING=${remote_staging}"
+)
+
+prepare_remote_staging() {
+  if [[ "${deploy_transport}" == "local" ]]; then
+    install -d -m 0700 "${remote_staging}"
+    cp "${bundle_copy}" "${backend_env}" "${vertex_key}" "${remote_staging}/"
+    return
+  fi
+
+  "${ssh_base[@]}" "install -d -m 0700 '${remote_staging}'"
+  "${scp_base[@]}" \
+    "${bundle_copy}" \
+    "${backend_env}" \
+    "${vertex_key}" \
+    "${OCI_A1_SSH_USER}@${OCI_A1_SSH_HOST}:${remote_staging}/"
+}
+
+run_remote_deploy() {
+  if [[ "${deploy_transport}" == "local" ]]; then
+    env "${remote_env[@]}" bash "${remote_script}"
+    return
+  fi
+
+  "${ssh_base[@]}" \
+    "$(printf '%q ' "${remote_env[@]}") bash -s" <"${remote_script}"
+}
+
+prepare_remote_staging
+run_remote_deploy
