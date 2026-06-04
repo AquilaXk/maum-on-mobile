@@ -262,6 +262,7 @@ test("repository exposes deployment, migration, storage, and compatibility evide
   assert.match(pubspec, /^version:\s*\d+\.\d+\.\d+\+\d+/m);
   assert.match(app, /String\.fromEnvironment\(\s*'APP_VERSION'/);
   assert.match(backendBuild, /version = ".+"/);
+  assert.match(backendBuild, /runtimeOnly\("org\.postgresql:postgresql"\)/);
 });
 
 test("ci runs production deploy readiness gate only for release candidate flows", () => {

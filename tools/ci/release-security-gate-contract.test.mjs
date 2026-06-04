@@ -46,7 +46,7 @@ test("release security gate contract covers dependency ecosystems and release bl
     assert.ok(contract.releaseBlockers.includes(blocker), `Missing release blocker: ${blocker}`);
   }
 
-  for (const license of ["Apache-2.0", "BSD-3-Clause", "MIT", "MPL-2.0"]) {
+  for (const license of ["Apache-2.0", "BSD-2-Clause", "BSD-3-Clause", "MIT", "MPL-2.0"]) {
     assert.ok(contract.licenseAllowList.includes(license), `Missing allowed license: ${license}`);
   }
 });
