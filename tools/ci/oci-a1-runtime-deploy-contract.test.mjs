@@ -56,7 +56,7 @@ test("OCI runtime deploy script is safe, idempotent, and verifies health", () =>
     script,
     /MAUMON_DOCKER_NETWORK='\$\{docker_network\}' MAUMON_APP_DATA_DIR='\$\{app_data_dir\}'/,
   );
-  assert.match(script, /install_runtime[\s\S]*prepare_runtime_resources[\s\S]*prepare_managed_postgres/);
+  assert.match(script, /\ninstall_runtime\n[\s\S]*\nprepare_runtime_resources\nprepare_managed_postgres\n\nsudo docker build/);
   assert.match(script, /container_name="maum-on-mobile-back"/);
   assert.match(script, /previous_container_name="maum-on-mobile-back-previous"/);
   assert.match(script, /network_name="\$\{MAUMON_DOCKER_NETWORK:-maum-on-mobile\}"/);
