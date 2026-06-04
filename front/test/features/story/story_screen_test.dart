@@ -33,8 +33,13 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byKey(const ValueKey('story-search-field')), findsOneWidget);
+    expect(find.byKey(const ValueKey('story-flow-panel')), findsOneWidget);
+    expect(find.text('스토리 탐색 흐름'), findsOneWidget);
+    expect(find.text('검색과 카테고리로 필요한 이야기를 좁혀 보세요.'), findsOneWidget);
+    expect(find.byKey(const ValueKey('story-search-panel')), findsOneWidget);
     expect(find.text('잠이 오지 않는 밤'), findsOneWidget);
 
+    await tester.ensureVisible(find.byKey(const ValueKey('story-card-1')));
     await tester.tap(find.byKey(const ValueKey('story-card-1')));
     await tester.pumpAndSettle();
 
@@ -92,8 +97,7 @@ void main() {
     expect(find.text('질문 본문'), findsOneWidget);
   });
 
-  testWidgets('loads the next story page from the list footer',
-      (tester) async {
+  testWidgets('loads the next story page from the list footer', (tester) async {
     final repository = _FakeStoryRepository(
       storyPages: [
         _storyPage(
@@ -563,12 +567,13 @@ class _FakeStoryRepository implements StoryRepository {
   final List<PageResponse<StoryComment>> commentPages;
   final int createdStoryId;
   final List<StoryDraft> createdDrafts = [];
-  final List<({
-    int postId,
-    int authorId,
-    String content,
-    int? parentCommentId,
-  })> createdComments = [];
+  final List<
+      ({
+        int postId,
+        int authorId,
+        String content,
+        int? parentCommentId,
+      })> createdComments = [];
 
   @override
   Future<PageResponse<StorySummary>> fetchStories({

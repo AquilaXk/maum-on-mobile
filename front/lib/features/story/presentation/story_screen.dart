@@ -115,6 +115,8 @@ class _StoryScreenState extends State<StoryScreen> {
               AppNotice(message: state.noticeMessage!),
               const SizedBox(height: AppSpacing.md),
             ],
+            _StoryFlowPanel(mode: state.mode),
+            const SizedBox(height: AppSpacing.lg),
             switch (state.mode) {
               StoryViewMode.list => _StoryListView(
                   state: state,
@@ -136,6 +138,39 @@ class _StoryScreenState extends State<StoryScreen> {
   }
 }
 
+class _StoryFlowPanel extends StatelessWidget {
+  const _StoryFlowPanel({required this.mode});
+
+  final StoryViewMode mode;
+
+  @override
+  Widget build(BuildContext context) {
+    return AppFlowPanel(
+      key: const ValueKey('story-flow-panel'),
+      icon: switch (mode) {
+        StoryViewMode.list => Icons.travel_explore_outlined,
+        StoryViewMode.detail => Icons.forum_outlined,
+        StoryViewMode.editor => Icons.edit_note_outlined,
+      },
+      title: switch (mode) {
+        StoryViewMode.list => '스토리 탐색 흐름',
+        StoryViewMode.detail => '대화 확인 흐름',
+        StoryViewMode.editor => '스토리 작성 흐름',
+      },
+      message: switch (mode) {
+        StoryViewMode.list => '검색과 카테고리로 필요한 이야기를 좁혀 보세요.',
+        StoryViewMode.detail => '본문을 읽고 댓글과 신고 상태를 한 화면에서 확인하세요.',
+        StoryViewMode.editor => '카테고리를 정하고 제목과 본문을 순서대로 작성하세요.',
+      },
+      steps: switch (mode) {
+        StoryViewMode.list => ['검색', '분류 선택', '이야기 열기'],
+        StoryViewMode.detail => ['본문', '댓글', '후속 액션'],
+        StoryViewMode.editor => ['카테고리', '제목', '본문 등록'],
+      },
+    );
+  }
+}
+
 class _StoryListView extends StatelessWidget {
   const _StoryListView({
     required this.state,
@@ -150,25 +185,37 @@ class _StoryListView extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        TextField(
-          key: const ValueKey('story-search-field'),
-          decoration: const InputDecoration(
-            labelText: '제목 검색',
-            border: OutlineInputBorder(),
+        AppSectionCard(
+          key: const ValueKey('story-search-panel'),
+          title: '이야기 찾기',
+          subtitle: '검색어와 분류를 함께 조정해 목록을 좁힙니다.',
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              TextField(
+                key: const ValueKey('story-search-field'),
+                decoration: const InputDecoration(
+                  labelText: '제목 검색',
+                  prefixIcon: Icon(Icons.search),
+                  border: OutlineInputBorder(),
+                ),
+                onChanged: controller.updateSearchQuery,
+                onSubmitted: (_) => controller.loadStories(),
+              ),
+              const SizedBox(height: AppSpacing.sm),
+              FilledButton.tonalIcon(
+                key: const ValueKey('story-search-button'),
+                onPressed: state.isListLoading ? null : controller.loadStories,
+                icon: const Icon(Icons.manage_search),
+                label: const Text('검색'),
+              ),
+              const SizedBox(height: AppSpacing.md),
+              _StoryCategoryFilter(
+                selectedCategory: state.selectedCategory,
+                onSelected: controller.selectCategory,
+              ),
+            ],
           ),
-          onChanged: controller.updateSearchQuery,
-          onSubmitted: (_) => controller.loadStories(),
-        ),
-        const SizedBox(height: AppSpacing.sm),
-        FilledButton.tonal(
-          key: const ValueKey('story-search-button'),
-          onPressed: state.isListLoading ? null : controller.loadStories,
-          child: const Text('검색'),
-        ),
-        const SizedBox(height: AppSpacing.md),
-        _StoryCategoryFilter(
-          selectedCategory: state.selectedCategory,
-          onSelected: controller.selectCategory,
         ),
         const SizedBox(height: AppSpacing.lg),
         if (state.isListLoading)

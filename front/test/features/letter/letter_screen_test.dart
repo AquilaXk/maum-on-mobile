@@ -24,8 +24,13 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('받은 편지'), findsWidgets);
+    expect(find.byKey(const ValueKey('letter-flow-panel')), findsOneWidget);
+    expect(find.text('편지 흐름'), findsOneWidget);
+    expect(find.text('수신 상태와 답장 단계를 한곳에서 확인하세요.'), findsOneWidget);
+    expect(find.byKey(const ValueKey('letter-list-section')), findsOneWidget);
     expect(find.text('도착한 편지'), findsOneWidget);
 
+    await tester.ensureVisible(find.byKey(const ValueKey('letter-card-1')));
     await tester.tap(find.byKey(const ValueKey('letter-card-1')));
     await tester.pumpAndSettle();
 
@@ -167,7 +172,8 @@ void main() {
       find.byKey(const ValueKey('letter-compose-cancel-button')),
     );
     await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const ValueKey('letter-compose-cancel-button')));
+    await tester
+        .tap(find.byKey(const ValueKey('letter-compose-cancel-button')));
     await tester.pumpAndSettle();
 
     expect(find.text('작성 중인 편지를 나갈까요?'), findsOneWidget);
@@ -181,7 +187,8 @@ void main() {
       find.byKey(const ValueKey('letter-compose-cancel-button')),
     );
     await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const ValueKey('letter-compose-cancel-button')));
+    await tester
+        .tap(find.byKey(const ValueKey('letter-compose-cancel-button')));
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey('letter-compose-leave-button')));
     await tester.pumpAndSettle();
@@ -190,7 +197,8 @@ void main() {
     expect(find.text('랜덤 편지 수신'), findsOneWidget);
   });
 
-  testWidgets('resets compose fields and exposes length limits', (tester) async {
+  testWidgets('resets compose fields and exposes length limits',
+      (tester) async {
     final controller = LetterController(
       letterRepository: _FakeLetterRepository(
         statsQueue: [_stats()],
@@ -252,7 +260,8 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(repository.requestedDetailIds, [12]);
-    expect(find.byKey(const ValueKey('letter-list-back-button')), findsOneWidget);
+    expect(
+        find.byKey(const ValueKey('letter-list-back-button')), findsOneWidget);
   });
 
   testWidgets('shows receiver guidance when no recipient is available',
