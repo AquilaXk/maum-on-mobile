@@ -60,8 +60,9 @@ class _AuthScreenState extends State<AuthScreen> {
     final state = widget.controller.state;
     final externalLoginState = widget.externalLoginController?.state;
     final platform = theme.platform;
-    final secondaryActions =
-        _secondaryActions(state, externalLoginState, platform);
+    final isAuthBusy =
+        state.isSubmitting || (externalLoginState?.isStarting ?? false);
+    final secondaryActions = _secondaryActions(platform, isAuthBusy);
 
     return Scaffold(
       body: DecoratedBox(
@@ -122,11 +123,11 @@ class _AuthScreenState extends State<AuthScreen> {
                                 ),
                                 const SizedBox(height: AppSpacing.lg),
                               ],
-                              ..._fieldsForMode(theme),
+                              ..._fieldsForMode(theme, isAuthBusy),
                               const SizedBox(height: AppSpacing.xl),
                               FilledButton.icon(
                                 key: ValueKey(_submitButtonKey),
-                                onPressed: state.isSubmitting ? null : _submit,
+                                onPressed: isAuthBusy ? null : _submit,
                                 icon: state.isSubmitting
                                     ? SizedBox.square(
                                         dimension: 18,
@@ -215,10 +216,10 @@ class _AuthScreenState extends State<AuthScreen> {
     };
   }
 
-  List<Widget> _fieldsForMode(ThemeData theme) {
+  List<Widget> _fieldsForMode(ThemeData theme, bool isAuthBusy) {
     return switch (_mode) {
       AuthFormMode.login => _loginFields(),
-      AuthFormMode.signup => _signupFields(theme),
+      AuthFormMode.signup => _signupFields(theme, isAuthBusy),
       AuthFormMode.passwordResetRequest => _passwordResetRequestFields(),
       AuthFormMode.passwordResetConfirm => _passwordResetConfirmFields(),
     };
@@ -242,7 +243,7 @@ class _AuthScreenState extends State<AuthScreen> {
     ];
   }
 
-  List<Widget> _signupFields(ThemeData theme) {
+  List<Widget> _signupFields(ThemeData theme, bool isAuthBusy) {
     final fields = <Widget>[
       _emailField(
         key: const ValueKey('login-email-field'),
@@ -262,7 +263,7 @@ class _AuthScreenState extends State<AuthScreen> {
         alignment: Alignment.centerLeft,
         child: TextButton(
           key: const ValueKey('signup-email-change-button'),
-          onPressed: _resetSignupEmailVerification,
+          onPressed: isAuthBusy ? null : _resetSignupEmailVerification,
           child: const Text('다른 이메일 사용'),
         ),
       ),
@@ -423,11 +424,7 @@ class _AuthScreenState extends State<AuthScreen> {
     );
   }
 
-  List<Widget> _secondaryActions(
-    AuthState state,
-    ExternalLoginState? externalLoginState,
-    TargetPlatform platform,
-  ) {
+  List<Widget> _secondaryActions(TargetPlatform platform, bool isAuthBusy) {
     final actions = <Widget>[];
 
     switch (_mode) {
@@ -435,7 +432,7 @@ class _AuthScreenState extends State<AuthScreen> {
         actions.add(
           TextButton(
             key: const ValueKey('password-reset-open-button'),
-            onPressed: state.isSubmitting
+            onPressed: isAuthBusy
                 ? null
                 : () => _changeMode(AuthFormMode.passwordResetRequest),
             child: const Text('비밀번호를 잊으셨나요?'),
@@ -443,9 +440,8 @@ class _AuthScreenState extends State<AuthScreen> {
         );
         actions.add(
           TextButton(
-            onPressed: state.isSubmitting
-                ? null
-                : () => _changeMode(AuthFormMode.signup),
+            onPressed:
+                isAuthBusy ? null : () => _changeMode(AuthFormMode.signup),
             child: const Text('새 계정 만들기'),
           ),
         );
@@ -463,7 +459,7 @@ class _AuthScreenState extends State<AuthScreen> {
           actions.add(
             _QuickLoginProviderRow(
               providers: providers,
-              isStarting: externalLoginState?.isStarting == true,
+              isStarting: isAuthBusy,
               onStart: (provider) => widget.externalLoginController!.start(
                 provider: provider.providerId,
               ),
@@ -474,9 +470,8 @@ class _AuthScreenState extends State<AuthScreen> {
       case AuthFormMode.signup:
         actions.add(
           TextButton(
-            onPressed: state.isSubmitting
-                ? null
-                : () => _changeMode(AuthFormMode.login),
+            onPressed:
+                isAuthBusy ? null : () => _changeMode(AuthFormMode.login),
             child: const Text('이미 계정이 있어요'),
           ),
         );
@@ -485,9 +480,8 @@ class _AuthScreenState extends State<AuthScreen> {
       case AuthFormMode.passwordResetConfirm:
         actions.add(
           TextButton(
-            onPressed: state.isSubmitting
-                ? null
-                : () => _changeMode(AuthFormMode.login),
+            onPressed:
+                isAuthBusy ? null : () => _changeMode(AuthFormMode.login),
             child: const Text('로그인으로 돌아가기'),
           ),
         );

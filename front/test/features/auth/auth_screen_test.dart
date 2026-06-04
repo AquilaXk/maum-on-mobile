@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:maum_on_mobile_front/features/auth/application/auth_controller.dart';
@@ -307,6 +309,82 @@ void main() {
       'maumon://auth/callback?provider=kakao',
     );
   });
+
+  testWidgets('disables other auth actions while quick login is starting',
+      (tester) async {
+    final repository = _FakeAuthRepository();
+    final authController = AuthController(authRepository: repository);
+    final launcher = _PendingExternalLoginLauncher();
+    final externalLoginController = ExternalLoginController(
+      authController: authController,
+      launcher: launcher,
+      config: ExternalLoginConfig(
+        apiBaseUrl: Uri.parse('https://api.example.com'),
+      ),
+    );
+
+    await tester.pumpWidget(
+      _AuthScreenHarness(
+        repository: repository,
+        controller: authController,
+        platform: TargetPlatform.android,
+        externalLoginController: externalLoginController,
+      ),
+    );
+
+    await tester.ensureVisible(
+      find.byKey(const ValueKey('external-login-kakao-button')),
+    );
+    await tester.tap(find.byKey(const ValueKey('external-login-kakao-button')));
+    await tester.pump();
+
+    expect(launcher.launchedUris, hasLength(1));
+    expect(externalLoginController.state.isStarting, isTrue);
+    expect(
+      tester
+          .widget<FilledButton>(
+            find.byKey(const ValueKey('login-submit-button')),
+          )
+          .onPressed,
+      isNull,
+    );
+    expect(
+      tester
+          .widget<TextButton>(
+            find.byKey(const ValueKey('password-reset-open-button')),
+          )
+          .onPressed,
+      isNull,
+    );
+    expect(
+      tester
+          .widget<Semantics>(
+            find.byKey(const ValueKey('external-login-kakao-button')),
+          )
+          .properties
+          .enabled,
+      isFalse,
+    );
+
+    await tester.tap(find.text('새 계정 만들기'));
+    await tester.pump();
+    expect(
+      find.byKey(const ValueKey('signup-email-verification-request-button')),
+      findsNothing,
+    );
+
+    launcher.complete();
+    await tester.pumpAndSettle();
+
+    expect(
+      tester
+          .widget<FilledButton>(
+            find.byKey(const ValueKey('login-submit-button')),
+          )
+          .onPressed,
+      isNotNull,
+    );
+  });
 }
 
 void _expectOnlyQuickLoginProviders(List<String> visibleProviders) {
@@ -335,11 +413,22 @@ class _AuthScreenHarness extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final authController =
+        controller ?? AuthController(authRepository: repository);
+
     return MaterialApp(
       theme: ThemeData(platform: platform),
-      home: AuthScreen(
-        controller: controller ?? AuthController(authRepository: repository),
-        externalLoginController: externalLoginController,
+      home: AnimatedBuilder(
+        animation: Listenable.merge([
+          authController,
+          externalLoginController,
+        ]),
+        builder: (context, _) {
+          return AuthScreen(
+            controller: authController,
+            externalLoginController: externalLoginController,
+          );
+        },
       ),
     );
   }
@@ -352,6 +441,21 @@ class _FakeExternalLoginLauncher implements ExternalLoginLauncher {
   Future<bool> launch(Uri uri) async {
     launchedUris.add(uri);
     return true;
+  }
+}
+
+class _PendingExternalLoginLauncher implements ExternalLoginLauncher {
+  final List<Uri> launchedUris = [];
+  final Completer<bool> _launchCompleter = Completer<bool>();
+
+  @override
+  Future<bool> launch(Uri uri) {
+    launchedUris.add(uri);
+    return _launchCompleter.future;
+  }
+
+  void complete([bool launched = true]) {
+    _launchCompleter.complete(launched);
   }
 }
 
