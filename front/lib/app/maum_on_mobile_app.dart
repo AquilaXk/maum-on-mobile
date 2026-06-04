@@ -911,7 +911,7 @@ class _MaumOnMobileAppState extends State<MaumOnMobileApp>
   ConsultationRepository _buildDefaultConsultationRepository() {
     return ApiConsultationRepository(
       apiClient: _sessionApiClient(tokenRefresher: _tokenRefresher()),
-      streamClient: DioConsultationStreamClient(
+      streamClient: HttpConsultationStreamClient(
         apiConfig: _apiConfig,
         tokenStore: _tokenStore,
       ),

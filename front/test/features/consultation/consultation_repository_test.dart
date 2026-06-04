@@ -1,7 +1,13 @@
+import 'dart:async';
+import 'dart:convert';
+import 'dart:io';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:maum_on_mobile_front/core/network/api_client.dart';
+import 'package:maum_on_mobile_front/core/network/api_error.dart';
 import 'package:maum_on_mobile_front/core/network/api_transport.dart';
 import 'package:maum_on_mobile_front/core/network/auth_token_store.dart';
+import 'package:maum_on_mobile_front/core/network/api_config.dart';
 import 'package:maum_on_mobile_front/features/consultation/data/consultation_repository.dart';
 import 'package:maum_on_mobile_front/features/consultation/domain/consultation_models.dart';
 
@@ -105,6 +111,97 @@ void main() {
       expect(transport.requests.single.path, '/api/v1/consultations/sensitive');
       expect(transport.requests.single.method, ApiMethod.delete);
       expect(deletedCount, 2);
+    });
+  });
+
+  group('HttpConsultationStreamClient', () {
+    test('streams SSE events with the saved bearer token', () async {
+      final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+      addTearDown(() => server.close(force: true));
+
+      final authHeaders = <String?>[];
+      unawaited(
+        server.forEach((request) async {
+          authHeaders
+              .add(request.headers.value(HttpHeaders.authorizationHeader));
+          request.response
+            ..statusCode = HttpStatus.ok
+            ..headers.contentType = ContentType('text', 'event-stream');
+          request.response
+              .add(utf8.encode('event: connect\ndata: connected\n\n'));
+          await request.response.flush();
+          request.response.add(
+            utf8.encode(
+              'event: chat\n'
+              'data: {"requestId":"r1","sequence":0,"chunk":"함께 "}\n\n',
+            ),
+          );
+          request.response.add(
+            utf8.encode(
+              'event: chat_done\n'
+              'data: {"requestId":"r1","sequence":1,"done":true}\n\n',
+            ),
+          );
+          await request.response.close();
+        }),
+      );
+
+      final client = HttpConsultationStreamClient(
+        apiConfig:
+            ApiConfig(baseUrl: Uri.parse('http://127.0.0.1:${server.port}')),
+        tokenStore: MemoryAuthTokenStore(
+          initialTokens: const TokenPair(
+            accessToken: 'access-token',
+            refreshToken: 'refresh-token',
+          ),
+        ),
+      );
+
+      final events = await client.connect().toList();
+
+      expect(authHeaders.single, 'Bearer access-token');
+      expect(events.map((event) => event.type), [
+        ConsultationStreamEventType.connect,
+        ConsultationStreamEventType.chat,
+        ConsultationStreamEventType.done,
+      ]);
+      expect(events[1].data, '함께 ');
+      expect(events[1].requestId, 'r1');
+      expect(events[1].sequence, 0);
+    });
+
+    test('clears expired tokens when the stream returns unauthorized',
+        () async {
+      final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+      addTearDown(() => server.close(force: true));
+
+      unawaited(
+        server.forEach((request) async {
+          request.response.statusCode = HttpStatus.unauthorized;
+          await request.response.close();
+        }),
+      );
+      final tokenStore = MemoryAuthTokenStore(
+        initialTokens: const TokenPair(
+          accessToken: 'expired-access-token',
+          refreshToken: 'expired-refresh-token',
+        ),
+      );
+      final client = HttpConsultationStreamClient(
+        apiConfig:
+            ApiConfig(baseUrl: Uri.parse('http://127.0.0.1:${server.port}')),
+        tokenStore: tokenStore,
+      );
+
+      await expectLater(
+        client.connect(),
+        emitsError(
+          isA<ApiClientException>()
+              .having((error) => error.kind, 'kind', ApiErrorKind.unauthorized),
+        ),
+      );
+      expect(await tokenStore.readAccessToken(), isNull);
+      expect(await tokenStore.readRefreshToken(), isNull);
     });
   });
 }
