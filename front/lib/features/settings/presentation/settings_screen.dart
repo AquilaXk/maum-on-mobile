@@ -161,18 +161,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                       semanticLabel: '계정 설정을 불러오는 중',
                                     )
                             else ...[
-                              const AppFlowPanel(
-                                key: ValueKey('settings-flow-panel'),
-                                icon: Icons.manage_accounts_outlined,
-                                title: '설정 관리 흐름',
-                                message: '계정 상태를 확인하고 필요한 변경을 순서대로 처리하세요.',
-                                steps: ['계정 확인', '앱 설정', '지원 요청'],
-                              ),
-                              const SizedBox(height: AppSpacing.lg),
                               _AccountSummary(
                                 email: settings.email,
                                 nickname: settings.nickname,
                                 isSocialAccount: settings.socialAccount,
+                                randomReceiveAllowed:
+                                    settings.randomReceiveAllowed,
+                                dataExport: state.dataExport,
                               ),
                               const SizedBox(height: AppSpacing.lg),
                               _ProfileSection(
@@ -419,26 +414,100 @@ class _AccountSummary extends StatelessWidget {
     required this.email,
     required this.nickname,
     required this.isSocialAccount,
+    required this.randomReceiveAllowed,
+    required this.dataExport,
   });
 
   final String email;
   final String nickname;
   final bool isSocialAccount;
+  final bool randomReceiveAllowed;
+  final MemberDataExportJob? dataExport;
 
   @override
   Widget build(BuildContext context) {
-    return AppSectionCard(
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final accountType = isSocialAccount ? '소셜 계정' : '이메일 계정';
+    final randomStatus = randomReceiveAllowed ? '랜덤 편지 수신 중' : '랜덤 편지 중지';
+    final exportStatus = dataExport == null
+        ? '내보내기 요청 가능'
+        : '내보내기 ${_exportStatusLabel(dataExport!.status)}';
+
+    return KeyedSubtree(
       key: const ValueKey('settings-account-section'),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            nickname,
-            style: Theme.of(context).textTheme.titleMedium,
+      child: Card(
+        key: const ValueKey('settings-account-toolbar'),
+        margin: EdgeInsets.zero,
+        child: Padding(
+          padding: const EdgeInsets.all(AppSpacing.md),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(
+                    Icons.manage_accounts_outlined,
+                    color: colorScheme.primary,
+                    size: 22,
+                  ),
+                  const SizedBox(width: AppSpacing.xs),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          nickname,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                        const SizedBox(height: AppSpacing.xxs),
+                        Text(
+                          email,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: AppSpacing.xs),
+              Wrap(
+                spacing: AppSpacing.xs,
+                runSpacing: AppSpacing.xs,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [
+                  AppStatusPill(
+                    label: accountType,
+                    tone: isSocialAccount
+                        ? AppStatusTone.warning
+                        : AppStatusTone.success,
+                  ),
+                  AppStatusPill(
+                    label: randomStatus,
+                    tone: randomReceiveAllowed
+                        ? AppStatusTone.success
+                        : AppStatusTone.neutral,
+                  ),
+                  AppStatusPill(
+                    label: exportStatus,
+                    tone: dataExport?.canDownload == true
+                        ? AppStatusTone.success
+                        : AppStatusTone.neutral,
+                  ),
+                ],
+              ),
+            ],
           ),
-          const SizedBox(height: AppSpacing.xxs),
-          Text('$email · ${isSocialAccount ? '소셜 계정' : '이메일 계정'}'),
-        ],
+        ),
       ),
     );
   }

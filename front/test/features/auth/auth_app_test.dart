@@ -195,7 +195,13 @@ void main() {
 
     await _tapVisibleText(tester, '설정');
     expect(find.text('계정 설정'), findsOneWidget);
-    expect(find.text('me@example.com'), findsOneWidget);
+    expect(
+      find.descendant(
+        of: find.byKey(const ValueKey('settings-account-toolbar')),
+        matching: find.text('me@example.com'),
+      ),
+      findsOneWidget,
+    );
     await _returnHome(tester);
   });
 
@@ -672,7 +678,13 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('계정 설정'), findsOneWidget);
-    expect(find.text('me@example.com'), findsOneWidget);
+    expect(
+      find.descendant(
+        of: find.byKey(const ValueKey('settings-account-toolbar')),
+        matching: find.text('me@example.com'),
+      ),
+      findsOneWidget,
+    );
 
     await tester.ensureVisible(
       find.byKey(const ValueKey('settings-request-withdraw')),

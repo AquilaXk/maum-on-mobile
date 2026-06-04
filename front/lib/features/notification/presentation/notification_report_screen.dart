@@ -148,6 +148,14 @@ class _NotificationReportScreenState extends State<NotificationReportScreen>
                         widget.notificationController.state.canOpenPushSettings,
                     unreadCount:
                         widget.notificationController.state.unreadCount,
+                    directCount:
+                        widget.notificationController.state.notifications
+                            .where(
+                              (notification) =>
+                                  notification.destination !=
+                                  NotificationTapDestination.notifications,
+                            )
+                            .length,
                     lastReceivedAt:
                         widget.notificationController.state.lastReceivedAt,
                     onBack: widget.onBack,
@@ -212,6 +220,7 @@ class _Header extends StatelessWidget {
     required this.pushNotificationState,
     required this.canOpenPushSettings,
     required this.unreadCount,
+    required this.directCount,
     required this.lastReceivedAt,
     required this.onBack,
     required this.onReconnect,
@@ -224,6 +233,7 @@ class _Header extends StatelessWidget {
   final PushNotificationState pushNotificationState;
   final bool canOpenPushSettings;
   final int unreadCount;
+  final int directCount;
   final String? lastReceivedAt;
   final VoidCallback onBack;
   final Future<void> Function() onReconnect;
@@ -238,13 +248,6 @@ class _Header extends StatelessWidget {
       NotificationConnectionState.connecting => '연결 중',
       NotificationConnectionState.connected => '연결됨',
       NotificationConnectionState.error => '연결 불안정',
-    };
-    final pushIcon = switch (pushNotificationState) {
-      PushNotificationState.registered => Icons.notifications_active,
-      PushNotificationState.requesting => Icons.hourglass_top,
-      PushNotificationState.denied => Icons.notifications_off_outlined,
-      PushNotificationState.error => Icons.notification_important_outlined,
-      PushNotificationState.idle => Icons.notifications_outlined,
     };
     final summary = lastReceivedAt == null
         ? '$statusText · 읽지 않음 $unreadCount'
@@ -298,37 +301,139 @@ class _Header extends StatelessWidget {
             title: '알림/신고',
             subtitle: summary,
             onBack: onBack,
-            actions: [
-              if (unreadCount > 0)
-                IconButton(
-                  key: const ValueKey('notification-mark-all-read-button'),
-                  tooltip: '모두 읽음',
-                  onPressed: () => onMarkAllRead(),
-                  icon: const Icon(Icons.done_all),
-                ),
-              IconButton(
-                key: const ValueKey('notification-push-button'),
-                tooltip: '푸시 알림',
-                onPressed:
-                    pushNotificationState == PushNotificationState.requesting
-                        ? null
-                        : () => unawaited(pushAction()),
-                icon: Icon(pushIcon),
-              ),
-              if (connectionState == NotificationConnectionState.error)
-                IconButton.filledTonal(
-                  key: const ValueKey('notification-reconnect-button'),
-                  tooltip: '다시 연결',
-                  onPressed: () => onReconnect(),
-                  icon: const Icon(Icons.refresh),
-                ),
-            ],
           ),
-          if (permissionState != null) ...[
-            const SizedBox(height: AppSpacing.sm),
-            permissionState,
-          ],
+          const SizedBox(height: AppSpacing.sm),
+          _NotificationStatusToolbar(
+            connectionState: connectionState,
+            pushNotificationState: pushNotificationState,
+            unreadCount: unreadCount,
+            directCount: directCount,
+            canOpenPushSettings: canOpenPushSettings,
+            onReconnect: onReconnect,
+            onPushAction: pushAction,
+            onMarkAllRead: onMarkAllRead,
+            permissionState: permissionState,
+          ),
         ],
+      ),
+    );
+  }
+}
+
+class _NotificationStatusToolbar extends StatelessWidget {
+  const _NotificationStatusToolbar({
+    required this.connectionState,
+    required this.pushNotificationState,
+    required this.unreadCount,
+    required this.directCount,
+    required this.canOpenPushSettings,
+    required this.onReconnect,
+    required this.onPushAction,
+    required this.onMarkAllRead,
+    required this.permissionState,
+  });
+
+  final NotificationConnectionState connectionState;
+  final PushNotificationState pushNotificationState;
+  final int unreadCount;
+  final int directCount;
+  final bool canOpenPushSettings;
+  final Future<void> Function() onReconnect;
+  final Future<void> Function() onPushAction;
+  final Future<void> Function() onMarkAllRead;
+  final AppStateView? permissionState;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final pushLabel = _pushStatusLabel(pushNotificationState);
+
+    return Card(
+      key: const ValueKey('notification-status-toolbar'),
+      margin: EdgeInsets.zero,
+      child: Padding(
+        padding: const EdgeInsets.all(AppSpacing.md),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(
+                  Icons.notifications_active_outlined,
+                  color: colorScheme.primary,
+                  size: 22,
+                ),
+                const SizedBox(width: AppSpacing.xs),
+                Expanded(
+                  child: Text(
+                    '알림 상태',
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
+                if (unreadCount > 0)
+                  IconButton(
+                    key: const ValueKey('notification-mark-all-read-button'),
+                    tooltip: '모두 읽음',
+                    onPressed: () => onMarkAllRead(),
+                    icon: const Icon(Icons.done_all),
+                  ),
+                IconButton(
+                  key: const ValueKey('notification-push-button'),
+                  tooltip: '푸시 알림',
+                  onPressed:
+                      pushNotificationState == PushNotificationState.requesting
+                          ? null
+                          : () => unawaited(onPushAction()),
+                  icon: Icon(_pushStatusIcon(pushNotificationState)),
+                ),
+                if (connectionState == NotificationConnectionState.error)
+                  IconButton.filledTonal(
+                    key: const ValueKey('notification-reconnect-button'),
+                    tooltip: '다시 연결',
+                    onPressed: () => onReconnect(),
+                    icon: const Icon(Icons.refresh),
+                  ),
+              ],
+            ),
+            const SizedBox(height: AppSpacing.xs),
+            Wrap(
+              spacing: AppSpacing.xs,
+              runSpacing: AppSpacing.xs,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              children: [
+                AppStatusPill(
+                  label: '읽지 않음 $unreadCount개',
+                  tone: unreadCount > 0
+                      ? AppStatusTone.warning
+                      : AppStatusTone.success,
+                ),
+                AppStatusPill(
+                  label: '바로 이동 $directCount개',
+                  tone: directCount > 0
+                      ? AppStatusTone.success
+                      : AppStatusTone.neutral,
+                ),
+                AppStatusPill(
+                  label: _connectionStatusLabel(connectionState),
+                  tone: _connectionStatusTone(connectionState),
+                ),
+                AppStatusPill(
+                  label: pushLabel,
+                  tone: _pushStatusTone(pushNotificationState),
+                ),
+              ],
+            ),
+            if (permissionState != null &&
+                pushNotificationState != PushNotificationState.idle) ...[
+              const SizedBox(height: AppSpacing.sm),
+              permissionState!,
+            ],
+          ],
+        ),
       ),
     );
   }
@@ -368,14 +473,6 @@ class _NotificationCenter extends StatelessWidget {
           physics: const AlwaysScrollableScrollPhysics(),
           padding: const EdgeInsets.all(AppSpacing.lg),
           children: [
-            const AppFlowPanel(
-              key: ValueKey('notification-report-flow-panel'),
-              icon: Icons.notifications_active_outlined,
-              title: '알림과 신고 흐름',
-              message: '알림을 확인하고 필요한 신고까지 이어서 처리하세요.',
-              steps: ['실시간 확인', '알림 열기', '신고 접수'],
-            ),
-            const SizedBox(height: AppSpacing.md),
             if (state.errorMessage != null) ...[
               AppStateView.error(
                 title: '알림을 불러오지 못했습니다.',
@@ -388,8 +485,6 @@ class _NotificationCenter extends StatelessWidget {
               _InlineNotice(message: state.noticeMessage!),
               const SizedBox(height: AppSpacing.md),
             ],
-            _NotificationCenterSummary(state: state),
-            const SizedBox(height: AppSpacing.md),
             if (state.isEmpty)
               const AppStateView.empty(
                 title: '아직 도착한 알림이 없습니다.',
@@ -406,50 +501,6 @@ class _NotificationCenter extends StatelessWidget {
           ],
         ),
       ),
-    );
-  }
-}
-
-class _NotificationCenterSummary extends StatelessWidget {
-  const _NotificationCenterSummary({required this.state});
-
-  final NotificationState state;
-
-  @override
-  Widget build(BuildContext context) {
-    final directCount = state.notifications
-        .where(
-          (notification) =>
-              notification.destination !=
-              NotificationTapDestination.notifications,
-        )
-        .length;
-
-    return Wrap(
-      spacing: AppSpacing.xs,
-      runSpacing: AppSpacing.xs,
-      children: [
-        AppMetricTile(
-          label: '읽지 않음',
-          value: state.unreadCount.toString(),
-          tone: state.unreadCount > 0
-              ? AppStatusTone.warning
-              : AppStatusTone.success,
-          width: 148,
-        ),
-        AppMetricTile(
-          label: '바로 이동',
-          value: directCount.toString(),
-          tone: directCount > 0 ? AppStatusTone.success : AppStatusTone.neutral,
-          width: 148,
-        ),
-        AppMetricTile(
-          label: '실시간 상태',
-          value: _connectionStatusLabel(state.connectionState),
-          tone: _connectionStatusTone(state.connectionState),
-          width: 148,
-        ),
-      ],
     );
   }
 }
@@ -553,6 +604,37 @@ AppStatusTone _connectionStatusTone(NotificationConnectionState state) {
     NotificationConnectionState.connecting => AppStatusTone.warning,
     NotificationConnectionState.error => AppStatusTone.danger,
     NotificationConnectionState.idle => AppStatusTone.neutral,
+  };
+}
+
+String _pushStatusLabel(PushNotificationState state) {
+  return switch (state) {
+    PushNotificationState.idle => '푸시 권한 확인',
+    PushNotificationState.requesting => '푸시 확인 중',
+    PushNotificationState.registered => '푸시 수신 중',
+    PushNotificationState.denied => '권한 꺼짐',
+    PushNotificationState.error => '권한 오류',
+  };
+}
+
+IconData _pushStatusIcon(PushNotificationState state) {
+  return switch (state) {
+    PushNotificationState.registered => Icons.notifications_active,
+    PushNotificationState.requesting => Icons.hourglass_top,
+    PushNotificationState.denied => Icons.notifications_off_outlined,
+    PushNotificationState.error => Icons.notification_important_outlined,
+    PushNotificationState.idle => Icons.notifications_outlined,
+  };
+}
+
+AppStatusTone _pushStatusTone(PushNotificationState state) {
+  return switch (state) {
+    PushNotificationState.registered => AppStatusTone.success,
+    PushNotificationState.requesting => AppStatusTone.warning,
+    PushNotificationState.denied ||
+    PushNotificationState.error =>
+      AppStatusTone.danger,
+    PushNotificationState.idle => AppStatusTone.neutral,
   };
 }
 

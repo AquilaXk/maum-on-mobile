@@ -300,8 +300,7 @@ class NotificationController extends ChangeNotifier {
           _state.copyWith(
             pushNotificationState: PushNotificationState.denied,
             canOpenPushSettings: permission.canOpenSettings,
-            errorMessage:
-                permission.message ?? '푸시 알림 권한이 허용되지 않았습니다.',
+            errorMessage: permission.message ?? '푸시 알림 권한이 허용되지 않았습니다.',
           ),
         );
         return;
@@ -594,12 +593,10 @@ class NotificationController extends ChangeNotifier {
       return current;
     }
 
+    // 서버 ID가 없는 실시간 알림은 음수 로컬 ID로만 구분되므로
+    // 양수 서버 ID와 절댓값을 맞춰 제거하면 첫 알림이 유실될 수 있다.
     final localOnly = current.where((notification) => notification.id < 0);
-    final fetchedIds = fetched.map((notification) => notification.id).toSet();
-    final stillLocal = localOnly.where(
-      (notification) => !fetchedIds.contains(-notification.id),
-    );
-    return [...stillLocal, ...fetched];
+    return [...localOnly, ...fetched];
   }
 
   void _handleError(Object error) {
@@ -693,7 +690,8 @@ extension on NotificationStreamEventType {
       NotificationStreamEventType.replyArrival => 'reply_arrival',
       NotificationStreamEventType.reportStatus => 'report_status',
       NotificationStreamEventType.consultationReply => 'consultation_reply',
-      NotificationStreamEventType.connect || NotificationStreamEventType.unknown =>
+      NotificationStreamEventType.connect ||
+      NotificationStreamEventType.unknown =>
         'fallback',
     };
   }
@@ -707,7 +705,8 @@ extension on NotificationStreamEventType {
         'LETTER',
       NotificationStreamEventType.reportStatus => 'REPORT',
       NotificationStreamEventType.consultationReply => 'CONSULTATION',
-      NotificationStreamEventType.connect || NotificationStreamEventType.unknown =>
+      NotificationStreamEventType.connect ||
+      NotificationStreamEventType.unknown =>
         null,
     };
   }

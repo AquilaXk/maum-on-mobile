@@ -8,6 +8,41 @@ import 'package:maum_on_mobile_front/features/consultation/domain/consultation_m
 import 'package:maum_on_mobile_front/features/consultation/presentation/consultation_screen.dart';
 
 void main() {
+  testWidgets('shows compact consultation status on a phone viewport',
+      (tester) async {
+    tester.view.physicalSize = const Size(390, 640);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    final repository = _FakeConsultationRepository();
+    final controller = ConsultationController(repository: repository);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: ConsultationScreen(
+          controller: controller,
+          onBack: () {},
+        ),
+      ),
+    );
+    await tester.pump();
+    repository.emit(const ConsultationStreamEvent.connect('connected'));
+    await tester.pump();
+
+    expect(
+      find.byKey(const ValueKey('consultation-status-toolbar')),
+      findsOneWidget,
+    );
+    expect(find.text('상담 연결됨'), findsOneWidget);
+    expect(find.text('메시지 1개'), findsOneWidget);
+    expect(find.text('입력 가능'), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('consultation-composer-section')),
+      findsOneWidget,
+    );
+  });
+
   testWidgets('renders chat stream and sends a message', (tester) async {
     final repository = _FakeConsultationRepository();
     final controller = ConsultationController(repository: repository);
@@ -27,9 +62,10 @@ void main() {
     expect(repository.connectCount, 1);
     expect(find.text('상담 연결됨'), findsOneWidget);
     expect(
-        find.byKey(const ValueKey('consultation-flow-panel')), findsOneWidget);
-    expect(find.text('상담 연결 흐름'), findsOneWidget);
-    expect(find.text('연결 상태를 확인하고 메시지를 주고받으세요.'), findsOneWidget);
+      find.byKey(const ValueKey('consultation-status-toolbar')),
+      findsOneWidget,
+    );
+    expect(find.text('메시지 1개'), findsOneWidget);
     expect(find.byKey(const ValueKey('consultation-chat-section')),
         findsOneWidget);
     expect(
