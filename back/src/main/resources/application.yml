@@ -38,6 +38,14 @@ app:
       issuer: maum-on-mobile
       secret: ${APP_JWT_SECRET}
       access-token-ttl: PT1H
+    rate-limit:
+      enabled: ${APP_SECURITY_RATE_LIMIT_ENABLED:true}
+      capacity: ${APP_SECURITY_RATE_LIMIT_CAPACITY:600}
+      window: ${APP_SECURITY_RATE_LIMIT_WINDOW:PT1M}
+      client-ip-header: ${APP_SECURITY_RATE_LIMIT_CLIENT_IP_HEADER:}
+      excluded-paths:
+        - /api/health
+        - /actuator/health
   notifications:
     push:
       request-timeout: ${PUSH_REQUEST_TIMEOUT:PT5S}
