@@ -45,6 +45,12 @@ void main() {
     );
 
     expect(find.text('2026년 5월'), findsOneWidget);
+    expect(find.byKey(const ValueKey('diary-flow-panel')), findsOneWidget);
+    expect(find.text('오늘의 기록 흐름'), findsOneWidget);
+    expect(find.text('선택한 날을 확인하고, 바로 이어서 기록하세요.'), findsOneWidget);
+    expect(
+        find.byKey(const ValueKey('diary-selected-section')), findsOneWidget);
+    expect(find.byKey(const ValueKey('diary-public-section')), findsOneWidget);
     expect(find.text('오늘의 기록'), findsWidgets);
     expect(find.text('공개 기록'), findsOneWidget);
     expect(find.text('함께 읽는 기록'), findsOneWidget);
@@ -85,8 +91,8 @@ void main() {
       find.byKey(const ValueKey('diary-content-field')),
       '사진이 있는 기록',
     );
-    await tester
-        .ensureVisible(find.byKey(const ValueKey('diary-image-gallery-button')));
+    await tester.ensureVisible(
+        find.byKey(const ValueKey('diary-image-gallery-button')));
     await tester.tap(find.byKey(const ValueKey('diary-image-gallery-button')));
     await tester.pump();
     await tester
@@ -96,7 +102,8 @@ void main() {
 
     expect(find.text('mind.png'), findsNothing);
     expect(repository.createdDrafts.single.image, isNull);
-    expect(repository.createdDrafts.single.imageUrl, '/images/uploads/mind.png');
+    expect(
+        repository.createdDrafts.single.imageUrl, '/images/uploads/mind.png');
   });
 
   testWidgets('adds multiple image and text blocks from the editor',
@@ -127,8 +134,8 @@ void main() {
       find.byKey(const ValueKey('diary-content-field')),
       '첫 문단',
     );
-    await tester
-        .ensureVisible(find.byKey(const ValueKey('diary-image-gallery-button')));
+    await tester.ensureVisible(
+        find.byKey(const ValueKey('diary-image-gallery-button')));
     await tester.tap(find.byKey(const ValueKey('diary-image-gallery-button')));
     await tester.pump();
 
@@ -136,18 +143,18 @@ void main() {
     await tester.ensureVisible(
       find.byKey(ValueKey('diary-add-text-after-$firstImageId')),
     );
-    await tester.tap(find.byKey(ValueKey('diary-add-text-after-$firstImageId')));
+    await tester
+        .tap(find.byKey(ValueKey('diary-add-text-after-$firstImageId')));
     await tester.pump();
 
-    final extraTextBlock = controller.state.contentBlocks
-        .where((block) => block.isText)
-        .last;
+    final extraTextBlock =
+        controller.state.contentBlocks.where((block) => block.isText).last;
     await tester.enterText(
       find.byKey(ValueKey('diary-text-block-${extraTextBlock.id}')),
       '뒤 문단',
     );
-    await tester
-        .ensureVisible(find.byKey(const ValueKey('diary-image-gallery-button')));
+    await tester.ensureVisible(
+        find.byKey(const ValueKey('diary-image-gallery-button')));
     await tester.tap(find.byKey(const ValueKey('diary-image-gallery-button')));
     await tester.pump();
 
@@ -166,7 +173,8 @@ void main() {
 
   testWidgets('camera action requests the camera source', (tester) async {
     final picker = _FakeDiaryImagePicker(
-      attachment: const DiaryImageAttachment(filename: 'camera.jpg', bytes: [1]),
+      attachment:
+          const DiaryImageAttachment(filename: 'camera.jpg', bytes: [1]),
     );
     final controller = DiaryController(
       diaryRepository: _FakeDiaryRepository(pages: [_page([])]),
@@ -219,8 +227,8 @@ void main() {
       ),
     );
 
-    await tester
-        .ensureVisible(find.byKey(const ValueKey('diary-image-gallery-button')));
+    await tester.ensureVisible(
+        find.byKey(const ValueKey('diary-image-gallery-button')));
     await tester.tap(find.byKey(const ValueKey('diary-image-gallery-button')));
     await tester.pump();
 
@@ -330,7 +338,9 @@ void main() {
       createDate: '2026-05-20T08:00:00',
     );
     final controller = DiaryController(
-      diaryRepository: _FakeDiaryRepository(pages: [_page([entry])]),
+      diaryRepository: _FakeDiaryRepository(pages: [
+        _page([entry])
+      ]),
       imageRepository: _FakeDiaryImageRepository(),
       now: DateTime(2026, 5, 20),
     );
@@ -368,7 +378,10 @@ void main() {
       createDate: '2026-05-20T08:00:00',
     );
     final repository = _FakeDiaryRepository(
-      pages: [_page([entry]), _page([])],
+      pages: [
+        _page([entry]),
+        _page([])
+      ],
     );
     final controller = DiaryController(
       diaryRepository: repository,

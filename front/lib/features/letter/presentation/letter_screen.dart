@@ -112,6 +112,8 @@ class _LetterScreenState extends State<LetterScreen> {
               _LetterNotice(message: state.noticeMessage!),
               const SizedBox(height: AppSpacing.md),
             ],
+            _LetterFlowPanel(mode: state.mode),
+            const SizedBox(height: AppSpacing.lg),
             switch (state.mode) {
               LetterViewMode.mailbox => _MailboxView(
                   state: state,
@@ -130,6 +132,39 @@ class _LetterScreenState extends State<LetterScreen> {
             },
           ],
         );
+      },
+    );
+  }
+}
+
+class _LetterFlowPanel extends StatelessWidget {
+  const _LetterFlowPanel({required this.mode});
+
+  final LetterViewMode mode;
+
+  @override
+  Widget build(BuildContext context) {
+    return AppFlowPanel(
+      key: const ValueKey('letter-flow-panel'),
+      icon: switch (mode) {
+        LetterViewMode.mailbox => Icons.mark_email_read_outlined,
+        LetterViewMode.detail => Icons.mail_outline,
+        LetterViewMode.compose => Icons.outgoing_mail,
+      },
+      title: switch (mode) {
+        LetterViewMode.mailbox => '편지 흐름',
+        LetterViewMode.detail => '편지 응답 흐름',
+        LetterViewMode.compose => '편지 작성 흐름',
+      },
+      message: switch (mode) {
+        LetterViewMode.mailbox => '수신 상태와 답장 단계를 한곳에서 확인하세요.',
+        LetterViewMode.detail => '상태를 확인하고 수락, 답장, 신고를 차례로 처리하세요.',
+        LetterViewMode.compose => '제목과 본문을 작성한 뒤 발송 상태를 보낸 편지함에서 확인하세요.',
+      },
+      steps: switch (mode) {
+        LetterViewMode.mailbox => ['수신 환경', '받은 목록', '답장 진행'],
+        LetterViewMode.detail => ['상태 확인', '수락/거절', '답장 보내기'],
+        LetterViewMode.compose => ['제목', '본문', '발송'],
       },
     );
   }
@@ -165,62 +200,110 @@ class _MailboxView extends StatelessWidget {
           onOpenRandomReceiveSettings: onOpenRandomReceiveSettings,
         ),
         const SizedBox(height: AppSpacing.md),
-        Wrap(
-          spacing: AppSpacing.xs,
-          runSpacing: AppSpacing.xs,
-          children: [
-            for (final tab in LetterMailboxTab.values)
-              ChoiceChip(
-                key: ValueKey('letter-tab-${tab.name}'),
-                label: Text(tab.label),
-                selected: state.activeTab == tab,
-                onSelected: (_) => controller.selectTab(tab),
+        KeyedSubtree(
+          key: const ValueKey('letter-list-section'),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const _MailboxSectionHeader(),
+              const SizedBox(height: AppSpacing.xs),
+              Wrap(
+                spacing: AppSpacing.xs,
+                runSpacing: AppSpacing.xs,
+                children: [
+                  for (final tab in LetterMailboxTab.values)
+                    ChoiceChip(
+                      key: ValueKey('letter-tab-${tab.name}'),
+                      label: Text(tab.label),
+                      selected: state.activeTab == tab,
+                      onSelected: (_) => controller.selectTab(tab),
+                    ),
+                ],
               ),
-          ],
+              const SizedBox(height: AppSpacing.lg),
+              if (state.isLoading)
+                const AppStateView.loading(
+                  title: '편지를 불러오는 중입니다.',
+                  semanticLabel: '편지함을 불러오는 중',
+                )
+              else if (state.isEmpty)
+                AppStateView.empty(
+                  title: state.activeTab == LetterMailboxTab.received
+                      ? '아직 받은 편지가 없습니다.'
+                      : '아직 보낸 편지가 없습니다.',
+                  message: state.activeTab == LetterMailboxTab.received
+                      ? '랜덤 편지 수신 설정을 켜 두면 새로운 편지를 받을 수 있습니다.'
+                      : '새 편지를 쓰면 이곳에서 발송 상태를 확인할 수 있습니다.',
+                  semanticLabel: '편지함 비어 있음',
+                )
+              else
+                for (final letter in state.visibleLetters) ...[
+                  _LetterCard(
+                    letter: letter,
+                    onTap: () => controller.openLetter(letter),
+                  ),
+                  const SizedBox(height: AppSpacing.sm),
+                ],
+              if (!state.isLoading && state.visibleLetters.isNotEmpty) ...[
+                const SizedBox(height: AppSpacing.xs),
+                if (state.isVisibleLastPage)
+                  const AppNotice(message: '마지막 편지입니다.')
+                else
+                  OutlinedButton.icon(
+                    key: const ValueKey('letter-load-more-button'),
+                    onPressed: state.isLoadingMore || state.errorMessage != null
+                        ? null
+                        : controller.loadMore,
+                    icon: state.isLoadingMore
+                        ? const SizedBox.square(
+                            dimension: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.expand_more),
+                    label: Text(state.isLoadingMore ? '불러오는 중' : '더 보기'),
+                  ),
+              ],
+            ],
+          ),
         ),
-        const SizedBox(height: AppSpacing.lg),
-        if (state.isLoading)
-          const AppStateView.loading(
-            title: '편지를 불러오는 중입니다.',
-            semanticLabel: '편지함을 불러오는 중',
-          )
-        else if (state.isEmpty)
-          AppStateView.empty(
-            title: state.activeTab == LetterMailboxTab.received
-                ? '아직 받은 편지가 없습니다.'
-                : '아직 보낸 편지가 없습니다.',
-            message: state.activeTab == LetterMailboxTab.received
-                ? '랜덤 편지 수신 설정을 켜 두면 새로운 편지를 받을 수 있습니다.'
-                : '새 편지를 쓰면 이곳에서 발송 상태를 확인할 수 있습니다.',
-            semanticLabel: '편지함 비어 있음',
-          )
-        else
-          for (final letter in state.visibleLetters) ...[
-            _LetterCard(
-              letter: letter,
-              onTap: () => controller.openLetter(letter),
-            ),
-            const SizedBox(height: AppSpacing.sm),
-          ],
-        if (!state.isLoading && state.visibleLetters.isNotEmpty) ...[
-          const SizedBox(height: AppSpacing.xs),
-          if (state.isVisibleLastPage)
-            const AppNotice(message: '마지막 편지입니다.')
-          else
-            OutlinedButton.icon(
-              key: const ValueKey('letter-load-more-button'),
-              onPressed: state.isLoadingMore || state.errorMessage != null
-                  ? null
-                  : controller.loadMore,
-              icon: state.isLoadingMore
-                  ? const SizedBox.square(
-                      dimension: 18,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : const Icon(Icons.expand_more),
-              label: Text(state.isLoadingMore ? '불러오는 중' : '더 보기'),
-            ),
-        ],
+      ],
+    );
+  }
+}
+
+class _MailboxSectionHeader extends StatelessWidget {
+  const _MailboxSectionHeader();
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(Icons.inbox_outlined, color: colorScheme.primary, size: 22),
+        const SizedBox(width: AppSpacing.xs),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                '편지 목록',
+                style: theme.textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              const SizedBox(height: AppSpacing.xxs),
+              Text(
+                '받은 편지와 보낸 편지를 탭으로 전환합니다.',
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ],
+          ),
+        ),
       ],
     );
   }

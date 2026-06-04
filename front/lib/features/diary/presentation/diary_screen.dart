@@ -225,6 +225,14 @@ class _DiaryScreenState extends State<DiaryScreen> {
               AppNotice(message: state.noticeMessage!),
               const SizedBox(height: AppSpacing.sm),
             ],
+            const AppFlowPanel(
+              key: ValueKey('diary-flow-panel'),
+              icon: Icons.edit_calendar_outlined,
+              title: '오늘의 기록 흐름',
+              message: '선택한 날을 확인하고, 바로 이어서 기록하세요.',
+              steps: ['날짜 선택', '기록 확인', '작성과 공개 설정'],
+            ),
+            const SizedBox(height: AppSpacing.lg),
             AppSectionCard(
               title: '월간 기록',
               child: _CalendarSection(
@@ -400,55 +408,64 @@ class _SelectedEntriesSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Text(selectedDateLabel, style: Theme.of(context).textTheme.titleMedium),
-        const SizedBox(height: AppSpacing.xs),
-        if (entries.isEmpty)
-          const AppStateView.empty(
-            title: '선택한 날짜에 작성한 기록이 없습니다.',
-            message: '아래 입력 영역에서 오늘의 마음을 기록할 수 있습니다.',
-            semanticLabel: '선택한 날짜 기록 비어 있음',
-          )
-        else
-          for (final entry in entries) ...[
-            Card(
-              child: Padding(
-                padding: const EdgeInsets.all(14),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(entry.title,
-                        style: Theme.of(context).textTheme.titleMedium),
-                    const SizedBox(height: AppSpacing.xs),
-                    _DiaryEntryContentPreview(entry: entry),
-                    const SizedBox(height: AppSpacing.xs),
-                    Wrap(
-                      spacing: AppSpacing.xs,
-                      crossAxisAlignment: WrapCrossAlignment.center,
-                      children: [
-                        Chip(label: Text(entry.category.label)),
-                        Chip(label: Text(entry.isPrivate ? '나만 보기' : '공개')),
-                        TextButton.icon(
-                          onPressed: () => onEdit(entry),
-                          icon: const Icon(Icons.edit),
-                          label: const Text('수정'),
-                        ),
-                        TextButton.icon(
-                          onPressed: () => onDelete(entry),
-                          icon: const Icon(Icons.delete_outline),
-                          label: const Text('삭제'),
-                        ),
-                      ],
-                    ),
-                  ],
+    final theme = Theme.of(context);
+
+    return KeyedSubtree(
+      key: const ValueKey('diary-selected-section'),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _ContentSectionHeader(
+            icon: Icons.today_outlined,
+            title: '선택한 날 기록',
+            subtitle: selectedDateLabel,
+          ),
+          const SizedBox(height: AppSpacing.xs),
+          if (entries.isEmpty)
+            const AppStateView.empty(
+              title: '선택한 날짜에 작성한 기록이 없습니다.',
+              message: '아래 입력 영역에서 오늘의 마음을 기록할 수 있습니다.',
+              semanticLabel: '선택한 날짜 기록 비어 있음',
+            )
+          else
+            for (final entry in entries) ...[
+              Card(
+                margin: EdgeInsets.zero,
+                child: Padding(
+                  padding: const EdgeInsets.all(14),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(entry.title, style: theme.textTheme.titleMedium),
+                      const SizedBox(height: AppSpacing.xs),
+                      _DiaryEntryContentPreview(entry: entry),
+                      const SizedBox(height: AppSpacing.xs),
+                      Wrap(
+                        spacing: AppSpacing.xs,
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        children: [
+                          Chip(label: Text(entry.category.label)),
+                          Chip(label: Text(entry.isPrivate ? '나만 보기' : '공개')),
+                          TextButton.icon(
+                            onPressed: () => onEdit(entry),
+                            icon: const Icon(Icons.edit),
+                            label: const Text('수정'),
+                          ),
+                          TextButton.icon(
+                            onPressed: () => onDelete(entry),
+                            icon: const Icon(Icons.delete_outline),
+                            label: const Text('삭제'),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
                 ),
               ),
-            ),
-            const SizedBox(height: AppSpacing.xs),
-          ],
-      ],
+              const SizedBox(height: AppSpacing.xs),
+            ],
+        ],
+      ),
     );
   }
 }
@@ -466,80 +483,134 @@ class _PublicEntriesSection extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Text('공개 기록', style: theme.textTheme.titleMedium),
-        const SizedBox(height: AppSpacing.xs),
-        if (state.isPublicLoading)
-          const AppStateView.loading(
-            title: '공개 기록을 불러오는 중입니다.',
-            semanticLabel: '공개 기록 목록을 불러오는 중',
-          )
-        else ...[
-          if (state.publicErrorMessage != null) ...[
-            AppStateView.error(
-              title: '공개 기록을 불러오지 못했습니다.',
-              message: state.publicErrorMessage!,
-              semanticLabel: '공개 기록 목록 오류',
-            ),
-            const SizedBox(height: AppSpacing.xs),
-          ],
-          if (state.isPublicEmpty)
-            const AppStateView.empty(
-              title: '아직 공개된 기록이 없습니다.',
-              message: '공개 기록이 생기면 이곳에 표시됩니다.',
-              semanticLabel: '공개 기록 목록 비어 있음',
-            ),
-          for (final entry in state.publicEntries) ...[
-            Card(
-              child: Padding(
-                padding: const EdgeInsets.all(14),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Wrap(
-                      spacing: AppSpacing.xs,
-                      crossAxisAlignment: WrapCrossAlignment.center,
-                      children: [
-                        Chip(label: Text(entry.category.label)),
-                        Text(
-                          entry.nickname,
-                          style: theme.textTheme.bodySmall,
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: AppSpacing.xs),
-                    Text(entry.title, style: theme.textTheme.titleMedium),
-                    const SizedBox(height: AppSpacing.xs),
-                    _DiaryEntryContentPreview(entry: entry),
-                  ],
+    return KeyedSubtree(
+      key: const ValueKey('diary-public-section'),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const _ContentSectionHeader(
+            icon: Icons.groups_outlined,
+            title: '공개 기록',
+            subtitle: '다른 사용자의 공개 기록을 읽으며 흐름을 이어갑니다.',
+          ),
+          const SizedBox(height: AppSpacing.xs),
+          if (state.isPublicLoading)
+            const AppStateView.loading(
+              title: '공개 기록을 불러오는 중입니다.',
+              semanticLabel: '공개 기록 목록을 불러오는 중',
+            )
+          else ...[
+            if (state.publicErrorMessage != null) ...[
+              AppStateView.error(
+                title: '공개 기록을 불러오지 못했습니다.',
+                message: state.publicErrorMessage!,
+                semanticLabel: '공개 기록 목록 오류',
+              ),
+              const SizedBox(height: AppSpacing.xs),
+            ],
+            if (state.isPublicEmpty)
+              const AppStateView.empty(
+                title: '아직 공개된 기록이 없습니다.',
+                message: '공개 기록이 생기면 이곳에 표시됩니다.',
+                semanticLabel: '공개 기록 목록 비어 있음',
+              ),
+            for (final entry in state.publicEntries) ...[
+              Card(
+                margin: EdgeInsets.zero,
+                child: Padding(
+                  padding: const EdgeInsets.all(14),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Wrap(
+                        spacing: AppSpacing.xs,
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        children: [
+                          Chip(label: Text(entry.category.label)),
+                          Text(
+                            entry.nickname,
+                            style: theme.textTheme.bodySmall,
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: AppSpacing.xs),
+                      Text(entry.title, style: theme.textTheme.titleMedium),
+                      const SizedBox(height: AppSpacing.xs),
+                      _DiaryEntryContentPreview(entry: entry),
+                    ],
+                  ),
                 ),
               ),
-            ),
+              const SizedBox(height: AppSpacing.xs),
+            ],
+          ],
+          if (!state.isPublicLoading && state.publicEntries.isNotEmpty) ...[
             const SizedBox(height: AppSpacing.xs),
+            if (state.isLastPublicPage)
+              const AppNotice(message: '마지막 공개 기록입니다.')
+            else
+              OutlinedButton.icon(
+                key: const ValueKey('diary-public-load-more-button'),
+                onPressed: state.isPublicLoadingMore ||
+                        state.publicErrorMessage != null
+                    ? null
+                    : onLoadMore,
+                icon: state.isPublicLoadingMore
+                    ? const SizedBox.square(
+                        dimension: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.expand_more),
+                label: Text(state.isPublicLoadingMore ? '불러오는 중' : '더 보기'),
+              ),
           ],
         ],
-        if (!state.isPublicLoading && state.publicEntries.isNotEmpty) ...[
-          const SizedBox(height: AppSpacing.xs),
-          if (state.isLastPublicPage)
-            const AppNotice(message: '마지막 공개 기록입니다.')
-          else
-            OutlinedButton.icon(
-              key: const ValueKey('diary-public-load-more-button'),
-              onPressed:
-                  state.isPublicLoadingMore || state.publicErrorMessage != null
-                      ? null
-                      : onLoadMore,
-              icon: state.isPublicLoadingMore
-                  ? const SizedBox.square(
-                      dimension: 18,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : const Icon(Icons.expand_more),
-              label: Text(state.isPublicLoadingMore ? '불러오는 중' : '더 보기'),
-            ),
-        ],
+      ),
+    );
+  }
+}
+
+class _ContentSectionHeader extends StatelessWidget {
+  const _ContentSectionHeader({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+  });
+
+  final IconData icon;
+  final String title;
+  final String subtitle;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(icon, color: colorScheme.primary, size: 22),
+        const SizedBox(width: AppSpacing.xs),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                style: theme.textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              const SizedBox(height: AppSpacing.xxs),
+              Text(
+                subtitle,
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ],
+          ),
+        ),
       ],
     );
   }
