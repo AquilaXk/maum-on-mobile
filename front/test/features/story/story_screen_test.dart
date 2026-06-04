@@ -7,6 +7,36 @@ import 'package:maum_on_mobile_front/features/story/domain/story_models.dart';
 import 'package:maum_on_mobile_front/features/story/presentation/story_screen.dart';
 
 void main() {
+  testWidgets('keeps story discovery controls compact on a phone viewport',
+      (tester) async {
+    tester.view.physicalSize = const Size(390, 640);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    final controller = StoryController(
+      storyRepository: _FakeStoryRepository(
+        storyPages: [
+          _storyPage([_summary(id: 1, title: '잠이 오지 않는 밤')]),
+        ],
+      ),
+      currentMemberId: 7,
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: StoryScreen(controller: controller, onBack: () {}),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const ValueKey('story-discovery-strip')), findsOneWidget);
+    expect(find.byKey(const ValueKey('story-search-field')), findsOneWidget);
+    expect(
+        find.byKey(const ValueKey('story-category-question')), findsOneWidget);
+    expect(find.text('1개의 스토리'), findsOneWidget);
+  });
+
   testWidgets('renders story list and opens detail with comments',
       (tester) async {
     final repository = _FakeStoryRepository(

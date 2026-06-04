@@ -7,6 +7,41 @@ import 'package:maum_on_mobile_front/features/letter/domain/letter_models.dart';
 import 'package:maum_on_mobile_front/features/letter/presentation/letter_screen.dart';
 
 void main() {
+  testWidgets('shows mailbox summary actions on a phone viewport',
+      (tester) async {
+    tester.view.physicalSize = const Size(390, 640);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    final controller = LetterController(
+      letterRepository: _FakeLetterRepository(
+        statsQueue: [
+          LetterStats(
+            receivedCount: 2,
+            latestReceivedLetter: _summary(id: 8, title: '최근 받은 편지'),
+            latestSentLetter: _summary(id: 2, title: '최근 보낸 편지'),
+          ),
+        ],
+        receivedPages: [
+          _page([_summary(id: 1, title: '도착한 편지')]),
+        ],
+      ),
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(home: LetterScreen(controller: controller, onBack: () {})),
+    );
+    await tester.pumpAndSettle();
+
+    expect(
+        find.byKey(const ValueKey('letter-mailbox-toolbar')), findsOneWidget);
+    expect(find.byKey(const ValueKey('letter-compose-button')), findsOneWidget);
+    expect(
+        find.byKey(const ValueKey('letter-receive-settings')), findsOneWidget);
+    expect(find.text('받은 편지 2개'), findsOneWidget);
+  });
+
   testWidgets('renders mailbox stats and opens a received letter',
       (tester) async {
     final repository = _FakeLetterRepository(

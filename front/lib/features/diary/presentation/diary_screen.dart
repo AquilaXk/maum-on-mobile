@@ -28,6 +28,7 @@ class DiaryScreen extends StatefulWidget {
 class _DiaryScreenState extends State<DiaryScreen> {
   late final TextEditingController _titleController;
   late final TextEditingController _contentController;
+  final GlobalKey _diaryFormAnchorKey = GlobalKey();
   final Map<String, TextEditingController> _textBlockControllers = {};
   bool _canOpenImageSettings = false;
 
@@ -152,6 +153,21 @@ class _DiaryScreenState extends State<DiaryScreen> {
     }
   }
 
+  void _scrollToDiaryForm() {
+    final formContext = _diaryFormAnchorKey.currentContext;
+    if (formContext == null) {
+      return;
+    }
+
+    unawaited(
+      Scrollable.ensureVisible(
+        formContext,
+        duration: const Duration(milliseconds: 240),
+        curve: Curves.easeOutCubic,
+      ),
+    );
+  }
+
   Future<void> _confirmDelete(DiaryEntry entry) async {
     final shouldDelete = await showDialog<bool>(
       context: context,
@@ -225,12 +241,14 @@ class _DiaryScreenState extends State<DiaryScreen> {
               AppNotice(message: state.noticeMessage!),
               const SizedBox(height: AppSpacing.sm),
             ],
-            const AppFlowPanel(
-              key: ValueKey('diary-flow-panel'),
-              icon: Icons.edit_calendar_outlined,
-              title: '오늘의 기록 흐름',
-              message: '선택한 날을 확인하고, 바로 이어서 기록하세요.',
-              steps: ['날짜 선택', '기록 확인', '작성과 공개 설정'],
+            KeyedSubtree(
+              key: const ValueKey('diary-quick-capture-panel'),
+              child: _DiaryQuickCapturePanel(
+                key: const ValueKey('diary-flow-panel'),
+                state: state,
+                selectedDateLabel: _formatDateLabel(state.selectedDate),
+                onWritePressed: _scrollToDiaryForm,
+              ),
             ),
             const SizedBox(height: AppSpacing.lg),
             AppSectionCard(
@@ -253,42 +271,141 @@ class _DiaryScreenState extends State<DiaryScreen> {
               onLoadMore: widget.controller.loadMorePublicEntries,
             ),
             const SizedBox(height: AppSpacing.xl),
-            _DiaryForm(
-              state: state,
-              titleController: _titleController,
-              contentController: _contentController,
-              textBlockControllerFor: _textControllerForBlock,
-              onTitleChanged: widget.controller.updateTitle,
-              onContentChanged: widget.controller.updateContent,
-              onTextBlockChanged: widget.controller.updateTextBlock,
-              onAddTextBlockAfter: widget.controller.addTextBlockAfter,
-              onMoveBlock: widget.controller.moveContentBlock,
-              onCategoryChanged: widget.controller.updateCategory,
-              onPrivacyChanged: widget.controller.updatePrivacy,
-              onPickImage: _pickImage,
-              onReplaceImage: (blockId, source) =>
-                  _pickImage(source, replaceBlockId: blockId),
-              canOpenImageSettings: _canOpenImageSettings,
-              onOpenImageSettings: _openImageSettings,
-              onClearImage: () {
-                setState(() {
-                  _canOpenImageSettings = false;
-                });
-                unawaited(widget.controller.clearImage());
-              },
-              onRemoveImageBlock: (blockId) {
-                setState(() {
-                  _canOpenImageSettings = false;
-                });
-                unawaited(widget.controller.removeImageBlock(blockId));
-              },
-              onRetryImageBlock: widget.controller.retryImageBlockUpload,
-              onReset: widget.controller.resetForm,
-              onSubmit: widget.controller.submit,
+            KeyedSubtree(
+              key: _diaryFormAnchorKey,
+              child: _DiaryForm(
+                state: state,
+                titleController: _titleController,
+                contentController: _contentController,
+                textBlockControllerFor: _textControllerForBlock,
+                onTitleChanged: widget.controller.updateTitle,
+                onContentChanged: widget.controller.updateContent,
+                onTextBlockChanged: widget.controller.updateTextBlock,
+                onAddTextBlockAfter: widget.controller.addTextBlockAfter,
+                onMoveBlock: widget.controller.moveContentBlock,
+                onCategoryChanged: widget.controller.updateCategory,
+                onPrivacyChanged: widget.controller.updatePrivacy,
+                onPickImage: _pickImage,
+                onReplaceImage: (blockId, source) =>
+                    _pickImage(source, replaceBlockId: blockId),
+                canOpenImageSettings: _canOpenImageSettings,
+                onOpenImageSettings: _openImageSettings,
+                onClearImage: () {
+                  setState(() {
+                    _canOpenImageSettings = false;
+                  });
+                  unawaited(widget.controller.clearImage());
+                },
+                onRemoveImageBlock: (blockId) {
+                  setState(() {
+                    _canOpenImageSettings = false;
+                  });
+                  unawaited(widget.controller.removeImageBlock(blockId));
+                },
+                onRetryImageBlock: widget.controller.retryImageBlockUpload,
+                onReset: widget.controller.resetForm,
+                onSubmit: widget.controller.submit,
+              ),
             ),
           ],
         );
       },
+    );
+  }
+}
+
+class _DiaryQuickCapturePanel extends StatelessWidget {
+  const _DiaryQuickCapturePanel({
+    required this.state,
+    required this.selectedDateLabel,
+    required this.onWritePressed,
+    super.key,
+  });
+
+  final DiaryState state;
+  final String selectedDateLabel;
+  final VoidCallback onWritePressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final selectedCount = state.selectedDateEntries.length;
+
+    return Card(
+      margin: EdgeInsets.zero,
+      color: colorScheme.primaryContainer.withValues(alpha: 0.68),
+      child: Padding(
+        padding: const EdgeInsets.all(AppSpacing.md),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: colorScheme.primary.withValues(alpha: 0.14),
+                    borderRadius: AppRadii.chip,
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.all(AppSpacing.xs),
+                    child: Icon(
+                      Icons.edit_calendar_outlined,
+                      color: colorScheme.onPrimaryContainer,
+                      size: 22,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: AppSpacing.sm),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        '오늘의 기록 흐름',
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          color: colorScheme.onPrimaryContainer,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                      const SizedBox(height: AppSpacing.xxs),
+                      Text(
+                        '선택한 날을 확인하고, 바로 이어서 기록하세요.',
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: colorScheme.onPrimaryContainer,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: AppSpacing.sm),
+            Wrap(
+              spacing: AppSpacing.xs,
+              runSpacing: AppSpacing.xs,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              children: [
+                AppStatusPill(label: selectedDateLabel),
+                AppStatusPill(label: '선택한 날 $selectedCount개'),
+                AppStatusPill(
+                  label: state.isEditing ? '수정 중' : state.category.label,
+                  tone: AppStatusTone.success,
+                ),
+                FilledButton.icon(
+                  key: const ValueKey('diary-quick-write-button'),
+                  onPressed: onWritePressed,
+                  icon: const Icon(Icons.edit_outlined),
+                  label: const Text('오늘 기록 쓰기'),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
