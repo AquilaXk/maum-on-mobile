@@ -53,6 +53,43 @@ void main() {
     expect(find.byKey(const ValueKey('home-feed-story-1')), findsNothing);
   });
 
+  testWidgets('keeps mobile home summary stats in a single row',
+      (tester) async {
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    final controller = HomeController(
+      homeRepository: const _FakeHomeRepository(),
+    );
+    await controller.load();
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: HomeScreen(
+          routeTitle: '홈',
+          nickname: '마음이',
+          homeController: controller,
+          onWriteDiary: () {},
+          onWriteLetter: () {},
+          onViewStory: () {},
+          onOpenConsultation: () {},
+          onOpenNotifications: () {},
+          onOpenSettings: () {},
+          onLogout: () {},
+        ),
+      ),
+    );
+
+    final diaryTop = tester.getTopLeft(find.text('오늘의 기록')).dy;
+    final letterTop = tester.getTopLeft(find.text('전달된 비밀 편지')).dy;
+    final worryTop = tester.getTopLeft(find.text('오늘 올라온 고민')).dy;
+
+    expect(letterTop, moreOrLessEquals(diaryTop, epsilon: 1));
+    expect(worryTop, moreOrLessEquals(diaryTop, epsilon: 1));
+  });
+
   testWidgets('routes draft continuation cards to their writing surfaces',
       (tester) async {
     final draftRepository = StorageDraftRecoveryRepository(

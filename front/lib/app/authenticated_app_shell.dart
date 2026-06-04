@@ -24,7 +24,7 @@ class AuthenticatedAppShell extends StatelessWidget {
       body: child,
       bottomNavigationBar: NavigationBar(
         selectedIndex: selectedIndex,
-        labelBehavior: NavigationDestinationLabelBehavior.alwaysHide,
+        labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
         onDestinationSelected: (index) {
           final selectedRoute = authenticatedPrimaryRoutes[index];
           if (selectedRoute != currentRoute) {
@@ -37,7 +37,7 @@ class AuthenticatedAppShell extends StatelessWidget {
               key: ValueKey('route-tab-${route.key}'),
               icon: Icon(route.icon),
               selectedIcon: Icon(route.selectedIcon),
-              label: '${route.navLabel} 탭',
+              label: route.navLabel,
             ),
         ],
       ),
