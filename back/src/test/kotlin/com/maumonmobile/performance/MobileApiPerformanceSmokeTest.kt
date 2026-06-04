@@ -1,6 +1,5 @@
 package com.maumonmobile.performance
 
-import com.fasterxml.jackson.databind.ObjectMapper
 import com.jayway.jsonpath.JsonPath
 import com.maumonmobile.adapter.`in`.web.auth.signupVerifiedMember
 import org.assertj.core.api.Assertions.assertThat
@@ -19,6 +18,7 @@ import kotlin.io.path.Path
 import kotlin.io.path.createDirectories
 import kotlin.math.ceil
 import kotlin.system.measureTimeMillis
+import tools.jackson.databind.ObjectMapper
 
 @SpringBootTest
 @AutoConfigureMockMvc

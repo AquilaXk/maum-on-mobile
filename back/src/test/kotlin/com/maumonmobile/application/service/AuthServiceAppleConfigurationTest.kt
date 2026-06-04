@@ -60,6 +60,7 @@ class AuthServiceAppleConfigurationTest {
             signupEmailVerificationTtl = Duration.ofMinutes(10),
             signupEmailVerificationMaxActiveRequests = 3,
             signupEmailVerificationMaxFailedAttempts = 5,
+            signupEmailVerificationHashSecret = "test-signup-email-verification-hash-secret",
             providerAuthorizationBaseUrl = "https://login.maumon.local",
             oidcClientId = "maum-on-mobile",
             appleAuthorizationUri = "https://appleid.apple.com/auth/authorize",

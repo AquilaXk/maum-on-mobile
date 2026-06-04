@@ -15,10 +15,22 @@ import org.springframework.stereotype.Component
 )
 class NoopSignupEmailVerificationMailSender : SignupEmailVerificationMailSender {
     override fun send(command: SignupEmailVerificationMailCommand) {
-        log.info("Signup email verification mail accepted for {}", command.email)
+        log.info("Signup email verification mail accepted for {}", command.email.maskedEmail())
     }
 
     private companion object {
         private val log = LoggerFactory.getLogger(NoopSignupEmailVerificationMailSender::class.java)
     }
+}
+
+private fun String.maskedEmail(): String {
+    val normalized = trim()
+    val atIndex = normalized.indexOf('@')
+    if (atIndex <= 0 || atIndex != normalized.lastIndexOf('@')) {
+        return "***"
+    }
+
+    val local = normalized.take(atIndex)
+    val visibleLocal = local.take(2).ifEmpty { "*" }
+    return "$visibleLocal***${normalized.substring(atIndex)}"
 }

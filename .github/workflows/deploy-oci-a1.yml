@@ -79,13 +79,14 @@ jobs:
           CUSTOM__MEMBER__SIGNUP__MAIL_ENABLED: ${{ secrets.CUSTOM__MEMBER__SIGNUP__MAIL_ENABLED }}
           CUSTOM__MEMBER__SIGNUP__MAIL_FROM: ${{ secrets.CUSTOM__MEMBER__SIGNUP__MAIL_FROM }}
           CUSTOM__MEMBER__SIGNUP__MAIL_SUBJECT: ${{ secrets.CUSTOM__MEMBER__SIGNUP__MAIL_SUBJECT }}
+          APP_AUTH_SIGNUP_EMAIL_HASH_SECRET: ${{ secrets.APP_AUTH_SIGNUP_EMAIL_HASH_SECRET }}
         run: |
           set -euo pipefail
 
           backend_env="${RUNNER_TEMP}/maum-on-mobile-backend.env"
           printf '%s' "${OCI_A1_BACKEND_ENV_B64}" | base64 --decode >"${backend_env}"
 
-          if [[ -n "${SPRING__MAIL__HOST:-}" && -z "${CUSTOM__MEMBER__SIGNUP__MAIL_ENABLED:-}" ]]; then
+          if [[ -n "${SPRING__MAIL__HOST:-}" && -n "${CUSTOM__MEMBER__SIGNUP__MAIL_FROM:-}" && -z "${CUSTOM__MEMBER__SIGNUP__MAIL_ENABLED:-}" ]]; then
             CUSTOM__MEMBER__SIGNUP__MAIL_ENABLED=true
           fi
 
@@ -117,7 +118,8 @@ jobs:
             SPRING__MAIL__PROPERTIES__MAIL__SMTP__STARTTLS__ENABLE \
             CUSTOM__MEMBER__SIGNUP__MAIL_ENABLED \
             CUSTOM__MEMBER__SIGNUP__MAIL_FROM \
-            CUSTOM__MEMBER__SIGNUP__MAIL_SUBJECT
+            CUSTOM__MEMBER__SIGNUP__MAIL_SUBJECT \
+            APP_AUTH_SIGNUP_EMAIL_HASH_SECRET
           do
             append_or_replace_env "${name}"
           done

@@ -157,6 +157,7 @@ test("OCI A1 deployment env template includes signup SMTP runtime variables", ()
     "CUSTOM__MEMBER__SIGNUP__MAIL_ENABLED",
     "CUSTOM__MEMBER__SIGNUP__MAIL_FROM",
     "CUSTOM__MEMBER__SIGNUP__MAIL_SUBJECT",
+    "APP_AUTH_SIGNUP_EMAIL_HASH_SECRET",
   ]) {
     assert.match(appConfig, new RegExp(name));
     assert.match(envExample, new RegExp(`^${name}=`, "m"));

@@ -6,6 +6,13 @@ import java.time.Instant
 interface SignupEmailVerificationRepository {
     fun save(verification: SignupEmailVerification): SignupEmailVerification
 
+    fun saveIfActiveCountBelow(
+        email: String,
+        now: Instant,
+        maxActiveRequests: Int,
+        verification: SignupEmailVerification,
+    ): SignupEmailVerification?
+
     fun countActiveByEmail(email: String, now: Instant): Int
 
     fun findLatestActiveByEmail(email: String, now: Instant): SignupEmailVerification?

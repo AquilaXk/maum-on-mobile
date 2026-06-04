@@ -1,7 +1,5 @@
 package com.maumonmobile.adapter.`in`.web.consultation
 
-import com.fasterxml.jackson.core.type.TypeReference
-import com.fasterxml.jackson.databind.ObjectMapper
 import com.jayway.jsonpath.JsonPath
 import com.maumonmobile.adapter.`in`.web.auth.signupVerifiedMember
 import com.maumonmobile.application.port.out.ConsultationAiRequest
@@ -29,6 +27,8 @@ import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.delete
 import org.springframework.test.web.servlet.get
 import org.springframework.test.web.servlet.post
+import tools.jackson.core.type.TypeReference
+import tools.jackson.databind.ObjectMapper
 
 @SpringBootTest
 @AutoConfigureMockMvc

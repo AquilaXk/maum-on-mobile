@@ -9,7 +9,12 @@ import org.springframework.context.annotation.Profile
 import org.springframework.jdbc.core.RowMapper
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate
 import org.springframework.stereotype.Repository
+import java.sql.ResultSet
+import java.sql.Timestamp
 import java.time.Instant
+import java.time.LocalDateTime
+import java.time.OffsetDateTime
+import java.time.ZoneOffset
 
 @Repository
 @Profile("!memory")
@@ -58,6 +63,20 @@ class JdbcSignupEmailVerificationRepository(
         return verification
     }
 
+    @Synchronized
+    override fun saveIfActiveCountBelow(
+        email: String,
+        now: Instant,
+        maxActiveRequests: Int,
+        verification: SignupEmailVerification,
+    ): SignupEmailVerification? {
+        if (countActiveByEmail(email, now) >= maxActiveRequests) {
+            return null
+        }
+
+        return save(verification)
+    }
+
     override fun countActiveByEmail(email: String, now: Instant): Int {
         return jdbc.queryForObject(
             """
@@ -69,7 +88,7 @@ class JdbcSignupEmailVerificationRepository(
             """.trimIndent(),
             params()
                 .withValue("email", email.trim().lowercase())
-                .withValue("now", now.toString()),
+                .withValue("now", now),
             Int::class.java,
         ) ?: 0
     }
@@ -87,7 +106,7 @@ class JdbcSignupEmailVerificationRepository(
             """.trimIndent(),
             params()
                 .withValue("email", email.trim().lowercase())
-                .withValue("now", now.toString()),
+                .withValue("now", now),
             rowMapper,
         ).singleOrNull()
     }
@@ -102,7 +121,7 @@ class JdbcSignupEmailVerificationRepository(
             """.trimIndent(),
             params()
                 .withValue("id", id)
-                .withValue("consumedAt", consumedAt.toString()),
+                .withValue("consumedAt", consumedAt),
         ) > 0
     }
 
@@ -125,10 +144,10 @@ class JdbcSignupEmailVerificationRepository(
     private fun SignupEmailVerification.toParams() = params()
         .withValue("email", email)
         .withValue("codeHash", codeHash)
-        .withValue("expiresAt", expiresAt.toString())
-        .withValue("consumedAt", consumedAt?.toString())
+        .withValue("expiresAt", expiresAt)
+        .withValue("consumedAt", consumedAt)
         .withValue("failedAttempts", failedAttempts)
-        .withValue("createdAt", createdAt.toString())
+        .withValue("createdAt", createdAt)
 
     private companion object {
         private val rowMapper = RowMapper { rs, _ ->
@@ -136,11 +155,30 @@ class JdbcSignupEmailVerificationRepository(
                 id = rs.getLong("id"),
                 email = rs.getString("email"),
                 codeHash = rs.getString("code_hash"),
-                expiresAt = Instant.parse(rs.getString("expires_at")),
-                consumedAt = rs.getString("consumed_at")?.let(Instant::parse),
+                expiresAt = rs.instant("expires_at"),
+                consumedAt = rs.nullableInstant("consumed_at"),
                 failedAttempts = rs.getInt("failed_attempts"),
-                createdAt = Instant.parse(rs.getString("created_at")),
+                createdAt = rs.instant("created_at"),
             )
         }
+    }
+}
+
+private fun ResultSet.instant(column: String): Instant {
+    return getObject(column).toInstant(column)
+}
+
+private fun ResultSet.nullableInstant(column: String): Instant? {
+    return getObject(column)?.toInstant(column)
+}
+
+private fun Any.toInstant(column: String): Instant {
+    return when (this) {
+        is Instant -> this
+        is OffsetDateTime -> toInstant()
+        is Timestamp -> toInstant()
+        is LocalDateTime -> toInstant(ZoneOffset.UTC)
+        is String -> Instant.parse(this)
+        else -> error("Unsupported timestamp value for $column: ${this::class.qualifiedName}")
     }
 }

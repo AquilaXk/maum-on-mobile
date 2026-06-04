@@ -52,6 +52,8 @@ import java.time.Duration
 import java.time.Instant
 import java.util.Base64
 import java.util.Locale
+import javax.crypto.Mac
+import javax.crypto.spec.SecretKeySpec
 
 @Service
 class AuthService(
@@ -71,6 +73,8 @@ class AuthService(
     private val signupEmailVerificationMaxActiveRequests: Int,
     @param:Value("\${app.auth.signup-email.max-failed-attempts:5}")
     private val signupEmailVerificationMaxFailedAttempts: Int,
+    @param:Value("\${app.auth.signup-email.hash-secret}")
+    private val signupEmailVerificationHashSecret: String,
     @param:Value("\${app.auth.oidc.provider-authorization-base-url:https://login.maumon.local}")
     private val providerAuthorizationBaseUrl: String,
     @param:Value("\${app.auth.oidc.client-id:maum-on-mobile}")
@@ -101,17 +105,13 @@ class AuthService(
         }
 
         val now = Instant.now()
-        if (
-            signupEmailVerificationRepository.countActiveByEmail(email, now) >=
-            signupEmailVerificationMaxActiveRequests
-        ) {
-            throw ApiException(ErrorCode.INVALID_REQUEST, "잠시 뒤 다시 시도해 주세요.")
-        }
-
         val code = randomVerificationCode()
         val expiresAt = now.plus(signupEmailVerificationTtl)
-        signupEmailVerificationRepository.save(
-            SignupEmailVerification(
+        val saved = signupEmailVerificationRepository.saveIfActiveCountBelow(
+            email = email,
+            now = now,
+            maxActiveRequests = signupEmailVerificationMaxActiveRequests,
+            verification = SignupEmailVerification(
                 id = 0L,
                 email = email,
                 codeHash = signupVerificationCodeHash(email, code),
@@ -120,15 +120,15 @@ class AuthService(
                 failedAttempts = 0,
                 createdAt = now,
             ),
-        )
+        ) ?: throw ApiException(ErrorCode.INVALID_REQUEST, "잠시 뒤 다시 시도해 주세요.")
         signupEmailVerificationMailSender.send(
             SignupEmailVerificationMailCommand(
-                email = email,
+                email = saved.email,
                 code = code,
-                expiresAt = expiresAt,
+                expiresAt = saved.expiresAt,
             ),
         )
-        log.info("Signup email verification code issued for {}", email)
+        log.info("Signup email verification code issued for {}", email.maskedEmail())
         return SignupEmailVerificationRequestResult(accepted = true)
     }
 
@@ -582,7 +582,8 @@ class AuthService(
             throw invalidSignupEmailVerificationCode()
         }
 
-        if (verification.codeHash != signupVerificationCodeHash(email, normalizedCode)) {
+        val candidateHash = signupVerificationCodeHash(email, normalizedCode)
+        if (!MessageDigest.isEqual(verification.codeHash.utf8Bytes(), candidateHash.utf8Bytes())) {
             signupEmailVerificationRepository.incrementFailedAttempts(verification.id)
             throw invalidSignupEmailVerificationCode()
         }
@@ -593,7 +594,15 @@ class AuthService(
     }
 
     private fun signupVerificationCodeHash(email: String, code: String): String {
-        return sha256("${email.trim().lowercase(Locale.ROOT)}:${code.trim()}")
+        val normalizedSecret = signupEmailVerificationHashSecret.trim()
+        check(normalizedSecret.isNotEmpty()) {
+            "app.auth.signup-email.hash-secret is required."
+        }
+
+        val mac = Mac.getInstance("HmacSHA256")
+        mac.init(SecretKeySpec(normalizedSecret.toByteArray(Charsets.UTF_8), "HmacSHA256"))
+        return mac.doFinal("${email.trim().lowercase(Locale.ROOT)}:${code.trim()}".utf8Bytes())
+            .joinToString("") { byte -> "%02x".format(byte) }
     }
 
     private fun randomVerificationCode(): String {
@@ -657,4 +666,20 @@ private fun String.looksLikeEmail(): Boolean {
     val atIndex = indexOf('@')
     val dotIndex = lastIndexOf('.')
     return atIndex > 0 && dotIndex > atIndex + 1 && dotIndex < length - 1
+}
+
+private fun String.utf8Bytes(): ByteArray {
+    return toByteArray(Charsets.UTF_8)
+}
+
+private fun String.maskedEmail(): String {
+    val normalized = trim()
+    val atIndex = normalized.indexOf('@')
+    if (atIndex <= 0 || atIndex != normalized.lastIndexOf('@')) {
+        return "***"
+    }
+
+    val local = normalized.take(atIndex)
+    val visibleLocal = local.take(2).ifEmpty { "*" }
+    return "$visibleLocal***${normalized.substring(atIndex)}"
 }

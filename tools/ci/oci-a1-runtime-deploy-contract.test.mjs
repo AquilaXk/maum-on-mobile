@@ -144,9 +144,14 @@ test("manual GitHub Actions deploy workflow builds jar, bundles it, and deploys 
     "CUSTOM__MEMBER__SIGNUP__MAIL_ENABLED",
     "CUSTOM__MEMBER__SIGNUP__MAIL_FROM",
     "CUSTOM__MEMBER__SIGNUP__MAIL_SUBJECT",
+    "APP_AUTH_SIGNUP_EMAIL_HASH_SECRET",
   ]) {
     assert.match(workflow, new RegExp(`secrets\\.${secret}`));
   }
 
+  assert.match(
+    workflow,
+    /if \[\[ -n "\$\{SPRING__MAIL__HOST:-\}" && -n "\$\{CUSTOM__MEMBER__SIGNUP__MAIL_FROM:-\}" && -z "\$\{CUSTOM__MEMBER__SIGNUP__MAIL_ENABLED:-\}" \]\]/,
+  );
   assert.doesNotMatch(workflow, /@v\d/);
 });

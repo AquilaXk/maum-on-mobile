@@ -28,6 +28,7 @@ app:
       ttl: ${APP_AUTH_SIGNUP_EMAIL_TTL:PT10M}
       max-active-requests: ${APP_AUTH_SIGNUP_EMAIL_MAX_ACTIVE_REQUESTS:3}
       max-failed-attempts: ${APP_AUTH_SIGNUP_EMAIL_MAX_FAILED_ATTEMPTS:5}
+      hash-secret: ${APP_AUTH_SIGNUP_EMAIL_HASH_SECRET:${app.security.jwt.secret}}
       mail:
         enabled: ${CUSTOM__MEMBER__SIGNUP__MAIL_ENABLED:${SIGNUP_EMAIL_MAIL_ENABLED:false}}
         from: ${CUSTOM__MEMBER__SIGNUP__MAIL_FROM:${SIGNUP_EMAIL_MAIL_FROM:}}
