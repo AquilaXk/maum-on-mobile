@@ -30,6 +30,43 @@ if [[ ! "${MAUMON_BACKEND_IMAGE_TAG}" =~ ^[a-z0-9][a-z0-9._/-]*:[A-Za-z0-9_.-]+$
   exit 1
 fi
 
+docker_network="${MAUMON_DOCKER_NETWORK:-maum-on-mobile}"
+app_data_dir="${MAUMON_APP_DATA_DIR:-/var/lib/maumon-data/app}"
+postgres_container_name="${MAUMON_POSTGRES_CONTAINER_NAME:-maum-on-mobile-postgres}"
+postgres_data_volume="${MAUMON_POSTGRES_DATA_VOLUME:-maum-on-mobile-postgres-data}"
+postgres_image_tag="${MAUMON_POSTGRES_IMAGE_TAG:-postgres:16-alpine}"
+deploy_managed_postgres="${MAUMON_DEPLOY_MANAGED_POSTGRES:-auto}"
+
+if [[ ! "${docker_network}" =~ ^[A-Za-z0-9][A-Za-z0-9_.-]{0,62}$ ]]; then
+  echo "Invalid MAUMON_DOCKER_NETWORK: ${docker_network}" >&2
+  exit 1
+fi
+
+if [[ ! "${app_data_dir}" =~ ^/[A-Za-z0-9._/-]+$ || "${app_data_dir}" == *".."* ]]; then
+  echo "Invalid MAUMON_APP_DATA_DIR: ${app_data_dir}" >&2
+  exit 1
+fi
+
+if [[ ! "${postgres_container_name}" =~ ^[A-Za-z0-9][A-Za-z0-9_.-]{0,62}$ ]]; then
+  echo "Invalid MAUMON_POSTGRES_CONTAINER_NAME: ${postgres_container_name}" >&2
+  exit 1
+fi
+
+if [[ ! "${postgres_data_volume}" =~ ^[A-Za-z0-9][A-Za-z0-9_.-]{0,62}$ ]]; then
+  echo "Invalid MAUMON_POSTGRES_DATA_VOLUME: ${postgres_data_volume}" >&2
+  exit 1
+fi
+
+if [[ ! "${postgres_image_tag}" =~ ^[a-z0-9][a-z0-9._/-]*:[A-Za-z0-9_.-]+$ ]]; then
+  echo "Invalid MAUMON_POSTGRES_IMAGE_TAG: ${postgres_image_tag}" >&2
+  exit 1
+fi
+
+if [[ ! "${deploy_managed_postgres}" =~ ^(auto|true|false)$ ]]; then
+  echo "Invalid MAUMON_DEPLOY_MANAGED_POSTGRES: ${deploy_managed_postgres}" >&2
+  exit 1
+fi
+
 tmp_dir="$(mktemp -d)"
 cleanup() {
   rm -rf "${tmp_dir}"
@@ -74,7 +111,7 @@ remote_staging="/tmp/maum-on-mobile-deploy-${GITHUB_RUN_ID:-local}-${GITHUB_RUN_
 "${scp_base[@]}" "${bundle_copy}" "${backend_env}" "${vertex_key}" "${OCI_A1_SSH_USER}@${OCI_A1_SSH_HOST}:${remote_staging}/"
 
 "${ssh_base[@]}" \
-  "MAUMON_BACKEND_IMAGE_TAG='${MAUMON_BACKEND_IMAGE_TAG}' MAUMON_DEPLOY_HEALTH_TIMEOUT_SECONDS='${MAUMON_DEPLOY_HEALTH_TIMEOUT_SECONDS:-90}' MAUMON_HOST_HTTP_PORT='${MAUMON_HOST_HTTP_PORT:-80}' REMOTE_STAGING='${remote_staging}' bash -s" <<'REMOTE'
+  "MAUMON_BACKEND_IMAGE_TAG='${MAUMON_BACKEND_IMAGE_TAG}' MAUMON_DEPLOY_HEALTH_TIMEOUT_SECONDS='${MAUMON_DEPLOY_HEALTH_TIMEOUT_SECONDS:-90}' MAUMON_HOST_HTTP_PORT='${MAUMON_HOST_HTTP_PORT:-80}' MAUMON_DOCKER_NETWORK='${docker_network}' MAUMON_APP_DATA_DIR='${app_data_dir}' MAUMON_POSTGRES_CONTAINER_NAME='${postgres_container_name}' MAUMON_POSTGRES_DATA_VOLUME='${postgres_data_volume}' MAUMON_POSTGRES_IMAGE_TAG='${postgres_image_tag}' MAUMON_DEPLOY_MANAGED_POSTGRES='${deploy_managed_postgres}' REMOTE_STAGING='${remote_staging}' bash -s" <<'REMOTE'
 set -euo pipefail
 
 container_name="maum-on-mobile-back"
@@ -82,6 +119,12 @@ previous_container_name="maum-on-mobile-back-previous"
 image_tag="${MAUMON_BACKEND_IMAGE_TAG}"
 health_timeout_seconds="${MAUMON_DEPLOY_HEALTH_TIMEOUT_SECONDS}"
 host_http_port="${MAUMON_HOST_HTTP_PORT:-80}"
+network_name="${MAUMON_DOCKER_NETWORK:-maum-on-mobile}"
+app_data_dir="${MAUMON_APP_DATA_DIR:-/var/lib/maumon-data/app}"
+postgres_container_name="${MAUMON_POSTGRES_CONTAINER_NAME:-maum-on-mobile-postgres}"
+postgres_data_volume="${MAUMON_POSTGRES_DATA_VOLUME:-maum-on-mobile-postgres-data}"
+postgres_image_tag="${MAUMON_POSTGRES_IMAGE_TAG:-postgres:16-alpine}"
+deploy_managed_postgres="${MAUMON_DEPLOY_MANAGED_POSTGRES:-auto}"
 container_uid="10001"
 container_gid="10001"
 staging_dir="${REMOTE_STAGING}"
@@ -116,6 +159,35 @@ require_remote_file() {
   fi
 }
 
+env_value() {
+  local key="$1"
+  awk -v key="${key}" 'index($0, key "=") == 1 { print substr($0, length(key) + 2); exit }' "${env_file}"
+}
+
+postgres_url_host() {
+  local url="$1"
+  local rest="${url#jdbc:postgresql://}"
+  if [[ "${rest}" == "${url}" ]]; then
+    return 1
+  fi
+  rest="${rest%%/*}"
+  rest="${rest%%:*}"
+  printf '%s' "${rest}"
+}
+
+postgres_url_db_name() {
+  local url="$1"
+  local rest="${url#jdbc:postgresql://}"
+  local db_name="postgres"
+  if [[ "${rest}" == */* ]]; then
+    db_name="${rest#*/}"
+    db_name="${db_name%%\?*}"
+    db_name="${db_name%%#*}"
+    db_name="${db_name%%/*}"
+  fi
+  printf '%s' "${db_name:-postgres}"
+}
+
 install_runtime() {
   if ! command -v docker >/dev/null 2>&1; then
     sudo apt-get update
@@ -128,6 +200,87 @@ install_runtime() {
   fi
 
   sudo systemctl enable --now docker
+}
+
+prepare_runtime_resources() {
+  if ! sudo docker network inspect "${network_name}" >/dev/null 2>&1; then
+    sudo docker network create "${network_name}" >/dev/null
+  fi
+
+  sudo install -d -m 0750 -o "${container_uid}" -g "${container_gid}" "${app_data_dir}"
+}
+
+wait_for_postgres() {
+  local db_username="$1"
+  local db_name="$2"
+  local deadline=$((SECONDS + health_timeout_seconds))
+  until sudo docker exec "${postgres_container_name}" pg_isready -U "${db_username}" -d "${db_name}" >/dev/null; do
+    if (( SECONDS >= deadline )); then
+      return 1
+    fi
+    sleep 3
+  done
+}
+
+prepare_managed_postgres() {
+  local db_url
+  local db_host
+  local db_name
+  local db_username
+  local db_password
+  local postgres_aliases
+
+  db_url="$(env_value DB_URL)"
+  db_host="$(postgres_url_host "${db_url}")"
+
+  if [[ "${deploy_managed_postgres}" == "false" ]]; then
+    return
+  fi
+
+  if [[ "${db_host}" != "postgres" ]]; then
+    if [[ "${deploy_managed_postgres}" == "true" ]]; then
+      echo "Managed PostgreSQL requires DB_URL host postgres" >&2
+      exit 1
+    fi
+    return
+  fi
+
+  db_name="$(postgres_url_db_name "${db_url}")"
+  db_username="$(env_value DB_USERNAME)"
+  db_password="$(env_value DB_PASSWORD)"
+
+  if [[ -z "${db_username}" || -z "${db_password}" || -z "${db_name}" ]]; then
+    echo "Managed PostgreSQL requires DB_URL, DB_USERNAME, and DB_PASSWORD" >&2
+    exit 1
+  fi
+
+  sudo docker volume create "${postgres_data_volume}" >/dev/null
+
+  if ! sudo docker inspect "${postgres_container_name}" >/dev/null 2>&1; then
+    sudo docker run \
+      --detach \
+      --name "${postgres_container_name}" \
+      --restart unless-stopped \
+      --network "${network_name}" \
+      --network-alias postgres \
+      --env POSTGRES_DB="${db_name}" \
+      --env POSTGRES_USER="${db_username}" \
+      --env POSTGRES_PASSWORD="${db_password}" \
+      --mount type=volume,source="${postgres_data_volume}",target=/var/lib/postgresql/data \
+      "${postgres_image_tag}" >/dev/null
+  else
+    sudo docker start "${postgres_container_name}" >/dev/null
+    postgres_aliases="$(sudo docker inspect --format "{{range \$name, \$network := .NetworkSettings.Networks}}{{if eq \$name \"${network_name}\"}}{{range \$network.Aliases}}{{.}} {{end}}{{end}}{{end}}" "${postgres_container_name}" 2>/dev/null || true)"
+    if [[ " ${postgres_aliases} " != *" postgres "* ]]; then
+      sudo docker network disconnect "${network_name}" "${postgres_container_name}" >/dev/null 2>&1 || true
+      sudo docker network connect --alias postgres "${network_name}" "${postgres_container_name}"
+    fi
+  fi
+
+  if ! wait_for_postgres "${db_username}" "${db_name}"; then
+    echo "Managed PostgreSQL did not become ready" >&2
+    exit 1
+  fi
 }
 
 wait_for_health() {
@@ -155,6 +308,9 @@ sudo install -m 0640 "${staging_dir}/backend.env" "${env_file}"
 sudo install -m 0400 "${staging_dir}/vertex-key.json" "${vertex_key_file}"
 sudo chown "${container_uid}:${container_gid}" "${vertex_key_file}"
 
+prepare_runtime_resources
+prepare_managed_postgres
+
 sudo docker build -t "${image_tag}" -f "${release_dir}/Dockerfile" "${release_dir}"
 sudo docker rm -f "${previous_container_name}" >/dev/null 2>&1 || true
 
@@ -168,7 +324,9 @@ if ! sudo docker run \
   --name "${container_name}" \
   --restart unless-stopped \
   --publish "${host_http_port}:8080" \
+  --network "${network_name}" \
   --env-file "${env_file}" \
+  --mount type=bind,source="${app_data_dir}",target=/app/data \
   --mount type=bind,source="${vertex_key_file}",target=/run/secrets/vertex-key.json,readonly \
   --health-cmd 'curl -fsS http://127.0.0.1:8080/actuator/health || exit 1' \
   --health-interval 30s \
