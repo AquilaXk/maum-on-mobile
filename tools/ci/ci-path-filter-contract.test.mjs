@@ -131,6 +131,7 @@ test("repository contracts preserve local docs and issue template policies", asy
   assert.match(repositoryContracts, /node --test tools\/ci\/\*\.test\.mjs/);
   assert.match(repositoryContracts, /ruby -e 'require "yaml"/);
   assert.match(repositoryContracts, /Unexpected tracked Markdown file/);
+  assert.doesNotMatch(repositoryContracts, /pull_request_template\.md/);
   assert.match(repositoryContracts, /Unexpected tracked local agent file/);
 });
 
@@ -145,16 +146,27 @@ test("local Vertex AI credentials stay ignored and default to Gemini 2.5 Flash",
   assert.match(backendConfig, /credentials-path: \$\{GOOGLE_APPLICATION_CREDENTIALS:\}/);
 });
 
-test("path classifier treats README and pull request template changes as docs-only", async () => {
-  const outputs = await classifyChangedFiles(["README.md", ".github/pull_request_template.md"]);
+test("path classifier treats README as docs-only and PR templates as repository policy changes", async () => {
+  const readmeOnly = await classifyChangedFiles(["README.md"]);
 
-  assert.equal(outputs.docs_only, "true");
+  assert.equal(readmeOnly.docs_only, "true");
+  assert.equal(readmeOnly.android, "false");
+  assert.equal(readmeOnly.backend, "false");
+  assert.equal(readmeOnly.frontend, "false");
+  assert.equal(readmeOnly.ios, "false");
+  assert.equal(readmeOnly.javascript, "false");
+  assert.equal(readmeOnly.repository, "false");
+  assert.equal(readmeOnly.ci, "false");
+
+  const outputs = await classifyChangedFiles([".github/pull_request_template.md"]);
+
+  assert.equal(outputs.docs_only, "false");
   assert.equal(outputs.android, "false");
   assert.equal(outputs.backend, "false");
   assert.equal(outputs.frontend, "false");
   assert.equal(outputs.ios, "false");
   assert.equal(outputs.javascript, "false");
-  assert.equal(outputs.repository, "false");
+  assert.equal(outputs.repository, "true");
   assert.equal(outputs.ci, "false");
 });
 
