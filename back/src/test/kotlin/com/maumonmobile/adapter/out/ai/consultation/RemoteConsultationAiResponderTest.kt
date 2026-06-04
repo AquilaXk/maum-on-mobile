@@ -95,7 +95,14 @@ class RemoteConsultationAiResponderTest {
         assertThat(client.accessToken).isEqualTo("vertex-token")
         val requestJson = ObjectMapper().readTree(client.requestBody!!)
         assertThat(requestJson["contents"].toString())
-            .contains("마음 온", "다정하고 따뜻한 공감 상담사", "요즘 마음이 지쳤어요.")
+            .contains(
+                "마음 온",
+                "다정하고 따뜻한 공감 상담사",
+                "chunks 배열은 1~3개",
+                "마크다운",
+                "의학적 진단을 대신하지",
+                "요즘 마음이 지쳤어요.",
+            )
     }
 
     @Test

@@ -133,7 +133,7 @@ class ConsultationControllerTest @Autowired constructor(
     }
 
     @Test
-    fun chatFailurePublishesJsonStreamErrorWithRequestIdAndSequence() {
+    fun chatFailurePublishesFallbackReplyWithRequestIdAndSequence() {
         val member = signupAndLogin("consultation-stream-error@example.com", "오류이")
 
         mockMvc.post("/api/v1/consultations/chat") {
@@ -146,12 +146,17 @@ class ConsultationControllerTest @Autowired constructor(
             }
 
         val events = consultationStreamEvents(member.memberId.toLong())
-        assertThat(events.map { event -> event.eventName }).containsExactly("chat_error")
+        assertThat(events.map { event -> event.eventName }).containsExactly("chat", "chat_done")
 
-        val payload = events.single().data.toJsonMap()
-        assertThat(payload["requestId"]?.toString()).isNotBlank()
-        assertThat(payload["sequence"]).isEqualTo(0)
-        assertThat(payload["message"]).isEqualTo("지금은 답변을 만들지 못했습니다. 잠시 후 다시 시도해 주세요.")
+        val chunk = events[0].data.toJsonMap()
+        val done = events[1].data.toJsonMap()
+        val requestId = chunk["requestId"]?.toString()
+        assertThat(requestId).isNotBlank()
+        assertThat(chunk["sequence"]).isEqualTo(0)
+        assertThat(chunk["chunk"]).isEqualTo("지금은 답변을 만들지 못했습니다. 잠시 후 다시 시도해 주세요.")
+        assertThat(done["requestId"]).isEqualTo(requestId)
+        assertThat(done["sequence"]).isEqualTo(1)
+        assertThat(done["done"]).isEqualTo(true)
     }
 
     @Test
@@ -323,7 +328,7 @@ class ConsultationControllerTest @Autowired constructor(
             .andExpect {
                 status { isOk() }
                 jsonPath("$.data.messages[0].role") { value("USER") }
-                jsonPath("$.data.messages[1].role") { value("SYSTEM") }
+                jsonPath("$.data.messages[1].role") { value("ASSISTANT") }
                 jsonPath("$.data.messages[1].content") {
                     value("지금은 답변을 만들지 못했습니다. 잠시 후 다시 시도해 주세요.")
                 }
@@ -354,7 +359,7 @@ class ConsultationControllerTest @Autowired constructor(
             .andExpect {
                 status { isOk() }
                 jsonPath("$.data.messages[0].role") { value("USER") }
-                jsonPath("$.data.messages[1].role") { value("SYSTEM") }
+                jsonPath("$.data.messages[1].role") { value("ASSISTANT") }
                 jsonPath("$.data.messages[1].content") {
                     value("지금은 답변을 만들지 못했습니다. 잠시 후 다시 시도해 주세요.")
                 }
