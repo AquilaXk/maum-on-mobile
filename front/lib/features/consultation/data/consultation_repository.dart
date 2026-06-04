@@ -1,4 +1,5 @@
-import 'package:dio/dio.dart';
+import 'dart:async';
+import 'dart:io';
 
 import '../../../core/network/api_client.dart';
 import '../../../core/network/api_config.dart';
@@ -85,72 +86,85 @@ class ApiConsultationRepository implements ConsultationRepository {
   }
 }
 
-class DioConsultationStreamClient implements ConsultationStreamClient {
-  DioConsultationStreamClient({
+class HttpConsultationStreamClient implements ConsultationStreamClient {
+  HttpConsultationStreamClient({
     required ApiConfig apiConfig,
     required AuthTokenStore tokenStore,
-    Dio? dio,
-  })  : _tokenStore = tokenStore,
-        _dio = dio ??
-            Dio(
-              BaseOptions(
-                baseUrl: apiConfig.baseUrl.toString(),
-                connectTimeout: const Duration(seconds: 5),
-                receiveTimeout: Duration.zero,
-                validateStatus: (_) => true,
-              ),
-            );
+    HttpClient? httpClient,
+  })  : _baseUrl = apiConfig.baseUrl,
+        _tokenStore = tokenStore,
+        _httpClient =
+            httpClient ?? (HttpClient()..connectionTimeout = _connectTimeout);
 
+  final Uri _baseUrl;
   final AuthTokenStore _tokenStore;
-  final Dio _dio;
+  final HttpClient _httpClient;
 
   @override
   Stream<ConsultationStreamEvent> connect() async* {
-    final accessToken = await _tokenStore.readAccessToken();
-    final headers = <String, String>{'Accept': 'text/event-stream'};
-    if (accessToken != null && accessToken.isNotEmpty) {
-      headers['Authorization'] = 'Bearer $accessToken';
-    }
-
-    final response = await _dio.get<ResponseBody>(
-      '/api/v1/consultations/connect',
-      options: Options(
-        responseType: ResponseType.stream,
-        headers: headers,
-      ),
-    );
-
-    final statusCode = response.statusCode ?? 0;
-    if (statusCode == 401) {
-      await _tokenStore.clear();
-      throw const ApiClientException(
-        kind: ApiErrorKind.unauthorized,
-        message: '다시 로그인해 주세요.',
-        statusCode: 401,
+    try {
+      final accessToken = await _tokenStore.readAccessToken();
+      final request = await _httpClient.getUrl(
+        _resolveApiPath(_baseUrl, '/api/v1/consultations/connect'),
       );
-    }
+      request.headers.set(HttpHeaders.acceptHeader, 'text/event-stream');
+      if (accessToken != null && accessToken.isNotEmpty) {
+        request.headers
+            .set(HttpHeaders.authorizationHeader, 'Bearer $accessToken');
+      }
 
-    if (statusCode < 200 || statusCode >= 300) {
-      throw ApiClientException(
-        kind: ApiErrorKind.server,
-        message: '상담 연결을 시작하지 못했습니다.',
-        statusCode: statusCode,
-      );
-    }
-
-    final body = response.data;
-    if (body == null) {
-      throw const ApiClientException(
-        kind: ApiErrorKind.emptyResponse,
-        message: '상담 연결 응답이 없습니다.',
-      );
-    }
-
-    yield* const SseEventParser().parse(body.stream).map(
-          (event) => ConsultationStreamEvent.fromSse(
-            event: event.event,
-            data: event.data,
-          ),
+      final response = await request.close();
+      final statusCode = response.statusCode;
+      if (statusCode == HttpStatus.unauthorized) {
+        await _tokenStore.clear();
+        await response.drain<void>();
+        throw const ApiClientException(
+          kind: ApiErrorKind.unauthorized,
+          message: '다시 로그인해 주세요.',
+          statusCode: HttpStatus.unauthorized,
         );
+      }
+
+      if (statusCode < 200 || statusCode >= 300) {
+        await response.drain<void>();
+        throw ApiClientException(
+          kind: ApiErrorKind.server,
+          message: '상담 연결을 시작하지 못했습니다.',
+          statusCode: statusCode,
+        );
+      }
+
+      yield* const SseEventParser().parse(response).map(
+            (event) => ConsultationStreamEvent.fromSse(
+              event: event.event,
+              data: event.data,
+            ),
+          );
+    } on ApiClientException {
+      rethrow;
+    } on SocketException {
+      throw const ApiClientException(
+        kind: ApiErrorKind.network,
+        message: '상담 연결을 시작하지 못했습니다. 네트워크 상태를 확인해 주세요.',
+      );
+    } on TimeoutException {
+      throw const ApiClientException(
+        kind: ApiErrorKind.network,
+        message: '상담 연결 시간이 초과되었습니다. 네트워크 상태를 확인해 주세요.',
+      );
+    } on HttpException {
+      throw const ApiClientException(
+        kind: ApiErrorKind.server,
+        message: '상담 연결이 종료되었습니다. 다시 연결해 주세요.',
+      );
+    }
   }
 }
+
+Uri _resolveApiPath(Uri baseUrl, String path) {
+  final base = baseUrl.toString().replaceFirst(RegExp(r'/$'), '');
+  final normalizedPath = path.startsWith('/') ? path.substring(1) : path;
+  return Uri.parse('$base/$normalizedPath');
+}
+
+const _connectTimeout = Duration(seconds: 5);
