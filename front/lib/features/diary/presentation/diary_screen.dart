@@ -241,14 +241,11 @@ class _DiaryScreenState extends State<DiaryScreen> {
               AppNotice(message: state.noticeMessage!),
               const SizedBox(height: AppSpacing.sm),
             ],
-            KeyedSubtree(
+            _DiaryQuickCapturePanel(
               key: const ValueKey('diary-quick-capture-panel'),
-              child: _DiaryQuickCapturePanel(
-                key: const ValueKey('diary-flow-panel'),
-                state: state,
-                selectedDateLabel: _formatDateLabel(state.selectedDate),
-                onWritePressed: _scrollToDiaryForm,
-              ),
+              state: state,
+              selectedDateLabel: _formatDateLabel(state.selectedDate),
+              onWritePressed: _scrollToDiaryForm,
             ),
             const SizedBox(height: AppSpacing.lg),
             AppSectionCard(

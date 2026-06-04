@@ -39,6 +39,14 @@ void main() {
     expect(find.byKey(const ValueKey('letter-compose-button')), findsOneWidget);
     expect(
         find.byKey(const ValueKey('letter-receive-settings')), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('letter-latest-received-button')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey('letter-latest-sent-button')),
+      findsOneWidget,
+    );
     expect(find.text('받은 편지 2개'), findsOneWidget);
   });
 

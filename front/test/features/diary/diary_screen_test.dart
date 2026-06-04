@@ -84,7 +84,8 @@ void main() {
     );
 
     expect(find.text('2026년 5월'), findsOneWidget);
-    expect(find.byKey(const ValueKey('diary-flow-panel')), findsOneWidget);
+    expect(find.byKey(const ValueKey('diary-quick-capture-panel')),
+        findsOneWidget);
     expect(find.text('오늘의 기록 흐름'), findsOneWidget);
     expect(find.text('선택한 날을 확인하고, 바로 이어서 기록하세요.'), findsOneWidget);
     expect(

@@ -301,7 +301,11 @@ class _StoryDiscoveryStrip extends StatelessWidget {
                 border: OutlineInputBorder(),
               ),
               onChanged: controller.updateSearchQuery,
-              onSubmitted: (_) => controller.loadStories(),
+              onSubmitted: (_) {
+                if (!state.isListLoading) {
+                  controller.loadStories();
+                }
+              },
             ),
             const SizedBox(height: AppSpacing.sm),
             Wrap(
