@@ -1,0 +1,13 @@
+.gradle/
+build/
+!build/libs/
+!build/docker/
+*.iml
+*.log
+data/
+src/
+gradle/
+gradlew
+gradlew.bat
+settings.gradle.kts
+build.gradle.kts

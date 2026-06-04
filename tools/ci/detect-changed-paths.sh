@@ -33,9 +33,14 @@ while IFS= read -r file; do
   fi
 
   case "${file}" in
-    .github/workflows/ci.yml|tools/ci/**)
+    .github/workflows/*.yml|tools/ci/**)
       ci=true
       repository=true
+      backend=true
+      ;;
+    tools/deploy/**)
+      repository=true
+      backend=true
       ;;
     contracts/mobile-api/**)
       backend=true
