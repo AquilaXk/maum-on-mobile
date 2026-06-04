@@ -264,6 +264,7 @@ test("repository exposes deployment, migration, storage, and compatibility evide
   assert.match(app, /String\.fromEnvironment\(\s*'APP_VERSION'/);
   assert.match(backendBuild, /version = ".+"/);
   assert.match(backendBuild, /runtimeOnly\("org\.postgresql:postgresql"\)/);
+  assert.match(backendBuild, /runtimeOnly\("org\.flywaydb:flyway-database-postgresql"\)/);
 });
 
 test("ci runs production deploy readiness gate only for release candidate flows", () => {

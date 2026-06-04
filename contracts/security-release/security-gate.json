@@ -71,6 +71,7 @@
       "com.h2database:h2": "MPL-2.0",
       "org.jetbrains.kotlin:kotlin-reflect": "Apache-2.0",
       "org.junit.platform:junit-platform-launcher": "Apache-2.0",
+      "org.flywaydb:flyway-database-postgresql": "Apache-2.0",
       "org.postgresql:postgresql": "BSD-2-Clause",
       "org.springframework.boot:spring-boot-starter-actuator": "Apache-2.0",
       "org.springframework.boot:spring-boot-starter-flyway": "Apache-2.0",
