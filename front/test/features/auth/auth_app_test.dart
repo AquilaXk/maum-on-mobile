@@ -76,6 +76,13 @@ void main() {
 
     await _tapVisibleText(tester, '알림/신고');
     await tester.pumpAndSettle();
+    await tester
+        .ensureVisible(find.byKey(const ValueKey('notification-card-1')));
+    await tester.drag(
+      find.byKey(const ValueKey('notification-list')),
+      const Offset(0, -220),
+    );
+    await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey('notification-card-1')));
     await tester.pumpAndSettle();
     await _returnHome(tester);

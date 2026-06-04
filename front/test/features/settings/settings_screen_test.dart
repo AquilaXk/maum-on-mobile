@@ -22,6 +22,13 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('설정'), findsOneWidget);
+    expect(find.byKey(const ValueKey('settings-flow-panel')), findsOneWidget);
+    expect(find.text('설정 관리 흐름'), findsOneWidget);
+    expect(find.text('계정 상태를 확인하고 필요한 변경을 순서대로 처리하세요.'), findsOneWidget);
+    expect(
+        find.byKey(const ValueKey('settings-account-section')), findsOneWidget);
+    expect(
+        find.byKey(const ValueKey('settings-profile-section')), findsOneWidget);
     expect(find.text('me@example.com'), findsOneWidget);
 
     await tester.enterText(
@@ -35,6 +42,9 @@ void main() {
       find.byKey(const ValueKey('settings-email-field')),
       'new@example.com',
     );
+    await tester
+        .ensureVisible(find.byKey(const ValueKey('settings-save-email')));
+    await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey('settings-save-email')));
     await tester.pump();
 
@@ -177,6 +187,8 @@ void main() {
     );
     await tester.pumpAndSettle();
 
+    expect(
+        find.byKey(const ValueKey('settings-support-section')), findsOneWidget);
     expect(find.text('고객지원'), findsWidgets);
     expect(find.text('개인정보 문의'), findsOneWidget);
     expect(find.text('장애 공지'), findsOneWidget);

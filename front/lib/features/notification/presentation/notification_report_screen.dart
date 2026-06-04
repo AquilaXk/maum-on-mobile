@@ -359,41 +359,52 @@ class _NotificationCenter extends StatelessWidget {
       );
     }
 
-    return RefreshIndicator(
-      onRefresh: () => onRefresh(silent: false),
-      child: ListView(
-        key: const ValueKey('notification-list'),
-        physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.all(AppSpacing.lg),
-        children: [
-          if (state.errorMessage != null) ...[
-            AppStateView.error(
-              title: '알림을 불러오지 못했습니다.',
-              message: state.errorMessage!,
-              semanticLabel: '알림 목록 오류',
+    return KeyedSubtree(
+      key: const ValueKey('notification-result-section'),
+      child: RefreshIndicator(
+        onRefresh: () => onRefresh(silent: false),
+        child: ListView(
+          key: const ValueKey('notification-list'),
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: const EdgeInsets.all(AppSpacing.lg),
+          children: [
+            const AppFlowPanel(
+              key: ValueKey('notification-report-flow-panel'),
+              icon: Icons.notifications_active_outlined,
+              title: '알림과 신고 흐름',
+              message: '알림을 확인하고 필요한 신고까지 이어서 처리하세요.',
+              steps: ['실시간 확인', '알림 열기', '신고 접수'],
             ),
             const SizedBox(height: AppSpacing.md),
-          ],
-          if (state.noticeMessage != null) ...[
-            _InlineNotice(message: state.noticeMessage!),
+            if (state.errorMessage != null) ...[
+              AppStateView.error(
+                title: '알림을 불러오지 못했습니다.',
+                message: state.errorMessage!,
+                semanticLabel: '알림 목록 오류',
+              ),
+              const SizedBox(height: AppSpacing.md),
+            ],
+            if (state.noticeMessage != null) ...[
+              _InlineNotice(message: state.noticeMessage!),
+              const SizedBox(height: AppSpacing.md),
+            ],
+            _NotificationCenterSummary(state: state),
             const SizedBox(height: AppSpacing.md),
+            if (state.isEmpty)
+              const AppStateView.empty(
+                title: '아직 도착한 알림이 없습니다.',
+                message: '새 알림이 오면 이곳에 표시됩니다.',
+                semanticLabel: '알림 목록 비어 있음',
+              ),
+            for (final notification in state.notifications) ...[
+              _NotificationTile(
+                notification: notification,
+                onOpenNotification: onOpenNotification,
+              ),
+              const SizedBox(height: AppSpacing.sm),
+            ],
           ],
-          _NotificationCenterSummary(state: state),
-          const SizedBox(height: AppSpacing.md),
-          if (state.isEmpty)
-            const AppStateView.empty(
-              title: '아직 도착한 알림이 없습니다.',
-              message: '새 알림이 오면 이곳에 표시됩니다.',
-              semanticLabel: '알림 목록 비어 있음',
-            ),
-          for (final notification in state.notifications) ...[
-            _NotificationTile(
-              notification: notification,
-              onOpenNotification: onOpenNotification,
-            ),
-            const SizedBox(height: AppSpacing.sm),
-          ],
-        ],
+        ),
       ),
     );
   }

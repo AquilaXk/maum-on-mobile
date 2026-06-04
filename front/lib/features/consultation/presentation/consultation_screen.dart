@@ -115,7 +115,23 @@ class _ConsultationScreenState extends State<ConsultationScreen>
                     onRetry: widget.controller.retryFailedMessage,
                     onDelete: widget.controller.deleteFailedMessage,
                   ),
+                const Padding(
+                  padding: EdgeInsets.fromLTRB(
+                    AppSpacing.md,
+                    0,
+                    AppSpacing.md,
+                    AppSpacing.sm,
+                  ),
+                  child: AppFlowPanel(
+                    key: ValueKey('consultation-flow-panel'),
+                    icon: Icons.support_agent_outlined,
+                    title: '상담 연결 흐름',
+                    message: '연결 상태를 확인하고 메시지를 주고받으세요.',
+                    steps: ['연결 확인', '메시지 입력', '응답 확인'],
+                  ),
+                ),
                 Expanded(
+                  key: const ValueKey('consultation-chat-section'),
                   child: ListView.builder(
                     key: const ValueKey('consultation-message-list'),
                     controller: _scrollController,
@@ -495,6 +511,7 @@ class _Composer extends StatelessWidget {
             : '${state.draft.length}/${ConsultationController.maxMessageLength}';
 
     return SafeArea(
+      key: const ValueKey('consultation-composer-section'),
       top: false,
       child: DecoratedBox(
         decoration: BoxDecoration(
