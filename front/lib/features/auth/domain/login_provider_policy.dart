@@ -19,11 +19,29 @@ class LoginProviderPolicy {
     LoginProvider.apple,
   ];
 
-  static List<LoginProvider> providersFor(TargetPlatform platform) {
-    if (platform == TargetPlatform.iOS) {
-      return const [LoginProvider.apple];
+  static const _enabledProviderIds = String.fromEnvironment(
+    'LOGIN_PROVIDER_IDS',
+    defaultValue: '',
+  );
+
+  static List<LoginProvider> providersFor(
+    TargetPlatform _, {
+    String enabledProviderIds = _enabledProviderIds,
+  }) {
+    final enabledIds = enabledProviderIds
+        .split(',')
+        .map((id) => id.trim().toLowerCase())
+        .where((id) => id.isNotEmpty)
+        .toSet();
+
+    if (enabledIds.isEmpty) {
+      return const [];
     }
-    return const [LoginProvider.kakao];
+
+    return [
+      for (final provider in allProviders)
+        if (enabledIds.contains(provider.providerId)) provider,
+    ];
   }
 
   static bool showsReviewEmailGuidance(TargetPlatform platform) {

@@ -18,12 +18,14 @@ class AuthScreen extends StatefulWidget {
   const AuthScreen({
     required this.controller,
     this.externalLoginController,
+    this.loginProviders,
     this.onOpenExternalUri,
     super.key,
   });
 
   final AuthController controller;
   final ExternalLoginController? externalLoginController;
+  final List<LoginProvider>? loginProviders;
   final Future<bool> Function(Uri uri)? onOpenExternalUri;
 
   @override
@@ -451,9 +453,8 @@ class _AuthScreenState extends State<AuthScreen> {
             const _IosReviewEmailLoginGuidance(),
           );
         }
-        final providers = LoginProviderPolicy.providersFor(
-          platform,
-        );
+        final providers =
+            widget.loginProviders ?? LoginProviderPolicy.providersFor(platform);
         if (widget.externalLoginController != null && providers.isNotEmpty) {
           actions.add(const SizedBox(height: 8));
           actions.add(

@@ -6,9 +6,27 @@ import 'package:maum_on_mobile_front/features/auth/application/auth_controller.d
 import 'package:maum_on_mobile_front/features/auth/data/auth_repository.dart';
 import 'package:maum_on_mobile_front/features/auth/deeplink/external_login.dart';
 import 'package:maum_on_mobile_front/features/auth/domain/auth_models.dart';
+import 'package:maum_on_mobile_front/features/auth/domain/login_provider_policy.dart';
 import 'package:maum_on_mobile_front/features/auth/presentation/auth_screen.dart';
 
 void main() {
+  test('login provider policy exposes only configured linked providers', () {
+    expect(
+      LoginProviderPolicy.providersFor(
+        TargetPlatform.iOS,
+        enabledProviderIds: ' kakao,apple,unknown ',
+      ),
+      [LoginProvider.kakao, LoginProvider.apple],
+    );
+    expect(
+      LoginProviderPolicy.providersFor(
+        TargetPlatform.android,
+        enabledProviderIds: '',
+      ),
+      isEmpty,
+    );
+  });
+
   testWidgets('renders the product brand wordmark in the existing header slot',
       (tester) async {
     final repository = _FakeAuthRepository();
@@ -215,7 +233,7 @@ void main() {
     expect(find.byKey(const ValueKey('auth-terms-link')), findsOneWidget);
   });
 
-  testWidgets('shows only Apple quick login on iOS', (tester) async {
+  testWidgets('hides quick login when no provider is linked', (tester) async {
     final repository = _FakeAuthRepository();
     final authController = AuthController(authRepository: repository);
     final launcher = _FakeExternalLoginLauncher();
@@ -237,7 +255,8 @@ void main() {
 
     expect(find.byKey(const ValueKey('login-email-field')), findsOneWidget);
     expect(find.byKey(const ValueKey('login-password-field')), findsOneWidget);
-    _expectOnlyQuickLoginProviders(['apple']);
+    expect(find.text('간편 로그인'), findsNothing);
+    _expectOnlyQuickLoginProviders([]);
     expect(
       find.byKey(const ValueKey('ios-review-email-login-guidance')),
       findsNothing,
@@ -246,31 +265,10 @@ void main() {
       find.byKey(const ValueKey('auth-account-deletion-guidance')),
       findsOneWidget,
     );
-
-    expect(
-      tester
-          .widget<Semantics>(
-              find.byKey(const ValueKey('external-login-apple-button')))
-          .properties
-          .enabled,
-      isTrue,
-    );
-
-    await tester.ensureVisible(
-      find.byKey(const ValueKey('external-login-apple-button')),
-    );
-    await tester.tap(find.byKey(const ValueKey('external-login-apple-button')));
-    await tester.pumpAndSettle();
-
-    final launchedUri = launcher.launchedUris.single;
-    expect(launchedUri.path, '/api/v1/auth/oidc/authorize/apple');
-    expect(
-      launchedUri.queryParameters['redirect_uri'],
-      'maumon://auth/callback?provider=apple',
-    );
+    expect(launcher.launchedUris, isEmpty);
   });
 
-  testWidgets('shows only Kakao quick login on Android', (tester) async {
+  testWidgets('shows configured Kakao quick login on Android', (tester) async {
     final repository = _FakeAuthRepository();
     final authController = AuthController(authRepository: repository);
     final launcher = _FakeExternalLoginLauncher();
@@ -280,6 +278,7 @@ void main() {
         repository: repository,
         controller: authController,
         platform: TargetPlatform.android,
+        loginProviders: const [LoginProvider.kakao],
         externalLoginController: ExternalLoginController(
           authController: authController,
           launcher: launcher,
@@ -328,6 +327,7 @@ void main() {
         repository: repository,
         controller: authController,
         platform: TargetPlatform.android,
+        loginProviders: const [LoginProvider.kakao],
         externalLoginController: externalLoginController,
       ),
     );
@@ -403,12 +403,14 @@ class _AuthScreenHarness extends StatelessWidget {
     required this.repository,
     this.controller,
     this.externalLoginController,
+    this.loginProviders,
     this.platform,
   });
 
   final _FakeAuthRepository repository;
   final AuthController? controller;
   final ExternalLoginController? externalLoginController;
+  final List<LoginProvider>? loginProviders;
   final TargetPlatform? platform;
 
   @override
@@ -427,6 +429,7 @@ class _AuthScreenHarness extends StatelessWidget {
           return AuthScreen(
             controller: authController,
             externalLoginController: externalLoginController,
+            loginProviders: loginProviders,
           );
         },
       ),
