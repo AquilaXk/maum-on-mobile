@@ -1,8 +1,7 @@
 package com.maumonmobile.adapter.`in`.web.consultation
 
-import com.fasterxml.jackson.core.type.TypeReference
-import com.fasterxml.jackson.databind.ObjectMapper
 import com.jayway.jsonpath.JsonPath
+import com.maumonmobile.adapter.`in`.web.auth.signupVerifiedMember
 import com.maumonmobile.application.port.out.ConsultationAiRequest
 import com.maumonmobile.application.port.out.ConsultationAiResponder
 import com.maumonmobile.application.port.out.ConsultationAiResponse
@@ -28,6 +27,8 @@ import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.delete
 import org.springframework.test.web.servlet.get
 import org.springframework.test.web.servlet.post
+import tools.jackson.core.type.TypeReference
+import tools.jackson.databind.ObjectMapper
 
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -403,10 +404,11 @@ class ConsultationControllerTest @Autowired constructor(
     }
 
     private fun signupAndLogin(email: String, nickname: String): TestMember {
-        val signupResult = mockMvc.post("/api/v1/auth/signup") {
-            contentType = MediaType.APPLICATION_JSON
-            content = """{"email":"$email","password":"pass1234","nickname":"$nickname"}"""
-        }
+        val signupResult = mockMvc.signupVerifiedMember(
+            email = email,
+            password = "pass1234",
+            nickname = nickname,
+        )
             .andExpect {
                 status { isOk() }
             }

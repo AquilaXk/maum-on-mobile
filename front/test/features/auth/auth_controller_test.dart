@@ -125,6 +125,40 @@ void main() {
       expect(controller.state.errorMessage, isNull);
     });
 
+    test('requestSignupEmailVerification trims email and shows info', () async {
+      final repository = _FakeAuthRepository();
+      final controller = AuthController(authRepository: repository);
+
+      final requested = await controller.requestSignupEmailVerification(
+        email: '  me@example.com  ',
+      );
+
+      expect(requested, isTrue);
+      expect(repository.signupVerificationEmails, ['me@example.com']);
+      expect(controller.state.isAuthenticated, isFalse);
+      expect(controller.state.infoMessage, '인증번호를 이메일로 보냈습니다.');
+      expect(controller.state.errorMessage, isNull);
+    });
+
+    test('signup sends the verification code and trims account fields',
+        () async {
+      final repository = _FakeAuthRepository();
+      final controller = AuthController(authRepository: repository);
+
+      await controller.signup(
+        email: '  me@example.com  ',
+        password: 'pass1234',
+        nickname: ' 마음이 ',
+        emailVerificationCode: '123456',
+      );
+
+      expect(repository.signupRequests.single.email, 'me@example.com');
+      expect(repository.signupRequests.single.nickname, '마음이');
+      expect(repository.signupRequests.single.emailVerificationCode, '123456');
+      expect(controller.state.infoMessage, '가입이 완료되었습니다. 로그인해 주세요.');
+      expect(controller.state.errorMessage, isNull);
+    });
+
     test('confirmPasswordReset sends token and returns to login-ready state',
         () async {
       final repository = _FakeAuthRepository();
@@ -179,12 +213,28 @@ class _FakeAuthRepository implements AuthRepository {
   final Object? restoreError;
   bool logoutCalled = false;
   int clearLocalSessionCount = 0;
+  final List<SignupRequest> signupRequests = [];
+  final List<String> signupVerificationEmails = [];
   final List<String> passwordResetEmails = [];
   final List<_PasswordResetConfirmation> passwordResetConfirmations = [];
 
   @override
-  Future<AuthMember> signup(SignupRequest request) {
-    throw UnimplementedError();
+  Future<AuthMember> signup(SignupRequest request) async {
+    signupRequests.add(request);
+    return const AuthMember(
+      id: 1,
+      email: 'me@example.com',
+      nickname: '마음이',
+      role: 'USER',
+      status: 'ACTIVE',
+    );
+  }
+
+  @override
+  Future<void> requestSignupEmailVerification(
+    SignupEmailVerificationRequest request,
+  ) async {
+    signupVerificationEmails.add(request.email);
   }
 
   @override

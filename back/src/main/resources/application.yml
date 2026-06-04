@@ -7,11 +7,32 @@ spring:
     password: ${DB_PASSWORD:}
     # 운영 기본값은 배포 env의 PostgreSQL URL과 맞춘다.
     driver-class-name: ${DB_DRIVER:org.postgresql.Driver}
+  mail:
+    host: ${SPRING__MAIL__HOST:${SPRING_MAIL_HOST:}}
+    port: ${SPRING__MAIL__PORT:${SPRING_MAIL_PORT:587}}
+    username: ${SPRING__MAIL__USERNAME:${SPRING_MAIL_USERNAME:}}
+    password: ${SPRING__MAIL__PASSWORD:${SPRING_MAIL_PASSWORD:}}
+    properties:
+      mail:
+        smtp:
+          auth: ${SPRING__MAIL__PROPERTIES__MAIL__SMTP__AUTH:${SPRING_MAIL_PROPERTIES_MAIL_SMTP_AUTH:true}}
+          starttls:
+            enable: ${SPRING__MAIL__PROPERTIES__MAIL__SMTP__STARTTLS__ENABLE:${SPRING_MAIL_PROPERTIES_MAIL_SMTP_STARTTLS_ENABLE:true}}
   flyway:
     enabled: true
     locations: classpath:db/migration
 
 app:
+  auth:
+    signup-email:
+      ttl: ${APP_AUTH_SIGNUP_EMAIL_TTL:PT10M}
+      max-active-requests: ${APP_AUTH_SIGNUP_EMAIL_MAX_ACTIVE_REQUESTS:3}
+      max-failed-attempts: ${APP_AUTH_SIGNUP_EMAIL_MAX_FAILED_ATTEMPTS:5}
+      hash-secret: ${APP_AUTH_SIGNUP_EMAIL_HASH_SECRET:${app.security.jwt.secret}}
+      mail:
+        enabled: ${CUSTOM__MEMBER__SIGNUP__MAIL_ENABLED:${SIGNUP_EMAIL_MAIL_ENABLED:false}}
+        from: ${CUSTOM__MEMBER__SIGNUP__MAIL_FROM:${SIGNUP_EMAIL_MAIL_FROM:}}
+        subject: ${CUSTOM__MEMBER__SIGNUP__MAIL_SUBJECT:${SIGNUP_EMAIL_MAIL_SUBJECT:[Maum On] 회원가입 이메일 인증}}
   security:
     jwt:
       issuer: maum-on-mobile

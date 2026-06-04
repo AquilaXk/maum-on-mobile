@@ -35,6 +35,66 @@ void main() {
       });
     });
 
+    test('requestSignupEmailVerification sends email without authentication',
+        () async {
+      final transport = _FakeApiTransport([
+        ApiTransportResponse.ok({
+          'success': true,
+          'data': {'accepted': true}
+        }),
+      ]);
+      final tokenStore = MemoryAuthTokenStore();
+      final repository = ApiAuthRepository(
+        apiClient: ApiClient(transport: transport, tokenStore: tokenStore),
+        tokenStore: tokenStore,
+      );
+
+      await repository.requestSignupEmailVerification(
+        const SignupEmailVerificationRequest(email: 'me@example.com'),
+      );
+
+      expect(transport.requests.single.method, ApiMethod.post);
+      expect(
+        transport.requests.single.path,
+        '/api/v1/auth/signup/email-verifications',
+      );
+      expect(transport.requests.single.requiresAuth, isFalse);
+      expect(transport.requests.single.retryOnUnauthorized, isFalse);
+      expect(transport.requests.single.body, {'email': 'me@example.com'});
+    });
+
+    test('signup sends email verification code without authentication',
+        () async {
+      final transport = _FakeApiTransport([
+        ApiTransportResponse.ok({'success': true, 'data': _memberJson()}),
+      ]);
+      final tokenStore = MemoryAuthTokenStore();
+      final repository = ApiAuthRepository(
+        apiClient: ApiClient(transport: transport, tokenStore: tokenStore),
+        tokenStore: tokenStore,
+      );
+
+      await repository.signup(
+        const SignupRequest(
+          email: 'me@example.com',
+          password: 'pass1234',
+          nickname: '마음이',
+          emailVerificationCode: '123456',
+        ),
+      );
+
+      expect(transport.requests.single.method, ApiMethod.post);
+      expect(transport.requests.single.path, '/api/v1/auth/signup');
+      expect(transport.requests.single.requiresAuth, isFalse);
+      expect(transport.requests.single.retryOnUnauthorized, isFalse);
+      expect(transport.requests.single.body, {
+        'email': 'me@example.com',
+        'password': 'pass1234',
+        'nickname': '마음이',
+        'emailVerificationCode': '123456',
+      });
+    });
+
     test('restoreSession stores the returned session token', () async {
       final transport = _FakeApiTransport([
         ApiTransportResponse.ok(_tokenEnvelope(accessToken: 'restored-token')),

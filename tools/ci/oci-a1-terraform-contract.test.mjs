@@ -143,6 +143,33 @@ test("OCI A1 deployment env template includes Vertex AI runtime and release-read
   }
 });
 
+test("OCI A1 deployment env template includes signup SMTP runtime variables", () => {
+  const appConfig = read("back/src/main/resources/application.yml");
+  const envExample = readTerraform("maum-on-mobile-oci-a1.env.example");
+
+  for (const name of [
+    "SPRING__MAIL__HOST",
+    "SPRING__MAIL__PORT",
+    "SPRING__MAIL__USERNAME",
+    "SPRING__MAIL__PASSWORD",
+    "SPRING__MAIL__PROPERTIES__MAIL__SMTP__AUTH",
+    "SPRING__MAIL__PROPERTIES__MAIL__SMTP__STARTTLS__ENABLE",
+    "CUSTOM__MEMBER__SIGNUP__MAIL_ENABLED",
+    "CUSTOM__MEMBER__SIGNUP__MAIL_FROM",
+    "CUSTOM__MEMBER__SIGNUP__MAIL_SUBJECT",
+    "APP_AUTH_SIGNUP_EMAIL_HASH_SECRET",
+  ]) {
+    assert.match(appConfig, new RegExp(name));
+    assert.match(envExample, new RegExp(`^${name}=`, "m"));
+  }
+
+  assert.match(envExample, /^SPRING__MAIL__PORT=587$/m);
+  assert.match(envExample, /^SPRING__MAIL__PROPERTIES__MAIL__SMTP__AUTH=true$/m);
+  assert.match(envExample, /^SPRING__MAIL__PROPERTIES__MAIL__SMTP__STARTTLS__ENABLE=true$/m);
+  assert.match(envExample, /^CUSTOM__MEMBER__SIGNUP__MAIL_ENABLED=false$/m);
+  assert.match(envExample, /^CUSTOM__MEMBER__SIGNUP__MAIL_SUBJECT=\[Maum On\] 회원가입 이메일 인증$/m);
+});
+
 test("OCI A1 Terraform files are formatted", () => {
   execFileSync("terraform", ["-chdir=infra/terraform/oci/always-free-a1-flex", "fmt", "-check", "-recursive"], {
     cwd: root,

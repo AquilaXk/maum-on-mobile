@@ -16,6 +16,8 @@ import com.maumonmobile.application.port.`in`.PasswordResetRequestCommand
 import com.maumonmobile.application.port.`in`.PasswordResetRequestResult
 import com.maumonmobile.application.port.`in`.RefreshCommand
 import com.maumonmobile.application.port.`in`.SignupCommand
+import com.maumonmobile.application.port.`in`.SignupEmailVerificationRequestCommand
+import com.maumonmobile.application.port.`in`.SignupEmailVerificationRequestResult
 import com.maumonmobile.application.port.out.AuthMemberRepository
 import com.maumonmobile.application.port.out.AuthOidcIdentity
 import com.maumonmobile.application.port.out.AuthOidcIdentityProvider
@@ -25,11 +27,15 @@ import com.maumonmobile.application.port.out.AuthOidcVerificationException
 import com.maumonmobile.application.port.out.PasswordResetMailCommand
 import com.maumonmobile.application.port.out.PasswordResetMailSender
 import com.maumonmobile.application.port.out.PasswordResetTokenRepository
+import com.maumonmobile.application.port.out.SignupEmailVerificationMailCommand
+import com.maumonmobile.application.port.out.SignupEmailVerificationMailSender
+import com.maumonmobile.application.port.out.SignupEmailVerificationRepository
 import com.maumonmobile.application.port.out.SseSessionRevocationPort
 import com.maumonmobile.domain.auth.AuthMember
 import com.maumonmobile.domain.auth.AuthMemberStatus
 import com.maumonmobile.domain.auth.AuthOidcState
 import com.maumonmobile.domain.auth.PasswordResetToken
+import com.maumonmobile.domain.auth.SignupEmailVerification
 import com.maumonmobile.global.security.AuthenticatedUser
 import com.maumonmobile.global.security.JwtTokenProvider
 import com.maumonmobile.global.web.ApiException
@@ -38,6 +44,7 @@ import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.security.crypto.password.PasswordEncoder
 import org.springframework.stereotype.Service
+import org.springframework.transaction.annotation.Transactional
 import org.springframework.web.util.UriComponentsBuilder
 import java.security.MessageDigest
 import java.security.SecureRandom
@@ -45,6 +52,8 @@ import java.time.Duration
 import java.time.Instant
 import java.util.Base64
 import java.util.Locale
+import javax.crypto.Mac
+import javax.crypto.spec.SecretKeySpec
 
 @Service
 class AuthService(
@@ -53,9 +62,19 @@ class AuthService(
     private val authOidcIdentityProvider: AuthOidcIdentityProvider,
     private val passwordResetTokenRepository: PasswordResetTokenRepository,
     private val passwordResetMailSender: PasswordResetMailSender,
+    private val signupEmailVerificationRepository: SignupEmailVerificationRepository,
+    private val signupEmailVerificationMailSender: SignupEmailVerificationMailSender,
     private val passwordEncoder: PasswordEncoder,
     private val jwtTokenProvider: JwtTokenProvider,
     private val sseSessionRevocationPort: SseSessionRevocationPort,
+    @param:Value("\${app.auth.signup-email.ttl:PT10M}")
+    private val signupEmailVerificationTtl: Duration,
+    @param:Value("\${app.auth.signup-email.max-active-requests:3}")
+    private val signupEmailVerificationMaxActiveRequests: Int,
+    @param:Value("\${app.auth.signup-email.max-failed-attempts:5}")
+    private val signupEmailVerificationMaxFailedAttempts: Int,
+    @param:Value("\${app.auth.signup-email.hash-secret}")
+    private val signupEmailVerificationHashSecret: String,
     @param:Value("\${app.auth.oidc.provider-authorization-base-url:https://login.maumon.local}")
     private val providerAuthorizationBaseUrl: String,
     @param:Value("\${app.auth.oidc.client-id:maum-on-mobile}")
@@ -76,11 +95,50 @@ class AuthService(
     private val passwordResetMaxFailedAttempts: Int,
 ) : AuthUseCase {
 
-    override fun signup(command: SignupCommand): AuthMemberResult {
-        val email = command.email.trim().lowercase()
+    @Transactional
+    override fun requestSignupEmailVerification(
+        command: SignupEmailVerificationRequestCommand,
+    ): SignupEmailVerificationRequestResult {
+        val email = normalizedSignupEmail(command.email)
         if (authMemberRepository.findByEmail(email) != null) {
             throw ApiException(ErrorCode.INVALID_REQUEST, "이미 가입된 이메일입니다.")
         }
+
+        val now = Instant.now()
+        val code = randomVerificationCode()
+        val expiresAt = now.plus(signupEmailVerificationTtl)
+        val saved = signupEmailVerificationRepository.saveIfActiveCountBelow(
+            email = email,
+            now = now,
+            maxActiveRequests = signupEmailVerificationMaxActiveRequests,
+            verification = SignupEmailVerification(
+                id = 0L,
+                email = email,
+                codeHash = signupVerificationCodeHash(email, code),
+                expiresAt = expiresAt,
+                consumedAt = null,
+                failedAttempts = 0,
+                createdAt = now,
+            ),
+        ) ?: throw ApiException(ErrorCode.INVALID_REQUEST, "잠시 뒤 다시 시도해 주세요.")
+        signupEmailVerificationMailSender.send(
+            SignupEmailVerificationMailCommand(
+                email = saved.email,
+                code = code,
+                expiresAt = saved.expiresAt,
+            ),
+        )
+        log.info("Signup email verification code issued for {}", email.maskedEmail())
+        return SignupEmailVerificationRequestResult(accepted = true)
+    }
+
+    @Transactional
+    override fun signup(command: SignupCommand): AuthMemberResult {
+        val email = normalizedSignupEmail(command.email)
+        if (authMemberRepository.findByEmail(email) != null) {
+            throw ApiException(ErrorCode.INVALID_REQUEST, "이미 가입된 이메일입니다.")
+        }
+        confirmSignupEmailVerification(email, command.emailVerificationCode)
 
         val member = authMemberRepository.save(
             AuthMember(
@@ -502,8 +560,61 @@ class AuthService(
             .joinToString("") { byte -> "%02x".format(byte) }
     }
 
+    private fun normalizedSignupEmail(email: String): String {
+        val normalized = email.trim().lowercase(Locale.ROOT)
+        if (!normalized.looksLikeEmail()) {
+            throw ApiException(ErrorCode.VALIDATION_ERROR, "이메일 형식을 확인해 주세요.")
+        }
+        return normalized
+    }
+
+    private fun confirmSignupEmailVerification(email: String, code: String) {
+        val normalizedCode = code.trim()
+        if (!normalizedCode.matches(SIGNUP_CODE_PATTERN)) {
+            throw invalidSignupEmailVerificationCode()
+        }
+
+        val now = Instant.now()
+        val verification = signupEmailVerificationRepository.findLatestActiveByEmail(email, now)
+            ?: throw invalidSignupEmailVerificationCode()
+
+        if (!verification.canBeConfirmed(now, signupEmailVerificationMaxFailedAttempts)) {
+            throw invalidSignupEmailVerificationCode()
+        }
+
+        val candidateHash = signupVerificationCodeHash(email, normalizedCode)
+        if (!MessageDigest.isEqual(verification.codeHash.utf8Bytes(), candidateHash.utf8Bytes())) {
+            signupEmailVerificationRepository.incrementFailedAttempts(verification.id)
+            throw invalidSignupEmailVerificationCode()
+        }
+
+        if (!signupEmailVerificationRepository.markConsumed(verification.id, now)) {
+            throw invalidSignupEmailVerificationCode()
+        }
+    }
+
+    private fun signupVerificationCodeHash(email: String, code: String): String {
+        val normalizedSecret = signupEmailVerificationHashSecret.trim()
+        check(normalizedSecret.isNotEmpty()) {
+            "app.auth.signup-email.hash-secret is required."
+        }
+
+        val mac = Mac.getInstance("HmacSHA256")
+        mac.init(SecretKeySpec(normalizedSecret.toByteArray(Charsets.UTF_8), "HmacSHA256"))
+        return mac.doFinal("${email.trim().lowercase(Locale.ROOT)}:${code.trim()}".utf8Bytes())
+            .joinToString("") { byte -> "%02x".format(byte) }
+    }
+
+    private fun randomVerificationCode(): String {
+        return secureRandom.nextInt(1_000_000).toString().padStart(6, '0')
+    }
+
     private fun invalidPasswordResetToken(): ApiException {
         return ApiException(ErrorCode.INVALID_REQUEST, "재설정 토큰이 유효하지 않습니다.")
+    }
+
+    private fun invalidSignupEmailVerificationCode(): ApiException {
+        return ApiException(ErrorCode.INVALID_REQUEST, "이메일 인증번호가 올바르지 않습니다.")
     }
 
     private fun findActiveMember(memberId: Long?): AuthMember {
@@ -535,6 +646,7 @@ class AuthService(
 
     private companion object {
         private const val APPLE_PROVIDER = "apple"
+        private val SIGNUP_CODE_PATTERN = Regex("^\\d{6}$")
         private val secureRandom = SecureRandom()
         private val log = LoggerFactory.getLogger(AuthService::class.java)
     }
@@ -554,4 +666,20 @@ private fun String.looksLikeEmail(): Boolean {
     val atIndex = indexOf('@')
     val dotIndex = lastIndexOf('.')
     return atIndex > 0 && dotIndex > atIndex + 1 && dotIndex < length - 1
+}
+
+private fun String.utf8Bytes(): ByteArray {
+    return toByteArray(Charsets.UTF_8)
+}
+
+private fun String.maskedEmail(): String {
+    val normalized = trim()
+    val atIndex = normalized.indexOf('@')
+    if (atIndex <= 0 || atIndex != normalized.lastIndexOf('@')) {
+        return "***"
+    }
+
+    val local = normalized.take(atIndex)
+    val visibleLocal = local.take(2).ifEmpty { "*" }
+    return "$visibleLocal***${normalized.substring(atIndex)}"
 }

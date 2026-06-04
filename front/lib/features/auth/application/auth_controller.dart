@@ -142,6 +142,7 @@ class AuthController extends ChangeNotifier {
     required String email,
     required String password,
     required String nickname,
+    required String emailVerificationCode,
   }) async {
     _setState(
       _state.copyWith(
@@ -157,6 +158,7 @@ class AuthController extends ChangeNotifier {
           email: email.trim(),
           password: password,
           nickname: nickname.trim(),
+          emailVerificationCode: emailVerificationCode.trim(),
         ),
       );
       _setState(
@@ -178,6 +180,45 @@ class AuthController extends ChangeNotifier {
           errorMessage: _messageFromError(error),
         ),
       );
+    }
+  }
+
+  Future<bool> requestSignupEmailVerification({
+    required String email,
+  }) async {
+    _setState(
+      _state.copyWith(
+        isSubmitting: true,
+        clearErrorMessage: true,
+        clearInfoMessage: true,
+      ),
+    );
+
+    try {
+      await _authRepository.requestSignupEmailVerification(
+        SignupEmailVerificationRequest(email: email.trim()),
+      );
+      _setState(
+        _state.copyWith(
+          status: AuthStatus.unauthenticated,
+          clearMember: true,
+          isSubmitting: false,
+          hasRestored: true,
+          infoMessage: '인증번호를 이메일로 보냈습니다.',
+        ),
+      );
+      return true;
+    } on Object catch (error) {
+      _setState(
+        _state.copyWith(
+          status: AuthStatus.unauthenticated,
+          clearMember: true,
+          isSubmitting: false,
+          hasRestored: true,
+          errorMessage: _messageFromError(error),
+        ),
+      );
+      return false;
     }
   }
 

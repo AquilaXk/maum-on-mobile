@@ -31,6 +31,13 @@ void main() {
 
 class _UnauthenticatedRepository implements AuthRepository {
   @override
+  Future<void> requestSignupEmailVerification(
+    SignupEmailVerificationRequest request,
+  ) {
+    throw UnimplementedError();
+  }
+
+  @override
   Future<AuthMember> signup(SignupRequest request) {
     throw UnimplementedError();
   }

@@ -122,6 +122,9 @@ test("manual GitHub Actions deploy workflow builds jar, bundles it, and deploys 
   assert.match(workflow, /\.\/gradlew --no-daemon test bootJar/);
   assert.match(workflow, /cp back\/Dockerfile build\/deploy-oci-a1\/Dockerfile/);
   assert.match(workflow, /tar -czf build\/maum-on-mobile-backend-bundle\.tar\.gz -C build\/deploy-oci-a1 \./);
+  assert.match(workflow, /name: Compose backend env/);
+  assert.match(workflow, /append_or_replace_env\(\)/);
+  assert.match(workflow, /OCI_A1_BACKEND_ENV_B64_COMPOSED/);
   assert.match(workflow, /bash tools\/deploy\/deploy-oci-a1-backend\.sh/);
 
   for (const secret of [
@@ -132,9 +135,23 @@ test("manual GitHub Actions deploy workflow builds jar, bundles it, and deploys 
     "OCI_A1_SSH_KNOWN_HOSTS_B64",
     "OCI_A1_BACKEND_ENV_B64",
     "OCI_A1_VERTEX_KEY_JSON_B64",
+    "SPRING__MAIL__HOST",
+    "SPRING__MAIL__PORT",
+    "SPRING__MAIL__USERNAME",
+    "SPRING__MAIL__PASSWORD",
+    "SPRING__MAIL__PROPERTIES__MAIL__SMTP__AUTH",
+    "SPRING__MAIL__PROPERTIES__MAIL__SMTP__STARTTLS__ENABLE",
+    "CUSTOM__MEMBER__SIGNUP__MAIL_ENABLED",
+    "CUSTOM__MEMBER__SIGNUP__MAIL_FROM",
+    "CUSTOM__MEMBER__SIGNUP__MAIL_SUBJECT",
+    "APP_AUTH_SIGNUP_EMAIL_HASH_SECRET",
   ]) {
     assert.match(workflow, new RegExp(`secrets\\.${secret}`));
   }
 
+  assert.match(
+    workflow,
+    /if \[\[ -n "\$\{SPRING__MAIL__HOST:-\}" && -n "\$\{CUSTOM__MEMBER__SIGNUP__MAIL_FROM:-\}" && -z "\$\{CUSTOM__MEMBER__SIGNUP__MAIL_ENABLED:-\}" \]\]/,
+  );
   assert.doesNotMatch(workflow, /@v\d/);
 });

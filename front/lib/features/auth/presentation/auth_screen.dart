@@ -35,8 +35,10 @@ class _AuthScreenState extends State<AuthScreen> {
   final _passwordConfirmController = TextEditingController();
   final _nicknameController = TextEditingController();
   final _resetTokenController = TextEditingController();
+  final _signupEmailVerificationCodeController = TextEditingController();
   AuthFormMode _mode = AuthFormMode.login;
   bool _acceptedRequiredTerms = false;
+  bool _signupEmailVerificationRequested = false;
   Map<String, String> _fieldErrors = {};
   String? _passwordResetEmail;
 
@@ -47,6 +49,7 @@ class _AuthScreenState extends State<AuthScreen> {
     _passwordConfirmController.dispose();
     _nicknameController.dispose();
     _resetTokenController.dispose();
+    _signupEmailVerificationCodeController.dispose();
     super.dispose();
   }
 
@@ -135,7 +138,9 @@ class _AuthScreenState extends State<AuthScreen> {
   String get _submitButtonKey {
     return switch (_mode) {
       AuthFormMode.login => 'login-submit-button',
-      AuthFormMode.signup => 'signup-submit-button',
+      AuthFormMode.signup => _signupEmailVerificationRequested
+          ? 'signup-submit-button'
+          : 'signup-email-verification-request-button',
       AuthFormMode.passwordResetRequest => 'password-reset-request-button',
       AuthFormMode.passwordResetConfirm => 'password-reset-confirm-button',
     };
@@ -144,7 +149,8 @@ class _AuthScreenState extends State<AuthScreen> {
   String get _submitLabel {
     return switch (_mode) {
       AuthFormMode.login => '로그인',
-      AuthFormMode.signup => '회원가입',
+      AuthFormMode.signup =>
+        _signupEmailVerificationRequested ? '회원가입' : '인증번호 받기',
       AuthFormMode.passwordResetRequest => '재설정 안내 받기',
       AuthFormMode.passwordResetConfirm => '비밀번호 변경',
     };
@@ -178,11 +184,42 @@ class _AuthScreenState extends State<AuthScreen> {
   }
 
   List<Widget> _signupFields(ThemeData theme) {
-    return [
+    final fields = <Widget>[
       _emailField(
         key: const ValueKey('login-email-field'),
         controller: _emailController,
         textInputAction: TextInputAction.next,
+        readOnly: _signupEmailVerificationRequested,
+      ),
+    ];
+
+    if (!_signupEmailVerificationRequested) {
+      return fields;
+    }
+
+    fields.addAll([
+      const SizedBox(height: 4),
+      Align(
+        alignment: Alignment.centerLeft,
+        child: TextButton(
+          key: const ValueKey('signup-email-change-button'),
+          onPressed: _resetSignupEmailVerification,
+          child: const Text('다른 이메일 사용'),
+        ),
+      ),
+      const SizedBox(height: 12),
+      TextField(
+        key: const ValueKey('signup-email-verification-code-field'),
+        controller: _signupEmailVerificationCodeController,
+        keyboardType: TextInputType.number,
+        maxLength: 6,
+        autofillHints: const [AutofillHints.oneTimeCode],
+        textInputAction: TextInputAction.next,
+        decoration: InputDecoration(
+          labelText: '이메일 인증번호',
+          counterText: '',
+          errorText: _fieldErrors['emailVerificationCode'],
+        ),
       ),
       const SizedBox(height: 12),
       _passwordField(
@@ -235,7 +272,9 @@ class _AuthScreenState extends State<AuthScreen> {
                 ),
               ),
       ),
-    ];
+    ]);
+
+    return fields;
   }
 
   List<Widget> _passwordResetRequestFields() {
@@ -288,10 +327,12 @@ class _AuthScreenState extends State<AuthScreen> {
     required Key key,
     required TextEditingController controller,
     required TextInputAction textInputAction,
+    bool readOnly = false,
   }) {
     return TextField(
       key: key,
       controller: controller,
+      readOnly: readOnly,
       keyboardType: TextInputType.emailAddress,
       autofillHints: const [AutofillHints.email],
       textInputAction: textInputAction,
@@ -355,26 +396,21 @@ class _AuthScreenState extends State<AuthScreen> {
             const _IosReviewEmailLoginGuidance(),
           );
         }
-        final providers = LoginProviderPolicy.providersFor(platform);
-        if (widget.externalLoginController != null && providers.isNotEmpty) {
+        final activeProviders = LoginProviderPolicy.providersFor(
+          platform,
+        ).toSet();
+        if (widget.externalLoginController != null) {
           actions.add(const SizedBox(height: 8));
-          for (final provider in providers) {
-            actions.add(
-              OutlinedButton(
-                key: ValueKey(provider.buttonKey),
-                onPressed: externalLoginState?.isStarting == true
-                    ? null
-                    : () => widget.externalLoginController!.start(
-                          provider: provider.providerId,
-                        ),
-                child: Text(
-                  externalLoginState?.isStarting == true
-                      ? '외부 로그인 준비 중'
-                      : provider.label,
-                ),
+          actions.add(
+            _QuickLoginProviderRow(
+              providers: LoginProviderPolicy.allProviders,
+              activeProviders: activeProviders,
+              isStarting: externalLoginState?.isStarting == true,
+              onStart: (provider) => widget.externalLoginController!.start(
+                provider: provider.providerId,
               ),
-            );
-          }
+            ),
+          );
         }
         break;
       case AuthFormMode.signup:
@@ -406,6 +442,29 @@ class _AuthScreenState extends State<AuthScreen> {
   Future<void> _submit() async {
     switch (_mode) {
       case AuthFormMode.signup:
+        if (!_signupEmailVerificationRequested) {
+          if (!_validateSignupEmailVerificationRequest()) {
+            return;
+          }
+          final email = _emailController.text.trim();
+          final requested =
+              await widget.controller.requestSignupEmailVerification(
+            email: email,
+          );
+          if (mounted && requested) {
+            setState(() {
+              _emailController.text = email;
+              _signupEmailVerificationRequested = true;
+              _signupEmailVerificationCodeController.clear();
+              _passwordController.clear();
+              _passwordConfirmController.clear();
+              _nicknameController.clear();
+              _acceptedRequiredTerms = false;
+              _fieldErrors = {};
+            });
+          }
+          return;
+        }
         if (!_validateSignup()) {
           return;
         }
@@ -413,6 +472,7 @@ class _AuthScreenState extends State<AuthScreen> {
           email: _emailController.text,
           password: _passwordController.text,
           nickname: _nicknameController.text,
+          emailVerificationCode: _signupEmailVerificationCodeController.text,
         );
         if (mounted && widget.controller.state.errorMessage == null) {
           _changeMode(AuthFormMode.login);
@@ -464,6 +524,7 @@ class _AuthScreenState extends State<AuthScreen> {
   bool _validateSignup() {
     final errors = <String, String>{};
     _validateEmail(errors, _emailController.text);
+    _validateEmailVerificationCode(errors);
     _validatePassword(errors, _passwordController.text);
     _validatePasswordConfirm(errors);
 
@@ -476,6 +537,12 @@ class _AuthScreenState extends State<AuthScreen> {
       errors['requiredTerms'] = '필수 동의 항목을 확인해 주세요.';
     }
 
+    return _commitFieldErrors(errors);
+  }
+
+  bool _validateSignupEmailVerificationRequest() {
+    final errors = <String, String>{};
+    _validateEmail(errors, _emailController.text);
     return _commitFieldErrors(errors);
   }
 
@@ -515,6 +582,14 @@ class _AuthScreenState extends State<AuthScreen> {
     }
   }
 
+  void _validateEmailVerificationCode(Map<String, String> errors) {
+    final codePattern = RegExp(r'^\d{6}$');
+    if (!codePattern
+        .hasMatch(_signupEmailVerificationCodeController.text.trim())) {
+      errors['emailVerificationCode'] = '인증번호 6자리를 입력해 주세요.';
+    }
+  }
+
   bool _commitFieldErrors(Map<String, String> errors) {
     setState(() {
       _fieldErrors = errors;
@@ -526,7 +601,14 @@ class _AuthScreenState extends State<AuthScreen> {
     setState(() {
       _mode = mode;
       _fieldErrors = {};
+      if (mode == AuthFormMode.signup) {
+        _signupEmailVerificationRequested = false;
+        _signupEmailVerificationCodeController.clear();
+        _acceptedRequiredTerms = false;
+      }
       if (mode != AuthFormMode.signup) {
+        _signupEmailVerificationRequested = false;
+        _signupEmailVerificationCodeController.clear();
         _acceptedRequiredTerms = false;
       }
       if (mode != AuthFormMode.login) {
@@ -540,6 +622,18 @@ class _AuthScreenState extends State<AuthScreen> {
         _resetTokenController.clear();
         _passwordResetEmail = null;
       }
+    });
+  }
+
+  void _resetSignupEmailVerification() {
+    setState(() {
+      _signupEmailVerificationRequested = false;
+      _signupEmailVerificationCodeController.clear();
+      _passwordController.clear();
+      _passwordConfirmController.clear();
+      _nicknameController.clear();
+      _acceptedRequiredTerms = false;
+      _fieldErrors = {};
     });
   }
 }
@@ -573,6 +667,156 @@ class _MessagePanel extends StatelessWidget {
         ),
       ),
     );
+  }
+}
+
+class _QuickLoginProviderRow extends StatelessWidget {
+  const _QuickLoginProviderRow({
+    required this.providers,
+    required this.activeProviders,
+    required this.isStarting,
+    required this.onStart,
+  });
+
+  final List<LoginProvider> providers;
+  final Set<LoginProvider> activeProviders;
+  final bool isStarting;
+  final ValueChanged<LoginProvider> onStart;
+
+  @override
+  Widget build(BuildContext context) {
+    return Wrap(
+      alignment: WrapAlignment.center,
+      spacing: 8,
+      runSpacing: 8,
+      children: [
+        for (final provider in providers)
+          _QuickLoginProviderButton(
+            provider: provider,
+            isActive: activeProviders.contains(provider),
+            isStarting: isStarting,
+            onPressed: () => onStart(provider),
+          ),
+      ],
+    );
+  }
+}
+
+class _QuickLoginProviderButton extends StatelessWidget {
+  const _QuickLoginProviderButton({
+    required this.provider,
+    required this.isActive,
+    required this.isStarting,
+    required this.onPressed,
+  });
+
+  final LoginProvider provider;
+  final bool isActive;
+  final bool isStarting;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final enabled = isActive && !isStarting;
+    final opacity = enabled ? 1.0 : (isActive ? 0.55 : 0.32);
+    final label = isActive ? provider.label : '${provider.label} 준비 중';
+
+    return Semantics(
+      key: ValueKey(provider.buttonKey),
+      button: true,
+      enabled: enabled,
+      label: label,
+      child: Tooltip(
+        message: label,
+        child: Opacity(
+          opacity: opacity,
+          child: Material(
+            color: _providerBackground(provider),
+            shape: CircleBorder(side: _providerBorder(provider)),
+            clipBehavior: Clip.antiAlias,
+            child: InkWell(
+              customBorder: const CircleBorder(),
+              onTap: enabled ? onPressed : null,
+              child: SizedBox.square(
+                dimension: 54,
+                child: Center(
+                  child: _QuickLoginProviderMark(provider: provider),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Color _providerBackground(LoginProvider provider) {
+    return switch (provider) {
+      LoginProvider.naver => const Color(0xFF03C75A),
+      LoginProvider.kakao => const Color(0xFFFEE500),
+      LoginProvider.facebook => const Color(0xFF4267B2),
+      LoginProvider.google => Colors.white,
+      LoginProvider.apple => Colors.black,
+    };
+  }
+
+  BorderSide _providerBorder(LoginProvider provider) {
+    return switch (provider) {
+      LoginProvider.google => const BorderSide(
+          color: Color(0xFF4285F4),
+          width: 1.4,
+        ),
+      _ => BorderSide.none,
+    };
+  }
+}
+
+class _QuickLoginProviderMark extends StatelessWidget {
+  const _QuickLoginProviderMark({
+    required this.provider,
+  });
+
+  final LoginProvider provider;
+
+  @override
+  Widget build(BuildContext context) {
+    return switch (provider) {
+      LoginProvider.naver => const Text(
+          'N',
+          style: TextStyle(
+            color: Colors.white,
+            fontSize: 30,
+            fontWeight: FontWeight.w900,
+          ),
+        ),
+      LoginProvider.kakao => const Icon(
+          Icons.chat_bubble,
+          color: Color(0xFF3C1E1E),
+          size: 25,
+        ),
+      LoginProvider.facebook => const Text(
+          'f',
+          style: TextStyle(
+            color: Colors.white,
+            fontSize: 38,
+            fontWeight: FontWeight.w800,
+            height: 0.95,
+          ),
+        ),
+      LoginProvider.google => const Text(
+          'G',
+          style: TextStyle(
+            color: Color(0xFF4285F4),
+            fontSize: 28,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+      LoginProvider.apple => const Icon(
+          Icons.apple,
+          color: Colors.white,
+          size: 30,
+        ),
+    };
   }
 }
 

@@ -1570,6 +1570,13 @@ class _FakeAuthRepository implements AuthRepository {
   int clearLocalSessionCount = 0;
 
   @override
+  Future<void> requestSignupEmailVerification(
+    SignupEmailVerificationRequest request,
+  ) {
+    throw UnimplementedError();
+  }
+
+  @override
   Future<AuthMember> signup(SignupRequest request) {
     throw UnimplementedError();
   }

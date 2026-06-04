@@ -1,6 +1,7 @@
 package com.maumonmobile.adapter.`in`.web.moderation
 
 import com.jayway.jsonpath.JsonPath
+import com.maumonmobile.adapter.`in`.web.auth.signupVerifiedMember
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
@@ -38,10 +39,11 @@ class ContentModerationControllerTest @Autowired constructor(
     }
 
     private fun signupAndLogin(email: String, nickname: String): String {
-        mockMvc.post("/api/v1/auth/signup") {
-            contentType = MediaType.APPLICATION_JSON
-            content = """{"email":"$email","password":"pass1234","nickname":"$nickname"}"""
-        }
+        mockMvc.signupVerifiedMember(
+            email = email,
+            password = "pass1234",
+            nickname = nickname,
+        )
             .andExpect {
                 status { isOk() }
             }
