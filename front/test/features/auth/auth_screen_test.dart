@@ -309,6 +309,43 @@ void main() {
     );
   });
 
+  testWidgets('shows configured Apple quick login on iOS', (tester) async {
+    final repository = _FakeAuthRepository();
+    final authController = AuthController(authRepository: repository);
+    final launcher = _FakeExternalLoginLauncher();
+
+    await tester.pumpWidget(
+      _AuthScreenHarness(
+        repository: repository,
+        controller: authController,
+        platform: TargetPlatform.iOS,
+        loginProviders: const [LoginProvider.apple],
+        externalLoginController: ExternalLoginController(
+          authController: authController,
+          launcher: launcher,
+          config: ExternalLoginConfig(
+            apiBaseUrl: Uri.parse('https://api.example.com'),
+          ),
+        ),
+      ),
+    );
+
+    _expectOnlyQuickLoginProviders(['apple']);
+
+    await tester.ensureVisible(
+      find.byKey(const ValueKey('external-login-apple-button')),
+    );
+    await tester.tap(find.byKey(const ValueKey('external-login-apple-button')));
+    await tester.pumpAndSettle();
+
+    final launchedUri = launcher.launchedUris.single;
+    expect(launchedUri.path, '/api/v1/auth/oidc/authorize/apple');
+    expect(
+      launchedUri.queryParameters['redirect_uri'],
+      'maumon://auth/callback?provider=apple',
+    );
+  });
+
   testWidgets('disables other auth actions while quick login is starting',
       (tester) async {
     final repository = _FakeAuthRepository();
