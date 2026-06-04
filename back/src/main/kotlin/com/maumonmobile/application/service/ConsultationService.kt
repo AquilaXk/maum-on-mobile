@@ -111,7 +111,11 @@ class ConsultationService(
                 reply.errorMessage
             },
             attributes = mapOf(
-                "status" to if (reply.errorMessage == null) "READY" else "FALLBACK",
+                "status" to when {
+                    reply.fallback -> "FALLBACK"
+                    reply.errorMessage == null -> "READY"
+                    else -> "ERROR"
+                },
             ),
         )
 
@@ -306,7 +310,7 @@ class ConsultationService(
     private fun fallbackReply(): ConsultationReplyResult {
         return ConsultationReplyResult(
             chunks = listOf(FALLBACK_MESSAGE),
-            errorMessage = FALLBACK_MESSAGE,
+            fallback = true,
         )
     }
 
@@ -321,6 +325,7 @@ class ConsultationService(
     private data class ConsultationReplyResult(
         val chunks: List<String>,
         val errorMessage: String? = null,
+        val fallback: Boolean = false,
     ) {
         val content: String = chunks.joinToString(separator = "")
     }
