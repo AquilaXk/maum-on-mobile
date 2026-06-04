@@ -70,7 +70,7 @@ scp_base=(
 
 remote_staging="/tmp/maum-on-mobile-deploy-${GITHUB_RUN_ID:-local}-${GITHUB_RUN_ATTEMPT:-0}"
 
-"${ssh_base[@]}" "mkdir -p '${remote_staging}'"
+"${ssh_base[@]}" "install -d -m 0700 '${remote_staging}'"
 "${scp_base[@]}" "${bundle_copy}" "${backend_env}" "${vertex_key}" "${OCI_A1_SSH_USER}@${OCI_A1_SSH_HOST}:${remote_staging}/"
 
 "${ssh_base[@]}" \
@@ -90,6 +90,11 @@ env_file="/etc/maum-on-mobile/backend.env"
 vertex_key_file="/etc/maum-on-mobile/vertex-key.json"
 bundle_path="${staging_dir}/maum-on-mobile-backend-bundle.tar.gz"
 
+cleanup_remote_staging() {
+  rm -f "${staging_dir}/backend.env" "${staging_dir}/vertex-key.json" "${bundle_path}" >/dev/null 2>&1 || true
+  rmdir --ignore-fail-on-non-empty "${staging_dir}" >/dev/null 2>&1 || true
+}
+
 rollback() {
   echo "rollback: restoring previous backend container" >&2
   sudo docker logs --tail 200 "${container_name}" || true
@@ -99,6 +104,9 @@ rollback() {
     sudo docker start "${container_name}"
   fi
 }
+
+trap cleanup_remote_staging EXIT
+trap 'exit 143' TERM
 
 require_remote_file() {
   if [[ ! -f "$1" ]]; then
@@ -154,7 +162,7 @@ if sudo docker inspect "${container_name}" >/dev/null 2>&1; then
   sudo docker rename "${container_name}" "${previous_container_name}"
 fi
 
-sudo docker run \
+if ! sudo docker run \
   --detach \
   --name "${container_name}" \
   --restart unless-stopped \
@@ -166,7 +174,10 @@ sudo docker run \
   --health-timeout 5s \
   --health-start-period 40s \
   --health-retries 5 \
-  "${image_tag}"
+  "${image_tag}"; then
+  rollback
+  exit 1
+fi
 
 if ! wait_for_health; then
   rollback
@@ -175,6 +186,5 @@ fi
 
 curl -fsS "http://127.0.0.1:8080/actuator/health" >/dev/null
 sudo docker rm "${previous_container_name}" >/dev/null 2>&1 || true
-rm -rf "${staging_dir}"
 echo "deployed ${image_tag}"
 REMOTE

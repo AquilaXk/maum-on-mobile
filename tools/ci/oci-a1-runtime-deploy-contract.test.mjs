@@ -52,6 +52,11 @@ test("OCI runtime deploy script is safe, idempotent, and verifies health", () =>
   assert.match(script, /--health-cmd 'curl -fsS http:\/\/127\.0\.0\.1:8080\/actuator\/health \|\| exit 1'/);
   assert.match(script, /curl -fsS "http:\/\/127\.0\.0\.1:8080\/actuator\/health"/);
   assert.match(script, /docker rm "\$\{previous_container_name\}"/);
+  assert.match(script, /install -d -m 0700 '\$\{remote_staging\}'/);
+  assert.match(script, /cleanup_remote_staging\(\)/);
+  assert.match(script, /rm -f "\$\{staging_dir\}\/backend\.env" "\$\{staging_dir\}\/vertex-key\.json" "\$\{bundle_path\}"/);
+  assert.match(script, /trap cleanup_remote_staging EXIT/);
+  assert.match(script, /if ! sudo docker run/);
   assert.match(script, /rollback/);
   assert.doesNotMatch(script, /set -x/);
 });
