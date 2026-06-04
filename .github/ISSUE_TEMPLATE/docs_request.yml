@@ -1,19 +1,19 @@
 name: "문서"
-description: "루트 README 또는 GitHub 템플릿처럼 저장소에 공개되는 문서 작업을 정리합니다."
+description: "루트 README처럼 저장소에 공개되는 문서 작업을 정리합니다."
 labels: ["documentation"]
 body:
   - type: markdown
     attributes:
       value: |
         제목은 `[Docs] 한국어 작업 요약` 형식으로 작성합니다.
-        루트 README.md와 GitHub 템플릿 외 Markdown 문서는 기본적으로 git에 올리지 않습니다.
+        루트 README.md 외 Markdown 문서는 기본적으로 git에 올리지 않습니다.
 
   - type: input
     id: target
     attributes:
       label: 대상
       description: 수정하거나 추가할 공개 문서 대상을 적어 주세요.
-      placeholder: 예) README.md, .github/pull_request_template.md
+      placeholder: 예) README.md
     validations:
       required: true
 
@@ -31,7 +31,7 @@ body:
       label: 추적 정책 확인
       description: 문서 추적 정책에 맞는지 확인해 주세요.
       placeholder: |
-        - [ ] README.md 또는 .github 템플릿에 해당하는가?
+        - [ ] 루트 README.md 변경에 해당하는가?
         - [ ] 로컬 에이전트 문서가 git에 포함되지 않았는가?
     validations:
       required: true

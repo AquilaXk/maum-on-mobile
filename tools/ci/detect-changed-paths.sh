@@ -15,7 +15,7 @@ saw_file=false
 
 is_docs_file() {
   case "$1" in
-    README.md|LICENSE|LICENSE.*|*.md|docs/**)
+    README.md|LICENSE|LICENSE.*)
       return 0
       ;;
     *)
@@ -136,8 +136,6 @@ while IFS= read -r file; do
       frontend=true
       ios=true
       repository=true
-      ;;
-    .github/pull_request_template.md)
       ;;
     .github/**|.gitignore|.coderabbit.yaml)
       repository=true
