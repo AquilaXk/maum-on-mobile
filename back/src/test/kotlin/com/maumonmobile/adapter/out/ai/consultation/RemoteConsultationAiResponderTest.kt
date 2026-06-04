@@ -55,6 +55,8 @@ class RemoteConsultationAiResponderTest {
         val requestJson = ObjectMapper().readTree(client.requestBody!!)
         assertThat(requestJson["contents"].toString()).contains("요즘 불안해요.", "어제도 불안했어요.")
         assertThat(requestJson["generationConfig"].toString()).contains("maxOutputTokens")
+        assertThat(requestJson["generationConfig"]["responseMimeType"].asString()).isEqualTo("application/json")
+        assertThat(requestJson["generationConfig"]["thinkingConfig"]["thinkingBudget"].asInt()).isEqualTo(0)
     }
 
     @Test

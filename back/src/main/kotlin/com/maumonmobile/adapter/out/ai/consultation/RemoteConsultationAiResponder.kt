@@ -95,6 +95,12 @@ class RemoteConsultationAiResponder internal constructor(
                 "generationConfig" to mapOf(
                     "temperature" to 0.3,
                     "maxOutputTokens" to 512,
+                    // Vertex AI가 JSON 응답을 반환하도록 요청한다.
+                    "responseMimeType" to "application/json",
+                    "thinkingConfig" to mapOf(
+                        // Gemini 2.5 Flash의 thinking 토큰으로 상담 JSON이 잘리지 않게 한다.
+                        "thinkingBudget" to 0,
+                    ),
                 ),
             ),
         )
@@ -111,7 +117,8 @@ class RemoteConsultationAiResponder internal constructor(
             사용자의 고민에 먼저 공감하고, 부담스럽지 않은 작은 다음 행동을 제안해.
             답변은 한국어 3~4문장 안에서 정중하고 따뜻하게 작성해.
             의학적 진단, 단정적인 판단, 위험한 지시는 하지 마.
-            Return JSON only. Use this shape: {"chunks":["short Korean response part"]}.
+            Return compact JSON only. Do not use markdown fences.
+            Use this shape: {"chunks":["short Korean response part"]}.
             memberId: ${request.memberId}
             recentMessages:
             $recentMessages
