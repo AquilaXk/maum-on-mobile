@@ -9,6 +9,45 @@ import 'package:maum_on_mobile_front/features/diary/presentation/diary_image_pic
 import 'package:maum_on_mobile_front/features/diary/presentation/diary_screen.dart';
 
 void main() {
+  testWidgets('shows compact write entry controls on a phone viewport',
+      (tester) async {
+    tester.view.physicalSize = const Size(390, 640);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    final controller = DiaryController(
+      diaryRepository: _FakeDiaryRepository(
+        pages: [
+          _page([
+            _entry(id: 1, title: '오늘의 기록', createDate: '2026-05-20T08:00:00'),
+          ]),
+        ],
+        publicPages: [_page([])],
+      ),
+      imageRepository: _FakeDiaryImageRepository(),
+      now: DateTime(2026, 5, 20),
+    );
+
+    await controller.load();
+    await tester.pumpWidget(
+      MaterialApp(
+        home: DiaryScreen(
+          controller: controller,
+          imagePicker: _FakeDiaryImagePicker(),
+          onBack: () {},
+        ),
+      ),
+    );
+
+    expect(find.byKey(const ValueKey('diary-quick-capture-panel')),
+        findsOneWidget);
+    expect(
+        find.byKey(const ValueKey('diary-quick-write-button')), findsOneWidget);
+    expect(find.text('오늘 기록 쓰기'), findsOneWidget);
+    expect(find.text('선택한 날 1개'), findsOneWidget);
+  });
+
   testWidgets('renders diary calendar, form, and selected date entries',
       (tester) async {
     final controller = DiaryController(
@@ -45,7 +84,8 @@ void main() {
     );
 
     expect(find.text('2026년 5월'), findsOneWidget);
-    expect(find.byKey(const ValueKey('diary-flow-panel')), findsOneWidget);
+    expect(find.byKey(const ValueKey('diary-quick-capture-panel')),
+        findsOneWidget);
     expect(find.text('오늘의 기록 흐름'), findsOneWidget);
     expect(find.text('선택한 날을 확인하고, 바로 이어서 기록하세요.'), findsOneWidget);
     expect(

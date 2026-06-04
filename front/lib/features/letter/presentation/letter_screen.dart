@@ -324,52 +324,93 @@ class _StatsSection extends StatelessWidget {
   Widget build(BuildContext context) {
     final latestReceived = stats?.latestReceivedLetter?.title ?? '-';
     final latestSent = stats?.latestSentLetter?.title ?? '-';
+    final receivedCount = stats?.receivedCount ?? 0;
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Wrap(
-          spacing: AppSpacing.xs,
-          runSpacing: AppSpacing.xs,
+    return Card(
+      key: const ValueKey('letter-mailbox-toolbar'),
+      margin: EdgeInsets.zero,
+      child: Padding(
+        padding: const EdgeInsets.all(AppSpacing.md),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            AppMetricTile(
-              label: '받은 편지',
-              value: (stats?.receivedCount ?? 0).toString(),
-              tone: AppStatusTone.success,
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(
+                  Icons.mark_email_read_outlined,
+                  color: colorScheme.primary,
+                  size: 22,
+                ),
+                const SizedBox(width: AppSpacing.xs),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        '받은 편지',
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                      const SizedBox(height: AppSpacing.xxs),
+                      Text(
+                        '최근 편지와 답장 상태를 빠르게 확인합니다.',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                AppStatusPill(
+                  label: '받은 편지 $receivedCount개',
+                  tone: AppStatusTone.success,
+                ),
+              ],
             ),
-            AppMetricTile(label: '최근 받은 편지', value: latestReceived),
-            AppMetricTile(
-              label: '최근 보낸 편지',
-              value: latestSent,
-              tone: AppStatusTone.warning,
+            const SizedBox(height: AppSpacing.sm),
+            Wrap(
+              spacing: AppSpacing.xs,
+              runSpacing: AppSpacing.xs,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              children: [
+                AppStatusPill(label: '최근 받은 편지 $latestReceived'),
+                AppStatusPill(
+                  label: '최근 보낸 편지 $latestSent',
+                  tone: AppStatusTone.warning,
+                ),
+              ],
             ),
+            if (stats?.latestReceivedLetter != null ||
+                stats?.latestSentLetter != null) ...[
+              const SizedBox(height: AppSpacing.xs),
+              Wrap(
+                spacing: AppSpacing.xs,
+                runSpacing: AppSpacing.xs,
+                children: [
+                  if (stats?.latestReceivedLetter != null)
+                    OutlinedButton.icon(
+                      key: const ValueKey('letter-latest-received-button'),
+                      onPressed: onOpenLatestReceived,
+                      icon: const Icon(Icons.inbox_outlined),
+                      label: const Text('최근 받은 편지 열기'),
+                    ),
+                  if (stats?.latestSentLetter != null)
+                    OutlinedButton.icon(
+                      key: const ValueKey('letter-latest-sent-button'),
+                      onPressed: onOpenLatestSent,
+                      icon: const Icon(Icons.send_outlined),
+                      label: const Text('최근 보낸 편지 열기'),
+                    ),
+                ],
+              ),
+            ],
           ],
         ),
-        if (stats?.latestReceivedLetter != null ||
-            stats?.latestSentLetter != null) ...[
-          const SizedBox(height: AppSpacing.xs),
-          Wrap(
-            spacing: AppSpacing.xs,
-            runSpacing: AppSpacing.xs,
-            children: [
-              if (stats?.latestReceivedLetter != null)
-                OutlinedButton.icon(
-                  key: const ValueKey('letter-latest-received-button'),
-                  onPressed: onOpenLatestReceived,
-                  icon: const Icon(Icons.inbox_outlined),
-                  label: const Text('최근 받은 편지 열기'),
-                ),
-              if (stats?.latestSentLetter != null)
-                OutlinedButton.icon(
-                  key: const ValueKey('letter-latest-sent-button'),
-                  onPressed: onOpenLatestSent,
-                  icon: const Icon(Icons.send_outlined),
-                  label: const Text('최근 보낸 편지 열기'),
-                ),
-            ],
-          ),
-        ],
-      ],
+      ),
     );
   }
 }
