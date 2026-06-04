@@ -40,10 +40,23 @@ test("OCI runtime deploy script is safe, idempotent, and verifies health", () =>
   assert.match(script, /OCI_A1_BACKEND_ENV_B64/);
   assert.match(script, /OCI_A1_VERTEX_KEY_JSON_B64/);
   assert.match(script, /Invalid MAUMON_BACKEND_IMAGE_TAG/);
+  assert.match(script, /docker_network="\$\{MAUMON_DOCKER_NETWORK:-maum-on-mobile\}"/);
+  assert.match(script, /app_data_dir="\$\{MAUMON_APP_DATA_DIR:-\/var\/lib\/maumon-data\/app\}"/);
+  assert.match(script, /Invalid MAUMON_DOCKER_NETWORK/);
+  assert.match(script, /Invalid MAUMON_APP_DATA_DIR/);
+  assert.match(script, /Invalid MAUMON_POSTGRES_CONTAINER_NAME/);
+  assert.match(script, /Invalid MAUMON_POSTGRES_DATA_VOLUME/);
+  assert.match(script, /Invalid MAUMON_POSTGRES_IMAGE_TAG/);
+  assert.match(script, /Invalid MAUMON_DEPLOY_MANAGED_POSTGRES/);
   assert.match(script, /tar -xzf "\$\{bundle_path\}" -C "\$\{release_dir\}"/);
   assert.match(script, /docker build -t "\$\{image_tag\}" -f "\$\{release_dir\}\/Dockerfile" "\$\{release_dir\}"/);
   assert.match(script, /container_uid="10001"/);
   assert.match(script, /chown "\$\{container_uid\}:\$\{container_gid\}" "\$\{vertex_key_file\}"/);
+  assert.match(
+    script,
+    /MAUMON_DOCKER_NETWORK='\$\{docker_network\}' MAUMON_APP_DATA_DIR='\$\{app_data_dir\}'/,
+  );
+  assert.match(script, /install_runtime[\s\S]*prepare_runtime_resources[\s\S]*prepare_managed_postgres/);
   assert.match(script, /container_name="maum-on-mobile-back"/);
   assert.match(script, /previous_container_name="maum-on-mobile-back-previous"/);
   assert.match(script, /network_name="\$\{MAUMON_DOCKER_NETWORK:-maum-on-mobile\}"/);
