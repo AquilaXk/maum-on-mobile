@@ -103,7 +103,6 @@ class ApiAuthRepository implements AuthRepository {
   Future<AuthSession> restoreSession() async {
     final session = await _apiClient.get<AuthSession>(
       '/api/v1/auth/session',
-      retryOnUnauthorized: false,
       parser: AuthSession.fromJson,
     );
     await _saveSession(session);

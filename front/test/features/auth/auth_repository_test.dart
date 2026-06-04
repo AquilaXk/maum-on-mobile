@@ -117,9 +117,61 @@ void main() {
       expect(transport.requests.single.method, ApiMethod.get);
       expect(transport.requests.single.path, '/api/v1/auth/session');
       expect(transport.requests.single.requiresAuth, isTrue);
+      expect(transport.requests.single.retryOnUnauthorized, isTrue);
       expect(
         transport.requests.single.headers['Authorization'],
         'Bearer saved-access',
+      );
+    });
+
+    test('restoreSession refreshes an expired access token before restoring',
+        () async {
+      final transport = _FakeApiTransport([
+        const ApiTransportResponse(
+          statusCode: 401,
+          body: {
+            'success': false,
+            'error': {'code': 'AUTH_REQUIRED', 'message': '인증이 필요합니다.'},
+          },
+        ),
+        ApiTransportResponse.ok(_tokenEnvelope(
+          accessToken: 'restored-token',
+          refreshToken: 'restored-refresh',
+        )),
+      ]);
+      final tokenStore = MemoryAuthTokenStore(
+        initialTokens: const TokenPair(
+          accessToken: 'expired-access',
+          refreshToken: 'saved-refresh',
+        ),
+      );
+      final repository = ApiAuthRepository(
+        apiClient: ApiClient(
+          transport: transport,
+          tokenStore: tokenStore,
+          tokenRefresher: const _FakeTokenRefresher(
+            tokens: TokenPair(
+              accessToken: 'refreshed-access',
+              refreshToken: 'refreshed-refresh',
+            ),
+          ),
+        ),
+        tokenStore: tokenStore,
+      );
+
+      final session = await repository.restoreSession();
+
+      expect(session.accessToken, 'restored-token');
+      expect(await tokenStore.readAccessToken(), 'restored-token');
+      expect(await tokenStore.readRefreshToken(), 'restored-refresh');
+      expect(transport.requests, hasLength(2));
+      expect(
+        transport.requests.first.headers['Authorization'],
+        'Bearer expired-access',
+      );
+      expect(
+        transport.requests.last.headers['Authorization'],
+        'Bearer refreshed-access',
       );
     });
 
@@ -353,4 +405,15 @@ class _FakeApiTransport implements ApiTransport {
 
     return _responses.removeAt(0);
   }
+}
+
+class _FakeTokenRefresher implements AuthTokenRefresher {
+  const _FakeTokenRefresher({
+    required this.tokens,
+  });
+
+  final TokenPair? tokens;
+
+  @override
+  Future<TokenPair?> refresh(String refreshToken) async => tokens;
 }

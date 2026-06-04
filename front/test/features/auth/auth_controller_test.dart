@@ -74,6 +74,25 @@ void main() {
       );
     });
 
+    test('restoreSession hides a generic unauthorized message', () async {
+      final controller = AuthController(
+        authRepository: _FakeAuthRepository(
+          restoreError: const ApiClientException(
+            kind: ApiErrorKind.unauthorized,
+            message: '인증이 필요합니다.',
+            statusCode: 401,
+          ),
+        ),
+      );
+
+      await controller.restoreSession();
+
+      expect(controller.state.isAuthenticated, isFalse);
+      expect(controller.state.hasRestored, isTrue);
+      expect(controller.state.infoMessage, isNull);
+      expect(controller.state.errorMessage, isNull);
+    });
+
     test('logout clears authenticated state immediately', () async {
       final repository = _FakeAuthRepository(loginSession: _session());
       final controller = AuthController(authRepository: repository);

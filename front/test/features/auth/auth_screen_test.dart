@@ -213,8 +213,7 @@ void main() {
     expect(find.byKey(const ValueKey('auth-terms-link')), findsOneWidget);
   });
 
-  testWidgets('shows quick login icons and enables only Apple on iOS',
-      (tester) async {
+  testWidgets('shows only Apple quick login on iOS', (tester) async {
     final repository = _FakeAuthRepository();
     final authController = AuthController(authRepository: repository);
     final launcher = _FakeExternalLoginLauncher();
@@ -236,7 +235,7 @@ void main() {
 
     expect(find.byKey(const ValueKey('login-email-field')), findsOneWidget);
     expect(find.byKey(const ValueKey('login-password-field')), findsOneWidget);
-    _expectQuickLoginIcons();
+    _expectOnlyQuickLoginProviders(['apple']);
     expect(
       find.byKey(const ValueKey('ios-review-email-login-guidance')),
       findsNothing,
@@ -245,10 +244,6 @@ void main() {
       find.byKey(const ValueKey('auth-account-deletion-guidance')),
       findsOneWidget,
     );
-
-    await tester.tap(find.byKey(const ValueKey('external-login-kakao-button')));
-    await tester.pumpAndSettle();
-    expect(launcher.launchedUris, isEmpty);
 
     expect(
       tester
@@ -273,8 +268,7 @@ void main() {
     );
   });
 
-  testWidgets('shows quick login icons and enables only Kakao on Android',
-      (tester) async {
+  testWidgets('shows only Kakao quick login on Android', (tester) async {
     final repository = _FakeAuthRepository();
     final authController = AuthController(authRepository: repository);
     final launcher = _FakeExternalLoginLauncher();
@@ -294,15 +288,11 @@ void main() {
       ),
     );
 
-    _expectQuickLoginIcons();
+    _expectOnlyQuickLoginProviders(['kakao']);
     expect(
       find.byKey(const ValueKey('ios-review-email-login-guidance')),
       findsNothing,
     );
-
-    await tester.tap(find.byKey(const ValueKey('external-login-apple-button')));
-    await tester.pumpAndSettle();
-    expect(launcher.launchedUris, isEmpty);
 
     await tester.ensureVisible(
       find.byKey(const ValueKey('external-login-kakao-button')),
@@ -319,11 +309,13 @@ void main() {
   });
 }
 
-void _expectQuickLoginIcons() {
+void _expectOnlyQuickLoginProviders(List<String> visibleProviders) {
   for (final provider in ['naver', 'kakao', 'facebook', 'google', 'apple']) {
+    final matcher =
+        visibleProviders.contains(provider) ? findsOneWidget : findsNothing;
     expect(
       find.byKey(ValueKey('external-login-$provider-button')),
-      findsOneWidget,
+      matcher,
     );
   }
 }
