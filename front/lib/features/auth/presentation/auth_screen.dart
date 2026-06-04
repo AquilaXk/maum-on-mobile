@@ -4,6 +4,7 @@ import '../application/auth_controller.dart';
 import '../deeplink/external_login.dart';
 import '../domain/login_provider_policy.dart';
 import '../../legal/presentation/legal_disclosure_links.dart';
+import '../../../shared/ui/app_design_system.dart';
 import '../../../shared/ui/brand_identity.dart';
 
 enum AuthFormMode {
@@ -59,67 +60,104 @@ class _AuthScreenState extends State<AuthScreen> {
     final state = widget.controller.state;
     final externalLoginState = widget.externalLoginController?.state;
     final platform = theme.platform;
+    final secondaryActions =
+        _secondaryActions(state, externalLoginState, platform);
 
     return Scaffold(
-      body: SafeArea(
-        child: Center(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(28),
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 420),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  const MaumOnBrandWordmark(height: 40),
-                  const SizedBox(height: 8),
-                  Text(
-                    _subtitle,
-                    style: theme.textTheme.bodyLarge,
+      body: DecoratedBox(
+        decoration: BoxDecoration(
+          color: theme.colorScheme.surfaceContainerHighest.withValues(
+            alpha: 0.42,
+          ),
+        ),
+        child: SafeArea(
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              return SingleChildScrollView(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: AppSpacing.xl,
+                  vertical: AppSpacing.xxl,
+                ),
+                child: Center(
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(
+                      minHeight: constraints.maxHeight - AppSpacing.xxl * 2,
+                      maxWidth: 440,
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        _AuthHeader(subtitle: _subtitle),
+                        const SizedBox(height: AppSpacing.xxl),
+                        _AuthFormPanel(
+                          title: _modeTitle,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              if (state.errorMessage != null) ...[
+                                _MessagePanel(
+                                  message: state.errorMessage!,
+                                  color: theme.colorScheme.errorContainer,
+                                  textColor: theme.colorScheme.onErrorContainer,
+                                  isError: true,
+                                ),
+                                const SizedBox(height: AppSpacing.lg),
+                              ],
+                              if (externalLoginState?.errorMessage != null) ...[
+                                _MessagePanel(
+                                  message: externalLoginState!.errorMessage!,
+                                  color: theme.colorScheme.errorContainer,
+                                  textColor: theme.colorScheme.onErrorContainer,
+                                  isError: true,
+                                ),
+                                const SizedBox(height: AppSpacing.lg),
+                              ],
+                              if (state.infoMessage != null) ...[
+                                _MessagePanel(
+                                  message: state.infoMessage!,
+                                  color: theme.colorScheme.primaryContainer,
+                                  textColor:
+                                      theme.colorScheme.onPrimaryContainer,
+                                ),
+                                const SizedBox(height: AppSpacing.lg),
+                              ],
+                              ..._fieldsForMode(theme),
+                              const SizedBox(height: AppSpacing.xl),
+                              FilledButton.icon(
+                                key: ValueKey(_submitButtonKey),
+                                onPressed: state.isSubmitting ? null : _submit,
+                                icon: state.isSubmitting
+                                    ? SizedBox.square(
+                                        dimension: 18,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                          color: theme.colorScheme.onPrimary,
+                                        ),
+                                      )
+                                    : Icon(_submitIcon),
+                                label: Text(
+                                  state.isSubmitting ? '처리 중' : _submitLabel,
+                                ),
+                              ),
+                              if (secondaryActions.isNotEmpty) ...[
+                                const SizedBox(height: AppSpacing.md),
+                                ...secondaryActions,
+                              ],
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: AppSpacing.lg),
+                        LegalDisclosureLinks(
+                          keyPrefix: 'auth',
+                          onOpenExternalUri: widget.onOpenExternalUri,
+                        ),
+                      ],
+                    ),
                   ),
-                  const SizedBox(height: 28),
-                  if (state.errorMessage != null) ...[
-                    _MessagePanel(
-                      message: state.errorMessage!,
-                      color: theme.colorScheme.errorContainer,
-                      textColor: theme.colorScheme.onErrorContainer,
-                    ),
-                    const SizedBox(height: 16),
-                  ],
-                  if (externalLoginState?.errorMessage != null) ...[
-                    _MessagePanel(
-                      message: externalLoginState!.errorMessage!,
-                      color: theme.colorScheme.errorContainer,
-                      textColor: theme.colorScheme.onErrorContainer,
-                    ),
-                    const SizedBox(height: 16),
-                  ],
-                  if (state.infoMessage != null) ...[
-                    _MessagePanel(
-                      message: state.infoMessage!,
-                      color: theme.colorScheme.primaryContainer,
-                      textColor: theme.colorScheme.onPrimaryContainer,
-                    ),
-                    const SizedBox(height: 16),
-                  ],
-                  ..._fieldsForMode(theme),
-                  const SizedBox(height: 20),
-                  FilledButton(
-                    key: ValueKey(_submitButtonKey),
-                    onPressed: state.isSubmitting ? null : _submit,
-                    child: Text(
-                      state.isSubmitting ? '처리 중' : _submitLabel,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  ..._secondaryActions(state, externalLoginState, platform),
-                  const SizedBox(height: 16),
-                  LegalDisclosureLinks(
-                    keyPrefix: 'auth',
-                    onOpenExternalUri: widget.onOpenExternalUri,
-                  ),
-                ],
-              ),
-            ),
+                ),
+              );
+            },
           ),
         ),
       ),
@@ -132,6 +170,16 @@ class _AuthScreenState extends State<AuthScreen> {
       AuthFormMode.signup => '새 계정을 만들고 시작하세요.',
       AuthFormMode.passwordResetRequest => '비밀번호 재설정',
       AuthFormMode.passwordResetConfirm => '비밀번호 재설정',
+    };
+  }
+
+  String get _modeTitle {
+    return switch (_mode) {
+      AuthFormMode.login => '로그인',
+      AuthFormMode.signup =>
+        _signupEmailVerificationRequested ? '회원가입' : '이메일 인증',
+      AuthFormMode.passwordResetRequest => '계정 이메일 확인',
+      AuthFormMode.passwordResetConfirm => '새 비밀번호 설정',
     };
   }
 
@@ -153,6 +201,17 @@ class _AuthScreenState extends State<AuthScreen> {
         _signupEmailVerificationRequested ? '회원가입' : '인증번호 받기',
       AuthFormMode.passwordResetRequest => '재설정 안내 받기',
       AuthFormMode.passwordResetConfirm => '비밀번호 변경',
+    };
+  }
+
+  IconData get _submitIcon {
+    return switch (_mode) {
+      AuthFormMode.login => Icons.login,
+      AuthFormMode.signup => _signupEmailVerificationRequested
+          ? Icons.person_add_alt_1
+          : Icons.mark_email_unread_outlined,
+      AuthFormMode.passwordResetRequest => Icons.outgoing_mail,
+      AuthFormMode.passwordResetConfirm => Icons.lock_reset,
     };
   }
 
@@ -637,16 +696,79 @@ class _AuthScreenState extends State<AuthScreen> {
   }
 }
 
+class _AuthHeader extends StatelessWidget {
+  const _AuthHeader({required this.subtitle});
+
+  final String subtitle;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        const MaumOnBrandWordmark(height: 44),
+        const SizedBox(height: AppSpacing.md),
+        ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 320),
+          child: Text(
+            subtitle,
+            textAlign: TextAlign.center,
+            style: theme.textTheme.bodyLarge?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _AuthFormPanel extends StatelessWidget {
+  const _AuthFormPanel({
+    required this.title,
+    required this.child,
+  });
+
+  final String title;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Card(
+      key: const ValueKey('auth-form-panel'),
+      margin: EdgeInsets.zero,
+      child: Padding(
+        padding: const EdgeInsets.all(AppSpacing.xl),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(title, style: theme.textTheme.titleLarge),
+            const SizedBox(height: AppSpacing.lg),
+            child,
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _MessagePanel extends StatelessWidget {
   const _MessagePanel({
     required this.message,
     required this.color,
     required this.textColor,
+    this.isError = false,
   });
 
   final String message;
   final Color color;
   final Color textColor;
+  final bool isError;
 
   @override
   Widget build(BuildContext context) {
@@ -654,15 +776,31 @@ class _MessagePanel extends StatelessWidget {
       decoration: BoxDecoration(
         color: color,
         borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: textColor.withValues(alpha: 0.16),
+        ),
       ),
       child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Text(
-          message,
-          style: TextStyle(
-            color: textColor,
-            fontWeight: FontWeight.w700,
-          ),
+        padding: const EdgeInsets.all(AppSpacing.md),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(
+              isError ? Icons.error_outline : Icons.check_circle_outline,
+              color: textColor,
+              size: 20,
+            ),
+            const SizedBox(width: AppSpacing.xs),
+            Expanded(
+              child: Text(
+                message,
+                style: TextStyle(
+                  color: textColor,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -682,17 +820,40 @@ class _QuickLoginProviderRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Wrap(
-      alignment: WrapAlignment.center,
-      spacing: 8,
-      runSpacing: 8,
+    final theme = Theme.of(context);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        for (final provider in providers)
-          _QuickLoginProviderButton(
-            provider: provider,
-            isStarting: isStarting,
-            onPressed: () => onStart(provider),
-          ),
+        Row(
+          children: [
+            const Expanded(child: Divider()),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm),
+              child: Text(
+                '간편 로그인',
+                style: theme.textTheme.labelLarge?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ),
+            const Expanded(child: Divider()),
+          ],
+        ),
+        const SizedBox(height: AppSpacing.md),
+        Wrap(
+          alignment: WrapAlignment.center,
+          spacing: AppSpacing.md,
+          runSpacing: AppSpacing.md,
+          children: [
+            for (final provider in providers)
+              _QuickLoginProviderButton(
+                provider: provider,
+                isStarting: isStarting,
+                onPressed: () => onStart(provider),
+              ),
+          ],
+        ),
       ],
     );
   }
@@ -732,7 +893,7 @@ class _QuickLoginProviderButton extends StatelessWidget {
               customBorder: const CircleBorder(),
               onTap: enabled ? onPressed : null,
               child: SizedBox.square(
-                dimension: 54,
+                dimension: 58,
                 child: Center(
                   child: _QuickLoginProviderMark(provider: provider),
                 ),

@@ -99,7 +99,7 @@ void main() {
       findsOneWidget,
     );
 
-    await tester.tap(find.byKey(const ValueKey('home-draft-diary')));
+    await _tapVisibleKey(tester, const ValueKey('home-draft-diary'));
 
     expect(diaryTaps, 1);
   });
