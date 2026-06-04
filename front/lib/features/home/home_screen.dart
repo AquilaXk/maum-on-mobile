@@ -103,11 +103,22 @@ class _HomeScreenState extends State<HomeScreen> {
           ],
           maxWidth: AppBreakpoints.compactContentMaxWidth,
           children: [
-            _StatsSection(state: state),
-            const SizedBox(height: AppSpacing.lg),
             _HealingQuote(
               summary: state.stats?.summary,
               onPrimaryAction: _openSurface,
+            ),
+            const SizedBox(height: AppSpacing.lg),
+            _StatsSection(state: state),
+            const SizedBox(height: AppSpacing.lg),
+            _ActionGrid(
+              onWriteDiary: widget.onWriteDiary,
+              onWriteLetter: widget.onWriteLetter,
+              onViewStory: widget.onViewStory,
+              onOpenConsultation: widget.onOpenConsultation,
+              onOpenSettings: widget.onOpenSettings,
+              onLogout: widget.onLogout,
+              isAdmin: widget.isAdmin,
+              onOpenOperations: widget.onOpenOperations,
             ),
             const SizedBox(height: AppSpacing.lg),
             _NotificationPriorityEntry(
@@ -119,17 +130,6 @@ class _HomeScreenState extends State<HomeScreen> {
             _DraftContinuationSection(
               state: state,
               onContinue: _openSurface,
-            ),
-            const SizedBox(height: AppSpacing.lg),
-            _ActionGrid(
-              onWriteDiary: widget.onWriteDiary,
-              onWriteLetter: widget.onWriteLetter,
-              onViewStory: widget.onViewStory,
-              onOpenConsultation: widget.onOpenConsultation,
-              onOpenSettings: widget.onOpenSettings,
-              onLogout: widget.onLogout,
-              isAdmin: widget.isAdmin,
-              onOpenOperations: widget.onOpenOperations,
             ),
             const SizedBox(height: AppSpacing.xl),
             _CategoryOverview(
@@ -163,11 +163,22 @@ class _StatsSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final stats = state.stats;
+    final theme = Theme.of(context);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Text('오늘 요약', style: Theme.of(context).textTheme.titleMedium),
+        Row(
+          children: [
+            Icon(
+              Icons.insights_outlined,
+              size: 20,
+              color: theme.colorScheme.primary,
+            ),
+            const SizedBox(width: AppSpacing.xs),
+            Text('오늘 요약', style: theme.textTheme.titleMedium),
+          ],
+        ),
         const SizedBox(height: AppSpacing.xs),
         if (state.statsErrorMessage != null) ...[
           AppNotice(
@@ -282,22 +293,57 @@ class _HealingQuote extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final homeSummary = summary ?? const HomeSummary();
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        AppNotice(
-          message: homeSummary.recoveryMessage,
-          tone: AppNoticeTone.success,
+    return Card(
+      key: const ValueKey('home-primary-panel'),
+      margin: EdgeInsets.zero,
+      color: colorScheme.primaryContainer,
+      child: Padding(
+        padding: const EdgeInsets.all(AppSpacing.lg),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: colorScheme.primary.withValues(alpha: 0.14),
+                    borderRadius: AppRadii.chip,
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.all(AppSpacing.xs),
+                    child: Icon(
+                      Icons.favorite_border,
+                      color: colorScheme.onPrimaryContainer,
+                      size: 22,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: AppSpacing.md),
+                Expanded(
+                  child: Text(
+                    homeSummary.recoveryMessage,
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      color: colorScheme.onPrimaryContainer,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: AppSpacing.lg),
+            FilledButton.icon(
+              key: const ValueKey('home-primary-action-button'),
+              onPressed: () =>
+                  onPrimaryAction(homeSummary.primaryActionSurface),
+              icon: const Icon(Icons.arrow_forward),
+              label: Text(homeSummary.primaryActionLabel),
+            ),
+          ],
         ),
-        const SizedBox(height: AppSpacing.xs),
-        FilledButton.icon(
-          key: const ValueKey('home-primary-action-button'),
-          onPressed: () => onPrimaryAction(homeSummary.primaryActionSurface),
-          icon: const Icon(Icons.favorite_border),
-          label: Text(homeSummary.primaryActionLabel),
-        ),
-      ],
+      ),
     );
   }
 }
@@ -489,36 +535,51 @@ class _ActionGrid extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final width = MediaQuery.sizeOf(context).width;
+    final cardAspectRatio = width < 390 ? 1.28 : 1.5;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Wrap(
-          spacing: AppSpacing.xs,
-          runSpacing: AppSpacing.xs,
+        Text('바로 시작', style: Theme.of(context).textTheme.titleMedium),
+        const SizedBox(height: AppSpacing.xs),
+        GridView.count(
+          crossAxisCount: 2,
+          crossAxisSpacing: AppSpacing.xs,
+          mainAxisSpacing: AppSpacing.xs,
+          childAspectRatio: cardAspectRatio,
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
           children: [
-            FilledButton.icon(
-              key: const ValueKey('home-action-diary'),
-              onPressed: onWriteDiary,
-              icon: const Icon(Icons.edit_note),
-              label: const Text('다이어리 쓰기'),
+            _HomeActionCard(
+              actionKey: const ValueKey('home-action-diary'),
+              title: '다이어리 쓰기',
+              subtitle: '오늘 마음 정리',
+              icon: Icons.edit_note,
+              tone: AppStatusTone.warning,
+              onTap: onWriteDiary,
             ),
-            FilledButton.tonalIcon(
-              key: const ValueKey('home-action-letter'),
-              onPressed: onWriteLetter,
-              icon: const Icon(Icons.mail_outline),
-              label: const Text('편지 쓰기'),
+            _HomeActionCard(
+              actionKey: const ValueKey('home-action-letter'),
+              title: '편지 쓰기',
+              subtitle: '조용히 전하기',
+              icon: Icons.mail_outline,
+              onTap: onWriteLetter,
             ),
-            OutlinedButton.icon(
-              key: const ValueKey('home-action-story'),
-              onPressed: onViewStory,
-              icon: const Icon(Icons.forum_outlined),
-              label: const Text('스토리 보기'),
+            _HomeActionCard(
+              actionKey: const ValueKey('home-action-story'),
+              title: '스토리 보기',
+              subtitle: '함께 읽기',
+              icon: Icons.forum_outlined,
+              tone: AppStatusTone.success,
+              onTap: onViewStory,
             ),
-            FilledButton.tonalIcon(
-              key: const ValueKey('home-action-consultation'),
-              onPressed: onOpenConsultation,
-              icon: const Icon(Icons.chat_bubble_outline),
-              label: const Text('상담하기'),
+            _HomeActionCard(
+              actionKey: const ValueKey('home-action-consultation'),
+              title: '상담하기',
+              subtitle: '지금 대화하기',
+              icon: Icons.chat_bubble_outline,
+              onTap: onOpenConsultation,
             ),
           ],
         ),
@@ -554,6 +615,78 @@ class _ActionGrid extends StatelessWidget {
           ],
         ),
       ],
+    );
+  }
+}
+
+class _HomeActionCard extends StatelessWidget {
+  const _HomeActionCard({
+    required this.actionKey,
+    required this.title,
+    required this.subtitle,
+    required this.icon,
+    required this.onTap,
+    this.tone = AppStatusTone.neutral,
+  });
+
+  final Key actionKey;
+  final String title;
+  final String subtitle;
+  final IconData icon;
+  final VoidCallback onTap;
+  final AppStatusTone tone;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colors = _homeActionColors(theme.colorScheme, tone);
+
+    return Card(
+      margin: EdgeInsets.zero,
+      color: colors.background,
+      child: InkWell(
+        key: actionKey,
+        borderRadius: AppRadii.card,
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.all(AppSpacing.md),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              DecoratedBox(
+                decoration: BoxDecoration(
+                  color: colors.foreground.withValues(alpha: 0.10),
+                  borderRadius: AppRadii.chip,
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.all(AppSpacing.xs),
+                  child: Icon(icon, color: colors.foreground, size: 22),
+                ),
+              ),
+              const Spacer(),
+              Text(
+                title,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: theme.textTheme.titleSmall?.copyWith(
+                  color: colors.foreground,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              const SizedBox(height: AppSpacing.xxs),
+              Text(
+                subtitle,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: colors.foreground.withValues(alpha: 0.78),
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }
@@ -649,7 +782,8 @@ class _PopularStorySection extends StatelessWidget {
           AppListRow(
             rowKey: ValueKey('home-popular-story-${story.id}'),
             title: story.title,
-            subtitle: '${story.label} · ${story.nickname} · 조회 ${story.viewCount}',
+            subtitle:
+                '${story.label} · ${story.nickname} · 조회 ${story.viewCount}',
             statusLabel: story.label,
             statusTone: AppStatusTone.success,
             leadingIcon: Icons.trending_up,
@@ -793,4 +927,40 @@ String _formatBadgeCount(int count) {
     return '99+';
   }
   return count.toString();
+}
+
+_HomeActionColors _homeActionColors(
+  ColorScheme colorScheme,
+  AppStatusTone tone,
+) {
+  final isDark = colorScheme.brightness == Brightness.dark;
+
+  return switch (tone) {
+    AppStatusTone.success => _HomeActionColors(
+        background: colorScheme.secondaryContainer,
+        foreground: colorScheme.onSecondaryContainer,
+      ),
+    AppStatusTone.warning => _HomeActionColors(
+        background: isDark ? const Color(0xFF3A2B18) : const Color(0xFFFFF4DE),
+        foreground: isDark ? const Color(0xFFFFD391) : const Color(0xFF62411B),
+      ),
+    AppStatusTone.danger => _HomeActionColors(
+        background: colorScheme.errorContainer,
+        foreground: colorScheme.onErrorContainer,
+      ),
+    AppStatusTone.neutral => _HomeActionColors(
+        background: colorScheme.primaryContainer,
+        foreground: colorScheme.onPrimaryContainer,
+      ),
+  };
+}
+
+class _HomeActionColors {
+  const _HomeActionColors({
+    required this.background,
+    required this.foreground,
+  });
+
+  final Color background;
+  final Color foreground;
 }
