@@ -121,6 +121,30 @@ test("OCI runtime deploy script is safe, idempotent, and verifies health", () =>
   assert.doesNotMatch(script, /set -x/);
 });
 
+test("OCI deploy diagnostics collector records runtime state without exposing secrets", () => {
+  const scriptPath = "tools/deploy/collect-oci-a1-deploy-diagnostics.sh";
+
+  assert.ok(existsSync(path.join(root, scriptPath)), `${scriptPath} must exist`);
+
+  const script = read(scriptPath);
+
+  assert.match(script, /^set -euo pipefail$/m);
+  assert.match(script, /phase="before"/);
+  assert.match(script, /output_dir="deploy-debug"/);
+  assert.match(script, /container_name="maum-on-mobile-back"/);
+  assert.match(script, /previous_container_name="maum-on-mobile-back-previous"/);
+  assert.match(script, /metadata\.txt/);
+  assert.match(script, /GITHUB_RUN_ID/);
+  assert.match(script, /docker info/);
+  assert.match(script, /docker ps -a/);
+  assert.match(script, /docker inspect "\$\{container_name\}"/);
+  assert.match(script, /docker inspect "\$\{previous_container_name\}"/);
+  assert.match(script, /docker image inspect "\$\{image_tag\}"/);
+  assert.match(script, /docker logs --tail "\$\{log_tail\}" "\$\{container_name\}"/);
+  assert.doesNotMatch(script, /set -x/);
+  assert.doesNotMatch(script, /printenv|env >|cat .*\.env/);
+});
+
 test("GitHub Actions deploy workflow builds jar, bundles it, and deploys on the server runner", () => {
   const workflowPath = ".github/workflows/deploy-oci-a1.yml";
 
@@ -154,6 +178,15 @@ test("GitHub Actions deploy workflow builds jar, bundles it, and deploys on the 
   assert.match(workflow, /bash tools\/deploy\/deploy-oci-a1-backend\.sh/);
   assert.match(workflow, /MAUMON_DEPLOY_TRANSPORT: local/);
   assert.match(workflow, /if: needs\.prepare\.outputs\.dry_run != 'true'/);
+  assert.match(workflow, /name: Prepare deploy diagnostics/);
+  assert.match(workflow, /name: Run preflight diagnostics/);
+  assert.match(workflow, /name: Run postflight diagnostics/);
+  assert.match(workflow, /name: Collect failure diagnostics/);
+  assert.match(workflow, /bash tools\/deploy\/collect-oci-a1-deploy-diagnostics\.sh/);
+  assert.match(workflow, /name: Upload deploy diagnostics/);
+  assert.match(workflow, /uses: actions\/upload-artifact@[a-f0-9]{40}/);
+  assert.match(workflow, /name: deploy-debug-\$\{\{ needs\.prepare\.outputs\.short_sha \}\}/);
+  assert.match(workflow, /retention-days: 14/);
 
   for (const secret of [
     "OCI_A1_BACKEND_ENV_B64",
@@ -203,8 +236,14 @@ test("backend deploy workflow auto-runs production deploy after successful main 
   assert.match(workflow, /git fetch --no-tags origin main:refs\/remotes\/origin\/main/);
   assert.match(workflow, /if \[\[ "\$\{dry_run\}" != "true" && "\$\{should_deploy\}" == "true" && "\$\{deploy_sha\}" != "\$\{main_sha\}" \]\]/);
   assert.match(workflow, /stale deployment SHA/);
-  assert.doesNotMatch(workflow, /detect-changed-paths\.sh/);
-  assert.doesNotMatch(workflow, /no deployment-impacting files changed/);
+  assert.match(workflow, /changed_files="\$\(mktemp\)"/);
+  assert.match(workflow, /git diff --name-only "\$\{deploy_sha\}\^" "\$\{deploy_sha\}" >"\$\{changed_files\}"/);
+  assert.match(workflow, /env -u GITHUB_OUTPUT -u GITHUB_STEP_SUMMARY bash tools\/ci\/detect-changed-paths\.sh "\$\{changed_files\}"/);
+  assert.match(workflow, /deploy_changed="\$\(printf '%s\\n' "\$\{gate_output\}" \| awk -F= '\$1 == "deploy" \{ print \$2 \}'\)"/);
+  assert.match(workflow, /no deployment-impacting files changed/);
+  assert.match(workflow, /### Deployment impact/);
+  assert.match(workflow, /short_sha="\$\{deploy_sha:0:12\}"/);
+  assert.match(workflow, /short_sha=\$\{short_sha\}/);
   assert.match(workflow, /deploy_reason: \$\{\{ steps\.context\.outputs\.deploy_reason \}\}/);
   assert.match(workflow, /dry_run: \$\{\{ steps\.context\.outputs\.dry_run \}\}/);
   assert.match(workflow, /\| deploy_reason \| \$\{deploy_reason\} \|/);
