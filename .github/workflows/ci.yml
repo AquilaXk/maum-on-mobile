@@ -496,6 +496,7 @@ jobs:
       - name: Build Flutter Android release appbundle
         if: ${{ github.event_name == 'workflow_dispatch' && inputs.android_release_mode != 'skip' && steps.scaffold.outputs.present == 'true' && steps.scaffold.outputs.stack == 'flutter' }}
         env:
+          MAUMON_API_BASE_URL: ${{ secrets.MAUMON_API_BASE_URL }}
           MAUMON_ANDROID_RELEASE_DRY_RUN: ${{ inputs.android_release_mode == 'dry-run' }}
           MAUMON_ANDROID_KEYSTORE_BASE64: ${{ secrets.MAUMON_ANDROID_KEYSTORE_BASE64 }}
           MAUMON_ANDROID_KEYSTORE_PASSWORD: ${{ secrets.MAUMON_ANDROID_KEYSTORE_PASSWORD }}
@@ -664,6 +665,7 @@ jobs:
       - name: Build iOS TestFlight archive or dry run
         if: ${{ github.event_name == 'workflow_dispatch' && steps.scaffold.outputs.present == 'true' && steps.scaffold.outputs.stack == 'flutter' }}
         env:
+          MAUMON_API_BASE_URL: ${{ secrets.MAUMON_API_BASE_URL }}
           MAUMON_IOS_RELEASE_DRY_RUN: ${{ inputs.ios_release_mode == 'dry-run' }}
           MAUMON_IOS_TESTFLIGHT_UPLOAD: ${{ inputs.ios_release_mode == 'upload' }}
           MAUMON_RELEASE_MANIFEST_PATH: contracts/release-manifest/current-release.json

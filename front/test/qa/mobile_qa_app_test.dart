@@ -24,6 +24,16 @@ void main() {
     expect(find.text('실시간 상담'), findsOneWidget);
     expect(find.text('상담 연결됨'), findsOneWidget);
 
+    await tester.enterText(
+      find.byKey(const ValueKey('consultation-message-field')),
+      '요즘 마음이 무거워요',
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('consultation-send-button')));
+    await tester.pumpAndSettle();
+    expect(find.text('상담 답변 QA 메시지입니다.'), findsOneWidget);
+    expect(find.text('상담 연결됨'), findsOneWidget);
+
     await tester.tap(find.byKey(mobileQaRouteKey('home')));
     await tester.pumpAndSettle();
     await tester

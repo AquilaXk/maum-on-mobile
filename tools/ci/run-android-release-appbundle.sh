@@ -4,6 +4,7 @@ set -euo pipefail
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 front_dir="${repo_root}/front"
 required_env=(
+  MAUMON_API_BASE_URL
   MAUMON_ANDROID_KEYSTORE_BASE64
   MAUMON_ANDROID_KEYSTORE_PASSWORD
   MAUMON_ANDROID_KEY_ALIAS
@@ -49,7 +50,7 @@ fi
 
 if [[ "${MAUMON_ANDROID_RELEASE_DRY_RUN:-false}" == "true" ]]; then
   echo "Android release appbundle dry run ok"
-  echo "flutter build appbundle --release"
+  echo "flutter build appbundle --release --dart-define=API_BASE_URL=${MAUMON_API_BASE_URL}"
   exit 0
 fi
 
@@ -74,7 +75,7 @@ export MAUMON_ANDROID_KEYSTORE_PATH="${release_keystore}"
 
 cd "${front_dir}"
 "${repo_root}/tools/flutterw" pub get
-"${repo_root}/tools/flutterw" build appbundle --release
+"${repo_root}/tools/flutterw" build appbundle --release --dart-define=API_BASE_URL="${MAUMON_API_BASE_URL}"
 
 bundle_path="${front_dir}/build/app/outputs/bundle/release/app-release.aab"
 if [[ ! -f "${bundle_path}" ]]; then

@@ -9,18 +9,29 @@ class ApiConfig {
     String baseUrl = const String.fromEnvironment('API_BASE_URL'),
     TargetPlatform? targetPlatform,
     bool isWeb = kIsWeb,
+    bool isReleaseMode = kReleaseMode,
   }) {
     final normalizedBaseUrl = baseUrl.trim();
+    final platform = targetPlatform ?? defaultTargetPlatform;
 
     if (baseUrl.isNotEmpty && normalizedBaseUrl.isEmpty) {
       throw StateError('API_BASE_URL must be provided with --dart-define.');
+    }
+
+    if (normalizedBaseUrl.isEmpty &&
+        isReleaseMode &&
+        (platform == TargetPlatform.android ||
+            platform == TargetPlatform.iOS)) {
+      throw StateError(
+        'API_BASE_URL must be provided with --dart-define for mobile release builds.',
+      );
     }
 
     return ApiConfig(
       baseUrl: Uri.parse(
         normalizedBaseUrl.isEmpty
             ? _localDevelopmentBaseUrl(
-                targetPlatform: targetPlatform ?? defaultTargetPlatform,
+                targetPlatform: platform,
                 isWeb: isWeb,
               )
             : normalizedBaseUrl,

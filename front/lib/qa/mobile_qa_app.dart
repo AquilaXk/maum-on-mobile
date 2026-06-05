@@ -533,6 +533,11 @@ class _QaConsultationRepository implements ConsultationRepository {
 
   @override
   Future<ConsultationSendResult> sendMessage(String message) async {
+    Future<void>.delayed(const Duration(milliseconds: 20), () {
+      _events
+        ..add(const ConsultationStreamEvent.chat('상담 답변 QA 메시지입니다.'))
+        ..add(const ConsultationStreamEvent.done());
+    });
     return const ConsultationSendResult(accepted: true);
   }
 
