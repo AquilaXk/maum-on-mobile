@@ -140,6 +140,58 @@ class RemoteConsultationAiResponderTest {
     }
 
     @Test
+    fun promptSeparatesConversationContextNormalToneAndSafetyTone() {
+        val client = RecordingVertexAiGenerateContentClient(
+            responseBody = vertexResponse("""{"chunks":["그 부담이 오래 이어져서 지치셨겠어요."]}"""),
+        )
+        val responder = RemoteConsultationAiResponder(
+            properties = aiProperties(),
+            objectMapper = ObjectMapper(),
+            accessTokenProvider = { "vertex-token" },
+            generateContentClient = client,
+        )
+
+        responder.generate(
+            ConsultationAiRequest(
+                memberId = 8L,
+                message = "오늘도 같은 고민이 반복돼요.",
+                recentMessages = listOf(
+                    ConsultationMessage(
+                        id = 10L,
+                        memberId = 8L,
+                        sender = ConsultationMessageSender.USER,
+                        content = "어제는 일이 밀려서 너무 버거웠어요.",
+                        createdAt = "2026-05-25T00:00:00Z",
+                    ),
+                    ConsultationMessage(
+                        id = 11L,
+                        memberId = 8L,
+                        sender = ConsultationMessageSender.ASSISTANT,
+                        content = "많이 버거우셨겠어요. 오늘은 한 가지만 내려놓아도 괜찮아요.",
+                        createdAt = "2026-05-25T00:01:00Z",
+                    ),
+                ),
+                timeout = Duration.ofSeconds(2),
+            ),
+        )
+
+        val prompt = ObjectMapper()
+            .readTree(client.requestBody!!)["contents"][0]["parts"][0]["text"]
+            .asString()
+
+        assertThat(prompt)
+            .contains(
+                "conversationState: CONTINUING",
+                "recentContext:",
+                "USER: 어제는 일이 밀려서 너무 버거웠어요.",
+                "ASSISTANT: 많이 버거우셨겠어요. 오늘은 한 가지만 내려놓아도 괜찮아요.",
+                "일반 상담 모드",
+                "안전 모드",
+                "이전 답변의 첫 문장이나 같은 위로 문장을 반복하지 마",
+            )
+    }
+
+    @Test
     fun promptDoesNotExposeInternalMemberIdToModel() {
         val client = RecordingVertexAiGenerateContentClient(
             responseBody = vertexResponse("""{"chunks":["함께 살펴볼게요."]}"""),

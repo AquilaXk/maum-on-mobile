@@ -107,24 +107,37 @@ class RemoteConsultationAiResponder internal constructor(
     }
 
     private fun prompt(request: ConsultationAiRequest): String {
+        val conversationState = if (request.recentMessages.isEmpty()) {
+            "NEW"
+        } else {
+            "CONTINUING"
+        }
         val recentMessages = request.recentMessages
             .takeLast(endpoint.recentMessageLimit)
             .joinToString("\n") { message ->
-                "${message.sender.toModelRole()}: ${message.content.take(endpoint.maxInputChars)}"
+                "${message.sender.toPromptRole()}: ${message.content.take(endpoint.maxInputChars)}"
             }
+            .ifBlank { "(none)" }
         return """
             너는 익명 상담 서비스 '마음 온'의 다정하고 따뜻한 공감 상담사야.
-            사용자의 표현을 한 번 자연스럽게 되짚어 감정을 알아차렸다는 느낌을 먼저 줘.
-            조언보다 공감과 정리를 우선하고, 작은 다음 행동은 한 가지만 부담 없이 제안해.
-            마지막 문장은 사용자가 답하기 쉬운 질문 하나로 끝내고, 질문을 여러 개 나열하지 마.
-            답변은 한국어 3~4문장 안에서 정중하고 따뜻하게 작성하고, 모바일에서 읽기 좋게 짧게 나눠.
-            의학적 진단을 대신하지 말고, 단정적인 판단이나 위험한 지시는 하지 마.
-            위기 신호가 보이면 공감보다 안전 확보를 먼저 안내하고, 112/119/응급실 또는 가까운 사람의 즉시 도움을 연결해.
+            conversationState: $conversationState
+
+            일반 상담 모드:
+            - 사용자의 표현을 한 번 자연스럽게 되짚어 감정을 알아차렸다는 느낌을 먼저 줘.
+            - 조언보다 공감과 정리를 우선하고, 작은 다음 행동은 한 가지만 부담 없이 제안해.
+            - 최근 대화가 있으면 이어지는 흐름으로 답하고, 이전 답변의 첫 문장이나 같은 위로 문장을 반복하지 마.
+            - 마지막 문장은 사용자가 답하기 쉬운 질문 하나로 끝내고, 질문을 여러 개 나열하지 마.
+            - 답변은 한국어 3~4문장 안에서 정중하고 따뜻하게 작성하고, 모바일에서 읽기 좋게 짧게 나눠.
+
+            안전 모드:
+            - 의학적 진단을 대신하지 말고, 단정적인 판단이나 위험한 지시는 하지 마.
+            - 위기 신호가 보이면 공감보다 안전 확보를 먼저 안내하고, 112/119/응급실 또는 가까운 사람의 즉시 도움을 연결해.
+
             최근 대화는 맥락으로만 사용하고, 사용자에게 개인정보나 연락처를 새로 요구하지 마.
             compact JSON만 반환하고, 마크다운이나 코드블록은 쓰지 마.
             chunks 배열은 1~3개로 만들고, 각 항목은 빈 문자열이 아니어야 해.
             Use this shape exactly: {"chunks":["short Korean response part"]}.
-            recentMessages:
+            recentContext:
             $recentMessages
             userMessage: ${request.message.take(endpoint.maxInputChars)}
         """.trimIndent()
@@ -182,11 +195,11 @@ class RemoteConsultationAiResponder internal constructor(
         return normalized.substring(startIndex, endIndex + 1)
     }
 
-    private fun ConsultationMessageSender.toModelRole(): String {
+    private fun ConsultationMessageSender.toPromptRole(): String {
         return when (this) {
-            ConsultationMessageSender.USER -> "user"
-            ConsultationMessageSender.ASSISTANT -> "assistant"
-            ConsultationMessageSender.SYSTEM -> "system"
+            ConsultationMessageSender.USER -> "USER"
+            ConsultationMessageSender.ASSISTANT -> "ASSISTANT"
+            ConsultationMessageSender.SYSTEM -> "SYSTEM"
         }
     }
 

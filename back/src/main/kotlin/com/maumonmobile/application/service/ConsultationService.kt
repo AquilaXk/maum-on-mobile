@@ -73,12 +73,12 @@ class ConsultationService(
             return handleSafetyIntervention(member, normalizedMessage, inputSafety)
         }
 
-        consultationRepository.appendMessage(
+        val currentUserMessage = consultationRepository.appendMessage(
             memberId = member.id,
             sender = ConsultationMessageSender.USER,
             content = normalizedMessage,
         )
-        val reply = generateReply(member, normalizedMessage)
+        val reply = generateReply(member, normalizedMessage, currentUserMessage.id)
         val replySafety = if (reply.errorMessage == null) {
             assessSafety(member.id, reply.content, Instant.now(), assistantResponse = true)
         } else {
@@ -261,9 +261,13 @@ class ConsultationService(
         )
     }
 
-    private fun generateReply(member: AuthMember, message: String): ConsultationReplyResult {
+    private fun generateReply(
+        member: AuthMember,
+        message: String,
+        currentUserMessageId: Long,
+    ): ConsultationReplyResult {
         return try {
-            val response = generateWithTimeout(member, message)
+            val response = generateWithTimeout(member, message, currentUserMessageId)
             val chunks = response.chunks.filter(String::isNotBlank)
             if (chunks.isEmpty()) {
                 metricsRegistry.recordAiModel("consultation", "empty")
@@ -288,13 +292,19 @@ class ConsultationService(
         }
     }
 
-    private fun generateWithTimeout(member: AuthMember, message: String) =
+    private fun generateWithTimeout(
+        member: AuthMember,
+        message: String,
+        currentUserMessageId: Long,
+    ) =
         CompletableFuture.supplyAsync {
             consultationAiResponder.generate(
                 ConsultationAiRequest(
                     memberId = member.id,
                     message = message.minimizeForModel(),
                     recentMessages = consultationRepository.findByMemberId(member.id)
+                        // 현재 사용자 입력은 userMessage로 별도 전달하므로 최근 맥락에서는 중복 제거한다.
+                        .filterNot { recentMessage -> recentMessage.id == currentUserMessageId }
                         .filterNot { recentMessage -> recentMessage.sensitive }
                         .takeLast(AI_CONTEXT_MESSAGE_LIMIT)
                         .map { recentMessage ->
