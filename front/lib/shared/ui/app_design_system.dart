@@ -518,6 +518,101 @@ class AppFlowPanel extends StatelessWidget {
   }
 }
 
+class AppInlineSectionHeader extends StatelessWidget {
+  const AppInlineSectionHeader({
+    required this.icon,
+    required this.title,
+    this.subtitle,
+    this.trailing,
+    super.key,
+  });
+
+  final IconData icon;
+  final String title;
+  final String? subtitle;
+  final Widget? trailing;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(icon, color: colorScheme.primary, size: 22),
+        const SizedBox(width: AppSpacing.xs),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                style: theme.textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              if (subtitle != null) ...[
+                const SizedBox(height: AppSpacing.xxs),
+                Text(
+                  subtitle!,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+        if (trailing != null) ...[
+          const SizedBox(width: AppSpacing.xs),
+          trailing!,
+        ],
+      ],
+    );
+  }
+}
+
+class AppResponsiveActionWrap extends StatelessWidget {
+  const AppResponsiveActionWrap({
+    required this.children,
+    this.fullWidthBreakpoint = 360,
+    super.key,
+  });
+
+  final List<Widget> children;
+  final double fullWidthBreakpoint;
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final useFullWidth = constraints.hasBoundedWidth &&
+            constraints.maxWidth < fullWidthBreakpoint;
+
+        return Wrap(
+          spacing: AppSpacing.xs,
+          runSpacing: AppSpacing.xs,
+          children: [
+            for (final child in children)
+              ConstrainedBox(
+                constraints: BoxConstraints(
+                  minHeight: 48,
+                  minWidth: useFullWidth ? constraints.maxWidth : 0,
+                ),
+                child: useFullWidth
+                    ? SizedBox(width: constraints.maxWidth, child: child)
+                    : child,
+              ),
+          ],
+        );
+      },
+    );
+  }
+}
+
 class AppSectionCard extends StatelessWidget {
   const AppSectionCard({
     required this.child,
@@ -838,29 +933,7 @@ class _AppContentActions extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final useFullWidth =
-            constraints.hasBoundedWidth && constraints.maxWidth < 360;
-
-        return Wrap(
-          spacing: AppSpacing.xs,
-          runSpacing: AppSpacing.xs,
-          children: [
-            for (final child in children)
-              ConstrainedBox(
-                constraints: BoxConstraints(
-                  minHeight: 48,
-                  minWidth: useFullWidth ? constraints.maxWidth : 0,
-                ),
-                child: useFullWidth
-                    ? SizedBox(width: constraints.maxWidth, child: child)
-                    : child,
-              ),
-          ],
-        );
-      },
-    );
+    return AppResponsiveActionWrap(children: children);
   }
 }
 

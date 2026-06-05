@@ -205,7 +205,11 @@ class _MailboxView extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              const _MailboxSectionHeader(),
+              const AppInlineSectionHeader(
+                icon: Icons.inbox_outlined,
+                title: '편지 목록',
+                subtitle: '받은 편지와 보낸 편지를 탭으로 전환합니다.',
+              ),
               const SizedBox(height: AppSpacing.xs),
               Wrap(
                 spacing: AppSpacing.xs,
@@ -271,44 +275,6 @@ class _MailboxView extends StatelessWidget {
   }
 }
 
-class _MailboxSectionHeader extends StatelessWidget {
-  const _MailboxSectionHeader();
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Icon(Icons.inbox_outlined, color: colorScheme.primary, size: 22),
-        const SizedBox(width: AppSpacing.xs),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                '편지 목록',
-                style: theme.textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-              const SizedBox(height: AppSpacing.xxs),
-              Text(
-                '받은 편지와 보낸 편지를 탭으로 전환합니다.',
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: colorScheme.onSurfaceVariant,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-}
-
 class _StatsSection extends StatelessWidget {
   const _StatsSection({
     required this.stats,
@@ -354,9 +320,7 @@ class _StatsSection extends StatelessWidget {
             if (stats?.latestReceivedLetter != null ||
                 stats?.latestSentLetter != null) ...[
               const SizedBox(height: AppSpacing.md),
-              Wrap(
-                spacing: AppSpacing.xs,
-                runSpacing: AppSpacing.xs,
+              AppResponsiveActionWrap(
                 children: [
                   if (stats?.latestReceivedLetter != null)
                     OutlinedButton.icon(
@@ -688,9 +652,7 @@ class _LetterComposeViewState extends State<_LetterComposeView> {
             ),
           ],
           const SizedBox(height: AppSpacing.lg),
-          Wrap(
-            spacing: AppSpacing.xs,
-            runSpacing: AppSpacing.xs,
+          AppResponsiveActionWrap(
             children: [
               FilledButton(
                 key: const ValueKey('letter-submit-button'),

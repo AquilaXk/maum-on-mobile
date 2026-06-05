@@ -527,7 +527,7 @@ class _SelectedEntriesSection extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          _ContentSectionHeader(
+          AppInlineSectionHeader(
             icon: Icons.today_outlined,
             title: '선택한 날 기록',
             subtitle: selectedDateLabel,
@@ -591,7 +591,7 @@ class _PublicEntriesSection extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const _ContentSectionHeader(
+          const AppInlineSectionHeader(
             icon: Icons.groups_outlined,
             title: '공개 기록',
             subtitle: '다른 사용자의 공개 기록을 읽으며 흐름을 이어갑니다.',
@@ -656,52 +656,6 @@ class _PublicEntriesSection extends StatelessWidget {
           ],
         ],
       ),
-    );
-  }
-}
-
-class _ContentSectionHeader extends StatelessWidget {
-  const _ContentSectionHeader({
-    required this.icon,
-    required this.title,
-    required this.subtitle,
-  });
-
-  final IconData icon;
-  final String title;
-  final String subtitle;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Icon(icon, color: colorScheme.primary, size: 22),
-        const SizedBox(width: AppSpacing.xs),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                title,
-                style: theme.textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-              const SizedBox(height: AppSpacing.xxs),
-              Text(
-                subtitle,
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: colorScheme.onSurfaceVariant,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ],
     );
   }
 }
@@ -960,9 +914,7 @@ class _ContentBlocksEditor extends StatelessWidget {
             ),
           const SizedBox(height: AppSpacing.sm),
         ],
-        Wrap(
-          spacing: AppSpacing.xs,
-          runSpacing: AppSpacing.xs,
+        AppResponsiveActionWrap(
           children: [
             OutlinedButton.icon(
               key: const ValueKey('diary-image-camera-button'),

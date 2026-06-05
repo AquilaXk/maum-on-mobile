@@ -247,8 +247,6 @@ class _StoryDiscoveryStrip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
     final storyCountLabel = '${state.stories.length}개의 스토리';
 
     return Card(
@@ -259,37 +257,15 @@ class _StoryDiscoveryStrip extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Row(
-              children: [
-                Icon(
-                  Icons.travel_explore_outlined,
-                  color: colorScheme.primary,
-                  size: 22,
-                ),
-                const SizedBox(width: AppSpacing.xs),
-                Expanded(
-                  child: Text(
-                    '이야기 찾기',
-                    style: theme.textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                ),
-                AppStatusPill(
-                  label: storyCountLabel,
-                  tone: state.stories.isEmpty
-                      ? AppStatusTone.neutral
-                      : AppStatusTone.success,
-                ),
-              ],
-            ),
-            const SizedBox(height: AppSpacing.xxs),
-            Text(
-              '검색과 카테고리로 필요한 이야기를 좁혀 보세요.',
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: colorScheme.onSurfaceVariant,
+            AppInlineSectionHeader(
+              icon: Icons.travel_explore_outlined,
+              title: '이야기 찾기',
+              subtitle: '검색과 카테고리로 필요한 이야기를 좁혀 보세요.',
+              trailing: AppStatusPill(
+                label: storyCountLabel,
+                tone: state.stories.isEmpty
+                    ? AppStatusTone.neutral
+                    : AppStatusTone.success,
               ),
             ),
             const SizedBox(height: AppSpacing.sm),
@@ -649,7 +625,7 @@ class _CommentTile extends StatelessWidget {
                   onChanged: controller.updateEditingCommentContent,
                 ),
                 const SizedBox(height: AppSpacing.xs),
-                _ResponsiveActionWrap(
+                AppResponsiveActionWrap(
                   children: [
                     FilledButton.tonal(
                       key: ValueKey('story-comment-save-button-${comment.id}'),
@@ -671,7 +647,7 @@ class _CommentTile extends StatelessWidget {
                 ),
                 if (comment.canReceiveReply) ...[
                   const SizedBox(height: AppSpacing.xs),
-                  _ResponsiveActionWrap(
+                  AppResponsiveActionWrap(
                     key: ValueKey('story-comment-action-row-${comment.id}'),
                     children: [
                       TextButton.icon(
@@ -825,7 +801,7 @@ class _ReplyComposerState extends State<_ReplyComposer> {
               ),
             ),
             const SizedBox(height: AppSpacing.xs),
-            _ResponsiveActionWrap(
+            AppResponsiveActionWrap(
               children: [
                 FilledButton.tonalIcon(
                   key: ValueKey(
@@ -928,9 +904,7 @@ class _StoryEditorView extends StatelessWidget {
             ],
           ),
           const SizedBox(height: AppSpacing.lg),
-          Wrap(
-            spacing: AppSpacing.xs,
-            runSpacing: AppSpacing.xs,
+          AppResponsiveActionWrap(
             children: [
               FilledButton(
                 key: const ValueKey('story-submit-button'),
@@ -946,42 +920,6 @@ class _StoryEditorView extends StatelessWidget {
           ),
         ],
       ),
-    );
-  }
-}
-
-class _ResponsiveActionWrap extends StatelessWidget {
-  const _ResponsiveActionWrap({
-    required this.children,
-    super.key,
-  });
-
-  final List<Widget> children;
-
-  @override
-  Widget build(BuildContext context) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final useFullWidth =
-            constraints.hasBoundedWidth && constraints.maxWidth < 360;
-
-        return Wrap(
-          spacing: AppSpacing.xs,
-          runSpacing: AppSpacing.xs,
-          children: [
-            for (final child in children)
-              ConstrainedBox(
-                constraints: BoxConstraints(
-                  minHeight: 48,
-                  minWidth: useFullWidth ? constraints.maxWidth : 0,
-                ),
-                child: useFullWidth
-                    ? SizedBox(width: constraints.maxWidth, child: child)
-                    : child,
-              ),
-          ],
-        );
-      },
     );
   }
 }
