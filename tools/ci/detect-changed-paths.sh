@@ -11,6 +11,7 @@ javascript=false
 repository=false
 docs_only=true
 ci=false
+deploy=false
 saw_file=false
 
 is_docs_file() {
@@ -41,6 +42,7 @@ while IFS= read -r file; do
     tools/deploy/**)
       repository=true
       backend=true
+      deploy=true
       ;;
     contracts/mobile-api/**)
       backend=true
@@ -143,8 +145,15 @@ while IFS= read -r file; do
   esac
 
   case "${file}" in
+    .github/workflows/ci.yml|.github/workflows/deploy-oci-a1.yml|tools/ci/detect-changed-paths.sh)
+      deploy=true
+      ;;
+  esac
+
+  case "${file}" in
     back/**)
       backend=true
+      deploy=true
       ;;
   esac
 
@@ -186,6 +195,7 @@ if [[ "${saw_file}" == "false" ]]; then
   ios=true
   javascript=true
   repository=true
+  deploy=true
   docs_only=false
 fi
 
@@ -209,6 +219,7 @@ javascript=${javascript}
 repository=${repository}
 docs_only=${docs_only}
 ci=${ci}
+deploy=${deploy}
 EOF
 }
 
@@ -232,6 +243,7 @@ write_summary() {
     echo "- repository: ${repository}"
     echo "- docs_only: ${docs_only}"
     echo "- ci: ${ci}"
+    echo "- deploy: ${deploy}"
   } >> "${GITHUB_STEP_SUMMARY}"
 }
 
