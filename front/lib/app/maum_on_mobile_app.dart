@@ -203,8 +203,6 @@ class _MaumOnMobileAppState extends State<MaumOnMobileApp>
 
   @override
   Widget build(BuildContext context) {
-    final initialRoute = getInitialRoute();
-
     return MaterialApp(
       title: 'Maum On',
       debugShowCheckedModeBanner: false,
@@ -259,7 +257,6 @@ class _MaumOnMobileAppState extends State<MaumOnMobileApp>
                   nickname: state.member!.nickname,
                   role: state.member!.role,
                   status: state.member!.status,
-                  routeTitle: initialRoute.title,
                 ),
               ),
             );
@@ -275,7 +272,6 @@ class _MaumOnMobileAppState extends State<MaumOnMobileApp>
     required String nickname,
     required String role,
     required String status,
-    required String routeTitle,
   }) {
     return switch (_route) {
       AuthenticatedRoute.diary => DiaryScreen(
