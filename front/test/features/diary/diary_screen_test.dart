@@ -142,6 +142,47 @@ void main() {
     expect(find.byKey(const ValueKey('diary-submit-button')), findsOneWidget);
   });
 
+  testWidgets('separates calendar day label from entry count', (tester) async {
+    tester.view.physicalSize = const Size(320, 640);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    final controller = DiaryController(
+      diaryRepository: _FakeDiaryRepository(
+        pages: [
+          _page([
+            _entry(id: 5, title: '5일 기록', createDate: '2026-05-05T08:00:00'),
+          ]),
+        ],
+      ),
+      imageRepository: _FakeDiaryImageRepository(),
+      now: DateTime(2026, 5, 20),
+    );
+
+    await controller.load();
+    await tester.pumpWidget(
+      MaterialApp(
+        home: DiaryScreen(
+          controller: controller,
+          imagePicker: _FakeDiaryImagePicker(),
+          onBack: () {},
+        ),
+      ),
+    );
+
+    final dayCell = find.byKey(const ValueKey('diary-day-2026-05-05'));
+    expect(dayCell, findsOneWidget);
+    expect(
+      find.descendant(of: dayCell, matching: find.text('5일')),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(of: dayCell, matching: find.text('1개')),
+      findsOneWidget,
+    );
+  });
+
   testWidgets('picks a gallery image and submits a diary', (tester) async {
     final repository = _FakeDiaryRepository(
       pages: [_page([]), _page([])],
