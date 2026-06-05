@@ -187,6 +187,7 @@ jobs:
       repository: ${{ steps.filter.outputs.repository }}
       docs_only: ${{ steps.filter.outputs.docs_only }}
       ci: ${{ steps.filter.outputs.ci }}
+      deploy: ${{ steps.filter.outputs.deploy }}
 
     steps:
       - name: Checkout

@@ -25,7 +25,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: deploy-oci-a1-backend-${{ github.event_name == 'workflow_dispatch' && inputs.environment || 'staging' }}
+  group: deploy-oci-a1-backend-${{ github.event_name == 'workflow_dispatch' && inputs.environment || 'production' }}
   cancel-in-progress: false
 
 jobs:
@@ -67,7 +67,7 @@ jobs:
           skip_reason=""
 
           if [[ "${event_name}" == "workflow_run" ]]; then
-            deploy_environment="staging"
+            deploy_environment="production"
             image_tag_suffix=""
             deploy_sha="${WORKFLOW_RUN_HEAD_SHA}"
             if [[ "${WORKFLOW_RUN_CONCLUSION}" != "success" ]]; then
@@ -98,10 +98,10 @@ jobs:
             fi
 
             gate_output="$(GITHUB_OUTPUT= GITHUB_STEP_SUMMARY= bash tools/ci/detect-changed-paths.sh "${changed_files}")"
-            backend_changed="$(printf '%s\n' "${gate_output}" | awk -F= '$1 == "backend" { print $2 }')"
-            if [[ "${backend_changed}" != "true" ]]; then
+            deploy_changed="$(printf '%s\n' "${gate_output}" | awk -F= '$1 == "deploy" { print $2 }')"
+            if [[ "${deploy_changed}" != "true" ]]; then
               should_deploy="false"
-              skip_reason="no backend deployment-impacting files changed"
+              skip_reason="no deployment-impacting files changed"
             fi
           fi
 

@@ -21,7 +21,7 @@ test("ci workflow detects changed paths before platform jobs", async () => {
   assert.match(changes, /git diff --name-only/);
   assert.match(changes, /bash tools\/ci\/detect-changed-paths\.sh changed-files\.txt/);
 
-  for (const output of ["android", "backend", "frontend", "ios", "javascript", "repository", "docs_only", "ci"]) {
+  for (const output of ["android", "backend", "frontend", "ios", "javascript", "repository", "docs_only", "ci", "deploy"]) {
     assert.match(changes, new RegExp(`${output}: \\$\\{\\{ steps\\.filter\\.outputs\\.${output} \\}\\}`));
   }
 });
@@ -157,6 +157,7 @@ test("path classifier treats README as docs-only and PR templates as repository 
   assert.equal(readmeOnly.javascript, "false");
   assert.equal(readmeOnly.repository, "false");
   assert.equal(readmeOnly.ci, "false");
+  assert.equal(readmeOnly.deploy, "false");
 
   const outputs = await classifyChangedFiles([".github/pull_request_template.md"]);
 
@@ -168,6 +169,7 @@ test("path classifier treats README as docs-only and PR templates as repository 
   assert.equal(outputs.javascript, "false");
   assert.equal(outputs.repository, "true");
   assert.equal(outputs.ci, "false");
+  assert.equal(outputs.deploy, "false");
 });
 
 test("path classifier enables repository checks for GitHub issue template changes", async () => {
@@ -242,6 +244,7 @@ test("path classifier enables backend checks for back changes", async () => {
 
   assert.equal(outputs.docs_only, "false");
   assert.equal(outputs.backend, "true");
+  assert.equal(outputs.deploy, "true");
   assert.equal(outputs.frontend, "false");
   assert.equal(outputs.android, "false");
   assert.equal(outputs.ios, "false");
@@ -265,12 +268,13 @@ test("path classifier keeps front package changes in frontend gate", async () =>
   assert.equal(outputs.javascript, "false");
 });
 
-test("path classifier enables backend and repository checks for runtime deploy changes", async () => {
+test("path classifier enables backend, repository, and deploy checks for runtime deploy changes", async () => {
   const outputs = await classifyChangedFiles(["tools/deploy/deploy-oci-a1-backend.sh"]);
 
   assert.equal(outputs.docs_only, "false");
   assert.equal(outputs.backend, "true");
   assert.equal(outputs.repository, "true");
+  assert.equal(outputs.deploy, "true");
   assert.equal(outputs.ci, "false");
   assert.equal(outputs.frontend, "false");
   assert.equal(outputs.android, "false");
@@ -481,6 +485,7 @@ test("path classifier enables all checks for ci workflow changes", async () => {
 
   assert.equal(outputs.docs_only, "false");
   assert.equal(outputs.ci, "true");
+  assert.equal(outputs.deploy, "true");
   assert.equal(outputs.android, "true");
   assert.equal(outputs.backend, "true");
   assert.equal(outputs.frontend, "true");
@@ -489,10 +494,21 @@ test("path classifier enables all checks for ci workflow changes", async () => {
   assert.equal(outputs.repository, "true");
 });
 
+test("path classifier keeps non-runtime CI contract changes out of deploy", async () => {
+  const outputs = await classifyChangedFiles(["tools/ci/store-listing-contract.test.mjs"]);
+
+  assert.equal(outputs.docs_only, "false");
+  assert.equal(outputs.ci, "true");
+  assert.equal(outputs.backend, "true");
+  assert.equal(outputs.repository, "true");
+  assert.equal(outputs.deploy, "false");
+});
+
 test("path classifier enables all checks when no changed files are available", async () => {
   const outputs = await classifyChangedFiles([]);
 
   assert.equal(outputs.docs_only, "false");
+  assert.equal(outputs.deploy, "true");
   assert.equal(outputs.android, "true");
   assert.equal(outputs.backend, "true");
   assert.equal(outputs.frontend, "true");
