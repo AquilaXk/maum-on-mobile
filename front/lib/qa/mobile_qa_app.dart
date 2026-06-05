@@ -533,9 +533,10 @@ class _QaConsultationRepository implements ConsultationRepository {
 
   @override
   Future<ConsultationSendResult> sendMessage(String message) async {
+    final reply = _qaConsultationReply(message);
     Future<void>.delayed(const Duration(milliseconds: 20), () {
       _events
-        ..add(const ConsultationStreamEvent.chat('상담 답변 QA 메시지입니다.'))
+        ..add(ConsultationStreamEvent.chat(reply))
         ..add(const ConsultationStreamEvent.done());
     });
     return const ConsultationSendResult(accepted: true);
@@ -543,6 +544,15 @@ class _QaConsultationRepository implements ConsultationRepository {
 
   @override
   Future<int> deleteSensitiveMessages() async => 0;
+}
+
+String _qaConsultationReply(String message) {
+  final normalized = message.trim();
+  if (normalized.length > 120) {
+    return '말해줘서 고마워요. 마음에 쌓인 말이 많았던 만큼, 지금은 한 번에 해결하려 하기보다 가장 무거운 감정 하나만 천천히 짚어봐요. 지금 제일 먼저 내려놓고 싶은 마음은 무엇인가요?';
+  }
+
+  return '말해줘서 고마워요. 지금 마음이 무거운 상태라면, 먼저 숨을 천천히 고르고 가장 크게 남은 감정 하나만 짚어봐요. 지금 제일 크게 느껴지는 감정은 무엇인가요?';
 }
 
 class _QaNotificationRepository implements NotificationRepository {
