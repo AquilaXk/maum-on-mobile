@@ -405,52 +405,70 @@ class _HealingQuote extends StatelessWidget {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
 
-    return Card(
+    return Semantics(
       key: const ValueKey('home-primary-panel'),
-      margin: EdgeInsets.zero,
-      color: colorScheme.primaryContainer,
-      child: Padding(
-        padding: const EdgeInsets.all(AppSpacing.lg),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                DecoratedBox(
-                  decoration: BoxDecoration(
-                    color: colorScheme.primary.withValues(alpha: 0.14),
-                    borderRadius: AppRadii.chip,
-                  ),
-                  child: Padding(
-                    padding: const EdgeInsets.all(AppSpacing.xs),
-                    child: Icon(
-                      Icons.favorite_border,
-                      color: colorScheme.onPrimaryContainer,
-                      size: 22,
+      container: true,
+      child: DecoratedBox(
+        key: const ValueKey('home-blue-hero'),
+        decoration: BoxDecoration(
+          color: colorScheme.primary,
+          borderRadius: AppRadii.card,
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              colorScheme.primary,
+              colorScheme.secondary,
+            ],
+          ),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(AppSpacing.lg),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  DecoratedBox(
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.16),
+                      borderRadius: AppRadii.chip,
+                    ),
+                    child: const Padding(
+                      padding: EdgeInsets.all(AppSpacing.xs),
+                      child: Icon(
+                        Icons.favorite_border,
+                        color: Colors.white,
+                        size: 22,
+                      ),
                     ),
                   ),
-                ),
-                const SizedBox(width: AppSpacing.md),
-                Expanded(
-                  child: Text(
-                    homeSummary.recoveryMessage,
-                    style: theme.textTheme.titleMedium?.copyWith(
-                      color: colorScheme.onPrimaryContainer,
+                  const SizedBox(width: AppSpacing.md),
+                  Expanded(
+                    child: Text(
+                      homeSummary.recoveryMessage,
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        color: Colors.white,
+                      ),
                     ),
                   ),
+                ],
+              ),
+              const SizedBox(height: AppSpacing.lg),
+              FilledButton.icon(
+                key: const ValueKey('home-primary-action-button'),
+                style: FilledButton.styleFrom(
+                  backgroundColor: Colors.white,
+                  foregroundColor: colorScheme.primary,
                 ),
-              ],
-            ),
-            const SizedBox(height: AppSpacing.lg),
-            FilledButton.icon(
-              key: const ValueKey('home-primary-action-button'),
-              onPressed: () =>
-                  onPrimaryAction(homeSummary.primaryActionSurface),
-              icon: const Icon(Icons.arrow_forward),
-              label: Text(homeSummary.primaryActionLabel),
-            ),
-          ],
+                onPressed: () =>
+                    onPrimaryAction(homeSummary.primaryActionSurface),
+                icon: const Icon(Icons.arrow_forward),
+                label: Text(homeSummary.primaryActionLabel),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -639,53 +657,84 @@ class _ActionGrid extends StatelessWidget {
     final width = MediaQuery.sizeOf(context).width;
     final cardAspectRatio = width < 390 ? 2.16 : 2.36;
 
-    return Column(
-      key: const ValueKey('home-primary-actions'),
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Text('바로 시작', style: Theme.of(context).textTheme.titleMedium),
-        const SizedBox(height: AppSpacing.xs),
-        GridView.count(
-          crossAxisCount: 2,
-          crossAxisSpacing: AppSpacing.xs,
-          mainAxisSpacing: AppSpacing.xs,
-          childAspectRatio: cardAspectRatio,
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    return DecoratedBox(
+      key: const ValueKey('home-primary-actions-panel'),
+      decoration: BoxDecoration(
+        color: colorScheme.surface.withValues(alpha: 0.86),
+        borderRadius: AppRadii.card,
+        border: Border.all(
+          color: colorScheme.primary.withValues(alpha: 0.12),
+        ),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(AppSpacing.md),
+        child: Column(
+          key: const ValueKey('home-primary-actions'),
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            _HomeActionCard(
-              actionKey: const ValueKey('home-action-diary'),
-              title: '다이어리 쓰기',
-              subtitle: '오늘 마음 정리',
-              icon: Icons.edit_note,
-              tone: AppStatusTone.warning,
-              onTap: onWriteDiary,
+            Row(
+              children: [
+                Icon(
+                  Icons.bolt_outlined,
+                  size: 20,
+                  color: colorScheme.primary,
+                ),
+                const SizedBox(width: AppSpacing.xs),
+                Text('바로 시작', style: theme.textTheme.titleMedium),
+              ],
             ),
-            _HomeActionCard(
-              actionKey: const ValueKey('home-action-letter'),
-              title: '편지 쓰기',
-              subtitle: '조용히 전하기',
-              icon: Icons.mail_outline,
-              onTap: onWriteLetter,
-            ),
-            _HomeActionCard(
-              actionKey: const ValueKey('home-action-story'),
-              title: '스토리 보기',
-              subtitle: '함께 읽기',
-              icon: Icons.forum_outlined,
-              tone: AppStatusTone.success,
-              onTap: onViewStory,
-            ),
-            _HomeActionCard(
-              actionKey: const ValueKey('home-action-consultation'),
-              title: '상담하기',
-              subtitle: '지금 대화하기',
-              icon: Icons.chat_bubble_outline,
-              onTap: onOpenConsultation,
+            const SizedBox(height: AppSpacing.xs),
+            GridView.count(
+              crossAxisCount: 2,
+              crossAxisSpacing: AppSpacing.xs,
+              mainAxisSpacing: AppSpacing.xs,
+              childAspectRatio: cardAspectRatio,
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              children: [
+                _HomeActionCard(
+                  actionKey: const ValueKey('home-action-diary'),
+                  surfaceKey: const ValueKey('home-action-diary-surface'),
+                  title: '다이어리 쓰기',
+                  subtitle: '오늘 마음 정리',
+                  icon: Icons.edit_note,
+                  tone: AppStatusTone.warning,
+                  onTap: onWriteDiary,
+                ),
+                _HomeActionCard(
+                  actionKey: const ValueKey('home-action-letter'),
+                  surfaceKey: const ValueKey('home-action-letter-surface'),
+                  title: '편지 쓰기',
+                  subtitle: '조용히 전하기',
+                  icon: Icons.mail_outline,
+                  onTap: onWriteLetter,
+                ),
+                _HomeActionCard(
+                  actionKey: const ValueKey('home-action-story'),
+                  surfaceKey: const ValueKey('home-action-story-surface'),
+                  title: '스토리 보기',
+                  subtitle: '함께 읽기',
+                  icon: Icons.forum_outlined,
+                  tone: AppStatusTone.success,
+                  onTap: onViewStory,
+                ),
+                _HomeActionCard(
+                  actionKey: const ValueKey('home-action-consultation'),
+                  surfaceKey:
+                      const ValueKey('home-action-consultation-surface'),
+                  title: '상담하기',
+                  subtitle: '지금 대화하기',
+                  icon: Icons.chat_bubble_outline,
+                  onTap: onOpenConsultation,
+                ),
+              ],
             ),
           ],
         ),
-      ],
+      ),
     );
   }
 }
@@ -761,6 +810,7 @@ class _AccountToolsSection extends StatelessWidget {
 class _HomeActionCard extends StatelessWidget {
   const _HomeActionCard({
     required this.actionKey,
+    required this.surfaceKey,
     required this.title,
     required this.subtitle,
     required this.icon,
@@ -769,6 +819,7 @@ class _HomeActionCard extends StatelessWidget {
   });
 
   final Key actionKey;
+  final Key surfaceKey;
   final String title;
   final String subtitle;
   final IconData icon;
@@ -780,56 +831,65 @@ class _HomeActionCard extends StatelessWidget {
     final theme = Theme.of(context);
     final colors = _homeActionColors(theme.colorScheme, tone);
 
-    return Card(
-      margin: EdgeInsets.zero,
-      color: colors.background,
-      child: InkWell(
-        key: actionKey,
+    return DecoratedBox(
+      key: surfaceKey,
+      decoration: BoxDecoration(
+        color: colors.background,
         borderRadius: AppRadii.card,
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.all(AppSpacing.sm),
-          child: Row(
-            children: [
-              DecoratedBox(
-                decoration: BoxDecoration(
-                  color: colors.foreground.withValues(alpha: 0.10),
-                  borderRadius: AppRadii.chip,
+        border: Border.all(
+          color: colors.foreground.withValues(alpha: 0.12),
+        ),
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          key: actionKey,
+          borderRadius: AppRadii.card,
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.all(AppSpacing.sm),
+            child: Row(
+              children: [
+                DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: colors.foreground.withValues(alpha: 0.10),
+                    borderRadius: AppRadii.chip,
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.all(AppSpacing.xs),
+                    child: Icon(icon, color: colors.foreground, size: 22),
+                  ),
                 ),
-                child: Padding(
-                  padding: const EdgeInsets.all(AppSpacing.xs),
-                  child: Icon(icon, color: colors.foreground, size: 22),
-                ),
-              ),
-              const SizedBox(width: AppSpacing.xs),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      title,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: theme.textTheme.titleSmall?.copyWith(
-                        color: colors.foreground,
-                        fontWeight: FontWeight.w800,
+                const SizedBox(width: AppSpacing.xs),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.titleSmall?.copyWith(
+                          color: colors.foreground,
+                          fontWeight: FontWeight.w800,
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: AppSpacing.xxs),
-                    Text(
-                      subtitle,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: colors.foreground.withValues(alpha: 0.78),
-                        fontWeight: FontWeight.w700,
+                      const SizedBox(height: AppSpacing.xxs),
+                      Text(
+                        subtitle,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: colors.foreground.withValues(alpha: 0.78),
+                          fontWeight: FontWeight.w700,
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
@@ -1083,12 +1143,12 @@ _HomeActionColors _homeActionColors(
 
   return switch (tone) {
     AppStatusTone.success => _HomeActionColors(
-        background: colorScheme.secondaryContainer,
-        foreground: colorScheme.onSecondaryContainer,
+        background: isDark ? const Color(0xFF123A5C) : const Color(0xFFEAF6FF),
+        foreground: isDark ? const Color(0xFFEAF6FF) : const Color(0xFF1F4D72),
       ),
     AppStatusTone.warning => _HomeActionColors(
-        background: isDark ? const Color(0xFF3A2B18) : const Color(0xFFFFF4DE),
-        foreground: isDark ? const Color(0xFFFFD391) : const Color(0xFF62411B),
+        background: isDark ? const Color(0xFF173B71) : const Color(0xFFE8F1FF),
+        foreground: isDark ? const Color(0xFFDCEBFF) : const Color(0xFF244C8A),
       ),
     AppStatusTone.danger => _HomeActionColors(
         background: colorScheme.errorContainer,
