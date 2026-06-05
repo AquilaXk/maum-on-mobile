@@ -80,7 +80,6 @@ class _LetterScreenState extends State<LetterScreen> {
 
         return AppScreen(
           title: '편지함',
-          subtitle: '받은 편지와 보낸 마음을 확인합니다.',
           onBack: widget.onBack,
           onRefresh: state.mode == LetterViewMode.mailbox
               ? widget.controller.load
@@ -173,7 +172,6 @@ class _MailboxView extends StatelessWidget {
               const AppInlineSectionHeader(
                 icon: Icons.inbox_outlined,
                 title: '편지 목록',
-                subtitle: '받은 편지와 보낸 편지를 탭으로 전환합니다.',
               ),
               const SizedBox(height: AppSpacing.xs),
               Wrap(
@@ -260,7 +258,6 @@ class _StatsSection extends StatelessWidget {
     return AppSectionCard(
       key: const ValueKey('letter-mailbox-toolbar'),
       title: '받은 편지',
-      subtitle: '최근 편지와 답장 상태를 빠르게 확인합니다.',
       child: Padding(
         padding: EdgeInsets.zero,
         child: Column(

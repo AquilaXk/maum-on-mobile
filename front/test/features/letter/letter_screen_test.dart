@@ -107,6 +107,9 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('받은 편지'), findsWidgets);
+    expect(find.text('받은 편지와 보낸 마음을 확인합니다.'), findsNothing);
+    expect(find.text('받은 편지와 보낸 편지를 탭으로 전환합니다.'), findsNothing);
+    expect(find.text('최근 편지와 답장 상태를 빠르게 확인합니다.'), findsNothing);
     expect(find.byKey(const ValueKey('letter-flow-panel')), findsNothing);
     expect(find.text('편지 흐름'), findsNothing);
     expect(find.text('수신 상태와 답장 단계를 한곳에서 확인하세요.'), findsNothing);
