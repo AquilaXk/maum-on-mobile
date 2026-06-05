@@ -222,7 +222,9 @@ class ConsultationControllerTest @Autowired constructor(
                 jsonPath("$.data.safety.category") { value("SELF_HARM") }
                 jsonPath("$.data.safety.severity") { value("CRITICAL") }
                 jsonPath("$.data.safety.actionPolicy") { value("BLOCK_AND_ESCALATE") }
-                jsonPath("$.data.safety.message") { isNotEmpty() }
+                jsonPath("$.data.safety.message") { value(org.hamcrest.Matchers.containsString("혼자 있지")) }
+                jsonPath("$.data.safety.message") { value(org.hamcrest.Matchers.containsString("119")) }
+                jsonPath("$.data.safety.message") { value(org.hamcrest.Matchers.containsString("112")) }
             }
 
         mockMvc.get("/api/v1/consultations/recent") {
@@ -235,6 +237,7 @@ class ConsultationControllerTest @Autowired constructor(
                 jsonPath("$.data.messages[1].role") { value("SYSTEM") }
                 jsonPath("$.data.messages[1].sensitive") { value(true) }
                 jsonPath("$.data.messages[1].content") { value(org.hamcrest.Matchers.containsString("119")) }
+                jsonPath("$.data.messages[1].content") { value(org.hamcrest.Matchers.containsString("112")) }
             }
 
         assertThatCriticalAuditExists(member.memberId.toLong())

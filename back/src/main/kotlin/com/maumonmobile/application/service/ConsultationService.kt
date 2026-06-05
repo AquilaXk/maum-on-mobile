@@ -341,7 +341,7 @@ class ConsultationService(
         private val SAFETY_RATE_WINDOW: Duration = Duration.ofMinutes(30)
         private val SENSITIVE_RETENTION: Duration = Duration.ofDays(30)
         private const val SELF_HARM_MESSAGE =
-            "지금 안전이 가장 중요합니다. 혼자 있지 말고 가까운 사람에게 바로 알려 주세요. 즉시 위험하면 119 또는 가까운 응급실에 도움을 요청해 주세요."
+            "지금 안전이 가장 중요합니다. 혼자 있지 말고 가까운 사람에게 바로 알려 주세요. 즉시 위험하면 119, 112 또는 가까운 응급실에 도움을 요청해 주세요."
         private const val VIOLENCE_MESSAGE =
             "누군가를 해칠 위험이 있다면 지금 대화를 멈추고 안전한 거리부터 확보해 주세요. 즉시 위험하면 112 또는 119에 연락해 주세요."
         private const val ABUSE_MESSAGE =
