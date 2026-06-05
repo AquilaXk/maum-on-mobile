@@ -121,7 +121,7 @@ test("OCI runtime deploy script is safe, idempotent, and verifies health", () =>
   assert.doesNotMatch(script, /set -x/);
 });
 
-test("manual GitHub Actions deploy workflow builds jar, bundles it, and deploys on the server runner", () => {
+test("GitHub Actions deploy workflow builds jar, bundles it, and deploys on the server runner", () => {
   const workflowPath = ".github/workflows/deploy-oci-a1.yml";
 
   assert.ok(existsSync(path.join(root, workflowPath)), `${workflowPath} must exist`);
@@ -131,7 +131,7 @@ test("manual GitHub Actions deploy workflow builds jar, bundles it, and deploys 
   assert.match(workflow, /^name: Deploy OCI A1 Backend$/m);
   assert.match(workflow, /workflow_dispatch:/);
   assert.match(workflow, /environment:/);
-  assert.match(workflow, /name: \$\{\{ inputs\.environment \}\}/);
+  assert.match(workflow, /name: \$\{\{ needs\.prepare\.outputs\.environment \}\}/);
   assert.match(workflow, /runs-on:\n\s+- self-hosted\n\s+- Linux\n\s+- ARM64\n\s+- oci-a1-deploy/);
   assert.match(workflow, /permissions:\n  contents: read/);
   assert.match(workflow, /concurrency:/);
@@ -171,4 +171,26 @@ test("manual GitHub Actions deploy workflow builds jar, bundles it, and deploys 
     /if \[\[ -n "\$\{SPRING__MAIL__HOST:-\}" && -n "\$\{CUSTOM__MEMBER__SIGNUP__MAIL_FROM:-\}" && -z "\$\{CUSTOM__MEMBER__SIGNUP__MAIL_ENABLED:-\}" \]\]/,
   );
   assert.doesNotMatch(workflow, /@v\d/);
+});
+
+test("backend deploy workflow auto-runs after successful main CI only for backend-impacting changes", () => {
+  const workflowPath = ".github/workflows/deploy-oci-a1.yml";
+
+  assert.ok(existsSync(path.join(root, workflowPath)), `${workflowPath} must exist`);
+
+  const workflow = read(workflowPath);
+
+  assert.match(workflow, /workflow_run:\n\s+workflows: \["CI"\]\n\s+types: \[completed\]\n\s+branches:\n\s+- main/);
+  assert.match(workflow, /jobs:\n  prepare:/);
+  assert.match(workflow, /WORKFLOW_RUN_CONCLUSION: \$\{\{ github\.event\.workflow_run\.conclusion \}\}/);
+  assert.match(workflow, /WORKFLOW_RUN_HEAD_BRANCH: \$\{\{ github\.event\.workflow_run\.head_branch \}\}/);
+  assert.match(workflow, /WORKFLOW_RUN_HEAD_SHA: \$\{\{ github\.event\.workflow_run\.head_sha \}\}/);
+  assert.match(workflow, /git fetch --no-tags origin main:refs\/remotes\/origin\/main/);
+  assert.match(workflow, /stale deployment SHA/);
+  assert.match(workflow, /git diff --name-only "\$\{deploy_sha\}\^" "\$\{deploy_sha\}"/);
+  assert.match(workflow, /GITHUB_OUTPUT= GITHUB_STEP_SUMMARY= bash tools\/ci\/detect-changed-paths\.sh "\$\{changed_files\}"/);
+  assert.match(workflow, /backend_changed="\$\(printf '%s\\n' "\$\{gate_output\}" \| awk -F= '\$1 == "backend" \{ print \$2 \}'\)"/);
+  assert.match(workflow, /skip_reason="no backend deployment-impacting files changed"/);
+  assert.match(workflow, /if: needs\.prepare\.outputs\.should_deploy != 'true'/);
+  assert.match(workflow, /if: needs\.prepare\.outputs\.should_deploy == 'true'/);
 });
