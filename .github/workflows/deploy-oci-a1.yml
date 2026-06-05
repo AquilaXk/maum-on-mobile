@@ -35,6 +35,7 @@ jobs:
     outputs:
       backend_image_tag: ${{ steps.context.outputs.backend_image_tag }}
       deploy_sha: ${{ steps.context.outputs.deploy_sha }}
+      deploy_reason: ${{ steps.context.outputs.deploy_reason }}
       environment: ${{ steps.context.outputs.environment }}
       image_tag_suffix: ${{ steps.context.outputs.image_tag_suffix }}
       should_deploy: ${{ steps.context.outputs.should_deploy }}
@@ -62,12 +63,14 @@ jobs:
 
           event_name="${GITHUB_EVENT_NAME}"
           deploy_environment="${DISPATCH_ENVIRONMENT:-staging}"
+          deploy_reason="manual dispatch"
           image_tag_suffix="${DISPATCH_IMAGE_TAG_SUFFIX:-}"
           should_deploy="true"
           skip_reason=""
 
           if [[ "${event_name}" == "workflow_run" ]]; then
             deploy_environment="production"
+            deploy_reason="main CI completed successfully"
             image_tag_suffix=""
             deploy_sha="${WORKFLOW_RUN_HEAD_SHA}"
             if [[ "${WORKFLOW_RUN_CONCLUSION}" != "success" ]]; then
@@ -89,27 +92,12 @@ jobs:
             skip_reason="stale deployment SHA ${deploy_sha} does not match origin/main ${main_sha}"
           fi
 
-          if [[ "${event_name}" == "workflow_run" && "${should_deploy}" == "true" ]]; then
-            changed_files="$(mktemp)"
-            if git rev-parse "${deploy_sha}^" >/dev/null 2>&1; then
-              git diff --name-only "${deploy_sha}^" "${deploy_sha}" >"${changed_files}"
-            else
-              git diff-tree --no-commit-id --name-only -r "${deploy_sha}" >"${changed_files}"
-            fi
-
-            gate_output="$(GITHUB_OUTPUT= GITHUB_STEP_SUMMARY= bash tools/ci/detect-changed-paths.sh "${changed_files}")"
-            deploy_changed="$(printf '%s\n' "${gate_output}" | awk -F= '$1 == "deploy" { print $2 }')"
-            if [[ "${deploy_changed}" != "true" ]]; then
-              should_deploy="false"
-              skip_reason="no deployment-impacting files changed"
-            fi
-          fi
-
           backend_image_tag="maum-on-mobile-back:${deploy_sha}${image_tag_suffix}"
 
           {
             echo "backend_image_tag=${backend_image_tag}"
             echo "deploy_sha=${deploy_sha}"
+            echo "deploy_reason=${deploy_reason}"
             echo "environment=${deploy_environment}"
             echo "image_tag_suffix=${image_tag_suffix}"
             echo "should_deploy=${should_deploy}"
@@ -126,6 +114,9 @@ jobs:
             echo "| origin/main | ${main_sha} |"
             echo "| environment | ${deploy_environment} |"
             echo "| should_deploy | ${should_deploy} |"
+            if [[ "${should_deploy}" == "true" ]]; then
+              echo "| deploy_reason | ${deploy_reason} |"
+            fi
             if [[ -n "${skip_reason}" ]]; then
               echo "| skip_reason | ${skip_reason} |"
             fi
