@@ -106,6 +106,68 @@ class RemoteConsultationAiResponderTest {
     }
 
     @Test
+    fun promptGuidesEmpathyActionAndOneFollowUpQuestionForShortConversations() {
+        val client = RecordingVertexAiGenerateContentClient(
+            responseBody = vertexResponse("""{"chunks":["마음이 많이 무거우셨겠어요."]}"""),
+        )
+        val responder = RemoteConsultationAiResponder(
+            properties = aiProperties(),
+            objectMapper = ObjectMapper(),
+            accessTokenProvider = { "vertex-token" },
+            generateContentClient = client,
+        )
+
+        responder.generate(
+            ConsultationAiRequest(
+                memberId = 6L,
+                message = "아무것도 하기 싫고 마음이 무거워요.",
+                recentMessages = emptyList(),
+                timeout = Duration.ofSeconds(2),
+            ),
+        )
+
+        val prompt = ObjectMapper()
+            .readTree(client.requestBody!!)["contents"][0]["parts"][0]["text"]
+            .asString()
+
+        assertThat(prompt)
+            .contains(
+                "사용자의 표현을 한 번 자연스럽게 되짚어",
+                "작은 다음 행동은 한 가지만",
+                "마지막 문장은 사용자가 답하기 쉬운 질문 하나",
+                "위기 신호가 보이면 공감보다 안전 확보를 먼저",
+            )
+    }
+
+    @Test
+    fun promptDoesNotExposeInternalMemberIdToModel() {
+        val client = RecordingVertexAiGenerateContentClient(
+            responseBody = vertexResponse("""{"chunks":["함께 살펴볼게요."]}"""),
+        )
+        val responder = RemoteConsultationAiResponder(
+            properties = aiProperties(),
+            objectMapper = ObjectMapper(),
+            accessTokenProvider = { "vertex-token" },
+            generateContentClient = client,
+        )
+
+        responder.generate(
+            ConsultationAiRequest(
+                memberId = 7L,
+                message = "오늘 마음이 복잡해요.",
+                recentMessages = emptyList(),
+                timeout = Duration.ofSeconds(2),
+            ),
+        )
+
+        val prompt = ObjectMapper()
+            .readTree(client.requestBody!!)["contents"][0]["parts"][0]["text"]
+            .asString()
+
+        assertThat(prompt).doesNotContain("memberId", "memberId: 7")
+    }
+
+    @Test
     fun usesDedicatedConsultationTokenForNonVertexEndpoint() {
         val client = RecordingVertexAiGenerateContentClient(
             responseBody = vertexResponse("""{"chunks":["괜찮아요."]}"""),
