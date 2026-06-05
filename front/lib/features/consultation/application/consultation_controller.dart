@@ -13,6 +13,8 @@ const List<Duration> _defaultReconnectBackoffDelays = [
   Duration(seconds: 2),
   Duration(seconds: 4),
 ];
+const _defaultSendTimeout = Duration(seconds: 15);
+const _defaultResponseTimeout = Duration(seconds: 20);
 
 class ConsultationFailedMessage {
   const ConsultationFailedMessage({
@@ -998,6 +1000,3 @@ class ConsultationController extends ChangeNotifier {
     _responseTimeoutTimer = null;
   }
 }
-
-const _defaultSendTimeout = Duration(seconds: 15);
-const _defaultResponseTimeout = Duration(seconds: 20);

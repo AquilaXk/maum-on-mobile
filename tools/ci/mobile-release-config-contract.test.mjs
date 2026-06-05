@@ -117,8 +117,10 @@ test("iOS store-facing metadata and privacy strings stay release ready", () => {
   assert.match(plist, /<key>CFBundleURLSchemes<\/key>\s*<array>\s*<string>maumon<\/string>/);
   assert.match(plist, /<key>NSAllowsLocalNetworking<\/key>\s*<true\/>/);
   assert.doesNotMatch(plist, /<key>NSAllowsArbitraryLoads<\/key>\s*<true\/>/);
-  assert.match(plist, /<key>NSExceptionDomains<\/key>\s*<dict>[\s\S]*<key>64\.110\.66\.27<\/key>/);
-  assert.match(plist, /<key>NSExceptionAllowsInsecureHTTPLoads<\/key>\s*<true\/>/);
+  assert.match(
+    plist,
+    /<key>NSExceptionDomains<\/key>\s*<dict>[\s\S]*?<key>64\.110\.66\.27<\/key>\s*<dict>[\s\S]*?<key>NSExceptionAllowsInsecureHTTPLoads<\/key>\s*<true\/>[\s\S]*?<\/dict>/
+  );
   assert.match(plist, /<key>NSPhotoLibraryUsageDescription<\/key>\s*<string>.+<\/string>/);
   assert.match(plist, /<key>NSCameraUsageDescription<\/key>\s*<string>\s*[^<\s][^<]*<\/string>/);
   assert.match(plist, /<key>UILaunchStoryboardName<\/key>\s*<string>LaunchScreen<\/string>/);
