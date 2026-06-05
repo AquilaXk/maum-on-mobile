@@ -782,44 +782,57 @@ class _ReportForm extends StatelessWidget {
             style: Theme.of(context).textTheme.titleMedium,
           ),
           const SizedBox(height: AppSpacing.sm),
-          Row(
-            children: [
-              SizedBox(
-                width: 132,
-                child: DropdownButtonFormField<ReportTargetType>(
-                  key: ValueKey(
-                    'report-target-type-field-${selectedTargetType.name}',
-                  ),
-                  initialValue: selectedTargetType,
-                  decoration: const InputDecoration(
-                    labelText: '유형',
-                    border: OutlineInputBorder(),
-                  ),
-                  items: [
-                    for (final type in ReportTargetType.values)
-                      DropdownMenuItem(
-                        value: type,
-                        child: Text(type.label),
-                      ),
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final typeField = DropdownButtonFormField<ReportTargetType>(
+                key: ValueKey(
+                  'report-target-type-field-${selectedTargetType.name}',
+                ),
+                initialValue: selectedTargetType,
+                decoration: const InputDecoration(
+                  labelText: '유형',
+                  border: OutlineInputBorder(),
+                ),
+                items: [
+                  for (final type in ReportTargetType.values)
+                    DropdownMenuItem(
+                      value: type,
+                      child: Text(type.label),
+                    ),
+                ],
+                onChanged: state.isSubmitted ? null : onTargetTypeChanged,
+              );
+              final idField = TextField(
+                key: const ValueKey('report-target-id-field'),
+                controller: targetIdController,
+                enabled: !state.isSubmitted,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(
+                  labelText: '대상 번호',
+                  border: OutlineInputBorder(),
+                ),
+                onChanged: onTargetIdChanged,
+              );
+
+              if (constraints.maxWidth < 360) {
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    typeField,
+                    const SizedBox(height: AppSpacing.sm),
+                    idField,
                   ],
-                  onChanged: state.isSubmitted ? null : onTargetTypeChanged,
-                ),
-              ),
-              const SizedBox(width: AppSpacing.sm),
-              Expanded(
-                child: TextField(
-                  key: const ValueKey('report-target-id-field'),
-                  controller: targetIdController,
-                  enabled: !state.isSubmitted,
-                  keyboardType: TextInputType.number,
-                  decoration: const InputDecoration(
-                    labelText: '대상 번호',
-                    border: OutlineInputBorder(),
-                  ),
-                  onChanged: onTargetIdChanged,
-                ),
-              ),
-            ],
+                );
+              }
+
+              return Row(
+                children: [
+                  SizedBox(width: 132, child: typeField),
+                  const SizedBox(width: AppSpacing.sm),
+                  Expanded(child: idField),
+                ],
+              );
+            },
           ),
           if (state.target != null) ...[
             const SizedBox(height: AppSpacing.xs),

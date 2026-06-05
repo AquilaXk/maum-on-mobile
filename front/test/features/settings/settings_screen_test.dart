@@ -287,6 +287,61 @@ void main() {
     expect(copiedDiagnostics.single, isNot(contains('memberId')));
     expect(copiedDiagnostics.single, isNot(contains('token')));
   });
+
+  testWidgets('stacks support actions on a narrow phone viewport',
+      (tester) async {
+    tester.view.physicalSize = const Size(320, 780);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    final repository = _FakeSettingsRepository();
+    final controller = SettingsController(repository: repository);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: SettingsScreen(
+          controller: controller,
+          onBack: () {},
+          supportContactInfo: const SupportContactInfo(
+            supportEmail: 'support@maum-on.app',
+            privacyEmail: 'privacy@maum-on.app',
+            supportUrl: 'https://maum-on.app/support',
+            incidentNoticeUrl: 'https://maum-on.app/status',
+            appVersion: '1.2.3',
+            buildNumber: '45',
+            platform: 'Android',
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.ensureVisible(
+      find.byKey(const ValueKey('settings-copy-diagnostics')),
+    );
+    await tester.pumpAndSettle();
+
+    final supportRect = tester.getRect(
+      find.byKey(const ValueKey('settings-support-contact-button')),
+    );
+    final privacyRect = tester.getRect(
+      find.byKey(const ValueKey('settings-privacy-contact-button')),
+    );
+    final incidentRect = tester.getRect(
+      find.byKey(const ValueKey('settings-incident-notice-button')),
+    );
+    final copyRect = tester.getRect(
+      find.byKey(const ValueKey('settings-copy-diagnostics')),
+    );
+
+    for (final rect in [supportRect, privacyRect, incidentRect, copyRect]) {
+      expect(rect.width, greaterThanOrEqualTo(240));
+    }
+    expect(privacyRect.top, greaterThan(supportRect.bottom));
+    expect(incidentRect.top, greaterThan(privacyRect.bottom));
+    expect(copyRect.top, greaterThan(incidentRect.bottom));
+  });
 }
 
 class _FakeSettingsRepository implements SettingsRepository {

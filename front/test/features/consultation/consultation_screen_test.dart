@@ -195,6 +195,49 @@ void main() {
     expect(find.text('삭제할 실패 메시지'), findsNothing);
   });
 
+  testWidgets('stacks failed send actions on a narrow phone viewport',
+      (tester) async {
+    tester.view.physicalSize = const Size(320, 780);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    final repository = _FakeConsultationRepository()
+      ..sendErrors.add(Exception('network down'));
+    final controller = ConsultationController(repository: repository);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: ConsultationScreen(
+          controller: controller,
+          onBack: () {},
+        ),
+      ),
+    );
+    await tester.pump();
+    repository.emit(const ConsultationStreamEvent.connect('connected'));
+    await tester.pump();
+
+    await tester.enterText(
+      find.byKey(const ValueKey('consultation-message-field')),
+      '전송 실패 확인',
+    );
+    await tester.pump();
+    await tester.tap(find.byKey(const ValueKey('consultation-send-button')));
+    await tester.pumpAndSettle();
+
+    final retryRect = tester.getRect(
+      find.byKey(const ValueKey('consultation-retry-failed-message-button')),
+    );
+    final deleteRect = tester.getRect(
+      find.byKey(const ValueKey('consultation-delete-failed-message-button')),
+    );
+
+    expect(retryRect.width, greaterThanOrEqualTo(240));
+    expect(deleteRect.width, greaterThanOrEqualTo(240));
+    expect(deleteRect.top, greaterThan(retryRect.bottom));
+  });
+
   testWidgets('shows safety guidance and deletes sensitive history',
       (tester) async {
     final repository = _FakeConsultationRepository(

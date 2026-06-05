@@ -358,21 +358,9 @@ class _CompactActionWrap extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final fullWidth = constraints.maxWidth < _compactActionBreakpoint;
-        return Wrap(
-          spacing: AppSpacing.xs,
-          runSpacing: AppSpacing.xs,
-          children: [
-            for (final child in children)
-              if (fullWidth)
-                SizedBox(width: constraints.maxWidth, child: child)
-              else
-                child,
-          ],
-        );
-      },
+    return AppResponsiveActionWrap(
+      fullWidthBreakpoint: _compactActionBreakpoint,
+      children: children,
     );
   }
 }

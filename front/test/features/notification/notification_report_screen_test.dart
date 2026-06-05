@@ -173,6 +173,50 @@ void main() {
       semantics.dispose();
     }
   });
+
+  testWidgets('stacks report target fields on a narrow phone viewport',
+      (tester) async {
+    tester.view.physicalSize = const Size(320, 780);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    final notificationRepository = _FakeNotificationRepository();
+    final reportRepository = _FakeReportRepository();
+    final notificationController = NotificationController(
+      repository: notificationRepository,
+    );
+    final reportController = ReportController(repository: reportRepository);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: NotificationReportScreen(
+          notificationController: notificationController,
+          reportController: reportController,
+          onBack: () {},
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('신고'));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(
+      find.byKey(const ValueKey('report-target-id-field')),
+    );
+    await tester.pumpAndSettle();
+
+    final typeRect = tester.getRect(
+      find.byKey(const ValueKey('report-target-type-field-post')),
+    );
+    final idRect = tester.getRect(
+      find.byKey(const ValueKey('report-target-id-field')),
+    );
+
+    expect(typeRect.width, greaterThanOrEqualTo(240));
+    expect(idRect.width, greaterThanOrEqualTo(240));
+    expect(idRect.top, greaterThan(typeRect.bottom));
+  });
 }
 
 class _FakeNotificationRepository implements NotificationRepository {
