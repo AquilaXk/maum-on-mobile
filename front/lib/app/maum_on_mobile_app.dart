@@ -203,8 +203,6 @@ class _MaumOnMobileAppState extends State<MaumOnMobileApp>
 
   @override
   Widget build(BuildContext context) {
-    final initialRoute = getInitialRoute();
-
     return MaterialApp(
       title: 'Maum On',
       debugShowCheckedModeBanner: false,
@@ -259,7 +257,6 @@ class _MaumOnMobileAppState extends State<MaumOnMobileApp>
                   nickname: state.member!.nickname,
                   role: state.member!.role,
                   status: state.member!.status,
-                  routeTitle: initialRoute.title,
                 ),
               ),
             );
@@ -275,7 +272,6 @@ class _MaumOnMobileAppState extends State<MaumOnMobileApp>
     required String nickname,
     required String role,
     required String status,
-    required String routeTitle,
   }) {
     return switch (_route) {
       AuthenticatedRoute.diary => DiaryScreen(
@@ -305,7 +301,6 @@ class _MaumOnMobileAppState extends State<MaumOnMobileApp>
             )
           : _buildHomeRoute(
               memberId: memberId,
-              routeTitle: routeTitle,
               nickname: nickname,
               isAdmin: false,
             ),
@@ -318,7 +313,6 @@ class _MaumOnMobileAppState extends State<MaumOnMobileApp>
       AuthenticatedRoute.story => _buildStoryRoute(memberId),
       AuthenticatedRoute.home => _buildHomeRoute(
           memberId: memberId,
-          routeTitle: routeTitle,
           nickname: nickname,
           isAdmin: role == 'ADMIN',
           onOpenOperations: role == 'ADMIN'
@@ -330,7 +324,6 @@ class _MaumOnMobileAppState extends State<MaumOnMobileApp>
 
   Widget _buildHomeRoute({
     required int memberId,
-    required String routeTitle,
     required String nickname,
     required bool isAdmin,
     VoidCallback? onOpenOperations,
@@ -343,7 +336,6 @@ class _MaumOnMobileAppState extends State<MaumOnMobileApp>
       required bool hasLiveConnection,
     }) {
       return HomeScreen(
-        routeTitle: routeTitle,
         nickname: nickname,
         homeController: homeController,
         onRefresh: notificationController == null

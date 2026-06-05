@@ -7,7 +7,6 @@ import 'domain/home_models.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({
-    required this.routeTitle,
     required this.nickname,
     required this.homeController,
     required this.onWriteDiary,
@@ -25,7 +24,6 @@ class HomeScreen extends StatefulWidget {
     super.key,
   });
 
-  final String routeTitle;
   final String nickname;
   final HomeController homeController;
   final VoidCallback onWriteDiary;
@@ -91,7 +89,6 @@ class _HomeScreenState extends State<HomeScreen> {
         final state = widget.homeController.state;
 
         return AppScreen(
-          eyebrow: widget.routeTitle,
           title: 'Maum On',
           subtitle: '${widget.nickname}님, 오늘의 마음을 이어가세요.',
           onRefresh: widget.onRefresh ?? widget.homeController.load,
