@@ -202,6 +202,28 @@ void main() {
     expect(refreshCount, 1);
   });
 
+  testWidgets('screen reserves scroll space above persistent navigation',
+      (tester) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: buildAppTheme(),
+        home: const AppScreen(
+          title: '상세',
+          children: [
+            SizedBox(height: 900, child: Text('마지막 액션')),
+          ],
+        ),
+      ),
+    );
+
+    final scrollView = tester.widget<SingleChildScrollView>(
+      find.byType(SingleChildScrollView),
+    );
+    final padding = scrollView.padding!.resolve(TextDirection.ltr);
+
+    expect(padding.bottom, greaterThanOrEqualTo(96));
+  });
+
   testWidgets('list and detail rows expose stable mobile accessibility',
       (tester) async {
     tester.view.physicalSize = const Size(320, 720);
@@ -248,6 +270,61 @@ void main() {
       tester.getSize(find.byKey(const ValueKey('design-list-row'))).height,
       greaterThanOrEqualTo(64),
     );
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets(
+      'content cards keep metadata and actions stable on compact phones',
+      (tester) async {
+    tester.view.physicalSize = const Size(320, 720);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: buildAppTheme(),
+        home: Scaffold(
+          body: ListView(
+            padding: const EdgeInsets.all(AppSpacing.md),
+            children: [
+              AppContentCard(
+                key: const ValueKey('design-content-card'),
+                leadingIcon: Icons.article_outlined,
+                title: '좁은 화면에서도 깨지지 않아야 하는 긴 콘텐츠 제목',
+                subtitle: '작성자 · 조회 1234 · 오늘',
+                badges: const [
+                  AppStatusPill(
+                    label: '일상',
+                    tone: AppStatusTone.success,
+                  ),
+                  AppStatusPill(label: '공개'),
+                ],
+                content: const Text(
+                  '본문 미리보기는 여러 줄이어도 카드 내부에서 안정적으로 줄바꿈됩니다.',
+                ),
+                actions: [
+                  TextButton.icon(
+                    onPressed: () {},
+                    icon: const Icon(Icons.edit_outlined),
+                    label: const Text('수정'),
+                  ),
+                  TextButton.icon(
+                    onPressed: () {},
+                    icon: const Icon(Icons.delete_outline),
+                    label: const Text('삭제'),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+
+    expect(find.byKey(const ValueKey('design-content-card')), findsOneWidget);
+    expect(find.text('수정'), findsOneWidget);
+    expect(find.text('삭제'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 }
