@@ -18,7 +18,7 @@ Options:
   --container NAME             Active backend container name. Default: maum-on-mobile-back
   --previous-container NAME    Previous backend container name. Default: maum-on-mobile-back-previous
   --image IMAGE                Optional backend image tag to inspect
-  --log-tail LINES             Container log lines for failure diagnostics. Default: 200
+  --log-tail LINES             Reserved log-tail validation option. Default: 200
 USAGE
 }
 
@@ -131,14 +131,15 @@ fi
 
 capture "docker-info.txt" "${docker_prefix[@]}" docker info
 capture "docker-ps.txt" "${docker_prefix[@]}" docker ps -a
-capture "container-inspect.json" "${docker_prefix[@]}" docker inspect "${container_name}"
-capture "previous-container-inspect.json" "${docker_prefix[@]}" docker inspect "${previous_container_name}"
+capture "container-status.txt" "${docker_prefix[@]}" docker inspect --format \
+  'name={{.Name}} image={{.Config.Image}} state={{.State.Status}} health={{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}} started={{.State.StartedAt}} finished={{.State.FinishedAt}} restart={{.HostConfig.RestartPolicy.Name}} ports={{json .NetworkSettings.Ports}}' \
+  "${container_name}"
+capture "previous-container-status.txt" "${docker_prefix[@]}" docker inspect --format \
+  'name={{.Name}} image={{.Config.Image}} state={{.State.Status}} health={{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}} started={{.State.StartedAt}} finished={{.State.FinishedAt}} restart={{.HostConfig.RestartPolicy.Name}} ports={{json .NetworkSettings.Ports}}' \
+  "${previous_container_name}"
 
 if [[ -n "${image_tag}" ]]; then
-  capture "image-inspect.json" "${docker_prefix[@]}" docker image inspect "${image_tag}"
-fi
-
-if [[ "${phase}" == "failure" ]]; then
-  capture "container-logs.txt" "${docker_prefix[@]}" docker logs --tail "${log_tail}" "${container_name}"
-  capture "previous-container-logs.txt" "${docker_prefix[@]}" docker logs --tail "${log_tail}" "${previous_container_name}"
+  capture "image-status.txt" "${docker_prefix[@]}" docker image inspect --format \
+    'id={{.Id}} tags={{json .RepoTags}} digests={{json .RepoDigests}} created={{.Created}} size={{.Size}}' \
+    "${image_tag}"
 fi

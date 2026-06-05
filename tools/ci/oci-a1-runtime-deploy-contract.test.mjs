@@ -137,10 +137,13 @@ test("OCI deploy diagnostics collector records runtime state without exposing se
   assert.match(script, /GITHUB_RUN_ID/);
   assert.match(script, /docker info/);
   assert.match(script, /docker ps -a/);
-  assert.match(script, /docker inspect "\$\{container_name\}"/);
-  assert.match(script, /docker inspect "\$\{previous_container_name\}"/);
-  assert.match(script, /docker image inspect "\$\{image_tag\}"/);
-  assert.match(script, /docker logs --tail "\$\{log_tail\}" "\$\{container_name\}"/);
+  assert.match(script, /container-status\.txt/);
+  assert.match(script, /previous-container-status\.txt/);
+  assert.match(script, /image-status\.txt/);
+  assert.match(script, /docker inspect --format/);
+  assert.match(script, /docker image inspect --format/);
+  assert.doesNotMatch(script, /container-inspect\.json|image-inspect\.json/);
+  assert.doesNotMatch(script, /docker logs/);
   assert.doesNotMatch(script, /set -x/);
   assert.doesNotMatch(script, /printenv|env >|cat .*\.env/);
 });
