@@ -233,9 +233,7 @@ class _FailedMessageNotice extends StatelessWidget {
                     ),
               ),
               const SizedBox(height: AppSpacing.sm),
-              Wrap(
-                spacing: AppSpacing.xs,
-                runSpacing: AppSpacing.xs,
+              AppResponsiveActionWrap(
                 children: [
                   FilledButton.tonalIcon(
                     key: const ValueKey(
@@ -291,9 +289,7 @@ class _SafetyNotice extends StatelessWidget {
             semanticLabel: '상담 위험 상황 도움 안내. ${safety.message}',
           ),
           const SizedBox(height: AppSpacing.sm),
-          Wrap(
-            spacing: AppSpacing.xs,
-            runSpacing: AppSpacing.xs,
+          AppResponsiveActionWrap(
             children: [
               _EmergencyActionButton(
                 key: const ValueKey('consultation-emergency-119-button'),

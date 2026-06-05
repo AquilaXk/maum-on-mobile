@@ -343,9 +343,7 @@ class _SupportActionButtons extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Wrap(
-      spacing: AppSpacing.xs,
-      runSpacing: AppSpacing.xs,
+    return AppResponsiveActionWrap(
       alignment: WrapAlignment.end,
       children: [
         FilledButton.icon(
@@ -750,9 +748,7 @@ class _WithdrawalSection extends StatelessWidget {
             ),
           ],
           const SizedBox(height: AppSpacing.md),
-          Wrap(
-            spacing: AppSpacing.xs,
-            runSpacing: AppSpacing.xs,
+          AppResponsiveActionWrap(
             children: [
               OutlinedButton(
                 onPressed: state.isSubmitting ? null : onCancel,
@@ -812,9 +808,7 @@ class _DataExportSection extends StatelessWidget {
           ),
         ],
         const SizedBox(height: AppSpacing.md),
-        Wrap(
-          spacing: AppSpacing.xs,
-          runSpacing: AppSpacing.xs,
+        AppResponsiveActionWrap(
           alignment: WrapAlignment.end,
           children: [
             if (export == null ||

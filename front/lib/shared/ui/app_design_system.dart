@@ -578,11 +578,13 @@ class AppInlineSectionHeader extends StatelessWidget {
 class AppResponsiveActionWrap extends StatelessWidget {
   const AppResponsiveActionWrap({
     required this.children,
+    this.alignment = WrapAlignment.start,
     this.fullWidthBreakpoint = 360,
     super.key,
   });
 
   final List<Widget> children;
+  final WrapAlignment alignment;
   final double fullWidthBreakpoint;
 
   @override
@@ -595,6 +597,7 @@ class AppResponsiveActionWrap extends StatelessWidget {
         return Wrap(
           spacing: AppSpacing.xs,
           runSpacing: AppSpacing.xs,
+          alignment: alignment,
           children: [
             for (final child in children)
               ConstrainedBox(
