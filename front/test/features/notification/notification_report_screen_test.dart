@@ -9,6 +9,7 @@ import 'package:maum_on_mobile_front/features/notification/presentation/notifica
 import 'package:maum_on_mobile_front/features/report/application/report_controller.dart';
 import 'package:maum_on_mobile_front/features/report/data/report_repository.dart';
 import 'package:maum_on_mobile_front/features/report/domain/report_models.dart';
+import 'package:maum_on_mobile_front/shared/ui/app_design_system.dart';
 
 void main() {
   testWidgets('shows compact notification status on a phone viewport',
@@ -44,10 +45,24 @@ void main() {
       find.byKey(const ValueKey('notification-status-toolbar')),
       findsOneWidget,
     );
+    expect(
+        find.byKey(const ValueKey('notification-flow-panel')), findsOneWidget);
+    expect(find.byKey(const ValueKey('notification-list-summary-card')),
+        findsOneWidget);
+    expect(find.text('알림 확인 흐름'), findsOneWidget);
     expect(find.text('읽지 않음 2개'), findsOneWidget);
     expect(find.text('바로 이동 2개'), findsOneWidget);
     expect(find.text('푸시 권한 확인'), findsOneWidget);
     expect(find.byKey(const ValueKey('notification-list')), findsOneWidget);
+
+    final notificationList = tester.widget<ListView>(
+      find.byKey(const ValueKey('notification-list')),
+    );
+    final notificationPadding = notificationList.padding! as EdgeInsets;
+    expect(
+      notificationPadding.bottom,
+      greaterThanOrEqualTo(AppSpacing.persistentNavigationReserve),
+    );
   });
 
   testWidgets('renders notifications and submits a report', (tester) async {
@@ -118,6 +133,16 @@ void main() {
 
       await tester.tap(find.text('신고'));
       await tester.pumpAndSettle();
+      expect(find.byKey(const ValueKey('report-flow-panel')), findsOneWidget);
+      expect(find.text('신고 접수 흐름'), findsOneWidget);
+      final reportForm = tester.widget<SingleChildScrollView>(
+        find.byKey(const ValueKey('report-form')),
+      );
+      final reportPadding = reportForm.padding! as EdgeInsets;
+      expect(
+        reportPadding.bottom,
+        greaterThanOrEqualTo(AppSpacing.persistentNavigationReserve),
+      );
       await tester.ensureVisible(
         find.byKey(const ValueKey('report-reason-spam')),
       );

@@ -452,6 +452,11 @@ void main() {
     expect(find.text('App Store review'), findsOneWidget);
     expect(find.text('Google Play review'), findsOneWidget);
     expect(
+      find.byKey(const ValueKey('operations-system-risk-panel')),
+      findsOneWidget,
+    );
+    expect(find.text('주의 작업'), findsOneWidget);
+    expect(
       find.bySemanticsLabel('지원 연락처, support@maum-on.app'),
       findsOneWidget,
     );

@@ -131,7 +131,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 Expanded(
                   child: SingleChildScrollView(
                     key: const ValueKey('settings-scroll'),
-                    padding: const EdgeInsets.all(AppSpacing.xl),
+                    padding: const EdgeInsets.fromLTRB(
+                      AppSpacing.xl,
+                      AppSpacing.xl,
+                      AppSpacing.xl,
+                      AppSpacing.persistentNavigationReserve,
+                    ),
                     child: Center(
                       child: ConstrainedBox(
                         constraints: const BoxConstraints(maxWidth: 560),
@@ -168,6 +173,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                 randomReceiveAllowed:
                                     settings.randomReceiveAllowed,
                                 dataExport: state.dataExport,
+                              ),
+                              const SizedBox(height: AppSpacing.lg),
+                              const AppFlowPanel(
+                                key: ValueKey('settings-flow-panel'),
+                                icon: Icons.route_outlined,
+                                title: '계정 점검 흐름',
+                                message: '계정 정보, 보안 항목, 지원 채널을 순서대로 확인합니다.',
+                                steps: ['계정', '보안', '지원'],
                               ),
                               const SizedBox(height: AppSpacing.lg),
                               _ProfileSection(
