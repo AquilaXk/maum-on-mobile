@@ -48,6 +48,50 @@ void main() {
     expect(find.text('선택한 날 1개'), findsOneWidget);
   });
 
+  testWidgets('stacks diary attachment actions on a narrow phone viewport',
+      (tester) async {
+    tester.view.physicalSize = const Size(320, 640);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    final controller = DiaryController(
+      diaryRepository: _FakeDiaryRepository(pages: [_page([])]),
+      imageRepository: _FakeDiaryImageRepository(),
+      now: DateTime(2026, 5, 20),
+    );
+    await controller.load();
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: DiaryScreen(
+          controller: controller,
+          imagePicker: _FakeDiaryImagePicker(),
+          onBack: () {},
+        ),
+      ),
+    );
+
+    await tester.ensureVisible(
+      find.byKey(const ValueKey('diary-image-camera-button')),
+    );
+    await tester.pumpAndSettle();
+
+    final cameraWidth = tester
+        .getSize(find.byKey(const ValueKey('diary-image-camera-button')))
+        .width;
+    final galleryWidth = tester
+        .getSize(find.byKey(const ValueKey('diary-image-gallery-button')))
+        .width;
+    final clearWidth = tester
+        .getSize(find.byKey(const ValueKey('diary-clear-images-button')))
+        .width;
+
+    expect(cameraWidth, greaterThanOrEqualTo(250));
+    expect(galleryWidth, moreOrLessEquals(cameraWidth, epsilon: 1));
+    expect(clearWidth, moreOrLessEquals(cameraWidth, epsilon: 1));
+  });
+
   testWidgets('renders diary calendar, form, and selected date entries',
       (tester) async {
     final controller = DiaryController(

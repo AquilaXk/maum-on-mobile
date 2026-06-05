@@ -37,6 +37,42 @@ void main() {
     expect(find.text('1개의 스토리'), findsOneWidget);
   });
 
+  testWidgets('stacks story editor actions on a narrow phone viewport',
+      (tester) async {
+    tester.view.physicalSize = const Size(320, 640);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    final controller = StoryController(
+      storyRepository: _FakeStoryRepository(storyPages: [_storyPage([])]),
+      currentMemberId: 7,
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: StoryScreen(controller: controller, onBack: () {}),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('story-create-button')));
+    await tester.pumpAndSettle();
+
+    await tester.ensureVisible(
+      find.byKey(const ValueKey('story-submit-button')),
+    );
+    await tester.pumpAndSettle();
+
+    final submitWidth =
+        tester.getSize(find.byKey(const ValueKey('story-submit-button'))).width;
+    final cancelWidth = tester
+        .getSize(find.byKey(const ValueKey('story-editor-cancel-button')))
+        .width;
+
+    expect(submitWidth, greaterThanOrEqualTo(250));
+    expect(cancelWidth, moreOrLessEquals(submitWidth, epsilon: 1));
+  });
+
   testWidgets('renders story list and opens detail with comments',
       (tester) async {
     final repository = _FakeStoryRepository(
