@@ -112,34 +112,6 @@ jobs:
             skip_reason="stale deployment SHA ${deploy_sha} does not match origin/main ${main_sha}"
           fi
 
-          if [[ "${event_name}" == "workflow_run" && "${should_deploy}" == "true" ]]; then
-            changed_files="$(mktemp)"
-            if git rev-parse "${deploy_sha}^" >/dev/null 2>&1; then
-              git diff --name-only "${deploy_sha}^" "${deploy_sha}" >"${changed_files}"
-            else
-              git diff-tree --no-commit-id --name-only -r "${deploy_sha}" >"${changed_files}"
-            fi
-
-            gate_output="$(env -u GITHUB_OUTPUT -u GITHUB_STEP_SUMMARY bash tools/ci/detect-changed-paths.sh "${changed_files}")"
-            deploy_changed="$(printf '%s\n' "${gate_output}" | awk -F= '$1 == "deploy" { print $2 }')"
-
-            {
-              echo "### Deployment impact"
-              echo
-              echo "| key | value |"
-              echo "| --- | --- |"
-              echo "| deploy_changed | ${deploy_changed:-false} |"
-              echo
-              echo "#### Changed files"
-              sed 's/^/- `/' "${changed_files}" | sed 's/$/`/'
-            } >>"${GITHUB_STEP_SUMMARY}"
-
-            if [[ "${deploy_changed}" != "true" ]]; then
-              should_deploy="false"
-              skip_reason="no deployment-impacting files changed"
-            fi
-          fi
-
           short_sha="${deploy_sha:0:12}"
           backend_image_tag="maum-on-mobile-back:${deploy_sha}"
 

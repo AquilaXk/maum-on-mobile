@@ -239,12 +239,10 @@ test("backend deploy workflow auto-runs production deploy after successful main 
   assert.match(workflow, /git fetch --no-tags origin main:refs\/remotes\/origin\/main/);
   assert.match(workflow, /if \[\[ "\$\{dry_run\}" != "true" && "\$\{should_deploy\}" == "true" && "\$\{deploy_sha\}" != "\$\{main_sha\}" \]\]/);
   assert.match(workflow, /stale deployment SHA/);
-  assert.match(workflow, /changed_files="\$\(mktemp\)"/);
-  assert.match(workflow, /git diff --name-only "\$\{deploy_sha\}\^" "\$\{deploy_sha\}" >"\$\{changed_files\}"/);
-  assert.match(workflow, /env -u GITHUB_OUTPUT -u GITHUB_STEP_SUMMARY bash tools\/ci\/detect-changed-paths\.sh "\$\{changed_files\}"/);
-  assert.match(workflow, /deploy_changed="\$\(printf '%s\\n' "\$\{gate_output\}" \| awk -F= '\$1 == "deploy" \{ print \$2 \}'\)"/);
-  assert.match(workflow, /no deployment-impacting files changed/);
-  assert.match(workflow, /### Deployment impact/);
+  assert.doesNotMatch(workflow, /detect-changed-paths\.sh/);
+  assert.doesNotMatch(workflow, /deploy_changed/);
+  assert.doesNotMatch(workflow, /no deployment-impacting files changed/);
+  assert.doesNotMatch(workflow, /### Deployment impact/);
   assert.match(workflow, /short_sha="\$\{deploy_sha:0:12\}"/);
   assert.match(workflow, /short_sha=\$\{short_sha\}/);
   assert.match(workflow, /deploy_reason: \$\{\{ steps\.context\.outputs\.deploy_reason \}\}/);
