@@ -13,6 +13,8 @@ const List<Duration> _defaultReconnectBackoffDelays = [
   Duration(seconds: 2),
   Duration(seconds: 4),
 ];
+const _defaultSendTimeout = Duration(seconds: 15);
+const _defaultResponseTimeout = Duration(seconds: 20);
 
 class ConsultationFailedMessage {
   const ConsultationFailedMessage({
@@ -96,11 +98,15 @@ class ConsultationController extends ChangeNotifier {
     DraftRecoveryRepository? draftRepository,
     VoidCallback? onUnauthorized,
     List<Duration> reconnectBackoffDelays = _defaultReconnectBackoffDelays,
+    Duration sendTimeout = _defaultSendTimeout,
+    Duration responseTimeout = _defaultResponseTimeout,
   })  : _repository = repository,
         _currentMemberId = currentMemberId,
         _draftRepository = draftRepository,
         _onUnauthorized = onUnauthorized,
         _reconnectBackoffDelays = reconnectBackoffDelays,
+        _sendTimeout = sendTimeout,
+        _responseTimeout = responseTimeout,
         _state = ConsultationState(
           messages: [
             ConsultationMessage(
@@ -119,10 +125,13 @@ class ConsultationController extends ChangeNotifier {
   final DraftRecoveryRepository? _draftRepository;
   final VoidCallback? _onUnauthorized;
   final List<Duration> _reconnectBackoffDelays;
+  final Duration _sendTimeout;
+  final Duration _responseTimeout;
 
   ConsultationState _state;
   StreamSubscription<ConsultationStreamEvent>? _streamSubscription;
   Timer? _reconnectTimer;
+  Timer? _responseTimeoutTimer;
   bool _shouldRestoreConnection = false;
   bool _hasLoadedRecentMessages = false;
   bool _isDisposed = false;
@@ -130,6 +139,7 @@ class ConsultationController extends ChangeNotifier {
   int _messageSequence = 0;
   String? _activeAssistantMessageId;
   String? _activeStreamRequestId;
+  bool _ignoreStreamEventsUntilDone = false;
   final Set<String> _processedStreamChunkKeys = <String>{};
   final Set<String> _completedStreamRequestIds = <String>{};
 
@@ -347,7 +357,12 @@ class ConsultationController extends ChangeNotifier {
     required String assistantMessageId,
   }) async {
     try {
-      final result = await _repository.sendMessage(content);
+      final result = await _repository.sendMessage(content).timeout(
+            _sendTimeout,
+            onTimeout: () {
+              throw TimeoutException('consultation send timed out');
+            },
+          );
       final safety = result.safety;
       if (safety != null && safety.blocksConversation) {
         await _draftRepository?.delete(_draftKey);
@@ -364,6 +379,13 @@ class ConsultationController extends ChangeNotifier {
         return;
       }
 
+      if (!result.accepted) {
+        throw const ApiClientException(
+          kind: ApiErrorKind.server,
+          message: '상담 요청이 수락되지 않았습니다. 잠시 후 다시 시도해 주세요.',
+        );
+      }
+
       await _draftRepository?.delete(_draftKey);
       _setState(
         _state.copyWith(
@@ -372,11 +394,14 @@ class ConsultationController extends ChangeNotifier {
           clearFailedMessage: true,
         ),
       );
+      _startResponseTimeout();
     } on Object catch (error) {
       final errorMessage = _messageFromError(error);
       await _markDraftFailed(content, error);
       _replaceActiveAssistantWithSystem('전송 실패: $errorMessage');
       _activeAssistantMessageId = null;
+      _ignoreStreamEventsUntilDone = true;
+      _cancelResponseTimeout();
       _setState(
         _state.copyWith(
           isSending: false,
@@ -463,12 +488,19 @@ class ConsultationController extends ChangeNotifier {
         );
         return;
       case ConsultationStreamEventType.chat:
+        if (_ignoreStreamEventsUntilDone) {
+          return;
+        }
         _appendAssistantChunk(event);
         return;
       case ConsultationStreamEventType.done:
         _finishStreaming(event);
         return;
       case ConsultationStreamEventType.error:
+        if (_ignoreStreamEventsUntilDone) {
+          _finishStreaming(event);
+          return;
+        }
         final message =
             event.data.isEmpty ? '상담 응답 생성 중 오류가 발생했습니다.' : event.data;
         _replaceActiveAssistantWithSystem(message);
@@ -530,13 +562,19 @@ class ConsultationController extends ChangeNotifier {
     _scheduleReconnect(message);
   }
 
-  void _scheduleReconnect(String message) {
+  void _scheduleReconnect(
+    String message, {
+    bool appendNotice = true,
+    bool reloadRecentMessages = true,
+  }) {
     if (!_shouldRestoreConnection || _isDisposed) {
       return;
     }
 
     if (_reconnectAttempt >= _reconnectBackoffDelays.length) {
-      _appendConnectionNotice('상담 연결이 끊어졌습니다. 다시 연결해 주세요.');
+      if (appendNotice) {
+        _appendConnectionNotice('상담 연결이 끊어졌습니다. 다시 연결해 주세요.');
+      }
       _setState(
         _state.copyWith(
           connectionState: ConsultationConnectionState.error,
@@ -550,7 +588,9 @@ class ConsultationController extends ChangeNotifier {
 
     final delay = _reconnectBackoffDelays[_reconnectAttempt];
     _reconnectAttempt += 1;
-    _appendConnectionNotice('상담 연결이 끊어졌습니다. 자동으로 다시 연결합니다.');
+    if (appendNotice) {
+      _appendConnectionNotice('상담 연결이 끊어졌습니다. 자동으로 다시 연결합니다.');
+    }
     _setState(
       _state.copyWith(
         connectionState: ConsultationConnectionState.reconnecting,
@@ -566,7 +606,7 @@ class ConsultationController extends ChangeNotifier {
       if (!_shouldRestoreConnection || _isDisposed) {
         return;
       }
-      unawaited(connect(reloadRecentMessages: true));
+      unawaited(connect(reloadRecentMessages: reloadRecentMessages));
     });
   }
 
@@ -633,6 +673,7 @@ class ConsultationController extends ChangeNotifier {
           clearErrorMessage: true,
         ),
       );
+      _restartResponseTimeout();
       return;
     }
 
@@ -650,6 +691,7 @@ class ConsultationController extends ChangeNotifier {
         clearErrorMessage: true,
       ),
     );
+    _restartResponseTimeout();
   }
 
   void _appendSystemMessage(String content) {
@@ -688,12 +730,14 @@ class ConsultationController extends ChangeNotifier {
   }
 
   void _finishStreaming([ConsultationStreamEvent? event]) {
+    _cancelResponseTimeout();
     final requestId = event?.requestId ?? _activeStreamRequestId;
     if (requestId != null) {
       _completedStreamRequestIds.add(requestId);
     }
     _activeAssistantMessageId = null;
     _activeStreamRequestId = null;
+    _ignoreStreamEventsUntilDone = false;
     _processedStreamChunkKeys.clear();
     _setState(_state.copyWith(isStreaming: false));
   }
@@ -755,9 +799,11 @@ class ConsultationController extends ChangeNotifier {
     final currentSubscription = _streamSubscription;
     _streamSubscription = null;
     _cancelPendingReconnect();
+    _cancelResponseTimeout();
     await currentSubscription?.cancel();
     _activeAssistantMessageId = null;
     _activeStreamRequestId = null;
+    _ignoreStreamEventsUntilDone = false;
     _processedStreamChunkKeys.clear();
     _setState(
       _state.copyWith(
@@ -776,11 +822,13 @@ class ConsultationController extends ChangeNotifier {
     final currentSubscription = _streamSubscription;
     _streamSubscription = null;
     _cancelPendingReconnect();
+    _cancelResponseTimeout();
     if (currentSubscription != null) {
       unawaited(currentSubscription.cancel());
     }
     _activeAssistantMessageId = null;
     _activeStreamRequestId = null;
+    _ignoreStreamEventsUntilDone = false;
     _processedStreamChunkKeys.clear();
     _setState(
       _state.copyWith(
@@ -821,12 +869,18 @@ class ConsultationController extends ChangeNotifier {
       return error.message;
     }
 
+    if (error is TimeoutException) {
+      return '상담 응답이 지연되고 있습니다. 잠시 후 다시 시도해 주세요.';
+    }
+
     return '요청을 처리하지 못했습니다.';
   }
 
   void _prepareForOutgoingStream(String assistantMessageId) {
+    _cancelResponseTimeout();
     _activeAssistantMessageId = assistantMessageId;
     _activeStreamRequestId = null;
+    _ignoreStreamEventsUntilDone = false;
     _processedStreamChunkKeys.clear();
   }
 
@@ -879,6 +933,7 @@ class ConsultationController extends ChangeNotifier {
   void dispose() {
     _isDisposed = true;
     _cancelPendingReconnect();
+    _cancelResponseTimeout();
     _streamSubscription?.cancel();
     super.dispose();
   }
@@ -886,5 +941,62 @@ class ConsultationController extends ChangeNotifier {
   void _cancelPendingReconnect() {
     _reconnectTimer?.cancel();
     _reconnectTimer = null;
+  }
+
+  void _startResponseTimeout() {
+    _cancelResponseTimeout();
+    if (!_state.isStreaming) {
+      return;
+    }
+    if (_responseTimeout <= Duration.zero) {
+      _handleResponseTimeout();
+      return;
+    }
+    _responseTimeoutTimer = Timer(_responseTimeout, _handleResponseTimeout);
+  }
+
+  void _restartResponseTimeout() {
+    if (_state.isStreaming) {
+      _startResponseTimeout();
+    }
+  }
+
+  void _handleResponseTimeout() {
+    _responseTimeoutTimer = null;
+    if (_isDisposed || !_state.isStreaming) {
+      return;
+    }
+
+    final message = _messageFromError(
+      TimeoutException('consultation response timed out'),
+    );
+    _replaceActiveAssistantWithSystem(message);
+    final currentSubscription = _streamSubscription;
+    _streamSubscription = null;
+    if (currentSubscription != null) {
+      unawaited(currentSubscription.cancel());
+    }
+
+    _activeAssistantMessageId = null;
+    _activeStreamRequestId = null;
+    _ignoreStreamEventsUntilDone = false;
+    _processedStreamChunkKeys.clear();
+    _setState(
+      _state.copyWith(
+        isSending: false,
+        isStreaming: false,
+        errorMessage: message,
+      ),
+    );
+    _scheduleReconnect(
+      message,
+      appendNotice: false,
+      reloadRecentMessages: false,
+    );
+  }
+
+  void _cancelResponseTimeout() {
+    _responseTimeoutTimer?.cancel();
+    _responseTimeoutTimer = null;
   }
 }

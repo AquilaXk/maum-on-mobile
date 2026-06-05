@@ -461,6 +461,108 @@ void main() {
       );
     });
 
+    test('times out stalled sends and restores input availability', () async {
+      final repository = _FakeConsultationRepository()
+        ..stallSendCompleter = Completer<ConsultationSendResult>();
+      final controller = ConsultationController(
+        repository: repository,
+        sendTimeout: Duration.zero,
+      );
+
+      await controller.connect();
+      repository.emit(const ConsultationStreamEvent.connect('connected'));
+      controller.updateDraft('응답 완료 처리가 멈추면 안 돼요');
+      await controller.submitMessage();
+
+      expect(controller.state.isSending, isFalse);
+      expect(controller.state.isStreaming, isFalse);
+      expect(controller.state.failedMessage?.content, '응답 완료 처리가 멈추면 안 돼요');
+      expect(controller.state.canSubmit, isFalse);
+      expect(
+        controller.state.messages.last.content,
+        contains('전송 실패'),
+      );
+    });
+
+    test('stops waiting when send result is not accepted', () async {
+      final repository = _FakeConsultationRepository(
+        sendResult: const ConsultationSendResult(accepted: false),
+      );
+      final controller = ConsultationController(repository: repository);
+
+      await controller.connect();
+      repository.emit(const ConsultationStreamEvent.connect('connected'));
+      controller.updateDraft('서버가 수락하지 않은 메시지');
+      await controller.submitMessage();
+
+      expect(repository.sentMessages, ['서버가 수락하지 않은 메시지']);
+      expect(controller.state.isSending, isFalse);
+      expect(controller.state.isStreaming, isFalse);
+      expect(controller.state.failedMessage?.content, '서버가 수락하지 않은 메시지');
+      expect(
+        controller.state.messages.last.content,
+        contains('전송 실패'),
+      );
+    });
+
+    test('times out stalled response streams after send succeeds', () async {
+      final repository = _FakeConsultationRepository();
+      final controller = ConsultationController(
+        repository: repository,
+        responseTimeout: Duration.zero,
+        reconnectBackoffDelays: const [],
+      );
+
+      await controller.connect();
+      repository.emit(const ConsultationStreamEvent.connect('connected'));
+      controller.updateDraft('응답 스트림이 멈추면 복구해 주세요');
+      await controller.submitMessage();
+
+      expect(repository.sentMessages, ['응답 스트림이 멈추면 복구해 주세요']);
+      expect(controller.state.isSending, isFalse);
+      expect(controller.state.isStreaming, isFalse);
+      expect(controller.state.failedMessage, isNull);
+      expect(controller.state.canSubmit, isFalse);
+      expect(repository.cancelCount, 1);
+      expect(
+        controller.state.messages.last.content,
+        contains('상담 응답이 지연되고 있습니다'),
+      );
+    });
+
+    test('ignores late response chunks after response timeout', () async {
+      final repository = _FakeConsultationRepository();
+      final controller = ConsultationController(
+        repository: repository,
+        responseTimeout: Duration.zero,
+        reconnectBackoffDelays: const [Duration.zero],
+      );
+
+      await controller.connect();
+      repository.emit(const ConsultationStreamEvent.connect('connected'));
+      controller.updateDraft('늦은 응답은 새 답변으로 붙으면 안 돼요');
+      await controller.submitMessage();
+
+      repository
+        ..emitAt(0, const ConsultationStreamEvent.chat('늦게 도착한 답변'))
+        ..emitAt(0, const ConsultationStreamEvent.done());
+
+      await Future<void>.delayed(Duration.zero);
+      repository.emit(const ConsultationStreamEvent.connect('connected'));
+      controller.updateDraft('다음 메시지');
+
+      expect(
+        controller.state.messages
+            .where((message) => message.content.contains('늦게 도착한 답변')),
+        isEmpty,
+      );
+      expect(repository.cancelCount, 1);
+      expect(repository.connectCount, 2);
+      expect(repository.loadRecentCount, 1);
+      expect(controller.state.isStreaming, isFalse);
+      expect(controller.state.canSubmit, isTrue);
+    });
+
     test('clears expired sessions when the stream rejects authorization',
         () async {
       final repository = _FakeConsultationRepository();
@@ -538,11 +640,13 @@ class _FakeConsultationRepository implements ConsultationRepository {
   final ConsultationSendResult sendResult;
   final List<String> sentMessages = [];
   final List<Object> sendErrors = [];
+  Completer<ConsultationSendResult>? stallSendCompleter;
   int connectCount = 0;
   int cancelCount = 0;
   int loadRecentCount = 0;
   int deleteSensitiveCount = 0;
   List<ConsultationMessage>? recentMessagesAfterDelete;
+  final List<StreamController<ConsultationStreamEvent>> streamControllers = [];
   StreamController<ConsultationStreamEvent>? _controller;
 
   @override
@@ -554,6 +658,7 @@ class _FakeConsultationRepository implements ConsultationRepository {
         cancelCount += 1;
       },
     );
+    streamControllers.add(_controller!);
     return _controller!.stream;
   }
 
@@ -562,6 +667,10 @@ class _FakeConsultationRepository implements ConsultationRepository {
     sentMessages.add(message);
     if (sendErrors.isNotEmpty) {
       throw sendErrors.removeAt(0);
+    }
+    final stalledSend = stallSendCompleter;
+    if (stalledSend != null) {
+      return stalledSend.future;
     }
     return sendResult;
   }
@@ -580,6 +689,10 @@ class _FakeConsultationRepository implements ConsultationRepository {
 
   void emit(ConsultationStreamEvent event) {
     _controller?.add(event);
+  }
+
+  void emitAt(int index, ConsultationStreamEvent event) {
+    streamControllers[index].add(event);
   }
 
   void emitError(Object error) {

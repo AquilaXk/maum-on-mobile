@@ -32,6 +32,7 @@ test("Android release builds require dedicated signing inputs", () => {
 test("Android store-facing metadata stays release ready", () => {
   const manifest = read("front/android/app/src/main/AndroidManifest.xml");
   const buildFile = read("front/android/app/build.gradle.kts");
+  const networkSecurityConfig = read("front/android/app/src/main/res/xml/network_security_config.xml");
 
   assert.match(read("front/pubspec.yaml"), /^version:\s*\d+\.\d+\.\d+\+\d+/m);
   assert.match(buildFile, /applicationId\s*=\s*"com\.aquilaxk\.maumonmobile"/);
@@ -44,6 +45,7 @@ test("Android store-facing metadata stays release ready", () => {
   assert.match(buildFile, /MAUMON_FIREBASE_SENDER_ID/);
   assert.match(manifest, /android:label="Maum On"/);
   assert.match(manifest, /android:icon="@mipmap\/ic_launcher"/);
+  assert.match(manifest, /android:networkSecurityConfig="@xml\/network_security_config"/);
   assert.match(manifest, /<uses-permission[^>]*android:name="android\.permission\.CAMERA"[^>]*\/?>/);
   assert.match(manifest, /android\.permission\.POST_NOTIFICATIONS/);
   assert.match(manifest, /android\.permission\.READ_MEDIA_IMAGES/);
@@ -52,6 +54,9 @@ test("Android store-facing metadata stays release ready", () => {
   assert.match(manifest, /android:scheme="maumon"/);
   assert.match(manifest, /android:host="auth"/);
   assert.match(manifest, /android:path="\/callback"/);
+  assert.doesNotMatch(networkSecurityConfig, /<base-config[^>]*cleartextTrafficPermitted="true"/);
+  assert.match(networkSecurityConfig, /<domain-config[^>]*cleartextTrafficPermitted="true"/);
+  assert.match(networkSecurityConfig, /<domain[^>]*>64\.110\.66\.27<\/domain>/);
 
   for (const density of ["mdpi", "hdpi", "xhdpi", "xxhdpi", "xxxhdpi"]) {
     assert.ok(
@@ -112,6 +117,10 @@ test("iOS store-facing metadata and privacy strings stay release ready", () => {
   assert.match(plist, /<key>CFBundleURLSchemes<\/key>\s*<array>\s*<string>maumon<\/string>/);
   assert.match(plist, /<key>NSAllowsLocalNetworking<\/key>\s*<true\/>/);
   assert.doesNotMatch(plist, /<key>NSAllowsArbitraryLoads<\/key>\s*<true\/>/);
+  assert.match(
+    plist,
+    /<key>NSExceptionDomains<\/key>\s*<dict>[\s\S]*?<key>64\.110\.66\.27<\/key>\s*<dict>[\s\S]*?<key>NSExceptionAllowsInsecureHTTPLoads<\/key>\s*<true\/>[\s\S]*?<\/dict>/
+  );
   assert.match(plist, /<key>NSPhotoLibraryUsageDescription<\/key>\s*<string>.+<\/string>/);
   assert.match(plist, /<key>NSCameraUsageDescription<\/key>\s*<string>\s*[^<\s][^<]*<\/string>/);
   assert.match(plist, /<key>UILaunchStoryboardName<\/key>\s*<string>LaunchScreen<\/string>/);
