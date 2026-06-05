@@ -211,69 +211,72 @@ void main() {
       (tester) async {
     final semanticsHandle = tester.ensureSemantics();
 
-    await tester.pumpWidget(
-      MaumOnMobileApp(
-        authRepository: _FakeAuthRepository(restoredSession: _session()),
-        homeRepository: const _FakeHomeRepository(),
-        diaryRepository: _FakeDiaryRepository(),
-        diaryImagePicker: const _FakeDiaryImagePicker(),
-        storyRepository: _FakeStoryRepository(),
-        letterRepository: _FakeLetterRepository(),
-        consultationRepository: _FakeConsultationRepository(),
-        listenForDeepLinks: false,
-      ),
-    );
+    try {
+      await tester.pumpWidget(
+        MaumOnMobileApp(
+          authRepository: _FakeAuthRepository(restoredSession: _session()),
+          homeRepository: const _FakeHomeRepository(),
+          diaryRepository: _FakeDiaryRepository(),
+          diaryImagePicker: const _FakeDiaryImagePicker(),
+          storyRepository: _FakeStoryRepository(),
+          letterRepository: _FakeLetterRepository(),
+          consultationRepository: _FakeConsultationRepository(),
+          listenForDeepLinks: false,
+        ),
+      );
 
-    await tester.pumpAndSettle();
+      await tester.pumpAndSettle();
 
-    expect(find.byType(NavigationBar), findsNothing);
-    expect(find.byKey(const ValueKey('app-bottom-navigation')), findsOneWidget);
-    expect(
-      find.byKey(const ValueKey('route-tab-home-selected-indicator')),
-      findsOneWidget,
-    );
-    expect(
-      [
-        'route-tab-home',
-        'route-tab-diary',
-        'route-tab-story',
-        'route-tab-letter',
-        'route-tab-consultation',
-      ].map((key) {
-        return tester.getSize(find.byKey(ValueKey(key))).height;
-      }),
-      everyElement(greaterThanOrEqualTo(64)),
-    );
-    expect(find.text('홈'), findsOneWidget);
-    expect(find.text('기록'), findsOneWidget);
-    expect(find.text('스토리'), findsOneWidget);
-    expect(find.text('편지'), findsOneWidget);
-    expect(find.text('상담'), findsOneWidget);
-    expect(
-      tester.getSemantics(find.bySemanticsLabel('홈 Tab 1 of 5')),
-      matchesSemantics(
-        label: '홈 Tab 1 of 5',
-        isButton: true,
-        hasSelectedState: true,
-        isSelected: true,
-        hasTapAction: true,
-      ),
-    );
+      expect(find.byType(NavigationBar), findsNothing);
+      expect(
+          find.byKey(const ValueKey('app-bottom-navigation')), findsOneWidget);
+      expect(
+        find.byKey(const ValueKey('route-tab-home-selected-indicator')),
+        findsOneWidget,
+      );
+      expect(
+        [
+          'route-tab-home',
+          'route-tab-diary',
+          'route-tab-story',
+          'route-tab-letter',
+          'route-tab-consultation',
+        ].map((key) {
+          return tester.getSize(find.byKey(ValueKey(key))).height;
+        }),
+        everyElement(greaterThanOrEqualTo(64)),
+      );
+      expect(find.text('홈'), findsOneWidget);
+      expect(find.text('기록'), findsOneWidget);
+      expect(find.text('스토리'), findsOneWidget);
+      expect(find.text('편지'), findsOneWidget);
+      expect(find.text('상담'), findsOneWidget);
+      expect(
+        tester.getSemantics(find.bySemanticsLabel('홈 Tab 1 of 5')),
+        matchesSemantics(
+          label: '홈 Tab 1 of 5',
+          isButton: true,
+          hasSelectedState: true,
+          isSelected: true,
+          hasTapAction: true,
+        ),
+      );
 
-    await tester.tap(find.byKey(const ValueKey('route-tab-story')));
-    await tester.pumpAndSettle();
-    expect(find.byKey(const ValueKey('story-create-button')), findsOneWidget);
+      await tester.tap(find.byKey(const ValueKey('route-tab-story')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const ValueKey('story-create-button')), findsOneWidget);
 
-    await tester.tap(find.byKey(const ValueKey('route-tab-letter')));
-    await tester.pumpAndSettle();
-    expect(find.text('편지함'), findsOneWidget);
-    expect(find.byKey(const ValueKey('letter-title-field')), findsNothing);
+      await tester.tap(find.byKey(const ValueKey('route-tab-letter')));
+      await tester.pumpAndSettle();
+      expect(find.text('편지함'), findsOneWidget);
+      expect(find.byKey(const ValueKey('letter-title-field')), findsNothing);
 
-    await tester.tap(find.byKey(const ValueKey('route-tab-home')));
-    await tester.pumpAndSettle();
-    expect(find.text('마음이님, 오늘의 마음을 이어가세요.'), findsOneWidget);
-
-    semanticsHandle.dispose();
+      await tester.tap(find.byKey(const ValueKey('route-tab-home')));
+      await tester.pumpAndSettle();
+      expect(find.text('마음이님, 오늘의 마음을 이어가세요.'), findsOneWidget);
+    } finally {
+      semanticsHandle.dispose();
+    }
   });
 
   testWidgets('marks home selected when the current route is not a primary tab',
