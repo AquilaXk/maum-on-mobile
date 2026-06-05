@@ -112,8 +112,6 @@ class _LetterScreenState extends State<LetterScreen> {
               _LetterNotice(message: state.noticeMessage!),
               const SizedBox(height: AppSpacing.md),
             ],
-            _LetterFlowPanel(mode: state.mode),
-            const SizedBox(height: AppSpacing.lg),
             switch (state.mode) {
               LetterViewMode.mailbox => _MailboxView(
                   state: state,
@@ -132,39 +130,6 @@ class _LetterScreenState extends State<LetterScreen> {
             },
           ],
         );
-      },
-    );
-  }
-}
-
-class _LetterFlowPanel extends StatelessWidget {
-  const _LetterFlowPanel({required this.mode});
-
-  final LetterViewMode mode;
-
-  @override
-  Widget build(BuildContext context) {
-    return AppFlowPanel(
-      key: const ValueKey('letter-flow-panel'),
-      icon: switch (mode) {
-        LetterViewMode.mailbox => Icons.mark_email_read_outlined,
-        LetterViewMode.detail => Icons.mail_outline,
-        LetterViewMode.compose => Icons.outgoing_mail,
-      },
-      title: switch (mode) {
-        LetterViewMode.mailbox => '편지 흐름',
-        LetterViewMode.detail => '편지 응답 흐름',
-        LetterViewMode.compose => '편지 작성 흐름',
-      },
-      message: switch (mode) {
-        LetterViewMode.mailbox => '수신 상태와 답장 단계를 한곳에서 확인하세요.',
-        LetterViewMode.detail => '상태를 확인하고 수락, 답장, 신고를 차례로 처리하세요.',
-        LetterViewMode.compose => '제목과 본문을 작성한 뒤 발송 상태를 보낸 편지함에서 확인하세요.',
-      },
-      steps: switch (mode) {
-        LetterViewMode.mailbox => ['수신 환경', '받은 목록', '답장 진행'],
-        LetterViewMode.detail => ['상태 확인', '수락/거절', '답장 보내기'],
-        LetterViewMode.compose => ['제목', '본문', '발송'],
       },
     );
   }

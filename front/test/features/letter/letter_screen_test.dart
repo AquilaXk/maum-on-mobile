@@ -107,9 +107,9 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('받은 편지'), findsWidgets);
-    expect(find.byKey(const ValueKey('letter-flow-panel')), findsOneWidget);
-    expect(find.text('편지 흐름'), findsOneWidget);
-    expect(find.text('수신 상태와 답장 단계를 한곳에서 확인하세요.'), findsOneWidget);
+    expect(find.byKey(const ValueKey('letter-flow-panel')), findsNothing);
+    expect(find.text('편지 흐름'), findsNothing);
+    expect(find.text('수신 상태와 답장 단계를 한곳에서 확인하세요.'), findsNothing);
     expect(find.byKey(const ValueKey('letter-list-section')), findsOneWidget);
     expect(find.text('도착한 편지'), findsOneWidget);
 
@@ -118,6 +118,8 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('본문'), findsOneWidget);
+    expect(find.byKey(const ValueKey('letter-flow-panel')), findsNothing);
+    expect(find.text('편지 응답 흐름'), findsNothing);
     expect(find.byKey(const ValueKey('letter-accept-button')), findsOneWidget);
     expect(find.byKey(const ValueKey('letter-reject-button')), findsOneWidget);
   });
@@ -409,6 +411,8 @@ void main() {
 
     expect(find.byKey(const ValueKey('letter-title-field')), findsOneWidget);
     expect(find.byKey(const ValueKey('letter-content-field')), findsOneWidget);
+    expect(find.byKey(const ValueKey('letter-flow-panel')), findsNothing);
+    expect(find.text('편지 작성 흐름'), findsNothing);
   });
 
   testWidgets('loads the next mailbox page from the list footer',
