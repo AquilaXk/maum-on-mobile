@@ -435,12 +435,14 @@ class _HealingQuote extends StatelessWidget {
                       color: Colors.white.withValues(alpha: 0.16),
                       borderRadius: AppRadii.chip,
                     ),
-                    child: const Padding(
-                      padding: EdgeInsets.all(AppSpacing.xs),
-                      child: Icon(
-                        Icons.favorite_border,
-                        color: Colors.white,
-                        size: 22,
+                    child: const ExcludeSemantics(
+                      child: Padding(
+                        padding: EdgeInsets.all(AppSpacing.xs),
+                        child: Icon(
+                          Icons.favorite_border,
+                          color: Colors.white,
+                          size: 22,
+                        ),
                       ),
                     ),
                   ),
@@ -663,7 +665,7 @@ class _ActionGrid extends StatelessWidget {
     return DecoratedBox(
       key: const ValueKey('home-primary-actions-panel'),
       decoration: BoxDecoration(
-        color: colorScheme.surface.withValues(alpha: 0.86),
+        color: colorScheme.surface,
         borderRadius: AppRadii.card,
         border: Border.all(
           color: colorScheme.primary.withValues(alpha: 0.12),

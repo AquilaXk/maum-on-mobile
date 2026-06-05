@@ -855,7 +855,7 @@ class _AuthTrustItem extends StatelessWidget {
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: theme.textTheme.bodySmall?.copyWith(
-                color: colorScheme.onSurfaceVariant,
+                color: colorScheme.onPrimaryContainer,
                 fontWeight: FontWeight.w800,
               ),
             ),
@@ -912,12 +912,14 @@ class _AuthFormPanel extends StatelessWidget {
                     color: theme.colorScheme.primaryContainer,
                     borderRadius: AppRadii.chip,
                   ),
-                  child: Padding(
-                    padding: const EdgeInsets.all(AppSpacing.xs),
-                    child: Icon(
-                      icon,
-                      color: theme.colorScheme.onPrimaryContainer,
-                      size: 20,
+                  child: ExcludeSemantics(
+                    child: Padding(
+                      padding: const EdgeInsets.all(AppSpacing.xs),
+                      child: Icon(
+                        icon,
+                        color: theme.colorScheme.onPrimaryContainer,
+                        size: 20,
+                      ),
                     ),
                   ),
                 ),
