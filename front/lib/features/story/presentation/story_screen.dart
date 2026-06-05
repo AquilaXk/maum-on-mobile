@@ -371,47 +371,26 @@ class _StoryListCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    return Card(
-      margin: EdgeInsets.zero,
-      child: InkWell(
-        key: ValueKey('story-card-${story.id}'),
-        borderRadius: BorderRadius.circular(8),
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Wrap(
-                spacing: 8,
-                runSpacing: 4,
-                children: [
-                  _Pill(label: story.category.label),
-                  _Pill(label: story.resolutionStatus.label),
-                ],
-              ),
-              const SizedBox(height: AppSpacing.xs),
-              Text(
-                story.title,
-                style: theme.textTheme.titleMedium,
-              ),
-              const SizedBox(height: AppSpacing.xs),
-              Text(
-                story.summary,
-                maxLines: 3,
-                overflow: TextOverflow.ellipsis,
-              ),
-              const SizedBox(height: AppSpacing.sm),
-              Text(
-                '${story.authorNickname} · 조회 ${story.viewCount}',
-                style: theme.textTheme.bodySmall,
-              ),
-            ],
-          ),
+    return AppContentCard(
+      key: ValueKey('story-card-${story.id}'),
+      leadingIcon: Icons.forum_outlined,
+      title: story.title,
+      subtitle: '${story.authorNickname} · 조회 ${story.viewCount}',
+      badges: [
+        AppStatusPill(
+          label: story.category.label,
+          tone: AppStatusTone.success,
         ),
+        AppStatusPill(label: story.resolutionStatus.label),
+      ],
+      content: Text(
+        story.summary,
+        maxLines: 3,
+        overflow: TextOverflow.ellipsis,
       ),
+      onTap: onTap,
+      semanticLabel:
+          '스토리 항목: ${story.title}, ${story.category.label}, 조회 ${story.viewCount}',
     );
   }
 }
@@ -458,81 +437,60 @@ class _StoryDetailView extends StatelessWidget {
             label: const Text('목록'),
           ),
         ),
-        Card(
-          margin: EdgeInsets.zero,
-          child: Padding(
-            padding: const EdgeInsets.all(18),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Wrap(
-                  spacing: AppSpacing.xs,
-                  runSpacing: AppSpacing.xxs,
-                  children: [
-                    _Pill(label: story.category.label),
-                    _Pill(label: story.resolutionStatus.label),
-                  ],
-                ),
-                const SizedBox(height: AppSpacing.md),
-                Text(
-                  story.title,
-                  style: Theme.of(context).textTheme.headlineSmall,
-                ),
-                const SizedBox(height: AppSpacing.xs),
-                Text(
-                  '${story.authorNickname} · 조회 ${story.viewCount}',
-                  style: Theme.of(context).textTheme.bodySmall,
-                ),
-                const SizedBox(height: AppSpacing.lg),
-                Text(story.content),
-                const SizedBox(height: AppSpacing.lg),
-                _ResponsiveActionWrap(
-                  key: const ValueKey('story-detail-action-panel'),
-                  children: [
-                    OutlinedButton.icon(
-                      key: const ValueKey('story-report-button'),
-                      onPressed: controller.selectStoryReportTarget,
-                      icon: const Icon(Icons.flag_outlined),
-                      label: const Text('신고'),
-                    ),
-                    if (canEdit) ...[
-                      FilledButton.tonalIcon(
-                        key: const ValueKey('story-status-button'),
-                        onPressed: state.isSubmitting
-                            ? null
-                            : controller.toggleSelectedResolutionStatus,
-                        icon: const Icon(Icons.check_circle_outline),
-                        label: const Text('상태 변경'),
-                      ),
-                      OutlinedButton.icon(
-                        key: const ValueKey('story-edit-button'),
-                        onPressed: controller.startEditingSelectedStory,
-                        icon: const Icon(Icons.edit_outlined),
-                        label: const Text('수정'),
-                      ),
-                      OutlinedButton.icon(
-                        key: const ValueKey('story-delete-button'),
-                        onPressed: state.isSubmitting
-                            ? null
-                            : controller.deleteSelectedStory,
-                        icon: const Icon(Icons.delete_outline),
-                        label: const Text('삭제'),
-                      ),
-                    ],
-                  ],
-                ),
-                if (state.reportTarget != null) ...[
-                  const SizedBox(height: AppSpacing.sm),
-                  AppNotice(
-                    key: const ValueKey('story-report-target-notice'),
-                    message: '${state.reportTarget!.label} 신고 대상을 선택했습니다.',
-                    tone: AppNoticeTone.warning,
-                  ),
-                ],
-              ],
+        AppContentCard(
+          key: const ValueKey('story-detail-card'),
+          leadingIcon: Icons.article_outlined,
+          title: story.title,
+          subtitle: '${story.authorNickname} · 조회 ${story.viewCount}',
+          badges: [
+            AppStatusPill(
+              label: story.category.label,
+              tone: AppStatusTone.success,
             ),
-          ),
+            AppStatusPill(label: story.resolutionStatus.label),
+          ],
+          content: Text(story.content),
+          actionsKey: const ValueKey('story-detail-action-panel'),
+          actions: [
+            OutlinedButton.icon(
+              key: const ValueKey('story-report-button'),
+              onPressed: controller.selectStoryReportTarget,
+              icon: const Icon(Icons.flag_outlined),
+              label: const Text('신고'),
+            ),
+            if (canEdit) ...[
+              FilledButton.tonalIcon(
+                key: const ValueKey('story-status-button'),
+                onPressed: state.isSubmitting
+                    ? null
+                    : controller.toggleSelectedResolutionStatus,
+                icon: const Icon(Icons.check_circle_outline),
+                label: const Text('상태 변경'),
+              ),
+              OutlinedButton.icon(
+                key: const ValueKey('story-edit-button'),
+                onPressed: controller.startEditingSelectedStory,
+                icon: const Icon(Icons.edit_outlined),
+                label: const Text('수정'),
+              ),
+              OutlinedButton.icon(
+                key: const ValueKey('story-delete-button'),
+                onPressed:
+                    state.isSubmitting ? null : controller.deleteSelectedStory,
+                icon: const Icon(Icons.delete_outline),
+                label: const Text('삭제'),
+              ),
+            ],
+          ],
         ),
+        if (state.reportTarget != null) ...[
+          const SizedBox(height: AppSpacing.sm),
+          AppNotice(
+            key: const ValueKey('story-report-target-notice'),
+            message: '${state.reportTarget!.label} 신고 대상을 선택했습니다.',
+            tone: AppNoticeTone.warning,
+          ),
+        ],
         const SizedBox(height: AppSpacing.xl),
         _CommentComposer(state: state, controller: controller),
         const SizedBox(height: AppSpacing.md),
@@ -1070,14 +1028,3 @@ class _MentionText extends StatelessWidget {
 }
 
 final RegExp _mentionPattern = RegExp(r'@[0-9A-Za-z._\-가-힣]{2,30}');
-
-class _Pill extends StatelessWidget {
-  const _Pill({required this.label});
-
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    return AppStatusPill(label: label, tone: AppStatusTone.success);
-  }
-}

@@ -10,6 +10,7 @@ abstract final class AppSpacing {
   static const double lg = 16;
   static const double xl = 20;
   static const double xxl = 24;
+  static const double persistentNavigationReserve = 112;
 }
 
 abstract final class AppBreakpoints {
@@ -43,7 +44,12 @@ class AppScreen extends StatelessWidget {
     this.onRefresh,
     this.actions = const [],
     this.maxWidth = AppBreakpoints.contentMaxWidth,
-    this.padding = const EdgeInsets.all(AppSpacing.xl),
+    this.padding = const EdgeInsets.fromLTRB(
+      AppSpacing.xl,
+      AppSpacing.xl,
+      AppSpacing.xl,
+      AppSpacing.persistentNavigationReserve,
+    ),
     super.key,
   });
 
@@ -553,6 +559,148 @@ class AppSectionCard extends StatelessWidget {
   }
 }
 
+class AppContentCard extends StatelessWidget {
+  const AppContentCard({
+    required this.title,
+    this.subtitle,
+    this.leadingIcon,
+    this.badges = const [],
+    this.content,
+    this.actions = const [],
+    this.actionsKey,
+    this.onTap,
+    this.trailingIcon,
+    this.semanticLabel,
+    super.key,
+  });
+
+  final String title;
+  final String? subtitle;
+  final IconData? leadingIcon;
+  final List<Widget> badges;
+  final Widget? content;
+  final List<Widget> actions;
+  final Key? actionsKey;
+  final VoidCallback? onTap;
+  final IconData? trailingIcon;
+  final String? semanticLabel;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final effectiveTrailingIcon =
+        trailingIcon ?? (onTap == null ? null : Icons.chevron_right);
+
+    final cardBody = Padding(
+      padding: const EdgeInsets.all(AppSpacing.md),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (leadingIcon != null) ...[
+                DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: colorScheme.primaryContainer,
+                    borderRadius: AppRadii.chip,
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.all(AppSpacing.xs),
+                    child: Icon(
+                      leadingIcon,
+                      color: colorScheme.onPrimaryContainer,
+                      size: 22,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: AppSpacing.sm),
+              ],
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      _softBreak(title),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    if (subtitle != null) ...[
+                      const SizedBox(height: AppSpacing.xxs),
+                      Text(
+                        _softBreak(subtitle!),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              if (effectiveTrailingIcon != null) ...[
+                const SizedBox(width: AppSpacing.xs),
+                Icon(
+                  effectiveTrailingIcon,
+                  color: colorScheme.onSurfaceVariant,
+                  size: 20,
+                ),
+              ],
+            ],
+          ),
+          if (badges.isNotEmpty) ...[
+            const SizedBox(height: AppSpacing.sm),
+            Wrap(
+              spacing: AppSpacing.xs,
+              runSpacing: AppSpacing.xs,
+              children: badges,
+            ),
+          ],
+          if (content != null) ...[
+            const SizedBox(height: AppSpacing.sm),
+            DefaultTextStyle.merge(
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: colorScheme.onSurface,
+              ),
+              child: content!,
+            ),
+          ],
+          if (actions.isNotEmpty) ...[
+            const SizedBox(height: AppSpacing.md),
+            _AppContentActions(key: actionsKey, children: actions),
+          ],
+        ],
+      ),
+    );
+
+    final card = Card(
+      margin: EdgeInsets.zero,
+      child: onTap == null
+          ? cardBody
+          : InkWell(
+              borderRadius: AppRadii.card,
+              onTap: onTap,
+              child: cardBody,
+            ),
+    );
+
+    return Semantics(
+      container: true,
+      button: onTap != null,
+      label: semanticLabel,
+      child: ExcludeSemantics(
+        excluding: semanticLabel != null,
+        child: card,
+      ),
+    );
+  }
+}
+
 class AppListRow extends StatelessWidget {
   const AppListRow({
     required this.title,
@@ -679,6 +827,39 @@ class AppListRow extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+class _AppContentActions extends StatelessWidget {
+  const _AppContentActions({required this.children, super.key});
+
+  final List<Widget> children;
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final useFullWidth =
+            constraints.hasBoundedWidth && constraints.maxWidth < 360;
+
+        return Wrap(
+          spacing: AppSpacing.xs,
+          runSpacing: AppSpacing.xs,
+          children: [
+            for (final child in children)
+              ConstrainedBox(
+                constraints: BoxConstraints(
+                  minHeight: 48,
+                  minWidth: useFullWidth ? constraints.maxWidth : 0,
+                ),
+                child: useFullWidth
+                    ? SizedBox(width: constraints.maxWidth, child: child)
+                    : child,
+              ),
+          ],
+        );
+      },
     );
   }
 }

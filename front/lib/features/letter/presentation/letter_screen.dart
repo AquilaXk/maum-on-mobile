@@ -325,58 +325,25 @@ class _StatsSection extends StatelessWidget {
     final latestReceived = stats?.latestReceivedLetter?.title ?? '-';
     final latestSent = stats?.latestSentLetter?.title ?? '-';
     final receivedCount = stats?.receivedCount ?? 0;
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
 
-    return Card(
+    return AppSectionCard(
       key: const ValueKey('letter-mailbox-toolbar'),
-      margin: EdgeInsets.zero,
+      title: '받은 편지',
+      subtitle: '최근 편지와 답장 상태를 빠르게 확인합니다.',
       child: Padding(
-        padding: const EdgeInsets.all(AppSpacing.md),
+        padding: EdgeInsets.zero,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Icon(
-                  Icons.mark_email_read_outlined,
-                  color: colorScheme.primary,
-                  size: 22,
-                ),
-                const SizedBox(width: AppSpacing.xs),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        '받은 편지',
-                        style: theme.textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                      const SizedBox(height: AppSpacing.xxs),
-                      Text(
-                        '최근 편지와 답장 상태를 빠르게 확인합니다.',
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: colorScheme.onSurfaceVariant,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                AppStatusPill(
-                  label: '받은 편지 $receivedCount개',
-                  tone: AppStatusTone.success,
-                ),
-              ],
-            ),
-            const SizedBox(height: AppSpacing.sm),
             Wrap(
               spacing: AppSpacing.xs,
               runSpacing: AppSpacing.xs,
               crossAxisAlignment: WrapCrossAlignment.center,
               children: [
+                AppStatusPill(
+                  label: '받은 편지 $receivedCount개',
+                  tone: AppStatusTone.success,
+                ),
                 AppStatusPill(label: '최근 받은 편지 $latestReceived'),
                 AppStatusPill(
                   label: '최근 보낸 편지 $latestSent',
@@ -386,7 +353,7 @@ class _StatsSection extends StatelessWidget {
             ),
             if (stats?.latestReceivedLetter != null ||
                 stats?.latestSentLetter != null) ...[
-              const SizedBox(height: AppSpacing.xs),
+              const SizedBox(height: AppSpacing.md),
               Wrap(
                 spacing: AppSpacing.xs,
                 runSpacing: AppSpacing.xs,
@@ -426,47 +393,29 @@ class _LetterCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    return Card(
-      margin: EdgeInsets.zero,
-      child: InkWell(
-        key: ValueKey('letter-card-${letter.id}'),
-        borderRadius: BorderRadius.circular(8),
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _StatusPill(status: letter.status),
-              const SizedBox(height: AppSpacing.xs),
-              Text(
-                letter.title.isEmpty ? '제목 없는 편지' : letter.title,
-                style: theme.textTheme.titleMedium,
-              ),
-              if (letter.content.isNotEmpty) ...[
-                const SizedBox(height: AppSpacing.xs),
-                Text(
-                  letter.content,
-                  maxLines: 3,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ],
-              const SizedBox(height: AppSpacing.xs),
-              Text(
-                letter.status.guidance,
-                style: theme.textTheme.bodySmall,
-              ),
-              const SizedBox(height: AppSpacing.sm),
-              Text(
-                letter.createdDate,
-                style: theme.textTheme.bodySmall,
-              ),
-            ],
-          ),
-        ),
+    return AppContentCard(
+      key: ValueKey('letter-card-${letter.id}'),
+      leadingIcon: Icons.mail_outline,
+      title: letter.title.isEmpty ? '제목 없는 편지' : letter.title,
+      subtitle: letter.createdDate,
+      badges: [_StatusPill(status: letter.status)],
+      content: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (letter.content.isNotEmpty) ...[
+            Text(
+              letter.content,
+              maxLines: 3,
+              overflow: TextOverflow.ellipsis,
+            ),
+            const SizedBox(height: AppSpacing.xs),
+          ],
+          Text(letter.status.guidance),
+        ],
       ),
+      onTap: onTap,
+      semanticLabel:
+          '편지 항목: ${letter.title.isEmpty ? '제목 없는 편지' : letter.title}, ${letter.status.displayLabel}',
     );
   }
 }
@@ -511,60 +460,48 @@ class _LetterDetailView extends StatelessWidget {
             label: const Text('목록'),
           ),
         ),
-        Card(
-          margin: EdgeInsets.zero,
-          child: Padding(
-            padding: const EdgeInsets.all(18),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _StatusPill(status: letter.status),
-                const SizedBox(height: AppSpacing.xs),
-                _StatusGuidance(status: letter.status),
-                const SizedBox(height: AppSpacing.md),
-                Text(
-                  letter.title,
-                  style: Theme.of(context).textTheme.headlineSmall,
-                ),
-                const SizedBox(height: AppSpacing.xs),
-                Text(
-                  letter.createdDate,
-                  style: Theme.of(context).textTheme.bodySmall,
-                ),
-                const SizedBox(height: AppSpacing.lg),
-                Text(letter.content),
-                const SizedBox(height: AppSpacing.lg),
-                Wrap(
-                  spacing: AppSpacing.xs,
-                  runSpacing: AppSpacing.xs,
-                  children: [
-                    OutlinedButton(
-                      key: const ValueKey('letter-report-button'),
-                      onPressed: controller.selectReportTarget,
-                      child: const Text('신고'),
-                    ),
-                    OutlinedButton(
-                      key: const ValueKey('letter-status-refresh-button'),
-                      onPressed: controller.refreshSelectedStatus,
-                      child: const Text('상태 확인'),
-                    ),
-                    if (state.canAcceptOrReject) ...[
-                      FilledButton.tonal(
-                        key: const ValueKey('letter-accept-button'),
-                        onPressed: controller.acceptSelectedLetter,
-                        child: const Text('수락'),
-                      ),
-                      OutlinedButton(
-                        key: const ValueKey('letter-reject-button'),
-                        onPressed: controller.rejectSelectedLetter,
-                        child: const Text('거절'),
-                      ),
-                    ],
-                  ],
-                ),
-              ],
-            ),
+        AppContentCard(
+          key: const ValueKey('letter-detail-card'),
+          leadingIcon: Icons.mail_outline,
+          title: letter.title,
+          subtitle: letter.createdDate,
+          badges: [_StatusPill(status: letter.status)],
+          content: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _StatusGuidance(status: letter.status),
+              const SizedBox(height: AppSpacing.md),
+              Text(letter.content),
+            ],
           ),
+          actions: [
+            OutlinedButton.icon(
+              key: const ValueKey('letter-report-button'),
+              onPressed: controller.selectReportTarget,
+              icon: const Icon(Icons.flag_outlined),
+              label: const Text('신고'),
+            ),
+            OutlinedButton.icon(
+              key: const ValueKey('letter-status-refresh-button'),
+              onPressed: controller.refreshSelectedStatus,
+              icon: const Icon(Icons.refresh),
+              label: const Text('상태 확인'),
+            ),
+            if (state.canAcceptOrReject) ...[
+              FilledButton.tonalIcon(
+                key: const ValueKey('letter-accept-button'),
+                onPressed: controller.acceptSelectedLetter,
+                icon: const Icon(Icons.check_circle_outline),
+                label: const Text('수락'),
+              ),
+              OutlinedButton.icon(
+                key: const ValueKey('letter-reject-button'),
+                onPressed: controller.rejectSelectedLetter,
+                icon: const Icon(Icons.close),
+                label: const Text('거절'),
+              ),
+            ],
+          ],
         ),
         if (letter.replied && letter.replyContent != null) ...[
           const SizedBox(height: AppSpacing.md),
@@ -631,11 +568,11 @@ class _ReplyComposerState extends State<_ReplyComposer> {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
+    return AppSectionCard(
       key: ValueKey('letter-reply-${widget.state.selectedLetter?.id ?? 0}'),
-      margin: EdgeInsets.zero,
+      title: '답장',
       child: Padding(
-        padding: const EdgeInsets.all(14),
+        padding: EdgeInsets.zero,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
@@ -713,83 +650,71 @@ class _LetterComposeViewState extends State<_LetterComposeView> {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
+    return AppSectionCard(
       key: const ValueKey('letter-compose-form'),
-      margin: EdgeInsets.zero,
-      child: Padding(
-        padding: const EdgeInsets.all(18),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Text(
-              '편지 쓰기',
-              style: Theme.of(context).textTheme.titleLarge,
+      title: '편지 쓰기',
+      subtitle: '제목은 60자, 본문은 1000자까지 보낼 수 있습니다.',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          TextFormField(
+            key: const ValueKey('letter-title-field'),
+            controller: _titleController,
+            maxLength: LetterLimits.titleMaxLength,
+            decoration: const InputDecoration(
+              labelText: '제목',
+              border: OutlineInputBorder(),
             ),
+            onChanged: widget.controller.updateTitle,
+          ),
+          const SizedBox(height: AppSpacing.md),
+          TextFormField(
+            key: const ValueKey('letter-content-field'),
+            controller: _contentController,
+            minLines: 8,
+            maxLines: 14,
+            maxLength: LetterLimits.contentMaxLength,
+            decoration: const InputDecoration(
+              labelText: '본문',
+              border: OutlineInputBorder(),
+            ),
+            onChanged: widget.controller.updateContent,
+          ),
+          if (widget.state.isComposeOverLimit) ...[
             const SizedBox(height: AppSpacing.xs),
-            Text(
-              '제목은 60자, 본문은 1000자까지 보낼 수 있습니다.',
-              style: Theme.of(context).textTheme.bodySmall,
-            ),
-            const SizedBox(height: AppSpacing.md),
-            TextFormField(
-              key: const ValueKey('letter-title-field'),
-              controller: _titleController,
-              maxLength: LetterLimits.titleMaxLength,
-              decoration: const InputDecoration(
-                labelText: '제목',
-                border: OutlineInputBorder(),
-              ),
-              onChanged: widget.controller.updateTitle,
-            ),
-            const SizedBox(height: AppSpacing.md),
-            TextFormField(
-              key: const ValueKey('letter-content-field'),
-              controller: _contentController,
-              minLines: 8,
-              maxLines: 14,
-              maxLength: LetterLimits.contentMaxLength,
-              decoration: const InputDecoration(
-                labelText: '본문',
-                border: OutlineInputBorder(),
-              ),
-              onChanged: widget.controller.updateContent,
-            ),
-            if (widget.state.isComposeOverLimit) ...[
-              const SizedBox(height: AppSpacing.xs),
-              const AppNotice(
-                message: '편지 길이를 줄인 뒤 다시 보내 주세요.',
-                tone: AppNoticeTone.warning,
-              ),
-            ],
-            const SizedBox(height: AppSpacing.lg),
-            Wrap(
-              spacing: AppSpacing.xs,
-              runSpacing: AppSpacing.xs,
-              children: [
-                FilledButton(
-                  key: const ValueKey('letter-submit-button'),
-                  onPressed: widget.state.canSubmitLetter
-                      ? widget.controller.submitLetter
-                      : null,
-                  child: const Text('보내기'),
-                ),
-                OutlinedButton.icon(
-                  key: const ValueKey('letter-compose-reset-button'),
-                  onPressed: widget.state.hasComposeDraft
-                      ? widget.controller.resetCompose
-                      : null,
-                  icon: const Icon(Icons.refresh),
-                  label: const Text('초기화'),
-                ),
-                OutlinedButton(
-                  key: const ValueKey('letter-compose-cancel-button'),
-                  onPressed: _handleCancelCompose,
-                  child: const Text('취소'),
-                ),
-              ],
+            const AppNotice(
+              message: '편지 길이를 줄인 뒤 다시 보내 주세요.',
+              tone: AppNoticeTone.warning,
             ),
           ],
-        ),
+          const SizedBox(height: AppSpacing.lg),
+          Wrap(
+            spacing: AppSpacing.xs,
+            runSpacing: AppSpacing.xs,
+            children: [
+              FilledButton(
+                key: const ValueKey('letter-submit-button'),
+                onPressed: widget.state.canSubmitLetter
+                    ? widget.controller.submitLetter
+                    : null,
+                child: const Text('보내기'),
+              ),
+              OutlinedButton.icon(
+                key: const ValueKey('letter-compose-reset-button'),
+                onPressed: widget.state.hasComposeDraft
+                    ? widget.controller.resetCompose
+                    : null,
+                icon: const Icon(Icons.refresh),
+                label: const Text('초기화'),
+              ),
+              OutlinedButton(
+                key: const ValueKey('letter-compose-cancel-button'),
+                onPressed: _handleCancelCompose,
+                child: const Text('취소'),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }

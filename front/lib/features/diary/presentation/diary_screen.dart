@@ -522,8 +522,6 @@ class _SelectedEntriesSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
     return KeyedSubtree(
       key: const ValueKey('diary-selected-section'),
       child: Column(
@@ -543,38 +541,31 @@ class _SelectedEntriesSection extends StatelessWidget {
             )
           else
             for (final entry in entries) ...[
-              Card(
-                margin: EdgeInsets.zero,
-                child: Padding(
-                  padding: const EdgeInsets.all(14),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(entry.title, style: theme.textTheme.titleMedium),
-                      const SizedBox(height: AppSpacing.xs),
-                      _DiaryEntryContentPreview(entry: entry),
-                      const SizedBox(height: AppSpacing.xs),
-                      Wrap(
-                        spacing: AppSpacing.xs,
-                        crossAxisAlignment: WrapCrossAlignment.center,
-                        children: [
-                          Chip(label: Text(entry.category.label)),
-                          Chip(label: Text(entry.isPrivate ? '나만 보기' : '공개')),
-                          TextButton.icon(
-                            onPressed: () => onEdit(entry),
-                            icon: const Icon(Icons.edit),
-                            label: const Text('수정'),
-                          ),
-                          TextButton.icon(
-                            onPressed: () => onDelete(entry),
-                            icon: const Icon(Icons.delete_outline),
-                            label: const Text('삭제'),
-                          ),
-                        ],
-                      ),
-                    ],
+              AppContentCard(
+                key: ValueKey('diary-entry-card-${entry.id}'),
+                leadingIcon: Icons.edit_note_outlined,
+                title: entry.title,
+                subtitle: entry.createDate,
+                badges: [
+                  AppStatusPill(
+                    label: entry.category.label,
+                    tone: AppStatusTone.success,
                   ),
-                ),
+                  AppStatusPill(label: entry.isPrivate ? '나만 보기' : '공개'),
+                ],
+                content: _DiaryEntryContentPreview(entry: entry),
+                actions: [
+                  TextButton.icon(
+                    onPressed: () => onEdit(entry),
+                    icon: const Icon(Icons.edit),
+                    label: const Text('수정'),
+                  ),
+                  TextButton.icon(
+                    onPressed: () => onDelete(entry),
+                    icon: const Icon(Icons.delete_outline),
+                    label: const Text('삭제'),
+                  ),
+                ],
               ),
               const SizedBox(height: AppSpacing.xs),
             ],
@@ -595,8 +586,6 @@ class _PublicEntriesSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
     return KeyedSubtree(
       key: const ValueKey('diary-public-section'),
       child: Column(
@@ -629,31 +618,18 @@ class _PublicEntriesSection extends StatelessWidget {
                 semanticLabel: '공개 기록 목록 비어 있음',
               ),
             for (final entry in state.publicEntries) ...[
-              Card(
-                margin: EdgeInsets.zero,
-                child: Padding(
-                  padding: const EdgeInsets.all(14),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Wrap(
-                        spacing: AppSpacing.xs,
-                        crossAxisAlignment: WrapCrossAlignment.center,
-                        children: [
-                          Chip(label: Text(entry.category.label)),
-                          Text(
-                            entry.nickname,
-                            style: theme.textTheme.bodySmall,
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: AppSpacing.xs),
-                      Text(entry.title, style: theme.textTheme.titleMedium),
-                      const SizedBox(height: AppSpacing.xs),
-                      _DiaryEntryContentPreview(entry: entry),
-                    ],
+              AppContentCard(
+                key: ValueKey('diary-public-card-${entry.id}'),
+                leadingIcon: Icons.groups_outlined,
+                title: entry.title,
+                subtitle: entry.nickname,
+                badges: [
+                  AppStatusPill(
+                    label: entry.category.label,
+                    tone: AppStatusTone.success,
                   ),
-                ),
+                ],
+                content: _DiaryEntryContentPreview(entry: entry),
               ),
               const SizedBox(height: AppSpacing.xs),
             ],
