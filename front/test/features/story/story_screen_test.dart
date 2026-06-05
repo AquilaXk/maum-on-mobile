@@ -99,8 +99,10 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byKey(const ValueKey('story-search-field')), findsOneWidget);
-    expect(find.byKey(const ValueKey('story-flow-panel')), findsOneWidget);
-    expect(find.text('스토리 탐색 흐름'), findsOneWidget);
+    expect(find.byKey(const ValueKey('story-flow-panel')), findsNothing);
+    expect(find.text('스토리 탐색 흐름'), findsNothing);
+    expect(find.text('대화 확인 흐름'), findsNothing);
+    expect(find.text('스토리 작성 흐름'), findsNothing);
     expect(find.text('검색과 카테고리로 필요한 이야기를 좁혀 보세요.'), findsOneWidget);
     expect(find.byKey(const ValueKey('story-search-panel')), findsOneWidget);
     expect(find.text('잠이 오지 않는 밤'), findsOneWidget);
@@ -111,6 +113,7 @@ void main() {
 
     expect(find.text('긴 이야기를 나눕니다.'), findsOneWidget);
     expect(find.text('천천히 쉬어도 괜찮아요.'), findsOneWidget);
+    expect(find.byKey(const ValueKey('story-flow-panel')), findsNothing);
   });
 
   testWidgets('submits a new story from the editor', (tester) async {

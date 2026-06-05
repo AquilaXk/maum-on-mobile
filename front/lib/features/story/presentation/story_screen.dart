@@ -115,8 +115,6 @@ class _StoryScreenState extends State<StoryScreen> {
               AppNotice(message: state.noticeMessage!),
               const SizedBox(height: AppSpacing.md),
             ],
-            _StoryFlowPanel(mode: state.mode),
-            const SizedBox(height: AppSpacing.lg),
             switch (state.mode) {
               StoryViewMode.list => _StoryListView(
                   state: state,
@@ -133,39 +131,6 @@ class _StoryScreenState extends State<StoryScreen> {
             },
           ],
         );
-      },
-    );
-  }
-}
-
-class _StoryFlowPanel extends StatelessWidget {
-  const _StoryFlowPanel({required this.mode});
-
-  final StoryViewMode mode;
-
-  @override
-  Widget build(BuildContext context) {
-    return AppFlowPanel(
-      key: const ValueKey('story-flow-panel'),
-      icon: switch (mode) {
-        StoryViewMode.list => Icons.travel_explore_outlined,
-        StoryViewMode.detail => Icons.forum_outlined,
-        StoryViewMode.editor => Icons.edit_note_outlined,
-      },
-      title: switch (mode) {
-        StoryViewMode.list => '스토리 탐색 흐름',
-        StoryViewMode.detail => '대화 확인 흐름',
-        StoryViewMode.editor => '스토리 작성 흐름',
-      },
-      message: switch (mode) {
-        StoryViewMode.list => '목록을 훑고 필요한 이야기로 바로 이동하세요.',
-        StoryViewMode.detail => '본문을 읽고 댓글과 신고 상태를 한 화면에서 확인하세요.',
-        StoryViewMode.editor => '카테고리를 정하고 제목과 본문을 순서대로 작성하세요.',
-      },
-      steps: switch (mode) {
-        StoryViewMode.list => ['검색', '분류 선택', '이야기 열기'],
-        StoryViewMode.detail => ['본문', '댓글', '후속 액션'],
-        StoryViewMode.editor => ['카테고리', '제목', '본문 등록'],
       },
     );
   }
