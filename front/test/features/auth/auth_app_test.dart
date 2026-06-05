@@ -1,6 +1,8 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:maum_on_mobile_front/app/app_routes.dart';
+import 'package:maum_on_mobile_front/app/authenticated_app_shell.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:maum_on_mobile_front/app/maum_on_mobile_app.dart';
 import 'package:maum_on_mobile_front/core/network/api_error.dart';
@@ -207,47 +209,92 @@ void main() {
 
   testWidgets('switches primary authenticated tabs through bottom navigation',
       (tester) async {
+    final semanticsHandle = tester.ensureSemantics();
+
+    try {
+      await tester.pumpWidget(
+        MaumOnMobileApp(
+          authRepository: _FakeAuthRepository(restoredSession: _session()),
+          homeRepository: const _FakeHomeRepository(),
+          diaryRepository: _FakeDiaryRepository(),
+          diaryImagePicker: const _FakeDiaryImagePicker(),
+          storyRepository: _FakeStoryRepository(),
+          letterRepository: _FakeLetterRepository(),
+          consultationRepository: _FakeConsultationRepository(),
+          listenForDeepLinks: false,
+        ),
+      );
+
+      await tester.pumpAndSettle();
+
+      expect(find.byType(NavigationBar), findsNothing);
+      expect(
+          find.byKey(const ValueKey('app-bottom-navigation')), findsOneWidget);
+      expect(
+        find.byKey(const ValueKey('route-tab-home-selected-indicator')),
+        findsOneWidget,
+      );
+      expect(
+        [
+          'route-tab-home',
+          'route-tab-diary',
+          'route-tab-story',
+          'route-tab-letter',
+          'route-tab-consultation',
+        ].map((key) {
+          return tester.getSize(find.byKey(ValueKey(key))).height;
+        }),
+        everyElement(greaterThanOrEqualTo(64)),
+      );
+      expect(find.text('홈'), findsOneWidget);
+      expect(find.text('기록'), findsOneWidget);
+      expect(find.text('스토리'), findsOneWidget);
+      expect(find.text('편지'), findsOneWidget);
+      expect(find.text('상담'), findsOneWidget);
+      expect(
+        tester.getSemantics(find.bySemanticsLabel('홈 Tab 1 of 5')),
+        matchesSemantics(
+          label: '홈 Tab 1 of 5',
+          isButton: true,
+          hasSelectedState: true,
+          isSelected: true,
+          hasTapAction: true,
+        ),
+      );
+
+      await tester.tap(find.byKey(const ValueKey('route-tab-story')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const ValueKey('story-create-button')), findsOneWidget);
+
+      await tester.tap(find.byKey(const ValueKey('route-tab-letter')));
+      await tester.pumpAndSettle();
+      expect(find.text('편지함'), findsOneWidget);
+      expect(find.byKey(const ValueKey('letter-title-field')), findsNothing);
+
+      await tester.tap(find.byKey(const ValueKey('route-tab-home')));
+      await tester.pumpAndSettle();
+      expect(find.text('마음이님, 오늘의 마음을 이어가세요.'), findsOneWidget);
+    } finally {
+      semanticsHandle.dispose();
+    }
+  });
+
+  testWidgets('marks home selected when the current route is not a primary tab',
+      (tester) async {
     await tester.pumpWidget(
-      MaumOnMobileApp(
-        authRepository: _FakeAuthRepository(restoredSession: _session()),
-        homeRepository: const _FakeHomeRepository(),
-        diaryRepository: _FakeDiaryRepository(),
-        diaryImagePicker: const _FakeDiaryImagePicker(),
-        storyRepository: _FakeStoryRepository(),
-        letterRepository: _FakeLetterRepository(),
-        consultationRepository: _FakeConsultationRepository(),
-        listenForDeepLinks: false,
+      MaterialApp(
+        home: AuthenticatedAppShell(
+          currentRoute: AuthenticatedRoute.settings,
+          onRouteSelected: (_) {},
+          child: const SizedBox.shrink(),
+        ),
       ),
     );
 
-    await tester.pumpAndSettle();
-
-    final navigationBar = tester.widget<NavigationBar>(
-      find.byType(NavigationBar),
-    );
     expect(
-      navigationBar.labelBehavior,
-      NavigationDestinationLabelBehavior.alwaysShow,
+      find.byKey(const ValueKey('route-tab-home-selected-indicator')),
+      findsOneWidget,
     );
-    expect(
-      navigationBar.destinations
-          .whereType<NavigationDestination>()
-          .map((destination) => destination.label),
-      ['홈', '기록', '스토리', '편지', '상담'],
-    );
-
-    await tester.tap(find.byKey(const ValueKey('route-tab-story')));
-    await tester.pumpAndSettle();
-    expect(find.byKey(const ValueKey('story-create-button')), findsOneWidget);
-
-    await tester.tap(find.byKey(const ValueKey('route-tab-letter')));
-    await tester.pumpAndSettle();
-    expect(find.text('편지함'), findsOneWidget);
-    expect(find.byKey(const ValueKey('letter-title-field')), findsNothing);
-
-    await tester.tap(find.byKey(const ValueKey('route-tab-home')));
-    await tester.pumpAndSettle();
-    expect(find.text('마음이님, 오늘의 마음을 이어가세요.'), findsOneWidget);
   });
 
   testWidgets('navigates authenticated users from home to diary',

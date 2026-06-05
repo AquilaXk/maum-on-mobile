@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'app_routes.dart';
+import 'maum_bottom_navigation.dart';
 
 class AuthenticatedAppShell extends StatelessWidget {
   const AuthenticatedAppShell({
@@ -16,30 +17,16 @@ class AuthenticatedAppShell extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final selectedIndex = authenticatedPrimaryRoutes.contains(currentRoute)
-        ? authenticatedPrimaryRoutes.indexOf(currentRoute)
-        : authenticatedPrimaryRoutes.indexOf(AuthenticatedRoute.home);
-
     return Scaffold(
       body: child,
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: selectedIndex,
-        labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
-        onDestinationSelected: (index) {
-          final selectedRoute = authenticatedPrimaryRoutes[index];
-          if (selectedRoute != currentRoute) {
-            onRouteSelected(selectedRoute);
+      bottomNavigationBar: MaumBottomNavigation(
+        routes: authenticatedPrimaryRoutes,
+        currentRoute: currentRoute,
+        onRouteSelected: (route) {
+          if (route != currentRoute) {
+            onRouteSelected(route);
           }
         },
-        destinations: [
-          for (final route in authenticatedPrimaryRoutes)
-            NavigationDestination(
-              key: ValueKey('route-tab-${route.key}'),
-              icon: Icon(route.icon),
-              selectedIcon: Icon(route.selectedIcon),
-              label: route.navLabel,
-            ),
-        ],
       ),
     );
   }
