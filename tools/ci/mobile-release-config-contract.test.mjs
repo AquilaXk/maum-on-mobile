@@ -224,6 +224,7 @@ test("CI exposes manual Android and iOS release build preflights", () => {
   assert.match(workflow, /Select Xcode 26/);
   assert.match(workflow, /Require Xcode 26 for iOS archive or upload/);
   assert.match(workflow, /ios_release_mode != 'dry-run'/);
+  assert.match(workflow, /ios_release_mode != 'skip'/);
   assert.match(workflow, /steps\.xcode\.outputs\.xcode26 != 'true'/);
   assert.match(workflow, /xcodebuild -version/);
   assert.doesNotMatch(
@@ -241,6 +242,30 @@ test("CI exposes manual Android and iOS release build preflights", () => {
   assert.match(workflow, /MAUMON_IOS_TESTFLIGHT_UPLOAD/);
   assert.match(workflow, /bash tools\/ci\/run-ios-testflight-archive\.sh/);
   assert.match(read("tools/ci/run-mobile-release-preflight.sh"), /DEVELOPER_DIR/);
+});
+
+test("manual CI validation skips iOS release packaging by default", () => {
+  const workflow = read(".github/workflows/ci.yml");
+  const iosReleaseInput = workflow.match(
+    /ios_release_mode:\n(?<body>[\s\S]*?)\n      release_candidate_device_matrix_mode:/
+  );
+  assert.ok(iosReleaseInput?.groups?.body, "ios_release_mode input block must exist");
+  assert.match(
+    iosReleaseInput.groups.body,
+    /default: skip/,
+    "manual CI must default to validation-only mode without release secrets"
+  );
+  assert.match(iosReleaseInput.groups.body, /- skip/, "iOS release mode must expose a skip option");
+
+  const archiveStep = workflow.match(
+    /- name: Build iOS TestFlight archive or dry run\n(?<body>[\s\S]*?)\n      - name: Validate iOS project metadata/
+  );
+  assert.ok(archiveStep?.groups?.body, "iOS archive step must exist");
+  assert.match(
+    archiveStep.groups.body,
+    /inputs\.ios_release_mode != 'skip'/,
+    "iOS archive step must run only when release packaging is explicitly requested"
+  );
 });
 
 test("Android release appbundle script fails clearly without signing and Firebase inputs", () => {

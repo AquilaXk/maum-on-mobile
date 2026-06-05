@@ -90,9 +90,10 @@ on:
       ios_release_mode:
         description: "iOS release pipeline mode"
         required: true
-        default: dry-run
+        default: skip
         type: choice
         options:
+          - skip
           - dry-run
           - archive
           - upload
@@ -611,7 +612,7 @@ jobs:
           xcrun --sdk iphoneos --show-sdk-version || true
 
       - name: Require Xcode 26 for iOS archive or upload
-        if: ${{ github.event_name == 'workflow_dispatch' && inputs.ios_release_mode != 'dry-run' && steps.xcode.outputs.xcode26 != 'true' }}
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.ios_release_mode != 'skip' && inputs.ios_release_mode != 'dry-run' && steps.xcode.outputs.xcode26 != 'true' }}
         shell: bash
         run: |
           echo "Xcode 26 is required for iOS archive/upload builds."
@@ -663,7 +664,7 @@ jobs:
         run: node tools/ci/run-mobile-quality-gate.mjs --platform ios --report-dir build/reports/mobile-quality
 
       - name: Build iOS TestFlight archive or dry run
-        if: ${{ github.event_name == 'workflow_dispatch' && steps.scaffold.outputs.present == 'true' && steps.scaffold.outputs.stack == 'flutter' }}
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.ios_release_mode != 'skip' && steps.scaffold.outputs.present == 'true' && steps.scaffold.outputs.stack == 'flutter' }}
         env:
           MAUMON_API_BASE_URL: ${{ secrets.MAUMON_API_BASE_URL }}
           MAUMON_IOS_RELEASE_DRY_RUN: ${{ inputs.ios_release_mode == 'dry-run' }}
