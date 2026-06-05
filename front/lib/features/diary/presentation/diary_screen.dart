@@ -439,55 +439,81 @@ class _CalendarDayButton extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = Theme.of(context).colorScheme;
+    final dateKey = dateKeyFromDate(day);
+    final semanticLabel = count > 0
+        ? '${_formatDateLabel(day)}, 기록 $count개'
+        : _formatDateLabel(day);
 
-    return OutlinedButton(
-      key: ValueKey('diary-day-${dateKeyFromDate(day)}'),
-      style: OutlinedButton.styleFrom(
-        padding: EdgeInsets.zero,
-        backgroundColor: isSelected ? colorScheme.primaryContainer : null,
-        minimumSize: Size.zero,
-        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-      ),
-      onPressed: onTap,
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(
-            '${day.day}일',
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: theme.textTheme.labelMedium?.copyWith(
-              fontWeight: FontWeight.w800,
-              color: isSelected
-                  ? colorScheme.onPrimaryContainer
-                  : colorScheme.onSurface,
-            ),
+    return Semantics(
+      key: ValueKey('diary-day-$dateKey'),
+      button: true,
+      label: semanticLabel,
+      onTap: onTap,
+      child: ExcludeSemantics(
+        child: OutlinedButton(
+          style: OutlinedButton.styleFrom(
+            padding: EdgeInsets.zero,
+            backgroundColor: isSelected ? colorScheme.primaryContainer : null,
+            minimumSize: Size.zero,
+            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
           ),
-          if (count > 0)
-            Padding(
-              padding: const EdgeInsets.only(top: 2),
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  color: colorScheme.primary.withValues(alpha: 0.12),
-                  borderRadius: AppRadii.chip,
-                ),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 5),
+          onPressed: onTap,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 2),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                FittedBox(
+                  fit: BoxFit.scaleDown,
                   child: Text(
-                    '$count개',
+                    '${day.day}일',
                     maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: theme.textTheme.labelSmall?.copyWith(
-                      color: colorScheme.primary,
+                    softWrap: false,
+                    style: theme.textTheme.labelMedium?.copyWith(
                       fontWeight: FontWeight.w800,
+                      color: isSelected
+                          ? colorScheme.onPrimaryContainer
+                          : colorScheme.onSurface,
                     ),
                   ),
                 ),
-              ),
+                if (count > 0) ...[
+                  const SizedBox(height: 3),
+                  _CalendarEntryMarker(
+                    key: ValueKey('diary-day-$dateKey-entry-marker'),
+                    isSelected: isSelected,
+                  ),
+                ],
+              ],
             ),
-        ],
+          ),
+        ),
       ),
+    );
+  }
+}
+
+class _CalendarEntryMarker extends StatelessWidget {
+  const _CalendarEntryMarker({
+    required this.isSelected,
+    super.key,
+  });
+
+  final bool isSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: isSelected
+            ? colorScheme.onPrimaryContainer
+            : colorScheme.primary.withValues(alpha: 0.72),
+        borderRadius: AppRadii.status,
+      ),
+      child: const SizedBox(width: 18, height: 5),
     );
   }
 }

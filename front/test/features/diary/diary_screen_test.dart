@@ -144,7 +144,8 @@ void main() {
     expect(find.byKey(const ValueKey('diary-submit-button')), findsOneWidget);
   });
 
-  testWidgets('separates calendar day label from entry count', (tester) async {
+  testWidgets('keeps calendar day label legible with compact entry marker',
+      (tester) async {
     tester.view.physicalSize = const Size(320, 640);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
@@ -181,7 +182,24 @@ void main() {
     );
     expect(
       find.descendant(of: dayCell, matching: find.text('1개')),
+      findsNothing,
+    );
+    expect(
+      find.descendant(
+        of: dayCell,
+        matching: find.byKey(
+          const ValueKey('diary-day-2026-05-05-entry-marker'),
+        ),
+      ),
       findsOneWidget,
+    );
+    expect(
+      tester.getSemantics(dayCell),
+      matchesSemantics(
+        label: '2026년 5월 5일, 기록 1개',
+        isButton: true,
+        hasTapAction: true,
+      ),
     );
   });
 
