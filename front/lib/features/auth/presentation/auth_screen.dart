@@ -93,7 +93,10 @@ class _AuthScreenState extends State<AuthScreen> {
                       children: [
                         _AuthHeader(subtitle: _subtitle),
                         const SizedBox(height: AppSpacing.lg),
-                        _AuthTrustStrip(items: _trustStripItems),
+                        _AuthTrustStrip(
+                          items: _trustStripItems,
+                          semanticLabel: _trustStripSemanticLabel,
+                        ),
                         const SizedBox(height: AppSpacing.lg),
                         _AuthFormPanel(
                           title: _modeTitle,
@@ -249,6 +252,18 @@ class _AuthScreenState extends State<AuthScreen> {
           _AuthTrustItemData(Icons.login, '다시 로그인'),
         ],
     };
+  }
+
+  String get _trustStripSemanticLabel {
+    final prefix = switch (_mode) {
+      AuthFormMode.login => '보안 기능',
+      AuthFormMode.signup => '가입 절차',
+      AuthFormMode.passwordResetRequest ||
+      AuthFormMode.passwordResetConfirm =>
+        '재설정 단계',
+    };
+    final labels = _trustStripItems.map((item) => item.label).join(', ');
+    return '$prefix: $labels';
   }
 
   List<Widget> _fieldsForMode(ThemeData theme, bool isAuthBusy) {
@@ -755,9 +770,13 @@ class _AuthHeader extends StatelessWidget {
 }
 
 class _AuthTrustStrip extends StatelessWidget {
-  const _AuthTrustStrip({required this.items});
+  const _AuthTrustStrip({
+    required this.items,
+    required this.semanticLabel,
+  });
 
   final List<_AuthTrustItemData> items;
+  final String semanticLabel;
 
   @override
   Widget build(BuildContext context) {
@@ -765,7 +784,7 @@ class _AuthTrustStrip extends StatelessWidget {
     final colorScheme = theme.colorScheme;
 
     return Semantics(
-      label: items.map((item) => item.label).join(', '),
+      label: semanticLabel,
       child: ExcludeSemantics(
         child: DecoratedBox(
           key: const ValueKey('auth-trust-strip'),

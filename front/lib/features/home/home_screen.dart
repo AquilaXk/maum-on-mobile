@@ -708,48 +708,52 @@ class _AccountToolsSection extends StatelessWidget {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
 
-    return Column(
-      key: const ValueKey('home-account-tools-section'),
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Text('계정 관리', style: theme.textTheme.titleMedium),
-        const SizedBox(height: AppSpacing.xs),
-        DecoratedBox(
-          decoration: BoxDecoration(
-            color: colorScheme.surface.withValues(alpha: 0.78),
-            borderRadius: AppRadii.card,
-            border: Border.all(color: colorScheme.outlineVariant),
-          ),
-          child: Padding(
-            padding: const EdgeInsets.all(AppSpacing.sm),
-            child: Wrap(
-              spacing: AppSpacing.xs,
-              runSpacing: AppSpacing.xs,
-              children: [
-                if (isAdmin && onOpenOperations != null)
+    return Semantics(
+      container: true,
+      label: '계정 관리',
+      child: Column(
+        key: const ValueKey('home-account-tools-section'),
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text('계정 관리', style: theme.textTheme.titleMedium),
+          const SizedBox(height: AppSpacing.xs),
+          DecoratedBox(
+            decoration: BoxDecoration(
+              color: colorScheme.surface.withValues(alpha: 0.78),
+              borderRadius: AppRadii.card,
+              border: Border.all(color: colorScheme.outlineVariant),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.all(AppSpacing.sm),
+              child: Wrap(
+                spacing: AppSpacing.xs,
+                runSpacing: AppSpacing.xs,
+                children: [
+                  if (isAdmin && onOpenOperations != null)
+                    OutlinedButton.icon(
+                      key: const ValueKey('home-operations-button'),
+                      onPressed: onOpenOperations,
+                      icon: const Icon(Icons.admin_panel_settings_outlined),
+                      label: const Text('운영 검수'),
+                    ),
                   OutlinedButton.icon(
-                    key: const ValueKey('home-operations-button'),
-                    onPressed: onOpenOperations,
-                    icon: const Icon(Icons.admin_panel_settings_outlined),
-                    label: const Text('운영 검수'),
+                    key: const ValueKey('home-action-settings'),
+                    onPressed: onOpenSettings,
+                    icon: const Icon(Icons.settings_outlined),
+                    label: const Text('설정'),
                   ),
-                OutlinedButton.icon(
-                  key: const ValueKey('home-action-settings'),
-                  onPressed: onOpenSettings,
-                  icon: const Icon(Icons.settings_outlined),
-                  label: const Text('설정'),
-                ),
-                OutlinedButton.icon(
-                  key: const ValueKey('home-action-logout'),
-                  onPressed: onLogout,
-                  icon: const Icon(Icons.logout),
-                  label: const Text('로그아웃'),
-                ),
-              ],
+                  OutlinedButton.icon(
+                    key: const ValueKey('home-action-logout'),
+                    onPressed: onLogout,
+                    icon: const Icon(Icons.logout),
+                    label: const Text('로그아웃'),
+                  ),
+                ],
+              ),
             ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }

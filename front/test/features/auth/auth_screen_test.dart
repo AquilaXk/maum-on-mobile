@@ -134,6 +134,19 @@ void main() {
     );
     expect(find.byKey(const ValueKey('login-password-field')), findsOneWidget);
     expect(find.byKey(const ValueKey('signup-nickname-field')), findsOneWidget);
+    final trustStrip = find.byKey(const ValueKey('auth-trust-strip'));
+    expect(
+      find.descendant(of: trustStrip, matching: find.text('인증번호 확인')),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(of: trustStrip, matching: find.text('비밀번호 설정')),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(of: trustStrip, matching: find.text('프로필 설정')),
+      findsOneWidget,
+    );
 
     await tester.enterText(
       find.byKey(const ValueKey('signup-email-verification-code-field')),
