@@ -166,15 +166,17 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.byKey(const ValueKey('operations-flow-panel')), findsOneWidget);
-    expect(find.text('운영 검수 흐름'), findsOneWidget);
-    expect(find.text('상태를 먼저 보고 필요한 조치 화면으로 이동하세요.'), findsOneWidget);
+    expect(find.byKey(const ValueKey('operations-flow-panel')), findsNothing);
+    expect(find.text('운영 검수 흐름'), findsNothing);
+    expect(find.text('상태를 먼저 보고 필요한 조치 화면으로 이동하세요.'), findsNothing);
     expect(find.text('운영 대시보드'), findsOneWidget);
     expect(find.text('미처리 신고'), findsOneWidget);
     expect(find.text('1'), findsWidgets);
 
     await tester.tap(find.byKey(const ValueKey('operations-view-members')));
     await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('operations-flow-panel')), findsNothing);
+    expect(find.text('회원 조치 흐름'), findsNothing);
     expect(find.text('회원 관리'), findsOneWidget);
     expect(
       find.bySemanticsLabel(
