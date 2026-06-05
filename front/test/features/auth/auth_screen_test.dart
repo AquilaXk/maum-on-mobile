@@ -42,6 +42,36 @@ void main() {
     expect(find.byKey(const ValueKey('login-submit-button')), findsOneWidget);
   });
 
+  testWidgets('shows a compact trust strip before the auth form',
+      (tester) async {
+    final repository = _FakeAuthRepository();
+    await tester.pumpWidget(
+      _AuthScreenHarness(repository: repository),
+    );
+
+    expect(find.byKey(const ValueKey('auth-trust-strip')), findsOneWidget);
+    expect(find.text('이메일 로그인'), findsOneWidget);
+    expect(find.text('자동 로그인'), findsOneWidget);
+    expect(find.text('안전한 기록'), findsOneWidget);
+
+    await tester.tap(find.text('새 계정 만들기'));
+    await tester.pumpAndSettle();
+
+    final trustStrip = find.byKey(const ValueKey('auth-trust-strip'));
+    expect(
+      find.descendant(of: trustStrip, matching: find.text('이메일 인증')),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(of: trustStrip, matching: find.text('6자리 코드')),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(of: trustStrip, matching: find.text('프로필 설정')),
+      findsOneWidget,
+    );
+  });
+
   testWidgets('signup validates fields before calling the repository',
       (tester) async {
     final repository = _FakeAuthRepository();
@@ -104,6 +134,19 @@ void main() {
     );
     expect(find.byKey(const ValueKey('login-password-field')), findsOneWidget);
     expect(find.byKey(const ValueKey('signup-nickname-field')), findsOneWidget);
+    final trustStrip = find.byKey(const ValueKey('auth-trust-strip'));
+    expect(
+      find.descendant(of: trustStrip, matching: find.text('인증번호 확인')),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(of: trustStrip, matching: find.text('비밀번호 설정')),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(of: trustStrip, matching: find.text('프로필 설정')),
+      findsOneWidget,
+    );
 
     await tester.enterText(
       find.byKey(const ValueKey('signup-email-verification-code-field')),

@@ -115,16 +115,19 @@ class _HomeScreenState extends State<HomeScreen> {
               onWriteLetter: widget.onWriteLetter,
               onViewStory: widget.onViewStory,
               onOpenConsultation: widget.onOpenConsultation,
-              onOpenSettings: widget.onOpenSettings,
-              onLogout: widget.onLogout,
-              isAdmin: widget.isAdmin,
-              onOpenOperations: widget.onOpenOperations,
             ),
             const SizedBox(height: AppSpacing.lg),
             _NotificationPriorityEntry(
               unreadCount: widget.unreadNotificationCount,
               hasLiveConnection: widget.hasLiveNotificationConnection,
               onOpenNotifications: widget.onOpenNotifications,
+            ),
+            const SizedBox(height: AppSpacing.lg),
+            _AccountToolsSection(
+              isAdmin: widget.isAdmin,
+              onOpenOperations: widget.onOpenOperations,
+              onOpenSettings: widget.onOpenSettings,
+              onLogout: widget.onLogout,
             ),
             const SizedBox(height: AppSpacing.lg),
             _DraftContinuationSection(
@@ -624,20 +627,12 @@ class _ActionGrid extends StatelessWidget {
     required this.onWriteLetter,
     required this.onViewStory,
     required this.onOpenConsultation,
-    required this.onOpenSettings,
-    required this.onLogout,
-    required this.isAdmin,
-    this.onOpenOperations,
   });
 
   final VoidCallback onWriteDiary;
   final VoidCallback onWriteLetter;
   final VoidCallback onViewStory;
   final VoidCallback onOpenConsultation;
-  final VoidCallback onOpenSettings;
-  final VoidCallback onLogout;
-  final bool isAdmin;
-  final VoidCallback? onOpenOperations;
 
   @override
   Widget build(BuildContext context) {
@@ -645,6 +640,7 @@ class _ActionGrid extends StatelessWidget {
     final cardAspectRatio = width < 390 ? 2.16 : 2.36;
 
     return Column(
+      key: const ValueKey('home-primary-actions'),
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Text('바로 시작', style: Theme.of(context).textTheme.titleMedium),
@@ -689,38 +685,75 @@ class _ActionGrid extends StatelessWidget {
             ),
           ],
         ),
-        if (isAdmin && onOpenOperations != null) ...[
+      ],
+    );
+  }
+}
+
+class _AccountToolsSection extends StatelessWidget {
+  const _AccountToolsSection({
+    required this.isAdmin,
+    required this.onOpenSettings,
+    required this.onLogout,
+    this.onOpenOperations,
+  });
+
+  final bool isAdmin;
+  final VoidCallback onOpenSettings;
+  final VoidCallback onLogout;
+  final VoidCallback? onOpenOperations;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    return Semantics(
+      container: true,
+      label: '계정 관리',
+      child: Column(
+        key: const ValueKey('home-account-tools-section'),
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text('계정 관리', style: theme.textTheme.titleMedium),
           const SizedBox(height: AppSpacing.xs),
-          Align(
-            alignment: AlignmentDirectional.centerStart,
-            child: OutlinedButton.icon(
-              key: const ValueKey('home-operations-button'),
-              onPressed: onOpenOperations,
-              icon: const Icon(Icons.admin_panel_settings_outlined),
-              label: const Text('운영 검수'),
+          DecoratedBox(
+            decoration: BoxDecoration(
+              color: colorScheme.surface.withValues(alpha: 0.78),
+              borderRadius: AppRadii.card,
+              border: Border.all(color: colorScheme.outlineVariant),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.all(AppSpacing.sm),
+              child: Wrap(
+                spacing: AppSpacing.xs,
+                runSpacing: AppSpacing.xs,
+                children: [
+                  if (isAdmin && onOpenOperations != null)
+                    OutlinedButton.icon(
+                      key: const ValueKey('home-operations-button'),
+                      onPressed: onOpenOperations,
+                      icon: const Icon(Icons.admin_panel_settings_outlined),
+                      label: const Text('운영 검수'),
+                    ),
+                  OutlinedButton.icon(
+                    key: const ValueKey('home-action-settings'),
+                    onPressed: onOpenSettings,
+                    icon: const Icon(Icons.settings_outlined),
+                    label: const Text('설정'),
+                  ),
+                  OutlinedButton.icon(
+                    key: const ValueKey('home-action-logout'),
+                    onPressed: onLogout,
+                    icon: const Icon(Icons.logout),
+                    label: const Text('로그아웃'),
+                  ),
+                ],
+              ),
             ),
           ),
         ],
-        const SizedBox(height: AppSpacing.xs),
-        Wrap(
-          spacing: AppSpacing.xs,
-          runSpacing: AppSpacing.xs,
-          children: [
-            OutlinedButton.icon(
-              key: const ValueKey('home-action-settings'),
-              onPressed: onOpenSettings,
-              icon: const Icon(Icons.settings_outlined),
-              label: const Text('설정'),
-            ),
-            OutlinedButton.icon(
-              key: const ValueKey('home-action-logout'),
-              onPressed: onLogout,
-              icon: const Icon(Icons.logout),
-              label: const Text('로그아웃'),
-            ),
-          ],
-        ),
-      ],
+      ),
     );
   }
 }
