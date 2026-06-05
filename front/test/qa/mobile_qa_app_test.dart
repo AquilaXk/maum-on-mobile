@@ -8,7 +8,11 @@ void main() {
     await tester.pumpWidget(buildMobileQaApp());
     await tester.pumpAndSettle();
 
-    expect(find.byKey(const ValueKey('home-primary-panel')), findsOneWidget);
+    expect(find.byKey(const ValueKey('home-primary-panel')), findsNothing);
+    expect(
+      find.byKey(const ValueKey('home-primary-actions-panel')),
+      findsOneWidget,
+    );
     expect(find.textContaining('오늘의 마음'), findsWidgets);
 
     await tester.ensureVisible(
