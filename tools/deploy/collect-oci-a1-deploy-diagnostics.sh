@@ -94,8 +94,8 @@ install -d -m 0755 "${output_dir}"
 
 docker_prefix=()
 if ! docker info >/dev/null 2>&1; then
-  if command -v sudo >/dev/null 2>&1 && sudo docker info >/dev/null 2>&1; then
-    docker_prefix=(sudo)
+  if command -v sudo >/dev/null 2>&1 && sudo -n docker info >/dev/null 2>&1; then
+    docker_prefix=(sudo -n)
   else
     echo "docker is unavailable" >"${output_dir}/${phase}-docker-unavailable.txt"
   fi
