@@ -371,7 +371,6 @@ class _ConsultationHeader extends StatelessWidget {
       ),
       child: AppScreenHeader(
         title: '실시간 상담',
-        eyebrow: _consultationHeaderEyebrow(connectionState),
         onBack: onBack,
       ),
     );
@@ -494,19 +493,6 @@ AppStatusTone _consultationStatusTone(
       AppStatusTone.warning,
     ConsultationConnectionState.error => AppStatusTone.danger,
     ConsultationConnectionState.idle => AppStatusTone.neutral,
-  };
-}
-
-String _consultationHeaderEyebrow(
-  ConsultationConnectionState connectionState,
-) {
-  return switch (connectionState) {
-    ConsultationConnectionState.connected => '상담',
-    ConsultationConnectionState.connecting ||
-    ConsultationConnectionState.reconnecting =>
-      '연결 확인',
-    ConsultationConnectionState.error => '연결 확인',
-    ConsultationConnectionState.idle => '상담',
   };
 }
 
