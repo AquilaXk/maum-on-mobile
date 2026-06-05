@@ -130,10 +130,15 @@ test("GitHub Actions deploy workflow builds jar, bundles it, and deploys on the 
 
   assert.match(workflow, /^name: Deploy OCI A1 Backend$/m);
   assert.match(workflow, /workflow_dispatch:/);
+  assert.match(workflow, /dry_run:/);
+  assert.match(workflow, /description: "Run deployment checks without changing the running backend"/);
+  assert.match(workflow, /default: true/);
+  assert.match(workflow, /ref:/);
+  assert.doesNotMatch(workflow, /image_tag_suffix:/);
   assert.match(workflow, /environment:/);
   assert.match(workflow, /name: \$\{\{ needs\.prepare\.outputs\.environment \}\}/);
   assert.match(workflow, /runs-on:\n\s+- self-hosted\n\s+- Linux\n\s+- ARM64\n\s+- oci-a1-deploy/);
-  assert.match(workflow, /permissions:\n  contents: read/);
+  assert.match(workflow, /permissions:\n  contents: read\n  deployments: write/);
   assert.match(workflow, /concurrency:/);
   assert.match(workflow, /uses: actions\/checkout@[a-f0-9]{40}/);
   assert.match(workflow, /persist-credentials: false/);
@@ -148,6 +153,7 @@ test("GitHub Actions deploy workflow builds jar, bundles it, and deploys on the 
   assert.match(workflow, /OCI_A1_BACKEND_ENV_B64_COMPOSED/);
   assert.match(workflow, /bash tools\/deploy\/deploy-oci-a1-backend\.sh/);
   assert.match(workflow, /MAUMON_DEPLOY_TRANSPORT: local/);
+  assert.match(workflow, /if: needs\.prepare\.outputs\.dry_run != 'true'/);
 
   for (const secret of [
     "OCI_A1_BACKEND_ENV_B64",
@@ -185,14 +191,24 @@ test("backend deploy workflow auto-runs production deploy after successful main 
   assert.match(workflow, /WORKFLOW_RUN_CONCLUSION: \$\{\{ github\.event\.workflow_run\.conclusion \}\}/);
   assert.match(workflow, /WORKFLOW_RUN_HEAD_BRANCH: \$\{\{ github\.event\.workflow_run\.head_branch \}\}/);
   assert.match(workflow, /WORKFLOW_RUN_HEAD_SHA: \$\{\{ github\.event\.workflow_run\.head_sha \}\}/);
+  assert.match(workflow, /DISPATCH_DRY_RUN: \$\{\{ inputs\.dry_run \}\}/);
+  assert.match(workflow, /DISPATCH_REF: \$\{\{ inputs\.ref \}\}/);
   assert.match(workflow, /deploy_environment="production"/);
   assert.match(workflow, /deploy_reason="main CI completed successfully"/);
+  assert.match(workflow, /dry_run="false"/);
+  assert.match(workflow, /dry_run="\$\{DISPATCH_DRY_RUN:-true\}"/);
+  assert.match(workflow, /git rev-parse --verify "\$\{DISPATCH_REF\}\^\{commit\}"/);
+  assert.match(workflow, /deploy_sha="\$\(git rev-parse "\$\{DISPATCH_REF\}\^\{commit\}"\)"/);
+  assert.match(workflow, /git fetch --no-tags origin "\$\{DISPATCH_REF\}"/);
   assert.match(workflow, /git fetch --no-tags origin main:refs\/remotes\/origin\/main/);
+  assert.match(workflow, /if \[\[ "\$\{dry_run\}" != "true" && "\$\{should_deploy\}" == "true" && "\$\{deploy_sha\}" != "\$\{main_sha\}" \]\]/);
   assert.match(workflow, /stale deployment SHA/);
   assert.doesNotMatch(workflow, /detect-changed-paths\.sh/);
   assert.doesNotMatch(workflow, /no deployment-impacting files changed/);
   assert.match(workflow, /deploy_reason: \$\{\{ steps\.context\.outputs\.deploy_reason \}\}/);
+  assert.match(workflow, /dry_run: \$\{\{ steps\.context\.outputs\.dry_run \}\}/);
   assert.match(workflow, /\| deploy_reason \| \$\{deploy_reason\} \|/);
+  assert.match(workflow, /\| dry_run \| \$\{dry_run\} \|/);
   assert.match(workflow, /if: needs\.prepare\.outputs\.should_deploy != 'true'/);
   assert.match(workflow, /if: needs\.prepare\.outputs\.should_deploy == 'true'/);
 });

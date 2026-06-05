@@ -8,24 +8,23 @@ on:
       - main
   workflow_dispatch:
     inputs:
-      environment:
-        description: "GitHub deployment environment"
+      dry_run:
+        description: "Run deployment checks without changing the running backend"
         required: true
-        default: staging
-        type: choice
-        options:
-          - staging
-          - production
-      image_tag_suffix:
-        description: "Optional image tag suffix"
+        type: boolean
+        default: true
+      ref:
+        description: "Optional branch, tag, or SHA to deploy for manual dry-runs"
         required: false
         type: string
+        default: ""
 
 permissions:
   contents: read
+  deployments: write
 
 concurrency:
-  group: deploy-oci-a1-backend-${{ github.event_name == 'workflow_dispatch' && inputs.environment || 'production' }}
+  group: deploy-oci-a1-backend
   cancel-in-progress: false
 
 jobs:
@@ -36,8 +35,8 @@ jobs:
       backend_image_tag: ${{ steps.context.outputs.backend_image_tag }}
       deploy_sha: ${{ steps.context.outputs.deploy_sha }}
       deploy_reason: ${{ steps.context.outputs.deploy_reason }}
+      dry_run: ${{ steps.context.outputs.dry_run }}
       environment: ${{ steps.context.outputs.environment }}
-      image_tag_suffix: ${{ steps.context.outputs.image_tag_suffix }}
       should_deploy: ${{ steps.context.outputs.should_deploy }}
       skip_reason: ${{ steps.context.outputs.skip_reason }}
 
@@ -45,7 +44,7 @@ jobs:
       - name: Checkout deploy ref
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
         with:
-          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+          ref: ${{ github.event.workflow_run.head_sha || inputs.ref || github.sha }}
           fetch-depth: 0
           persist-credentials: false
 
@@ -53,8 +52,8 @@ jobs:
         id: context
         shell: bash
         env:
-          DISPATCH_ENVIRONMENT: ${{ inputs.environment }}
-          DISPATCH_IMAGE_TAG_SUFFIX: ${{ inputs.image_tag_suffix }}
+          DISPATCH_DRY_RUN: ${{ inputs.dry_run }}
+          DISPATCH_REF: ${{ inputs.ref }}
           WORKFLOW_RUN_CONCLUSION: ${{ github.event.workflow_run.conclusion }}
           WORKFLOW_RUN_HEAD_BRANCH: ${{ github.event.workflow_run.head_branch }}
           WORKFLOW_RUN_HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
@@ -62,16 +61,15 @@ jobs:
           set -euo pipefail
 
           event_name="${GITHUB_EVENT_NAME}"
-          deploy_environment="${DISPATCH_ENVIRONMENT:-staging}"
-          deploy_reason="manual dispatch"
-          image_tag_suffix="${DISPATCH_IMAGE_TAG_SUFFIX:-}"
+          deploy_environment="production"
+          deploy_reason="manual dry-run"
+          dry_run="true"
           should_deploy="true"
           skip_reason=""
 
           if [[ "${event_name}" == "workflow_run" ]]; then
-            deploy_environment="production"
             deploy_reason="main CI completed successfully"
-            image_tag_suffix=""
+            dry_run="false"
             deploy_sha="${WORKFLOW_RUN_HEAD_SHA}"
             if [[ "${WORKFLOW_RUN_CONCLUSION}" != "success" ]]; then
               should_deploy="false"
@@ -81,25 +79,46 @@ jobs:
               skip_reason="CI head branch is ${WORKFLOW_RUN_HEAD_BRANCH}"
             fi
           else
-            deploy_sha="$(git rev-parse HEAD)"
+            dry_run="${DISPATCH_DRY_RUN:-true}"
+            if [[ -n "${DISPATCH_REF:-}" ]]; then
+              if git rev-parse --verify "${DISPATCH_REF}^{commit}" >/dev/null 2>&1; then
+                deploy_sha="$(git rev-parse "${DISPATCH_REF}^{commit}")"
+              else
+                git fetch --no-tags origin "${DISPATCH_REF}"
+                deploy_sha="$(git rev-parse FETCH_HEAD)"
+              fi
+            else
+              deploy_sha="$(git rev-parse HEAD)"
+            fi
+
+            if [[ "${dry_run}" == "true" ]]; then
+              deploy_reason="manual dry-run"
+            else
+              deploy_reason="manual deploy"
+            fi
+          fi
+
+          if [[ ! "${dry_run}" =~ ^(true|false)$ ]]; then
+            echo "Invalid dry_run value: ${dry_run}" >&2
+            exit 1
           fi
 
           git fetch --no-tags origin main:refs/remotes/origin/main
           main_sha="$(git rev-parse origin/main)"
 
-          if [[ "${event_name}" == "workflow_run" && "${should_deploy}" == "true" && "${deploy_sha}" != "${main_sha}" ]]; then
+          if [[ "${dry_run}" != "true" && "${should_deploy}" == "true" && "${deploy_sha}" != "${main_sha}" ]]; then
             should_deploy="false"
             skip_reason="stale deployment SHA ${deploy_sha} does not match origin/main ${main_sha}"
           fi
 
-          backend_image_tag="maum-on-mobile-back:${deploy_sha}${image_tag_suffix}"
+          backend_image_tag="maum-on-mobile-back:${deploy_sha}"
 
           {
             echo "backend_image_tag=${backend_image_tag}"
             echo "deploy_sha=${deploy_sha}"
             echo "deploy_reason=${deploy_reason}"
+            echo "dry_run=${dry_run}"
             echo "environment=${deploy_environment}"
-            echo "image_tag_suffix=${image_tag_suffix}"
             echo "should_deploy=${should_deploy}"
             echo "skip_reason=${skip_reason}"
           } >>"${GITHUB_OUTPUT}"
@@ -113,6 +132,7 @@ jobs:
             echo "| deploy_sha | ${deploy_sha} |"
             echo "| origin/main | ${main_sha} |"
             echo "| environment | ${deploy_environment} |"
+            echo "| dry_run | ${dry_run} |"
             echo "| should_deploy | ${should_deploy} |"
             if [[ "${should_deploy}" == "true" ]]; then
               echo "| deploy_reason | ${deploy_reason} |"
@@ -258,6 +278,7 @@ jobs:
 
       - name: Create GitHub deployment
         id: deployment
+        if: needs.prepare.outputs.dry_run != 'true'
         shell: bash
         env:
           DEPLOY_ENVIRONMENT: ${{ needs.prepare.outputs.environment }}
@@ -295,6 +316,7 @@ jobs:
 
       - name: Deploy on server runner
         id: deploy_run
+        if: needs.prepare.outputs.dry_run != 'true'
         shell: bash
         env:
           MAUMON_DEPLOY_TRANSPORT: local
@@ -303,6 +325,16 @@ jobs:
           MAUMON_BACKEND_BUNDLE_PATH: build/maum-on-mobile-backend-bundle.tar.gz
           MAUMON_BACKEND_IMAGE_TAG: ${{ needs.prepare.outputs.backend_image_tag }}
         run: bash tools/deploy/deploy-oci-a1-backend.sh
+
+      - name: Write dry-run summary
+        if: needs.prepare.outputs.dry_run == 'true'
+        shell: bash
+        run: |
+          {
+            echo "### OCI A1 backend deploy dry-run completed"
+            echo
+            echo "Build, bundle, and runtime env composition completed without changing the running backend."
+          } >>"${GITHUB_STEP_SUMMARY}"
 
       - name: Mark deployment success
         if: steps.deploy_run.outcome == 'success' && steps.deployment.outputs.deployment_id != ''
