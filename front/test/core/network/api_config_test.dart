@@ -31,6 +31,28 @@ void main() {
       expect(config.baseUrl, Uri.parse('http://localhost:8080'));
     });
 
+    test('requires API_BASE_URL for Android release builds', () {
+      expect(
+        () => ApiConfig.fromEnvironment(
+          baseUrl: '',
+          targetPlatform: TargetPlatform.android,
+          isReleaseMode: true,
+        ),
+        throwsA(isA<StateError>()),
+      );
+    });
+
+    test('requires API_BASE_URL for iOS release builds', () {
+      expect(
+        () => ApiConfig.fromEnvironment(
+          baseUrl: '',
+          targetPlatform: TargetPlatform.iOS,
+          isReleaseMode: true,
+        ),
+        throwsA(isA<StateError>()),
+      );
+    });
+
     test('uses an injected API_BASE_URL value', () {
       final config = ApiConfig.fromEnvironment(
         baseUrl: 'https://api.maumon.example',
