@@ -100,11 +100,6 @@ class _HomeScreenState extends State<HomeScreen> {
           ],
           maxWidth: AppBreakpoints.compactContentMaxWidth,
           children: [
-            _HealingQuote(
-              summary: state.stats?.summary,
-              onPrimaryAction: _openSurface,
-            ),
-            const SizedBox(height: AppSpacing.lg),
             _StatsSection(state: state),
             const SizedBox(height: AppSpacing.lg),
             _ActionGrid(
@@ -382,93 +377,6 @@ class _HomeNotificationHeaderButton extends StatelessWidget {
               ),
             ),
         ],
-      ),
-    );
-  }
-}
-
-class _HealingQuote extends StatelessWidget {
-  const _HealingQuote({
-    required this.summary,
-    required this.onPrimaryAction,
-  });
-
-  final HomeSummary? summary;
-  final ValueChanged<HomeActionSurface> onPrimaryAction;
-
-  @override
-  Widget build(BuildContext context) {
-    final homeSummary = summary ?? const HomeSummary();
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-
-    return Semantics(
-      key: const ValueKey('home-primary-panel'),
-      container: true,
-      child: DecoratedBox(
-        key: const ValueKey('home-blue-hero'),
-        decoration: BoxDecoration(
-          color: colorScheme.primary,
-          borderRadius: AppRadii.card,
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              colorScheme.primary,
-              colorScheme.secondary,
-            ],
-          ),
-        ),
-        child: Padding(
-          padding: const EdgeInsets.all(AppSpacing.lg),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  DecoratedBox(
-                    decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.16),
-                      borderRadius: AppRadii.chip,
-                    ),
-                    child: const ExcludeSemantics(
-                      child: Padding(
-                        padding: EdgeInsets.all(AppSpacing.xs),
-                        child: Icon(
-                          Icons.favorite_border,
-                          color: Colors.white,
-                          size: 22,
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: AppSpacing.md),
-                  Expanded(
-                    child: Text(
-                      homeSummary.recoveryMessage,
-                      style: theme.textTheme.titleMedium?.copyWith(
-                        color: Colors.white,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: AppSpacing.lg),
-              FilledButton.icon(
-                key: const ValueKey('home-primary-action-button'),
-                style: FilledButton.styleFrom(
-                  backgroundColor: Colors.white,
-                  foregroundColor: colorScheme.primary,
-                ),
-                onPressed: () =>
-                    onPrimaryAction(homeSummary.primaryActionSurface),
-                icon: const Icon(Icons.arrow_forward),
-                label: Text(homeSummary.primaryActionLabel),
-              ),
-            ],
-          ),
-        ),
       ),
     );
   }

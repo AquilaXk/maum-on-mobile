@@ -39,7 +39,11 @@ void main() {
     expect(find.text('오늘의 기록'), findsOneWidget);
     expect(find.text('알림/신고'), findsOneWidget);
     expect(find.text('읽지 않은 알림 없음 · 알림 센터'), findsOneWidget);
-    expect(find.text('지금 마음을 천천히 살펴보세요.'), findsOneWidget);
+    expect(find.byKey(const ValueKey('home-primary-panel')), findsNothing);
+    expect(find.byKey(const ValueKey('home-blue-hero')), findsNothing);
+    expect(find.text('지금 마음을 천천히 살펴보세요.'), findsNothing);
+    expect(find.byKey(const ValueKey('home-primary-actions-panel')),
+        findsOneWidget);
     expect(find.text('최근 인기'), findsOneWidget);
     expect(find.text('오늘 너무 지쳐요'), findsWidgets);
     expect(find.byKey(const ValueKey('home-feed-story-1')), findsOneWidget);
@@ -90,7 +94,7 @@ void main() {
     expect(worryTop, moreOrLessEquals(diaryTop, epsilon: 1));
   });
 
-  testWidgets('uses blue hero and primary action surfaces on mobile',
+  testWidgets('uses primary action surfaces without the hero card on mobile',
       (tester) async {
     tester.view.physicalSize = const Size(390, 844);
     tester.view.devicePixelRatio = 1;
@@ -119,16 +123,9 @@ void main() {
       ),
     );
 
-    expect(find.byKey(const ValueKey('home-blue-hero')), findsOneWidget);
-    expect(
-      (tester
-              .widget<DecoratedBox>(
-                find.byKey(const ValueKey('home-blue-hero')),
-              )
-              .decoration as BoxDecoration)
-          .gradient,
-      isNotNull,
-    );
+    expect(find.byKey(const ValueKey('home-primary-panel')), findsNothing);
+    expect(find.byKey(const ValueKey('home-blue-hero')), findsNothing);
+    expect(find.text('지금 마음을 천천히 살펴보세요.'), findsNothing);
     expect(
       find.byKey(const ValueKey('home-primary-actions-panel')),
       findsOneWidget,
