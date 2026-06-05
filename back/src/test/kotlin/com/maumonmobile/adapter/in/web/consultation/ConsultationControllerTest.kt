@@ -100,6 +100,36 @@ class ConsultationControllerTest @Autowired constructor(
     }
 
     @Test
+    fun promptContextExcludesCurrentUserMessageFromRecentHistory() {
+        val member = signupAndLogin("consultation-context@example.com", "문맥이")
+
+        mockMvc.post("/api/v1/consultations/chat") {
+            header("Authorization", "Bearer ${member.accessToken}")
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"message":"첫 상담이에요."}"""
+        }
+            .andExpect {
+                status { isOk() }
+            }
+
+        mockMvc.post("/api/v1/consultations/chat") {
+            header("Authorization", "Bearer ${member.accessToken}")
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"message":"두 번째 상담이에요."}"""
+        }
+            .andExpect {
+                status { isOk() }
+            }
+
+        val modelRequest = consultationAiResponder.requests.last()
+
+        assertThat(modelRequest.message).isEqualTo("두 번째 상담이에요.")
+        assertThat(modelRequest.recentMessages.map { message -> message.content })
+            .contains("첫 상담이에요.", "함께 살펴볼게요.")
+            .doesNotContain("두 번째 상담이에요.")
+    }
+
+    @Test
     fun chatPublishesJsonStreamEventsWithRequestIdAndSequence() {
         val member = signupAndLogin("consultation-stream-events@example.com", "스트림이")
 
