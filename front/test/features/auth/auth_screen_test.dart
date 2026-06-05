@@ -8,6 +8,7 @@ import 'package:maum_on_mobile_front/features/auth/deeplink/external_login.dart'
 import 'package:maum_on_mobile_front/features/auth/domain/auth_models.dart';
 import 'package:maum_on_mobile_front/features/auth/domain/login_provider_policy.dart';
 import 'package:maum_on_mobile_front/features/auth/presentation/auth_screen.dart';
+import 'package:maum_on_mobile_front/theme/app_theme.dart';
 
 void main() {
   test('login provider policy exposes only configured linked providers', () {
@@ -70,6 +71,21 @@ void main() {
       find.descendant(of: trustStrip, matching: find.text('프로필 설정')),
       findsOneWidget,
     );
+  });
+
+  testWidgets('keeps auth structure inside a blue visual shell',
+      (tester) async {
+    final repository = _FakeAuthRepository();
+    await tester.pumpWidget(
+      _AuthScreenHarness(repository: repository),
+    );
+
+    expect(find.byKey(const ValueKey('auth-blue-shell')), findsOneWidget);
+    expect(find.byKey(const ValueKey('auth-form-panel')), findsOneWidget);
+    expect(find.byKey(const ValueKey('auth-form-title-row')), findsOneWidget);
+    expect(find.byKey(const ValueKey('auth-form-title-icon')), findsOneWidget);
+    expect(find.byKey(const ValueKey('login-email-field')), findsOneWidget);
+    expect(find.byKey(const ValueKey('login-password-field')), findsOneWidget);
   });
 
   testWidgets('signup validates fields before calling the repository',
@@ -299,6 +315,8 @@ void main() {
     expect(find.byKey(const ValueKey('login-email-field')), findsOneWidget);
     expect(find.byKey(const ValueKey('login-password-field')), findsOneWidget);
     expect(find.text('간편 로그인'), findsNothing);
+    expect(
+        find.byKey(const ValueKey('quick-login-provider-row')), findsNothing);
     _expectOnlyQuickLoginProviders([]);
     expect(
       find.byKey(const ValueKey('ios-review-email-login-guidance')),
@@ -333,6 +351,10 @@ void main() {
     );
 
     _expectOnlyQuickLoginProviders(['kakao']);
+    expect(
+      find.byKey(const ValueKey('quick-login-provider-row')),
+      findsOneWidget,
+    );
     expect(
       find.byKey(const ValueKey('ios-review-email-login-guidance')),
       findsNothing,
@@ -374,6 +396,10 @@ void main() {
     );
 
     _expectOnlyQuickLoginProviders(['apple']);
+    expect(
+      find.byKey(const ValueKey('quick-login-provider-row')),
+      findsOneWidget,
+    );
 
     await tester.ensureVisible(
       find.byKey(const ValueKey('external-login-apple-button')),
@@ -499,7 +525,7 @@ class _AuthScreenHarness extends StatelessWidget {
         controller ?? AuthController(authRepository: repository);
 
     return MaterialApp(
-      theme: ThemeData(platform: platform),
+      theme: buildAppTheme().copyWith(platform: platform),
       home: AnimatedBuilder(
         animation: Listenable.merge([
           authController,

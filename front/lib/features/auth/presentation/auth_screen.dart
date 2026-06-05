@@ -68,9 +68,16 @@ class _AuthScreenState extends State<AuthScreen> {
 
     return Scaffold(
       body: DecoratedBox(
-        decoration: BoxDecoration(
-          color: theme.colorScheme.surfaceContainerHighest.withValues(
-            alpha: 0.42,
+        key: const ValueKey('auth-blue-shell'),
+        decoration: const BoxDecoration(
+          color: AppBrandColors.backgroundBlue,
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              Color(0xFFE7F2FF),
+              Color(0xFFF7FBFF),
+            ],
           ),
         ),
         child: SafeArea(
@@ -100,6 +107,7 @@ class _AuthScreenState extends State<AuthScreen> {
                         const SizedBox(height: AppSpacing.lg),
                         _AuthFormPanel(
                           title: _modeTitle,
+                          icon: _submitIcon,
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.stretch,
                             children: [
@@ -751,7 +759,10 @@ class _AuthHeader extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
-        const MaumOnBrandWordmark(height: 44),
+        const MaumOnBrandWordmark(
+          height: 44,
+          foregroundColor: AppBrandColors.foreground,
+        ),
         const SizedBox(height: AppSpacing.md),
         ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 320),
@@ -789,9 +800,11 @@ class _AuthTrustStrip extends StatelessWidget {
         child: DecoratedBox(
           key: const ValueKey('auth-trust-strip'),
           decoration: BoxDecoration(
-            color: colorScheme.surface.withValues(alpha: 0.72),
+            color: colorScheme.primaryContainer.withValues(alpha: 0.56),
             borderRadius: AppRadii.card,
-            border: Border.all(color: colorScheme.outlineVariant),
+            border: Border.all(
+              color: colorScheme.primary.withValues(alpha: 0.14),
+            ),
           ),
           child: Padding(
             padding: const EdgeInsets.symmetric(
@@ -842,7 +855,7 @@ class _AuthTrustItem extends StatelessWidget {
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: theme.textTheme.bodySmall?.copyWith(
-                color: colorScheme.onSurfaceVariant,
+                color: colorScheme.onPrimaryContainer,
                 fontWeight: FontWeight.w800,
               ),
             ),
@@ -863,10 +876,12 @@ class _AuthTrustItemData {
 class _AuthFormPanel extends StatelessWidget {
   const _AuthFormPanel({
     required this.title,
+    required this.icon,
     required this.child,
   });
 
   final String title;
+  final IconData icon;
   final Widget child;
 
   @override
@@ -876,12 +891,44 @@ class _AuthFormPanel extends StatelessWidget {
     return Card(
       key: const ValueKey('auth-form-panel'),
       margin: EdgeInsets.zero,
+      color: theme.colorScheme.surface,
+      shape: RoundedRectangleBorder(
+        borderRadius: AppRadii.card,
+        side: BorderSide(
+          color: theme.colorScheme.primary.withValues(alpha: 0.14),
+        ),
+      ),
       child: Padding(
         padding: const EdgeInsets.all(AppSpacing.xl),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Text(title, style: theme.textTheme.titleLarge),
+            Row(
+              key: const ValueKey('auth-form-title-row'),
+              children: [
+                DecoratedBox(
+                  key: const ValueKey('auth-form-title-icon'),
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.primaryContainer,
+                    borderRadius: AppRadii.chip,
+                  ),
+                  child: ExcludeSemantics(
+                    child: Padding(
+                      padding: const EdgeInsets.all(AppSpacing.xs),
+                      child: Icon(
+                        icon,
+                        color: theme.colorScheme.onPrimaryContainer,
+                        size: 20,
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: AppSpacing.sm),
+                Expanded(
+                  child: Text(title, style: theme.textTheme.titleLarge),
+                ),
+              ],
+            ),
             const SizedBox(height: AppSpacing.lg),
             child,
           ],
@@ -957,6 +1004,7 @@ class _QuickLoginProviderRow extends StatelessWidget {
     final theme = Theme.of(context);
 
     return Column(
+      key: const ValueKey('quick-login-provider-row'),
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Row(

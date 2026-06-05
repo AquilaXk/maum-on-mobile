@@ -6,6 +6,7 @@ import 'package:maum_on_mobile_front/features/home/application/home_controller.d
 import 'package:maum_on_mobile_front/features/home/data/home_repository.dart';
 import 'package:maum_on_mobile_front/features/home/domain/home_models.dart';
 import 'package:maum_on_mobile_front/features/home/home_screen.dart';
+import 'package:maum_on_mobile_front/theme/app_theme.dart';
 
 void main() {
   testWidgets('renders stats, story feed, and category filter in a scroll view',
@@ -88,6 +89,69 @@ void main() {
 
     expect(letterTop, moreOrLessEquals(diaryTop, epsilon: 1));
     expect(worryTop, moreOrLessEquals(diaryTop, epsilon: 1));
+  });
+
+  testWidgets('uses blue hero and primary action surfaces on mobile',
+      (tester) async {
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    final controller = HomeController(
+      homeRepository: const _FakeHomeRepository(),
+    );
+    await controller.load();
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: buildAppTheme(),
+        home: HomeScreen(
+          routeTitle: '홈',
+          nickname: '마음이',
+          homeController: controller,
+          onWriteDiary: () {},
+          onWriteLetter: () {},
+          onViewStory: () {},
+          onOpenConsultation: () {},
+          onOpenNotifications: () {},
+          onOpenSettings: () {},
+          onLogout: () {},
+        ),
+      ),
+    );
+
+    expect(find.byKey(const ValueKey('home-blue-hero')), findsOneWidget);
+    expect(
+      (tester
+              .widget<DecoratedBox>(
+                find.byKey(const ValueKey('home-blue-hero')),
+              )
+              .decoration as BoxDecoration)
+          .gradient,
+      isNotNull,
+    );
+    expect(
+      find.byKey(const ValueKey('home-primary-actions-panel')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey('home-action-diary-surface')),
+      findsOneWidget,
+    );
+    expect(
+      (tester
+              .widget<DecoratedBox>(
+                find.byKey(const ValueKey('home-action-diary-surface')),
+              )
+              .decoration as BoxDecoration)
+          .color,
+      const Color(0xFFE8F1FF),
+    );
+    expect(
+      find.byKey(const ValueKey('home-action-story-surface')),
+      findsOneWidget,
+    );
   });
 
   testWidgets('routes draft continuation cards to their writing surfaces',
