@@ -34,12 +34,11 @@ void main() {
       find.byKey(const ValueKey('consultation-status-toolbar')),
       findsOneWidget,
     );
-    expect(
-        find.byKey(const ValueKey('consultation-flow-panel')), findsOneWidget);
-    expect(find.text('상담 흐름'), findsOneWidget);
-    expect(find.text('연결'), findsOneWidget);
-    expect(find.text('입력'), findsOneWidget);
-    expect(find.text('응답'), findsOneWidget);
+    expect(find.byKey(const ValueKey('consultation-flow-panel')), findsNothing);
+    expect(find.text('상담 흐름'), findsNothing);
+    expect(find.text('연결'), findsNothing);
+    expect(find.text('입력'), findsNothing);
+    expect(find.text('응답'), findsNothing);
     expect(find.text('상담 연결됨'), findsOneWidget);
     expect(find.text('메시지 1개'), findsOneWidget);
     expect(find.text('입력 가능'), findsOneWidget);
