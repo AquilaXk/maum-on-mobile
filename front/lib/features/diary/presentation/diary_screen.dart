@@ -444,6 +444,7 @@ class _CalendarSection extends StatelessWidget {
         const SizedBox(height: AppSpacing.xs),
         GridView.count(
           crossAxisCount: 7,
+          childAspectRatio: 0.74,
           crossAxisSpacing: 6,
           mainAxisSpacing: 6,
           shrinkWrap: true,
@@ -480,6 +481,7 @@ class _CalendarDayButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     final colorScheme = Theme.of(context).colorScheme;
 
     return OutlinedButton(
@@ -487,18 +489,45 @@ class _CalendarDayButton extends StatelessWidget {
       style: OutlinedButton.styleFrom(
         padding: EdgeInsets.zero,
         backgroundColor: isSelected ? colorScheme.primaryContainer : null,
+        minimumSize: Size.zero,
+        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
       ),
       onPressed: onTap,
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
+        mainAxisSize: MainAxisSize.min,
         children: [
-          Text('${day.day}'),
+          Text(
+            '${day.day}일',
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: theme.textTheme.labelMedium?.copyWith(
+              fontWeight: FontWeight.w800,
+              color: isSelected
+                  ? colorScheme.onPrimaryContainer
+                  : colorScheme.onSurface,
+            ),
+          ),
           if (count > 0)
-            Text(
-              '$count',
-              style: TextStyle(
-                color: colorScheme.primary,
-                fontWeight: FontWeight.w800,
+            Padding(
+              padding: const EdgeInsets.only(top: 2),
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  color: colorScheme.primary.withValues(alpha: 0.12),
+                  borderRadius: AppRadii.chip,
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 5),
+                  child: Text(
+                    '$count개',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.labelSmall?.copyWith(
+                      color: colorScheme.primary,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
               ),
             ),
         ],
