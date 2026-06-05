@@ -173,7 +173,7 @@ test("GitHub Actions deploy workflow builds jar, bundles it, and deploys on the 
   assert.doesNotMatch(workflow, /@v\d/);
 });
 
-test("backend deploy workflow auto-runs production deploy after successful main CI for deploy-impacting changes", () => {
+test("backend deploy workflow auto-runs production deploy after successful main CI", () => {
   const workflowPath = ".github/workflows/deploy-oci-a1.yml";
 
   assert.ok(existsSync(path.join(root, workflowPath)), `${workflowPath} must exist`);
@@ -186,12 +186,13 @@ test("backend deploy workflow auto-runs production deploy after successful main 
   assert.match(workflow, /WORKFLOW_RUN_HEAD_BRANCH: \$\{\{ github\.event\.workflow_run\.head_branch \}\}/);
   assert.match(workflow, /WORKFLOW_RUN_HEAD_SHA: \$\{\{ github\.event\.workflow_run\.head_sha \}\}/);
   assert.match(workflow, /deploy_environment="production"/);
+  assert.match(workflow, /deploy_reason="main CI completed successfully"/);
   assert.match(workflow, /git fetch --no-tags origin main:refs\/remotes\/origin\/main/);
   assert.match(workflow, /stale deployment SHA/);
-  assert.match(workflow, /git diff --name-only "\$\{deploy_sha\}\^" "\$\{deploy_sha\}"/);
-  assert.match(workflow, /GITHUB_OUTPUT= GITHUB_STEP_SUMMARY= bash tools\/ci\/detect-changed-paths\.sh "\$\{changed_files\}"/);
-  assert.match(workflow, /deploy_changed="\$\(printf '%s\\n' "\$\{gate_output\}" \| awk -F= '\$1 == "deploy" \{ print \$2 \}'\)"/);
-  assert.match(workflow, /skip_reason="no deployment-impacting files changed"/);
+  assert.doesNotMatch(workflow, /detect-changed-paths\.sh/);
+  assert.doesNotMatch(workflow, /no deployment-impacting files changed/);
+  assert.match(workflow, /deploy_reason: \$\{\{ steps\.context\.outputs\.deploy_reason \}\}/);
+  assert.match(workflow, /\| deploy_reason \| \$\{deploy_reason\} \|/);
   assert.match(workflow, /if: needs\.prepare\.outputs\.should_deploy != 'true'/);
   assert.match(workflow, /if: needs\.prepare\.outputs\.should_deploy == 'true'/);
 });
