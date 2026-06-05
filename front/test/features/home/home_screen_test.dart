@@ -189,6 +189,41 @@ void main() {
     expect(settingsTaps, 1);
   });
 
+  testWidgets('separates account tools from the primary home action grid',
+      (tester) async {
+    final controller = HomeController(
+      homeRepository: const _FakeHomeRepository(),
+    );
+    await controller.load();
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: HomeScreen(
+          routeTitle: '홈',
+          nickname: '관리자',
+          homeController: controller,
+          isAdmin: true,
+          onOpenOperations: () {},
+          onWriteDiary: () {},
+          onWriteLetter: () {},
+          onViewStory: () {},
+          onOpenConsultation: () {},
+          onOpenNotifications: () {},
+          onOpenSettings: () {},
+          onLogout: () {},
+        ),
+      ),
+    );
+
+    expect(find.byKey(const ValueKey('home-primary-actions')), findsOneWidget);
+    expect(find.byKey(const ValueKey('home-account-tools-section')),
+        findsOneWidget);
+    expect(find.text('계정 관리'), findsOneWidget);
+    expect(find.text('운영 검수'), findsOneWidget);
+    expect(find.text('설정'), findsOneWidget);
+    expect(find.text('로그아웃'), findsOneWidget);
+  });
+
   testWidgets('shows operations entry only to admins', (tester) async {
     final userController = HomeController(
       homeRepository: const _FakeHomeRepository(),

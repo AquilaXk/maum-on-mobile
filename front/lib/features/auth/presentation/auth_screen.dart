@@ -92,7 +92,9 @@ class _AuthScreenState extends State<AuthScreen> {
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         _AuthHeader(subtitle: _subtitle),
-                        const SizedBox(height: AppSpacing.xxl),
+                        const SizedBox(height: AppSpacing.lg),
+                        _AuthTrustStrip(items: _trustStripItems),
+                        const SizedBox(height: AppSpacing.lg),
                         _AuthFormPanel(
                           title: _modeTitle,
                           child: Column(
@@ -215,6 +217,37 @@ class _AuthScreenState extends State<AuthScreen> {
           : Icons.mark_email_unread_outlined,
       AuthFormMode.passwordResetRequest => Icons.outgoing_mail,
       AuthFormMode.passwordResetConfirm => Icons.lock_reset,
+    };
+  }
+
+  List<_AuthTrustItemData> get _trustStripItems {
+    return switch (_mode) {
+      AuthFormMode.login => const [
+          _AuthTrustItemData(Icons.alternate_email, '이메일 로그인'),
+          _AuthTrustItemData(Icons.verified_user_outlined, '자동 로그인'),
+          _AuthTrustItemData(Icons.lock_outline, '안전한 기록'),
+        ],
+      AuthFormMode.signup => _signupEmailVerificationRequested
+          ? const [
+              _AuthTrustItemData(Icons.mark_email_read_outlined, '인증번호 확인'),
+              _AuthTrustItemData(Icons.lock_outline, '비밀번호 설정'),
+              _AuthTrustItemData(Icons.person_outline, '프로필 설정'),
+            ]
+          : const [
+              _AuthTrustItemData(Icons.mark_email_unread_outlined, '이메일 인증'),
+              _AuthTrustItemData(Icons.pin_outlined, '6자리 코드'),
+              _AuthTrustItemData(Icons.person_outline, '프로필 설정'),
+            ],
+      AuthFormMode.passwordResetRequest => const [
+          _AuthTrustItemData(Icons.alternate_email, '이메일 확인'),
+          _AuthTrustItemData(Icons.outgoing_mail, '안내 발송'),
+          _AuthTrustItemData(Icons.lock_reset, '재설정'),
+        ],
+      AuthFormMode.passwordResetConfirm => const [
+          _AuthTrustItemData(Icons.password, '토큰 입력'),
+          _AuthTrustItemData(Icons.lock_reset, '새 비밀번호'),
+          _AuthTrustItemData(Icons.login, '다시 로그인'),
+        ],
     };
   }
 
@@ -719,6 +752,93 @@ class _AuthHeader extends StatelessWidget {
       ],
     );
   }
+}
+
+class _AuthTrustStrip extends StatelessWidget {
+  const _AuthTrustStrip({required this.items});
+
+  final List<_AuthTrustItemData> items;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    return Semantics(
+      label: items.map((item) => item.label).join(', '),
+      child: ExcludeSemantics(
+        child: DecoratedBox(
+          key: const ValueKey('auth-trust-strip'),
+          decoration: BoxDecoration(
+            color: colorScheme.surface.withValues(alpha: 0.72),
+            borderRadius: AppRadii.card,
+            border: Border.all(color: colorScheme.outlineVariant),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(
+              horizontal: AppSpacing.xs,
+              vertical: AppSpacing.xs,
+            ),
+            child: Row(
+              children: [
+                for (var index = 0; index < items.length; index++) ...[
+                  Expanded(child: _AuthTrustItem(item: items[index])),
+                  if (index != items.length - 1)
+                    Container(
+                      width: 1,
+                      height: 24,
+                      color: colorScheme.outlineVariant,
+                    ),
+                ],
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _AuthTrustItem extends StatelessWidget {
+  const _AuthTrustItem({required this.item});
+
+  final _AuthTrustItemData item;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xxs),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(item.icon, size: 16, color: colorScheme.primary),
+          const SizedBox(width: AppSpacing.xxs),
+          Flexible(
+            child: Text(
+              item.label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: colorScheme.onSurfaceVariant,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _AuthTrustItemData {
+  const _AuthTrustItemData(this.icon, this.label);
+
+  final IconData icon;
+  final String label;
 }
 
 class _AuthFormPanel extends StatelessWidget {
