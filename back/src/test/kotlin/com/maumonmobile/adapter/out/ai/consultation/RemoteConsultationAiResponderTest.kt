@@ -136,6 +136,7 @@ class RemoteConsultationAiResponderTest {
                 "작은 다음 행동은 한 가지만",
                 "마지막 문장은 사용자가 답하기 쉬운 질문 하나",
                 "위기 신호가 보이면 공감보다 안전 확보를 먼저",
+                "QA, 테스트, 샘플, placeholder, fixture",
             )
     }
 

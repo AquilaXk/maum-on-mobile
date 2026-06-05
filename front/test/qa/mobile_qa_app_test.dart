@@ -31,7 +31,12 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey('consultation-send-button')));
     await tester.pumpAndSettle();
-    expect(find.text('상담 답변 QA 메시지입니다.'), findsOneWidget);
+    expect(find.textContaining('QA'), findsNothing);
+    expect(find.textContaining('테스트'), findsNothing);
+    expect(
+        find.text(
+            '말해줘서 고마워요. 지금 마음이 무거운 상태라면, 먼저 숨을 천천히 고르고 가장 크게 남은 감정 하나만 짚어봐요. 지금 제일 크게 느껴지는 감정은 무엇인가요?'),
+        findsOneWidget);
     expect(find.text('상담 연결됨'), findsOneWidget);
 
     await tester.tap(find.byKey(mobileQaRouteKey('home')));
