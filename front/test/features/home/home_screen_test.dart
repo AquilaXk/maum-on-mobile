@@ -19,7 +19,6 @@ void main() {
     await tester.pumpWidget(
       MaterialApp(
         home: HomeScreen(
-          routeTitle: '홈',
           nickname: '마음이',
           homeController: controller,
           onWriteDiary: () {},
@@ -34,6 +33,7 @@ void main() {
     );
 
     expect(find.byType(SingleChildScrollView), findsOneWidget);
+    expect(find.text('홈'), findsNothing);
     expect(find.text('오늘 올라온 고민'), findsOneWidget);
     expect(find.text('전달된 비밀 편지'), findsOneWidget);
     expect(find.text('오늘의 기록'), findsOneWidget);
@@ -69,7 +69,6 @@ void main() {
     await tester.pumpWidget(
       MaterialApp(
         home: HomeScreen(
-          routeTitle: '홈',
           nickname: '마음이',
           homeController: controller,
           onWriteDiary: () {},
@@ -107,7 +106,6 @@ void main() {
       MaterialApp(
         theme: buildAppTheme(),
         home: HomeScreen(
-          routeTitle: '홈',
           nickname: '마음이',
           homeController: controller,
           onWriteDiary: () {},
@@ -177,7 +175,6 @@ void main() {
     await tester.pumpWidget(
       MaterialApp(
         home: HomeScreen(
-          routeTitle: '홈',
           nickname: '마음이',
           homeController: controller,
           onWriteDiary: () => diaryTaps += 1,
@@ -220,7 +217,6 @@ void main() {
     await tester.pumpWidget(
       MaterialApp(
         home: HomeScreen(
-          routeTitle: '홈',
           nickname: '마음이',
           homeController: controller,
           onWriteDiary: () => diaryTaps += 1,
@@ -263,7 +259,6 @@ void main() {
     await tester.pumpWidget(
       MaterialApp(
         home: HomeScreen(
-          routeTitle: '홈',
           nickname: '관리자',
           homeController: controller,
           isAdmin: true,
@@ -297,7 +292,6 @@ void main() {
     await tester.pumpWidget(
       MaterialApp(
         home: HomeScreen(
-          routeTitle: '홈',
           nickname: '마음이',
           homeController: userController,
           onWriteDiary: () {},
@@ -322,7 +316,6 @@ void main() {
     await tester.pumpWidget(
       MaterialApp(
         home: HomeScreen(
-          routeTitle: '홈',
           nickname: '관리자',
           homeController: adminController,
           isAdmin: true,

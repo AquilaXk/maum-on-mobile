@@ -305,7 +305,6 @@ class _MaumOnMobileAppState extends State<MaumOnMobileApp>
             )
           : _buildHomeRoute(
               memberId: memberId,
-              routeTitle: routeTitle,
               nickname: nickname,
               isAdmin: false,
             ),
@@ -318,7 +317,6 @@ class _MaumOnMobileAppState extends State<MaumOnMobileApp>
       AuthenticatedRoute.story => _buildStoryRoute(memberId),
       AuthenticatedRoute.home => _buildHomeRoute(
           memberId: memberId,
-          routeTitle: routeTitle,
           nickname: nickname,
           isAdmin: role == 'ADMIN',
           onOpenOperations: role == 'ADMIN'
@@ -330,7 +328,6 @@ class _MaumOnMobileAppState extends State<MaumOnMobileApp>
 
   Widget _buildHomeRoute({
     required int memberId,
-    required String routeTitle,
     required String nickname,
     required bool isAdmin,
     VoidCallback? onOpenOperations,
@@ -343,7 +340,6 @@ class _MaumOnMobileAppState extends State<MaumOnMobileApp>
       required bool hasLiveConnection,
     }) {
       return HomeScreen(
-        routeTitle: routeTitle,
         nickname: nickname,
         homeController: homeController,
         onRefresh: notificationController == null
