@@ -561,11 +561,14 @@ class _SystemToolsView extends StatelessWidget {
           status: LegalDisclosures.reviewSupportStatus,
         ),
         const SizedBox(height: AppSpacing.md),
+        _SystemRiskActionPanel(
+          onOpenSettings: onOpenSettings,
+          onLogout: onLogout,
+        ),
+        const SizedBox(height: AppSpacing.md),
         _SystemActionPanel(
           state: state,
           onRefresh: onRefresh,
-          onOpenSettings: onOpenSettings,
-          onLogout: onLogout,
           onOpenObservabilityTool: () => _openObservabilityTool(context),
         ),
       ],
@@ -584,6 +587,41 @@ class _SystemToolsView extends StatelessWidget {
         const SnackBar(content: Text('관측 도구를 열지 못했습니다.')),
       );
     }
+  }
+}
+
+class _SystemRiskActionPanel extends StatelessWidget {
+  const _SystemRiskActionPanel({
+    this.onOpenSettings,
+    this.onLogout,
+  });
+
+  final VoidCallback? onOpenSettings;
+  final VoidCallback? onLogout;
+
+  @override
+  Widget build(BuildContext context) {
+    return AppSectionCard(
+      key: const ValueKey('operations-system-risk-panel'),
+      title: '주의 작업',
+      subtitle: '계정 이동과 세션 종료는 운영 중인 조치와 분리해서 확인합니다.',
+      child: _CompactActionWrap(
+        children: [
+          OutlinedButton.icon(
+            key: const ValueKey('operations-system-settings-button'),
+            onPressed: onOpenSettings,
+            icon: const Icon(Icons.settings_outlined),
+            label: const Text('내 설정'),
+          ),
+          OutlinedButton.icon(
+            key: const ValueKey('operations-system-logout-button'),
+            onPressed: onLogout,
+            icon: const Icon(Icons.logout),
+            label: const Text('로그아웃'),
+          ),
+        ],
+      ),
+    );
   }
 }
 
@@ -755,15 +793,11 @@ class _SystemActionPanel extends StatelessWidget {
     required this.state,
     required this.onRefresh,
     required this.onOpenObservabilityTool,
-    this.onOpenSettings,
-    this.onLogout,
   });
 
   final OperationsState state;
   final Future<void> Function() onRefresh;
   final VoidCallback onOpenObservabilityTool;
-  final VoidCallback? onOpenSettings;
-  final VoidCallback? onLogout;
 
   @override
   Widget build(BuildContext context) {
@@ -791,18 +825,6 @@ class _SystemActionPanel extends StatelessWidget {
                   },
             icon: const Icon(Icons.refresh),
             label: Text(state.isSystemStatusLoading ? '새로고침 중' : '새로고침'),
-          ),
-          OutlinedButton.icon(
-            key: const ValueKey('operations-system-settings-button'),
-            onPressed: onOpenSettings,
-            icon: const Icon(Icons.settings_outlined),
-            label: const Text('내 설정'),
-          ),
-          OutlinedButton.icon(
-            key: const ValueKey('operations-system-logout-button'),
-            onPressed: onLogout,
-            icon: const Icon(Icons.logout),
-            label: const Text('로그아웃'),
           ),
         ],
       ),

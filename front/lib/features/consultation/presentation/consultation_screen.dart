@@ -133,9 +133,15 @@ class _ConsultationScreenState extends State<ConsultationScreen>
                     keyboardDismissBehavior:
                         ScrollViewKeyboardDismissBehavior.onDrag,
                     padding: const EdgeInsets.all(16),
-                    itemCount: state.messages.length,
+                    itemCount: state.messages.length + 2,
                     itemBuilder: (context, index) {
-                      return _MessageBubble(message: state.messages[index]);
+                      if (index == 0) {
+                        return const _ConsultationFlowPanel();
+                      }
+                      if (index == 1) {
+                        return const SizedBox(height: AppSpacing.md);
+                      }
+                      return _MessageBubble(message: state.messages[index - 2]);
                     },
                   ),
                 ),
@@ -150,6 +156,21 @@ class _ConsultationScreenState extends State<ConsultationScreen>
           ),
         );
       },
+    );
+  }
+}
+
+class _ConsultationFlowPanel extends StatelessWidget {
+  const _ConsultationFlowPanel();
+
+  @override
+  Widget build(BuildContext context) {
+    return const AppFlowPanel(
+      key: ValueKey('consultation-flow-panel'),
+      icon: Icons.psychology_alt_outlined,
+      title: '상담 흐름',
+      message: '연결 상태를 확인하고 고민을 입력한 뒤 답변을 이어서 확인합니다.',
+      steps: ['연결', '입력', '응답'],
     );
   }
 }

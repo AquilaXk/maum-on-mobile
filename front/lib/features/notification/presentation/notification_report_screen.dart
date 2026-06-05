@@ -471,8 +471,15 @@ class _NotificationCenter extends StatelessWidget {
         child: ListView(
           key: const ValueKey('notification-list'),
           physics: const AlwaysScrollableScrollPhysics(),
-          padding: const EdgeInsets.all(AppSpacing.lg),
+          padding: const EdgeInsets.fromLTRB(
+            AppSpacing.lg,
+            AppSpacing.lg,
+            AppSpacing.lg,
+            AppSpacing.persistentNavigationReserve,
+          ),
           children: [
+            _NotificationOverviewPanel(state: state),
+            const SizedBox(height: AppSpacing.md),
             if (state.errorMessage != null) ...[
               AppStateView.error(
                 title: '알림을 불러오지 못했습니다.',
@@ -500,6 +507,65 @@ class _NotificationCenter extends StatelessWidget {
             ],
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _NotificationOverviewPanel extends StatelessWidget {
+  const _NotificationOverviewPanel({required this.state});
+
+  final NotificationState state;
+
+  @override
+  Widget build(BuildContext context) {
+    final directCount = state.notifications
+        .where(
+          (notification) =>
+              notification.destination !=
+              NotificationTapDestination.notifications,
+        )
+        .length;
+
+    return AppSectionCard(
+      key: const ValueKey('notification-flow-panel'),
+      title: '알림 확인 흐름',
+      padding: const EdgeInsets.all(AppSpacing.sm),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const Wrap(
+            spacing: AppSpacing.xs,
+            runSpacing: AppSpacing.xs,
+            children: [
+              AppStatusPill(label: '확인', tone: AppStatusTone.success),
+              AppStatusPill(label: '이동', tone: AppStatusTone.success),
+              AppStatusPill(label: '정리', tone: AppStatusTone.success),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.xs),
+          KeyedSubtree(
+            key: const ValueKey('notification-list-summary-card'),
+            child: Wrap(
+              spacing: AppSpacing.xs,
+              runSpacing: AppSpacing.xs,
+              children: [
+                AppStatusPill(
+                  label: '미확인 ${state.unreadCount}개',
+                  tone: state.unreadCount > 0
+                      ? AppStatusTone.warning
+                      : AppStatusTone.success,
+                ),
+                AppStatusPill(
+                  label: '이동 가능 $directCount개',
+                  tone: directCount > 0
+                      ? AppStatusTone.success
+                      : AppStatusTone.neutral,
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -694,10 +760,23 @@ class _ReportForm extends StatelessWidget {
 
     return SingleChildScrollView(
       key: const ValueKey('report-form'),
-      padding: const EdgeInsets.all(AppSpacing.lg),
+      padding: const EdgeInsets.fromLTRB(
+        AppSpacing.lg,
+        AppSpacing.lg,
+        AppSpacing.lg,
+        AppSpacing.persistentNavigationReserve,
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          const AppFlowPanel(
+            key: ValueKey('report-flow-panel'),
+            icon: Icons.shield_outlined,
+            title: '신고 접수 흐름',
+            message: '대상을 확인하고 사유를 선택한 뒤 접수 상태를 확인합니다.',
+            steps: ['대상', '사유', '접수'],
+          ),
+          const SizedBox(height: AppSpacing.lg),
           Text(
             '신고 대상',
             style: Theme.of(context).textTheme.titleMedium,

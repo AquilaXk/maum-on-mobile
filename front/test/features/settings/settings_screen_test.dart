@@ -5,6 +5,7 @@ import 'package:maum_on_mobile_front/features/settings/data/settings_repository.
 import 'package:maum_on_mobile_front/features/settings/domain/settings_models.dart';
 import 'package:maum_on_mobile_front/features/settings/presentation/settings_screen.dart';
 import 'package:maum_on_mobile_front/features/legal/domain/legal_disclosures.dart';
+import 'package:maum_on_mobile_front/shared/ui/app_design_system.dart';
 
 void main() {
   testWidgets('shows compact account status on a phone viewport',
@@ -31,12 +32,26 @@ void main() {
       find.byKey(const ValueKey('settings-account-toolbar')),
       findsOneWidget,
     );
+    expect(find.byKey(const ValueKey('settings-flow-panel')), findsOneWidget);
+    expect(find.text('계정 점검 흐름'), findsOneWidget);
+    expect(find.text('계정'), findsOneWidget);
+    expect(find.text('보안'), findsOneWidget);
+    expect(find.text('지원'), findsOneWidget);
     expect(find.text('이메일 계정'), findsOneWidget);
     expect(find.text('랜덤 편지 수신 중'), findsOneWidget);
     expect(find.text('내보내기 요청 가능'), findsOneWidget);
     expect(
       find.byKey(const ValueKey('settings-profile-section')),
       findsOneWidget,
+    );
+
+    final scrollView = tester.widget<SingleChildScrollView>(
+      find.byKey(const ValueKey('settings-scroll')),
+    );
+    final padding = scrollView.padding! as EdgeInsets;
+    expect(
+      padding.bottom,
+      greaterThanOrEqualTo(AppSpacing.persistentNavigationReserve),
     );
   });
 
