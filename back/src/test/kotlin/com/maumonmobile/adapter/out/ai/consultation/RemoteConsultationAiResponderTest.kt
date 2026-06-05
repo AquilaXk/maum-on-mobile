@@ -192,6 +192,92 @@ class RemoteConsultationAiResponderTest {
     }
 
     @Test
+    fun promptDefinesContextualReplyChecklistAndPersonalDataBoundaries() {
+        val client = RecordingVertexAiGenerateContentClient(
+            responseBody = vertexResponse("""{"chunks":["계속 버티느라 많이 지치셨겠어요."]}"""),
+        )
+        val responder = RemoteConsultationAiResponder(
+            properties = aiProperties(),
+            objectMapper = ObjectMapper(),
+            accessTokenProvider = { "vertex-token" },
+            generateContentClient = client,
+        )
+
+        responder.generate(
+            ConsultationAiRequest(
+                memberId = 9L,
+                message = "그래도 오늘 출근을 해야 해서 막막해요.",
+                recentMessages = listOf(
+                    ConsultationMessage(
+                        id = 20L,
+                        memberId = 9L,
+                        sender = ConsultationMessageSender.USER,
+                        content = "요즘 잠을 못 자서 버티기가 힘들어요.",
+                        createdAt = "2026-05-25T00:00:00Z",
+                    ),
+                    ConsultationMessage(
+                        id = 21L,
+                        memberId = 9L,
+                        sender = ConsultationMessageSender.ASSISTANT,
+                        content = "많이 힘드셨겠어요. 오늘은 물 한 잔부터 시작해도 괜찮아요.",
+                        createdAt = "2026-05-25T00:01:00Z",
+                    ),
+                ),
+                timeout = Duration.ofSeconds(2),
+            ),
+        )
+
+        val prompt = ObjectMapper()
+            .readTree(client.requestBody!!)["contents"][0]["parts"][0]["text"]
+            .asString()
+
+        assertThat(prompt)
+            .contains(
+                "출력 체크리스트",
+                "최근 대화에서 마지막 사용자 감정과 직전 ASSISTANT 답변을 참고하되 그대로 반복하지 마",
+                "답변 구조는 공감 1문장, 작은 행동 제안 1개, 후속 질문 1개 순서",
+                "질문은 정확히 1개만 포함하고 물음표도 1개 이하",
+                "이메일, 전화번호, 실명, 주소, 소셜 계정, 위치 공유를 요구하지 마",
+                "450자 이내",
+            )
+    }
+
+    @Test
+    fun promptPrioritizesImmediateSafetyForCrisisSignals() {
+        val client = RecordingVertexAiGenerateContentClient(
+            responseBody = vertexResponse("""{"chunks":["지금은 안전이 먼저예요."]}"""),
+        )
+        val responder = RemoteConsultationAiResponder(
+            properties = aiProperties(),
+            objectMapper = ObjectMapper(),
+            accessTokenProvider = { "vertex-token" },
+            generateContentClient = client,
+        )
+
+        responder.generate(
+            ConsultationAiRequest(
+                memberId = 10L,
+                message = "죽고 싶다는 생각이 너무 강해요.",
+                recentMessages = emptyList(),
+                timeout = Duration.ofSeconds(2),
+            ),
+        )
+
+        val prompt = ObjectMapper()
+            .readTree(client.requestBody!!)["contents"][0]["parts"][0]["text"]
+            .asString()
+
+        assertThat(prompt)
+            .contains(
+                "위기 신호 단어가 userMessage 또는 recentContext에 있으면 일반 상담 구조보다 안전 확보 안내를 먼저 작성해",
+                "혼자 있지 말고 가까운 사람에게 즉시 알려",
+                "112/119/응급실",
+                "안전한 장소",
+                "상담을 이어가기 위한 질문보다 즉시 도움 연결을 우선",
+            )
+    }
+
+    @Test
     fun promptDoesNotExposeInternalMemberIdToModel() {
         val client = RecordingVertexAiGenerateContentClient(
             responseBody = vertexResponse("""{"chunks":["함께 살펴볼게요."]}"""),
