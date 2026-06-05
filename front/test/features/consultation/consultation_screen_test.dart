@@ -35,6 +35,7 @@ void main() {
       findsOneWidget,
     );
     expect(find.byKey(const ValueKey('consultation-flow-panel')), findsNothing);
+    expect(find.text('상담'), findsNothing);
     expect(find.text('상담 흐름'), findsNothing);
     expect(find.text('연결'), findsNothing);
     expect(find.text('입력'), findsNothing);

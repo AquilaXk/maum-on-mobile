@@ -412,7 +412,6 @@ class _SettingsHeader extends StatelessWidget {
         AppSpacing.xs,
       ),
       child: AppScreenHeader(
-        eyebrow: '설정',
         title: '계정 설정',
         onBack: onBack,
       ),

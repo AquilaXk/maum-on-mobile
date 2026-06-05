@@ -69,7 +69,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('설정'), findsOneWidget);
+    expect(find.text('설정'), findsNothing);
     expect(
       find.byKey(const ValueKey('settings-account-toolbar')),
       findsOneWidget,
