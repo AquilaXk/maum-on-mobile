@@ -32,11 +32,9 @@ void main() {
       find.byKey(const ValueKey('settings-account-toolbar')),
       findsOneWidget,
     );
-    expect(find.byKey(const ValueKey('settings-flow-panel')), findsOneWidget);
-    expect(find.text('계정 점검 흐름'), findsOneWidget);
-    expect(find.text('계정'), findsOneWidget);
-    expect(find.text('보안'), findsOneWidget);
-    expect(find.text('지원'), findsOneWidget);
+    expect(find.byKey(const ValueKey('settings-flow-panel')), findsNothing);
+    expect(find.text('계정 점검 흐름'), findsNothing);
+    expect(find.text('계정 정보, 보안 항목, 지원 채널을 순서대로 확인합니다.'), findsNothing);
     expect(find.text('이메일 계정'), findsOneWidget);
     expect(find.text('랜덤 편지 수신 중'), findsOneWidget);
     expect(find.text('내보내기 요청 가능'), findsOneWidget);
