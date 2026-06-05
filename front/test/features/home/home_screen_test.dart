@@ -44,6 +44,11 @@ void main() {
     expect(find.text('지금 마음을 천천히 살펴보세요.'), findsNothing);
     expect(find.byKey(const ValueKey('home-primary-actions-panel')),
         findsOneWidget);
+    expect(find.text('이어쓸 내용이 없습니다.'), findsNothing);
+    expect(
+      find.text('새 기록, 편지, 스토리, 상담을 바로 시작할 수 있습니다.'),
+      findsNothing,
+    );
     expect(find.text('최근 인기'), findsOneWidget);
     expect(find.text('오늘 너무 지쳐요'), findsWidgets);
     expect(find.byKey(const ValueKey('home-feed-story-1')), findsOneWidget);

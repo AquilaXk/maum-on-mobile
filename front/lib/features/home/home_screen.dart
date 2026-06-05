@@ -87,6 +87,7 @@ class _HomeScreenState extends State<HomeScreen> {
       animation: widget.homeController,
       builder: (context, _) {
         final state = widget.homeController.state;
+        final showDraftContinuation = _shouldShowDraftContinuation(state);
 
         return AppScreen(
           title: 'Maum On',
@@ -121,11 +122,13 @@ class _HomeScreenState extends State<HomeScreen> {
               onOpenSettings: widget.onOpenSettings,
               onLogout: widget.onLogout,
             ),
-            const SizedBox(height: AppSpacing.lg),
-            _DraftContinuationSection(
-              state: state,
-              onContinue: _openSurface,
-            ),
+            if (showDraftContinuation) ...[
+              const SizedBox(height: AppSpacing.lg),
+              _DraftContinuationSection(
+                state: state,
+                onContinue: _openSurface,
+              ),
+            ],
             const SizedBox(height: AppSpacing.xl),
             _CategoryOverview(
               stats: state.stats,
@@ -148,6 +151,12 @@ class _HomeScreenState extends State<HomeScreen> {
       },
     );
   }
+}
+
+bool _shouldShowDraftContinuation(HomeState state) {
+  return state.isDraftLoading ||
+      state.draftErrorMessage != null ||
+      state.drafts.isNotEmpty;
 }
 
 class _StatsSection extends StatelessWidget {

@@ -13,6 +13,11 @@ void main() {
       find.byKey(const ValueKey('home-primary-actions-panel')),
       findsOneWidget,
     );
+    expect(find.text('이어쓸 내용이 없습니다.'), findsNothing);
+    expect(
+      find.text('새 기록, 편지, 스토리, 상담을 바로 시작할 수 있습니다.'),
+      findsNothing,
+    );
     expect(find.textContaining('오늘의 마음'), findsWidgets);
 
     await tester.ensureVisible(
