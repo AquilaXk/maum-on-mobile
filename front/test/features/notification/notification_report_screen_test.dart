@@ -216,6 +216,30 @@ void main() {
     expect(idRect.width, greaterThanOrEqualTo(240));
     expect(idRect.top, greaterThan(typeRect.bottom));
   });
+
+  testWidgets('keeps notification empty state free of helper explanation copy',
+      (tester) async {
+    final notificationRepository = _EmptyNotificationRepository();
+    final reportRepository = _FakeReportRepository();
+    final notificationController = NotificationController(
+      repository: notificationRepository,
+    );
+    final reportController = ReportController(repository: reportRepository);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: NotificationReportScreen(
+          notificationController: notificationController,
+          reportController: reportController,
+          onBack: () {},
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('아직 도착한 알림이 없습니다.'), findsOneWidget);
+    expect(find.text('새 알림이 오면 이곳에 표시됩니다.'), findsNothing);
+  });
 }
 
 class _FakeNotificationRepository implements NotificationRepository {
@@ -294,6 +318,16 @@ class _FakeNotificationRepository implements NotificationRepository {
 
   void emit(NotificationStreamEvent event) {
     _controller?.add(event);
+  }
+}
+
+class _EmptyNotificationRepository extends _FakeNotificationRepository {
+  @override
+  Future<List<NotificationItem>> fetchNotifications() async => const [];
+
+  @override
+  Future<NotificationBulkReadResult> markAllRead() async {
+    return const NotificationBulkReadResult(updatedCount: 0);
   }
 }
 
