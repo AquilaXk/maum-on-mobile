@@ -493,6 +493,7 @@ class _ReplyComposerState extends State<_ReplyComposer> {
               minLines: 4,
               maxLines: 8,
               maxLength: LetterLimits.replyMaxLength,
+              buildCounter: _hideLengthCounter,
               decoration: const InputDecoration(
                 labelText: '답장',
                 border: OutlineInputBorder(),
@@ -571,6 +572,7 @@ class _LetterComposeViewState extends State<_LetterComposeView> {
             key: const ValueKey('letter-title-field'),
             controller: _titleController,
             maxLength: LetterLimits.titleMaxLength,
+            buildCounter: _hideLengthCounter,
             decoration: const InputDecoration(
               labelText: '제목',
               border: OutlineInputBorder(),
@@ -584,6 +586,7 @@ class _LetterComposeViewState extends State<_LetterComposeView> {
             minLines: 8,
             maxLines: 14,
             maxLength: LetterLimits.contentMaxLength,
+            buildCounter: _hideLengthCounter,
             decoration: const InputDecoration(
               labelText: '본문',
               border: OutlineInputBorder(),
@@ -672,6 +675,15 @@ void _syncText(TextEditingController controller, String nextText) {
     text: nextText,
     selection: TextSelection.collapsed(offset: nextText.length),
   );
+}
+
+Widget? _hideLengthCounter(
+  BuildContext context, {
+  required int currentLength,
+  required bool isFocused,
+  required int? maxLength,
+}) {
+  return null;
 }
 
 class _StatusPill extends StatelessWidget {
