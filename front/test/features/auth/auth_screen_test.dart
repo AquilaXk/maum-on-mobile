@@ -28,7 +28,7 @@ void main() {
     );
   });
 
-  testWidgets('renders the product brand wordmark in the existing header slot',
+  testWidgets('renders the product brand wordmark without helper copy',
       (tester) async {
     final repository = _FakeAuthRepository();
     await tester.pumpWidget(
@@ -38,39 +38,29 @@ void main() {
     expect(
         find.byKey(const ValueKey('maum-on-brand-wordmark')), findsOneWidget);
     expect(find.bySemanticsLabel('Maum On'), findsOneWidget);
-    expect(find.text('계정으로 마음 기록을 이어가세요.'), findsOneWidget);
+    expect(find.text('계정으로 마음 기록을 이어가세요.'), findsNothing);
     expect(find.byKey(const ValueKey('login-email-field')), findsOneWidget);
     expect(find.byKey(const ValueKey('login-submit-button')), findsOneWidget);
   });
 
-  testWidgets('shows a compact trust strip before the auth form',
+  testWidgets('keeps auth modes free of trust strip helper copy',
       (tester) async {
     final repository = _FakeAuthRepository();
     await tester.pumpWidget(
       _AuthScreenHarness(repository: repository),
     );
 
-    expect(find.byKey(const ValueKey('auth-trust-strip')), findsOneWidget);
-    expect(find.text('이메일 로그인'), findsOneWidget);
-    expect(find.text('자동 로그인'), findsOneWidget);
-    expect(find.text('안전한 기록'), findsOneWidget);
+    expect(find.byKey(const ValueKey('auth-trust-strip')), findsNothing);
+    expect(find.text('이메일 로그인'), findsNothing);
+    expect(find.text('자동 로그인'), findsNothing);
+    expect(find.text('안전한 기록'), findsNothing);
 
     await tester.tap(find.text('새 계정 만들기'));
     await tester.pumpAndSettle();
 
-    final trustStrip = find.byKey(const ValueKey('auth-trust-strip'));
-    expect(
-      find.descendant(of: trustStrip, matching: find.text('이메일 인증')),
-      findsOneWidget,
-    );
-    expect(
-      find.descendant(of: trustStrip, matching: find.text('6자리 코드')),
-      findsOneWidget,
-    );
-    expect(
-      find.descendant(of: trustStrip, matching: find.text('프로필 설정')),
-      findsOneWidget,
-    );
+    expect(find.byKey(const ValueKey('auth-trust-strip')), findsNothing);
+    expect(find.text('6자리 코드'), findsNothing);
+    expect(find.text('프로필 설정'), findsNothing);
   });
 
   testWidgets('keeps auth structure inside a blue visual shell',
@@ -150,19 +140,13 @@ void main() {
     );
     expect(find.byKey(const ValueKey('login-password-field')), findsOneWidget);
     expect(find.byKey(const ValueKey('signup-nickname-field')), findsOneWidget);
-    final trustStrip = find.byKey(const ValueKey('auth-trust-strip'));
     expect(
-      find.descendant(of: trustStrip, matching: find.text('인증번호 확인')),
-      findsOneWidget,
+      find.byKey(const ValueKey('auth-trust-strip')),
+      findsNothing,
     );
-    expect(
-      find.descendant(of: trustStrip, matching: find.text('비밀번호 설정')),
-      findsOneWidget,
-    );
-    expect(
-      find.descendant(of: trustStrip, matching: find.text('프로필 설정')),
-      findsOneWidget,
-    );
+    expect(find.text('인증번호 확인'), findsNothing);
+    expect(find.text('비밀번호 설정'), findsNothing);
+    expect(find.text('프로필 설정'), findsNothing);
 
     await tester.enterText(
       find.byKey(const ValueKey('signup-email-verification-code-field')),
@@ -207,7 +191,7 @@ void main() {
 
     await tester.tap(find.byKey(const ValueKey('password-reset-open-button')));
     await tester.pumpAndSettle();
-    expect(find.text('비밀번호 재설정'), findsOneWidget);
+    expect(find.text('계정 이메일 확인'), findsOneWidget);
 
     await tester.enterText(
       find.byKey(const ValueKey('password-reset-email-field')),
@@ -256,7 +240,7 @@ void main() {
     );
   });
 
-  testWidgets('exposes privacy, terms, support, and deletion guidance',
+  testWidgets('exposes legal links without account deletion helper copy',
       (tester) async {
     final repository = _FakeAuthRepository();
     await tester.pumpWidget(
@@ -269,8 +253,27 @@ void main() {
     expect(find.byKey(const ValueKey('auth-support-link')), findsOneWidget);
     expect(
       find.byKey(const ValueKey('auth-account-deletion-guidance')),
+      findsNothing,
+    );
+    expect(
+      find.byKey(const ValueKey('auth-account-deletion-link')),
       findsOneWidget,
     );
+
+    await tester.ensureVisible(
+      find.byKey(const ValueKey('auth-account-deletion-link')),
+    );
+    await tester.tap(find.byKey(const ValueKey('auth-account-deletion-link')));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.byKey(const ValueKey('auth-account-deletion-dialog')),
+      findsOneWidget,
+    );
+    expect(find.text('로그인 후 설정에서 진행할 수 있습니다.'), findsOneWidget);
+
+    await tester.tap(find.text('확인'));
+    await tester.pumpAndSettle();
 
     await tester.tap(find.text('새 계정 만들기'));
     await tester.pumpAndSettle();
@@ -290,6 +293,14 @@ void main() {
     expect(
         find.byKey(const ValueKey('auth-privacy-policy-link')), findsOneWidget);
     expect(find.byKey(const ValueKey('auth-terms-link')), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('auth-account-deletion-guidance')),
+      findsNothing,
+    );
+    expect(
+      find.byKey(const ValueKey('auth-account-deletion-link')),
+      findsOneWidget,
+    );
   });
 
   testWidgets('hides quick login when no provider is linked', (tester) async {
@@ -324,6 +335,10 @@ void main() {
     );
     expect(
       find.byKey(const ValueKey('auth-account-deletion-guidance')),
+      findsNothing,
+    );
+    expect(
+      find.byKey(const ValueKey('auth-account-deletion-link')),
       findsOneWidget,
     );
     expect(launcher.launchedUris, isEmpty);

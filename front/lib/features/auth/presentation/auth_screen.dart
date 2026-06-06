@@ -98,13 +98,8 @@ class _AuthScreenState extends State<AuthScreen> {
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        _AuthHeader(subtitle: _subtitle),
-                        const SizedBox(height: AppSpacing.lg),
-                        _AuthTrustStrip(
-                          items: _trustStripItems,
-                          semanticLabel: _trustStripSemanticLabel,
-                        ),
-                        const SizedBox(height: AppSpacing.lg),
+                        const _AuthHeader(),
+                        const SizedBox(height: AppSpacing.xl),
                         _AuthFormPanel(
                           title: _modeTitle,
                           icon: _submitIcon,
@@ -167,6 +162,19 @@ class _AuthScreenState extends State<AuthScreen> {
                         LegalDisclosureLinks(
                           keyPrefix: 'auth',
                           onOpenExternalUri: widget.onOpenExternalUri,
+                          showAccountDeletionGuidance: false,
+                        ),
+                        const SizedBox(height: AppSpacing.xs),
+                        Center(
+                          child: TextButton.icon(
+                            key: const ValueKey('auth-account-deletion-link'),
+                            onPressed: _showAccountDeletionGuidance,
+                            icon: const Icon(
+                              Icons.person_remove_outlined,
+                              size: 18,
+                            ),
+                            label: const Text('회원 탈퇴'),
+                          ),
                         ),
                       ],
                     ),
@@ -178,15 +186,6 @@ class _AuthScreenState extends State<AuthScreen> {
         ),
       ),
     );
-  }
-
-  String get _subtitle {
-    return switch (_mode) {
-      AuthFormMode.login => '계정으로 마음 기록을 이어가세요.',
-      AuthFormMode.signup => '새 계정을 만들고 시작하세요.',
-      AuthFormMode.passwordResetRequest => '비밀번호 재설정',
-      AuthFormMode.passwordResetConfirm => '비밀번호 재설정',
-    };
   }
 
   String get _modeTitle {
@@ -229,49 +228,6 @@ class _AuthScreenState extends State<AuthScreen> {
       AuthFormMode.passwordResetRequest => Icons.outgoing_mail,
       AuthFormMode.passwordResetConfirm => Icons.lock_reset,
     };
-  }
-
-  List<_AuthTrustItemData> get _trustStripItems {
-    return switch (_mode) {
-      AuthFormMode.login => const [
-          _AuthTrustItemData(Icons.alternate_email, '이메일 로그인'),
-          _AuthTrustItemData(Icons.verified_user_outlined, '자동 로그인'),
-          _AuthTrustItemData(Icons.lock_outline, '안전한 기록'),
-        ],
-      AuthFormMode.signup => _signupEmailVerificationRequested
-          ? const [
-              _AuthTrustItemData(Icons.mark_email_read_outlined, '인증번호 확인'),
-              _AuthTrustItemData(Icons.lock_outline, '비밀번호 설정'),
-              _AuthTrustItemData(Icons.person_outline, '프로필 설정'),
-            ]
-          : const [
-              _AuthTrustItemData(Icons.mark_email_unread_outlined, '이메일 인증'),
-              _AuthTrustItemData(Icons.pin_outlined, '6자리 코드'),
-              _AuthTrustItemData(Icons.person_outline, '프로필 설정'),
-            ],
-      AuthFormMode.passwordResetRequest => const [
-          _AuthTrustItemData(Icons.alternate_email, '이메일 확인'),
-          _AuthTrustItemData(Icons.outgoing_mail, '안내 발송'),
-          _AuthTrustItemData(Icons.lock_reset, '재설정'),
-        ],
-      AuthFormMode.passwordResetConfirm => const [
-          _AuthTrustItemData(Icons.password, '토큰 입력'),
-          _AuthTrustItemData(Icons.lock_reset, '새 비밀번호'),
-          _AuthTrustItemData(Icons.login, '다시 로그인'),
-        ],
-    };
-  }
-
-  String get _trustStripSemanticLabel {
-    final prefix = switch (_mode) {
-      AuthFormMode.login => '보안 기능',
-      AuthFormMode.signup => '가입 절차',
-      AuthFormMode.passwordResetRequest ||
-      AuthFormMode.passwordResetConfirm =>
-        '재설정 단계',
-    };
-    final labels = _trustStripItems.map((item) => item.label).join(', ');
-    return '$prefix: $labels';
   }
 
   List<Widget> _fieldsForMode(ThemeData theme, bool isAuthBusy) {
@@ -503,12 +459,6 @@ class _AuthScreenState extends State<AuthScreen> {
             child: const Text('새 계정 만들기'),
           ),
         );
-        if (LoginProviderPolicy.showsReviewEmailGuidance(platform)) {
-          actions.add(const SizedBox(height: 8));
-          actions.add(
-            const _IosReviewEmailLoginGuidance(),
-          );
-        }
         final providers =
             widget.loginProviders ?? LoginProviderPolicy.providersFor(platform);
         if (widget.externalLoginController != null && providers.isNotEmpty) {
@@ -734,6 +684,23 @@ class _AuthScreenState extends State<AuthScreen> {
     });
   }
 
+  Future<void> _showAccountDeletionGuidance() {
+    return showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        key: const ValueKey('auth-account-deletion-dialog'),
+        title: const Text('회원 탈퇴'),
+        content: const Text('로그인 후 설정에서 진행할 수 있습니다.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            child: const Text('확인'),
+          ),
+        ],
+      ),
+    );
+  }
+
   void _resetSignupEmailVerification() {
     setState(() {
       _signupEmailVerificationRequested = false;
@@ -748,129 +715,20 @@ class _AuthScreenState extends State<AuthScreen> {
 }
 
 class _AuthHeader extends StatelessWidget {
-  const _AuthHeader({required this.subtitle});
-
-  final String subtitle;
+  const _AuthHeader();
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    return Column(
+    return const Column(
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
-        const MaumOnBrandWordmark(
+        MaumOnBrandWordmark(
           height: 44,
           foregroundColor: AppBrandColors.foreground,
-        ),
-        const SizedBox(height: AppSpacing.md),
-        ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 320),
-          child: Text(
-            subtitle,
-            textAlign: TextAlign.center,
-            style: theme.textTheme.bodyLarge?.copyWith(
-              color: theme.colorScheme.onSurfaceVariant,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
         ),
       ],
     );
   }
-}
-
-class _AuthTrustStrip extends StatelessWidget {
-  const _AuthTrustStrip({
-    required this.items,
-    required this.semanticLabel,
-  });
-
-  final List<_AuthTrustItemData> items;
-  final String semanticLabel;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-
-    return Semantics(
-      label: semanticLabel,
-      child: ExcludeSemantics(
-        child: DecoratedBox(
-          key: const ValueKey('auth-trust-strip'),
-          decoration: BoxDecoration(
-            color: colorScheme.primaryContainer.withValues(alpha: 0.56),
-            borderRadius: AppRadii.card,
-            border: Border.all(
-              color: colorScheme.primary.withValues(alpha: 0.14),
-            ),
-          ),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(
-              horizontal: AppSpacing.xs,
-              vertical: AppSpacing.xs,
-            ),
-            child: Row(
-              children: [
-                for (var index = 0; index < items.length; index++) ...[
-                  Expanded(child: _AuthTrustItem(item: items[index])),
-                  if (index != items.length - 1)
-                    Container(
-                      width: 1,
-                      height: 24,
-                      color: colorScheme.outlineVariant,
-                    ),
-                ],
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _AuthTrustItem extends StatelessWidget {
-  const _AuthTrustItem({required this.item});
-
-  final _AuthTrustItemData item;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xxs),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(item.icon, size: 16, color: colorScheme.primary),
-          const SizedBox(width: AppSpacing.xxs),
-          Flexible(
-            child: Text(
-              item.label,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: colorScheme.onPrimaryContainer,
-                fontWeight: FontWeight.w800,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _AuthTrustItemData {
-  const _AuthTrustItemData(this.icon, this.label);
-
-  final IconData icon;
-  final String label;
 }
 
 class _AuthFormPanel extends StatelessWidget {
@@ -1154,21 +1012,5 @@ class _QuickLoginProviderMark extends StatelessWidget {
           size: 30,
         ),
     };
-  }
-}
-
-class _IosReviewEmailLoginGuidance extends StatelessWidget {
-  const _IosReviewEmailLoginGuidance();
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Text(
-      'iOS에서는 이메일과 비밀번호로 로그인할 수 있으며, 계정 삭제는 로그인 후 설정의 회원 탈퇴에서 진행할 수 있습니다.',
-      key: const ValueKey('ios-review-email-login-guidance'),
-      style: theme.textTheme.bodySmall?.copyWith(
-        color: theme.colorScheme.onSurfaceVariant,
-      ),
-    );
   }
 }
