@@ -173,7 +173,7 @@ void main() {
     expect(cleaned, isTrue);
   });
 
-  testWidgets('exposes privacy disclosures and deletion guidance',
+  testWidgets('exposes privacy disclosures and withdrawal action',
       (tester) async {
     final repository = _FakeSettingsRepository();
     final controller = SettingsController(repository: repository);
@@ -197,10 +197,53 @@ void main() {
         findsOneWidget);
     expect(find.byKey(const ValueKey('settings-terms-link')), findsOneWidget);
     expect(find.byKey(const ValueKey('settings-support-link')), findsOneWidget);
-    expect(find.textContaining('계정 삭제'), findsOneWidget);
     expect(find.textContaining('내 데이터'), findsWidgets);
     expect(find.byKey(const ValueKey('settings-request-withdraw')),
         findsOneWidget);
+  });
+
+  testWidgets('keeps settings sections free of helper explanation copy',
+      (tester) async {
+    final repository = _FakeSettingsRepository()
+      ..settings = const MemberSettings(
+        id: 7,
+        email: 'me@example.com',
+        nickname: '마음이',
+        randomReceiveAllowed: true,
+        socialAccount: true,
+      );
+    final controller = SettingsController(repository: repository);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: SettingsScreen(
+          controller: controller,
+          onBack: () {},
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(
+      find.text('계정 삭제는 아래 회원 탈퇴에서 처리하며, 보존 정책을 먼저 확인해 주세요.'),
+      findsNothing,
+    );
+    expect(
+      find.text('탈퇴 전 데이터 내보내기와 보존 정책을 확인해 주세요.'),
+      findsNothing,
+    );
+
+    final emailField = tester.widget<TextField>(
+      find.byKey(const ValueKey('settings-email-field')),
+    );
+    final currentPasswordField = tester.widget<TextField>(
+      find.byKey(const ValueKey('settings-current-password-field')),
+    );
+
+    expect(emailField.decoration?.helperText, isNull);
+    expect(currentPasswordField.decoration?.helperText, isNull);
+    expect(emailField.enabled, isFalse);
+    expect(currentPasswordField.enabled, isFalse);
   });
 
   testWidgets('opens support contacts and copies sanitized diagnostics',
