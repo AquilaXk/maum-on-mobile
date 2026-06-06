@@ -46,6 +46,8 @@ void main() {
         find.byKey(const ValueKey('diary-quick-write-button')), findsOneWidget);
     expect(find.text('오늘 기록 쓰기'), findsOneWidget);
     expect(find.text('선택한 날 1개'), findsOneWidget);
+    expect(find.text('다른 사용자의 공개 기록을 읽으며 흐름을 이어갑니다.'), findsNothing);
+    expect(find.text('공개 기록이 생기면 이곳에 표시됩니다.'), findsNothing);
   });
 
   testWidgets('stacks diary attachment actions on a narrow phone viewport',
@@ -132,6 +134,8 @@ void main() {
         findsOneWidget);
     expect(find.text('오늘의 기록 흐름'), findsNothing);
     expect(find.text('선택한 날을 확인하고, 바로 이어서 기록하세요.'), findsNothing);
+    expect(find.text('아래 입력 영역에서 오늘의 마음을 기록할 수 있습니다.'), findsNothing);
+    expect(find.text('다른 사용자의 공개 기록을 읽으며 흐름을 이어갑니다.'), findsNothing);
     expect(
         find.byKey(const ValueKey('diary-quick-write-button')), findsOneWidget);
     expect(
@@ -473,7 +477,9 @@ void main() {
 
     expect(find.text('처음 공개 기록'), findsOneWidget);
     expect(find.text('다음 공개 기록'), findsOneWidget);
-    expect(find.text('마지막 공개 기록입니다.'), findsOneWidget);
+    expect(find.text('마지막 공개 기록입니다.'), findsNothing);
+    expect(find.byKey(const ValueKey('diary-public-load-more-button')),
+        findsNothing);
   });
 
   testWidgets('cancels editing and clears the form', (tester) async {
