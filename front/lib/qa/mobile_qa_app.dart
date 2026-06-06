@@ -164,7 +164,7 @@ class _QaHomeRepository implements HomeRepository {
             ),
             HomeStory(
               id: 2,
-              title: '일상 QA 스토리',
+              title: '작은 산책이 남긴 여유',
               summary: '평범한 하루에서 찾은 회복의 장면',
               authorNickname: '온기',
               category: HomeStoryCategory.daily,
@@ -173,7 +173,7 @@ class _QaHomeRepository implements HomeRepository {
             ),
             HomeStory(
               id: 3,
-              title: '질문 QA 스토리',
+              title: '다른 관점을 묻는 밤',
               summary: '다른 사람의 관점을 묻고 답을 기다리는 이야기',
               authorNickname: '물음표',
               category: HomeStoryCategory.question,
@@ -194,7 +194,7 @@ HomeStory _qaHomeStory(HomeStoryCategory category) {
   return switch (category) {
     HomeStoryCategory.worry => const HomeStory(
         id: 11,
-        title: '고민 QA 스토리',
+        title: '복잡한 마음을 꺼내는 연습',
         summary: '복잡한 마음을 안전하게 꺼내 보는 이야기',
         authorNickname: '마음이',
         category: HomeStoryCategory.worry,
@@ -203,7 +203,7 @@ HomeStory _qaHomeStory(HomeStoryCategory category) {
       ),
     HomeStoryCategory.daily => const HomeStory(
         id: 12,
-        title: '일상 QA 스토리',
+        title: '작은 산책이 남긴 여유',
         summary: '평범한 하루에서 찾은 회복의 장면',
         authorNickname: '온기',
         category: HomeStoryCategory.daily,
@@ -212,7 +212,7 @@ HomeStory _qaHomeStory(HomeStoryCategory category) {
       ),
     HomeStoryCategory.question => const HomeStory(
         id: 13,
-        title: '질문 QA 스토리',
+        title: '다른 관점을 묻는 밤',
         summary: '다른 사람의 관점을 묻고 답을 기다리는 이야기',
         authorNickname: '물음표',
         category: HomeStoryCategory.question,
@@ -965,7 +965,7 @@ class _QaSettingsRepository implements SettingsRepository {
       requestedAt: '2026-06-05T09:30:00Z',
       completedAt: '2026-06-05T09:30:00Z',
       expiresAt: '2999-06-05T09:30:00Z',
-      downloadUrl: '/qa/export/1',
+      downloadUrl: '/exports/1',
     );
   }
 
@@ -977,16 +977,16 @@ class _QaSettingsRepository implements SettingsRepository {
       requestedAt: '2026-06-05T09:30:00Z',
       completedAt: '2026-06-05T09:30:00Z',
       expiresAt: '2999-06-05T09:30:00Z',
-      downloadUrl: '/qa/export/$exportId',
+      downloadUrl: '/exports/$exportId',
     );
   }
 
   @override
   Future<MemberDataExportFile> downloadDataExport(int exportId) async {
     return MemberDataExportFile(
-      filename: 'maum-on-qa-export-$exportId.json',
+      filename: 'maum-on-export-$exportId.json',
       contentType: 'application/json',
-      content: '{"qa":true}',
+      content: '{"ready":true}',
       expiresAt: '2999-06-05T09:30:00Z',
     );
   }
@@ -1006,7 +1006,7 @@ class _QaContentModerationRepository implements ContentModerationRepository {
     return const ContentModerationResult(
       allowed: true,
       riskLevel: ContentModerationRiskLevel.low,
-      message: 'QA 입력은 통과되었습니다.',
+      message: '입력 내용을 저장할 수 있습니다.',
       categories: [],
     );
   }
@@ -1093,12 +1093,12 @@ AdminMemberSummary _qaAdminMemberSummary({
   );
 }
 
-AdminAuditEvent _qaAuditEvent({String reason = 'QA 검수'}) {
+AdminAuditEvent _qaAuditEvent({String reason = '검수 완료'}) {
   return AdminAuditEvent(
     id: 1,
     targetMemberId: 7,
     actorMemberId: 7,
-    action: 'QA_ACTION',
+    action: 'REVIEW_ACTION',
     previousValue: 'OLD',
     newValue: 'NEW',
     reason: reason,
