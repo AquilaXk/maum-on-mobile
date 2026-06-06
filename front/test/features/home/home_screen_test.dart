@@ -34,6 +34,7 @@ void main() {
 
     expect(find.byType(SingleChildScrollView), findsOneWidget);
     expect(find.text('홈'), findsNothing);
+    expect(find.text('마음이님, 오늘의 마음을 이어가세요.'), findsNothing);
     expect(find.text('오늘 올라온 고민'), findsOneWidget);
     expect(find.text('전달된 비밀 편지'), findsOneWidget);
     expect(find.text('오늘의 기록'), findsOneWidget);
@@ -49,6 +50,7 @@ void main() {
       find.text('새 기록, 편지, 스토리, 상담을 바로 시작할 수 있습니다.'),
       findsNothing,
     );
+    expect(find.text('고민 이야기가 가장 활발합니다.'), findsNothing);
     expect(find.text('최근 인기'), findsOneWidget);
     expect(find.text('오늘 너무 지쳐요'), findsWidgets);
     expect(find.byKey(const ValueKey('home-feed-story-1')), findsOneWidget);
@@ -131,6 +133,7 @@ void main() {
     expect(find.byKey(const ValueKey('home-primary-panel')), findsNothing);
     expect(find.byKey(const ValueKey('home-blue-hero')), findsNothing);
     expect(find.text('지금 마음을 천천히 살펴보세요.'), findsNothing);
+    expect(find.text('마음이님, 오늘의 마음을 이어가세요.'), findsNothing);
     expect(
       find.byKey(const ValueKey('home-primary-actions-panel')),
       findsOneWidget,

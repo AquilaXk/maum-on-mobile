@@ -22,7 +22,8 @@ void main() {
     expect(find.text('조용히 전하기'), findsNothing);
     expect(find.text('함께 읽기'), findsNothing);
     expect(find.text('지금 대화하기'), findsNothing);
-    expect(find.textContaining('오늘의 마음'), findsWidgets);
+    expect(find.textContaining('오늘의 마음'), findsNothing);
+    expect(find.text('최근 마음 나눔이 차분히 이어지고 있어요.'), findsNothing);
 
     await tester.ensureVisible(
       find.byKey(const ValueKey('home-category-daily')),
