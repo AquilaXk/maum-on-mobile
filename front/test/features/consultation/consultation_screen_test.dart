@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:maum_on_mobile_front/features/consultation/application/consultation_controller.dart';
 import 'package:maum_on_mobile_front/features/consultation/data/consultation_repository.dart';
@@ -105,6 +106,7 @@ void main() {
 
   testWidgets('hides composer count and aligns send action with input',
       (tester) async {
+    final semanticsHandle = tester.ensureSemantics();
     tester.view.physicalSize = const Size(390, 640);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
@@ -144,9 +146,26 @@ void main() {
     final messageField = tester.widget<TextField>(
       find.byKey(const ValueKey('consultation-message-field')),
     );
+    expect(messageField.maxLength, ConsultationController.maxMessageLength);
+    expect(messageField.inputFormatters, isNull);
+    expect(messageField.buildCounter, isNotNull);
+    expect(messageField.decoration?.helperText, isNull);
     expect(messageField.decoration?.counterText, isNull);
-    expect(messageField.decoration?.counter, isA<SizedBox>());
+    expect(messageField.decoration?.semanticCounterText, isNull);
+    expect(messageField.decoration?.counter, isNull);
     expect(messageField.decoration?.constraints?.minHeight, 56);
+
+    final fieldSemantics = _findSemanticsWithLengthLimit(
+      tester,
+      ConsultationController.maxMessageLength,
+      where: (data) =>
+          data.flagsCollection.isTextField &&
+          data.currentValueLength == 2 &&
+          data.value == '안녕',
+    );
+    expect(fieldSemantics, isNotNull);
+    expect(fieldSemantics!.currentValueLength, 2);
+    semanticsHandle.dispose();
 
     final fieldRect = tester.getRect(
       find.byKey(const ValueKey('consultation-message-field')),
@@ -156,11 +175,71 @@ void main() {
     );
 
     expect(
-      (sendButtonRect.height - fieldRect.height).abs(),
-      lessThanOrEqualTo(1),
+      sendButtonRect.width,
+      52,
+    );
+    expect(
+      sendButtonRect.height,
+      52,
+    );
+    expect(
+      fieldRect.height,
+      greaterThanOrEqualTo(sendButtonRect.height),
     );
     expect(
       (sendButtonRect.center.dy - fieldRect.center.dy).abs(),
+      lessThanOrEqualTo(1),
+    );
+
+    await tester.tap(find.byKey(const ValueKey('consultation-send-button')));
+    await tester.pump();
+
+    expect(find.text('답변을 작성 중입니다.'), findsNothing);
+    expect(
+      tester
+          .widget<TextField>(
+            find.byKey(const ValueKey('consultation-message-field')),
+          )
+          .decoration
+          ?.helperText,
+      isNull,
+    );
+    final streamingFieldRect = tester.getRect(
+      find.byKey(const ValueKey('consultation-message-field')),
+    );
+    final streamingSendButtonRect = tester.getRect(
+      find.byKey(const ValueKey('consultation-send-button')),
+    );
+    expect(
+      (streamingSendButtonRect.center.dy - streamingFieldRect.center.dy).abs(),
+      lessThanOrEqualTo(1),
+    );
+
+    repository.emit(const ConsultationStreamEvent.done());
+    await tester.pump();
+
+    await tester.enterText(
+      find.byKey(const ValueKey('consultation-message-field')),
+      '첫 줄\n둘째 줄\n셋째 줄',
+    );
+    await tester.pump();
+
+    expect(
+      find.textContaining('/${ConsultationController.maxMessageLength}'),
+      findsNothing,
+    );
+
+    final expandedFieldRect = tester.getRect(
+      find.byKey(const ValueKey('consultation-message-field')),
+    );
+    final fixedSendButtonRect = tester.getRect(
+      find.byKey(const ValueKey('consultation-send-button')),
+    );
+
+    expect(fixedSendButtonRect.width, 52);
+    expect(fixedSendButtonRect.height, 52);
+    expect(
+      (fixedSendButtonRect.center.dy - expandedFieldRect.center.dy).abs(),
       lessThanOrEqualTo(1),
     );
   });
@@ -357,6 +436,8 @@ void main() {
       find.byKey(const ValueKey('consultation-message-field')),
     );
     expect(messageField.enabled, isFalse);
+    expect(messageField.decoration?.helperText, isNull);
+    expect(find.text('안전 안내 확인 후 다시 이용할 수 있습니다.'), findsNothing);
 
     await tester.tap(
       find.byKey(const ValueKey('consultation-emergency-119-button')),
@@ -375,6 +456,48 @@ void main() {
     expect(
         find.byKey(const ValueKey('consultation-safety-notice')), findsNothing);
   });
+}
+
+SemanticsData? _findSemanticsWithLengthLimit(
+  WidgetTester tester,
+  int maxValueLength, {
+  bool Function(SemanticsData data)? where,
+}) {
+  final roots = <SemanticsNode>[];
+  void collectSemanticsRoots(PipelineOwner owner) {
+    final root = owner.semanticsOwner?.rootSemanticsNode;
+    if (root != null) {
+      roots.add(root);
+    }
+    owner.visitChildren(collectSemanticsRoots);
+  }
+
+  collectSemanticsRoots(tester.binding.rootPipelineOwner);
+  for (final root in roots) {
+    final data = _findSemanticsData(root, maxValueLength, where: where);
+    if (data != null) {
+      return data;
+    }
+  }
+  return null;
+}
+
+SemanticsData? _findSemanticsData(
+  SemanticsNode node,
+  int maxValueLength, {
+  bool Function(SemanticsData data)? where,
+}) {
+  final data = node.getSemanticsData();
+  if (data.maxValueLength == maxValueLength && (where?.call(data) ?? true)) {
+    return data;
+  }
+
+  SemanticsData? result;
+  node.visitChildren((child) {
+    result ??= _findSemanticsData(child, maxValueLength, where: where);
+    return result == null;
+  });
+  return result;
 }
 
 class _FakeConsultationRepository implements ConsultationRepository {
