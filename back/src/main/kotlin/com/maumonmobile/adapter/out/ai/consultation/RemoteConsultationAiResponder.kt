@@ -137,7 +137,7 @@ class RemoteConsultationAiResponder internal constructor(
             안전 모드:
             - 의학적 진단을 대신하지 말고, 단정적인 판단이나 위험한 지시는 하지 마.
             - 위기 신호가 보이면 공감보다 안전 확보를 먼저 안내해.
-            - 위기 신호 단어가 userMessage 또는 recentContext에 있으면 일반 상담 구조보다 안전 확보 안내를 먼저 작성해.
+            - 위기 신호 단어가 USER 입력 또는 [이전 대화 맥락]에 있으면 일반 상담 구조보다 안전 확보 안내를 먼저 작성해.
             - 혼자 있지 말고 가까운 사람에게 즉시 알려 도움을 받도록 안내해.
             - 즉시 위험하면 112/119/응급실에 도움을 요청하도록 안내해.
             - 폭력, 감금, 자해 위험이 있으면 안전한 장소로 이동하거나 안전한 거리를 확보하도록 안내해.
@@ -147,9 +147,11 @@ class RemoteConsultationAiResponder internal constructor(
             compact JSON만 반환하고, 마크다운이나 코드블록은 쓰지 마.
             chunks 배열은 1~3개로 만들고, 각 항목은 빈 문자열이 아니어야 해.
             Use this shape exactly: {"chunks":["short Korean response part"]}.
-            recentContext:
+
+            [이전 대화 맥락]
             $recentMessages
-            userMessage: ${request.message.take(endpoint.maxInputChars)}
+            USER: ${request.message.take(endpoint.maxInputChars)}
+            ASSISTANT:
         """.trimIndent()
     }
 
@@ -235,12 +237,13 @@ class RemoteConsultationAiResponder internal constructor(
             """(?:qa|테스트|샘플|placeholder|fixture|stub|스텁|내부\s*검수)"""
         private const val INTERNAL_REVIEW_MESSAGE_SUFFIX = """(?:메시지|메세지|응답|답변|문구)"""
         private const val INTERNAL_REVIEW_PHRASE_END = """(?:입니다\.?|[.!?。！？]|$)"""
+        private const val INTERNAL_REVIEW_SEPARATOR = """(?:은|는)?\s*(?::|：|-|–|—)?\s*"""
         private const val INTERNAL_REVIEW_STANDALONE_PREFIX =
-            """(?:^|[.!?。！？]\s*|(?:죄송합니다|응답|답변|다음\s*(?:응답|답변))\s*(?:은|는|입니다\.?)?\s*)"""
+            """(?:^|[.!?。！？]\s*|(?:죄송합니다|응답|답변|다음\s*(?:응답|답변))\s*(?:은|는|입니다\.?)?\s*(?::|：|-|–|—)?\s*)"""
 
         private val INTERNAL_REVIEW_MARKER_PATTERNS = listOf(
             Regex(
-                """상담\s*답변\s*$INTERNAL_REVIEW_MARKER(\s*$INTERNAL_REVIEW_MARKER)*\s*(?:(?:$INTERNAL_REVIEW_MESSAGE_SUFFIX)\s*$INTERNAL_REVIEW_PHRASE_END|입니다\.?)""",
+                """상담\s*답변\s*$INTERNAL_REVIEW_SEPARATOR$INTERNAL_REVIEW_MARKER(\s*$INTERNAL_REVIEW_MARKER)*\s*(?:(?:$INTERNAL_REVIEW_MESSAGE_SUFFIX)\s*$INTERNAL_REVIEW_PHRASE_END|입니다\.?)""",
                 RegexOption.IGNORE_CASE,
             ),
             Regex(
