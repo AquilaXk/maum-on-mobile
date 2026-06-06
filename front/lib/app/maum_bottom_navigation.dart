@@ -86,8 +86,9 @@ class _MaumBottomNavigationItem extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
-    final foreground =
-        isSelected ? colorScheme.primary : colorScheme.onSurfaceVariant;
+    final foreground = isSelected
+        ? colorScheme.onPrimaryContainer
+        : colorScheme.onSurfaceVariant;
     final selectedBackground = Color.lerp(
       colorScheme.surface,
       colorScheme.primaryContainer,
