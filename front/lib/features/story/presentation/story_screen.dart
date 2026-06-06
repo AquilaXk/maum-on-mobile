@@ -83,7 +83,6 @@ class _StoryScreenState extends State<StoryScreen> {
 
         return AppScreen(
           title: '스토리',
-          subtitle: '서로의 고민과 답변을 살펴봅니다.',
           onBack: widget.onBack,
           onRefresh: state.mode == StoryViewMode.list
               ? widget.controller.loadStories
@@ -225,7 +224,6 @@ class _StoryDiscoveryStrip extends StatelessWidget {
             AppInlineSectionHeader(
               icon: Icons.travel_explore_outlined,
               title: '이야기 찾기',
-              subtitle: '검색과 카테고리로 필요한 이야기를 좁혀 보세요.',
               trailing: AppStatusPill(
                 label: storyCountLabel,
                 tone: state.stories.isEmpty
@@ -324,11 +322,6 @@ class _StoryListCard extends StatelessWidget {
         ),
         AppStatusPill(label: story.resolutionStatus.label),
       ],
-      content: Text(
-        story.summary,
-        maxLines: 3,
-        overflow: TextOverflow.ellipsis,
-      ),
       onTap: onTap,
       semanticLabel:
           '스토리 항목: ${story.title}, ${story.category.label}, 조회 ${story.viewCount}',
