@@ -348,7 +348,7 @@ class _QaStoryRepository implements StoryRepository {
         StorySummary(
           id: 1,
           title: '오늘의 스토리',
-          summary: '작은 회복을 나누는 이야기',
+          summary: '',
           authorNickname: '마음이',
           category: StoryCategory.daily,
           resolutionStatus: StoryResolutionStatus.ongoing,
@@ -371,7 +371,7 @@ class _QaStoryRepository implements StoryRepository {
       id: id,
       title: '오늘의 스토리',
       content: '마음을 천천히 꺼내 놓는 연습을 하고 있어요.',
-      summary: '작은 회복을 나누는 이야기',
+      summary: '',
       authorNickname: '마음이',
       category: StoryCategory.daily,
       resolutionStatus: StoryResolutionStatus.ongoing,
