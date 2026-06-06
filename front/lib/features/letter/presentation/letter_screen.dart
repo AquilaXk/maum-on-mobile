@@ -196,11 +196,8 @@ class _MailboxView extends StatelessWidget {
               else if (state.isEmpty)
                 AppStateView.empty(
                   title: state.activeTab == LetterMailboxTab.received
-                      ? '아직 받은 편지가 없습니다.'
-                      : '아직 보낸 편지가 없습니다.',
-                  message: state.activeTab == LetterMailboxTab.received
-                      ? '랜덤 편지 수신 설정을 켜 두면 새로운 편지를 받을 수 있습니다.'
-                      : '새 편지를 쓰면 이곳에서 발송 상태를 확인할 수 있습니다.',
+                      ? '받은 편지 없음'
+                      : '보낸 편지 없음',
                   semanticLabel: '편지함 비어 있음',
                 )
               else
@@ -213,9 +210,7 @@ class _MailboxView extends StatelessWidget {
                 ],
               if (!state.isLoading && state.visibleLetters.isNotEmpty) ...[
                 const SizedBox(height: AppSpacing.xs),
-                if (state.isVisibleLastPage)
-                  const AppNotice(message: '마지막 편지입니다.')
-                else
+                if (!state.isVisibleLastPage)
                   OutlinedButton.icon(
                     key: const ValueKey('letter-load-more-button'),
                     onPressed: state.isLoadingMore || state.errorMessage != null
@@ -325,20 +320,13 @@ class _LetterCard extends StatelessWidget {
       title: letter.title.isEmpty ? '제목 없는 편지' : letter.title,
       subtitle: letter.createdDate,
       badges: [_StatusPill(status: letter.status)],
-      content: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          if (letter.content.isNotEmpty) ...[
-            Text(
+      content: letter.content.isEmpty
+          ? null
+          : Text(
               letter.content,
               maxLines: 3,
               overflow: TextOverflow.ellipsis,
             ),
-            const SizedBox(height: AppSpacing.xs),
-          ],
-          Text(letter.status.guidance),
-        ],
-      ),
       onTap: onTap,
       semanticLabel:
           '편지 항목: ${letter.title.isEmpty ? '제목 없는 편지' : letter.title}, ${letter.status.displayLabel}',
@@ -368,8 +356,7 @@ class _LetterDetailView extends StatelessWidget {
 
     if (letter == null) {
       return const AppStateView.empty(
-        title: '편지를 선택해 주세요.',
-        message: '편지함에서 확인할 편지를 선택하면 상세 내용이 열립니다.',
+        title: '편지 선택',
         semanticLabel: '편지 상세 선택 필요',
       );
     }
@@ -395,8 +382,6 @@ class _LetterDetailView extends StatelessWidget {
           content: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _StatusGuidance(status: letter.status),
-              const SizedBox(height: AppSpacing.md),
               Text(letter.content),
             ],
           ),
@@ -579,7 +564,6 @@ class _LetterComposeViewState extends State<_LetterComposeView> {
     return AppSectionCard(
       key: const ValueKey('letter-compose-form'),
       title: '편지 쓰기',
-      subtitle: '제목은 60자, 본문은 1000자까지 보낼 수 있습니다.',
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -717,13 +701,6 @@ class _LetterNotice extends StatelessWidget {
           message: message,
           tone: isSendSuccess ? AppNoticeTone.success : AppNoticeTone.neutral,
         ),
-        if (isSendSuccess) ...[
-          const SizedBox(height: AppSpacing.xs),
-          Text(
-            '보낸 편지함에서 상태를 확인해 주세요.',
-            style: Theme.of(context).textTheme.bodySmall,
-          ),
-        ],
       ],
     );
   }
@@ -738,7 +715,6 @@ class _ReceiveSettingsCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return AppSectionCard(
       title: '랜덤 편지 수신',
-      subtitle: '수신 설정을 켜 두면 익명의 마음 편지를 받을 수 있습니다.',
       child: Align(
         alignment: Alignment.centerLeft,
         child: OutlinedButton.icon(
@@ -752,20 +728,6 @@ class _ReceiveSettingsCard extends StatelessWidget {
   }
 }
 
-class _StatusGuidance extends StatelessWidget {
-  const _StatusGuidance({required this.status});
-
-  final LetterStatus status;
-
-  @override
-  Widget build(BuildContext context) {
-    return Text(
-      status.guidance,
-      style: Theme.of(context).textTheme.bodySmall,
-    );
-  }
-}
-
 extension _LetterStatusPresentation on LetterStatus {
   String get displayLabel {
     return switch (this) {
@@ -773,15 +735,6 @@ extension _LetterStatusPresentation on LetterStatus {
       LetterStatus.accepted => '답장 가능',
       LetterStatus.writing => '답장 작성 중',
       LetterStatus.replied => '답장 완료',
-    };
-  }
-
-  String get guidance {
-    return switch (this) {
-      LetterStatus.sent => '상대방의 답장을 기다리고 있습니다.',
-      LetterStatus.accepted => '편지를 수락했습니다. 답장을 작성할 수 있습니다.',
-      LetterStatus.writing => '상대방이 답장을 작성하고 있습니다.',
-      LetterStatus.replied => '답장이 도착했습니다. 상세에서 내용을 확인해 주세요.',
     };
   }
 

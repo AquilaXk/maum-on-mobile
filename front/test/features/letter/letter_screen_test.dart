@@ -39,6 +39,7 @@ void main() {
     expect(find.byKey(const ValueKey('letter-compose-button')), findsOneWidget);
     expect(
         find.byKey(const ValueKey('letter-receive-settings')), findsOneWidget);
+    expect(find.text('수신 설정을 켜 두면 익명의 마음 편지를 받을 수 있습니다.'), findsNothing);
     expect(
       find.byKey(const ValueKey('letter-latest-received-button')),
       findsOneWidget,
@@ -127,7 +128,7 @@ void main() {
     expect(find.byKey(const ValueKey('letter-reject-button')), findsOneWidget);
   });
 
-  testWidgets('renders mailbox state guidance and opens receive settings',
+  testWidgets('renders mailbox state controls and opens receive settings',
       (tester) async {
     var settingsOpenCount = 0;
     final repository = _FakeLetterRepository(
@@ -160,7 +161,8 @@ void main() {
     expect(find.text('수신 설정'), findsOneWidget);
     expect(find.text('수신 대기'), findsOneWidget);
     expect(find.text('답장 작성 중'), findsOneWidget);
-    expect(find.text('상대방의 답장을 기다리고 있습니다.'), findsOneWidget);
+    expect(find.text('상대방의 답장을 기다리고 있습니다.'), findsNothing);
+    expect(find.text('랜덤 편지 수신 설정을 켜 두면 새로운 편지를 받을 수 있습니다.'), findsNothing);
 
     await tester.tap(find.byKey(const ValueKey('letter-receive-settings')));
     await tester.pump();
@@ -233,7 +235,7 @@ void main() {
 
     expect(repository.createdDrafts.single.title, '새 편지');
     expect(find.text('편지가 전송되었습니다.'), findsOneWidget);
-    expect(find.text('보낸 편지함에서 상태를 확인해 주세요.'), findsOneWidget);
+    expect(find.text('보낸 편지함에서 상태를 확인해 주세요.'), findsNothing);
     expect(find.text('보낸 편지함'), findsOneWidget);
   });
 
@@ -301,7 +303,7 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('letter-compose-button')));
     await tester.pumpAndSettle();
 
-    expect(find.text('제목은 60자, 본문은 1000자까지 보낼 수 있습니다.'), findsOneWidget);
+    expect(find.text('제목은 60자, 본문은 1000자까지 보낼 수 있습니다.'), findsNothing);
 
     await tester.enterText(
       find.byKey(const ValueKey('letter-title-field')),
@@ -453,7 +455,8 @@ void main() {
 
     expect(find.text('첫 편지'), findsOneWidget);
     expect(find.text('다음 편지'), findsOneWidget);
-    expect(find.text('마지막 편지입니다.'), findsOneWidget);
+    expect(find.text('마지막 편지입니다.'), findsNothing);
+    expect(find.byKey(const ValueKey('letter-load-more-button')), findsNothing);
   });
 
   testWidgets('accepts a letter, writes a reply, and selects report target',
