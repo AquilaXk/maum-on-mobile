@@ -183,9 +183,11 @@ class RemoteConsultationAiResponderTest {
         assertThat(prompt)
             .contains(
                 "conversationState: CONTINUING",
-                "recentContext:",
+                "[이전 대화 맥락]",
                 "USER: 어제는 일이 밀려서 너무 버거웠어요.",
                 "ASSISTANT: 많이 버거우셨겠어요. 오늘은 한 가지만 내려놓아도 괜찮아요.",
+                "USER: 오늘도 같은 고민이 반복돼요.",
+                "ASSISTANT:",
                 "일반 상담 모드",
                 "안전 모드",
                 "이전 답변의 첫 문장이나 같은 위로 문장을 반복하지 마",
@@ -270,7 +272,7 @@ class RemoteConsultationAiResponderTest {
 
         assertThat(prompt)
             .contains(
-                "위기 신호 단어가 userMessage 또는 recentContext에 있으면 일반 상담 구조보다 안전 확보 안내를 먼저 작성해",
+                "위기 신호 단어가 USER 입력 또는 [이전 대화 맥락]에 있으면 일반 상담 구조보다 안전 확보 안내를 먼저 작성해",
                 "혼자 있지 말고 가까운 사람에게 즉시 알려",
                 "112/119/응급실",
                 "안전한 장소",
@@ -414,6 +416,9 @@ class RemoteConsultationAiResponderTest {
     fun rejectsInternalDevelopmentMarkerReplyVariants() {
         val internalReplies = listOf(
             "상담 답변 QA 테스트 메시지입니다.",
+            "상담 답변은 QA 메세지입니다.",
+            "상담 답변: QA 메세지입니다.",
+            "상담 답변 - QA 메세지입니다.",
             "상담 답변 테스트 답변입니다.",
             "상담 답변 placeholder 메시지입니다.",
             "상담 답변 placeholder fixture 응답입니다.",
