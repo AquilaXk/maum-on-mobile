@@ -255,6 +255,25 @@ void main() {
       find.byKey(const ValueKey('auth-account-deletion-guidance')),
       findsNothing,
     );
+    expect(
+      find.byKey(const ValueKey('auth-account-deletion-link')),
+      findsOneWidget,
+    );
+
+    await tester.ensureVisible(
+      find.byKey(const ValueKey('auth-account-deletion-link')),
+    );
+    await tester.tap(find.byKey(const ValueKey('auth-account-deletion-link')));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.byKey(const ValueKey('auth-account-deletion-dialog')),
+      findsOneWidget,
+    );
+    expect(find.text('로그인 후 설정에서 진행할 수 있습니다.'), findsOneWidget);
+
+    await tester.tap(find.text('확인'));
+    await tester.pumpAndSettle();
 
     await tester.tap(find.text('새 계정 만들기'));
     await tester.pumpAndSettle();
@@ -277,6 +296,10 @@ void main() {
     expect(
       find.byKey(const ValueKey('auth-account-deletion-guidance')),
       findsNothing,
+    );
+    expect(
+      find.byKey(const ValueKey('auth-account-deletion-link')),
+      findsOneWidget,
     );
   });
 
@@ -313,6 +336,10 @@ void main() {
     expect(
       find.byKey(const ValueKey('auth-account-deletion-guidance')),
       findsNothing,
+    );
+    expect(
+      find.byKey(const ValueKey('auth-account-deletion-link')),
+      findsOneWidget,
     );
     expect(launcher.launchedUris, isEmpty);
   });

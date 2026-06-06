@@ -164,6 +164,18 @@ class _AuthScreenState extends State<AuthScreen> {
                           onOpenExternalUri: widget.onOpenExternalUri,
                           showAccountDeletionGuidance: false,
                         ),
+                        const SizedBox(height: AppSpacing.xs),
+                        Center(
+                          child: TextButton.icon(
+                            key: const ValueKey('auth-account-deletion-link'),
+                            onPressed: _showAccountDeletionGuidance,
+                            icon: const Icon(
+                              Icons.person_remove_outlined,
+                              size: 18,
+                            ),
+                            label: const Text('회원 탈퇴'),
+                          ),
+                        ),
                       ],
                     ),
                   ),
@@ -670,6 +682,23 @@ class _AuthScreenState extends State<AuthScreen> {
         _passwordResetEmail = null;
       }
     });
+  }
+
+  Future<void> _showAccountDeletionGuidance() {
+    return showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        key: const ValueKey('auth-account-deletion-dialog'),
+        title: const Text('회원 탈퇴'),
+        content: const Text('로그인 후 설정에서 진행할 수 있습니다.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            child: const Text('확인'),
+          ),
+        ],
+      ),
+    );
   }
 
   void _resetSignupEmailVerification() {
