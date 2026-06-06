@@ -165,7 +165,6 @@ class _StoryListView extends StatelessWidget {
         else if (state.isEmpty)
           const AppStateView.empty(
             title: '조건에 맞는 스토리가 없습니다.',
-            message: '검색어 또는 카테고리를 바꿔 다시 확인해 주세요.',
             semanticLabel: '스토리 목록 비어 있음',
           )
         else
@@ -351,7 +350,6 @@ class _StoryDetailView extends StatelessWidget {
     if (story == null) {
       return const AppStateView.empty(
         title: '스토리를 선택해 주세요.',
-        message: '목록에서 읽을 스토리를 선택하면 상세 내용을 볼 수 있습니다.',
         semanticLabel: '스토리 상세 선택 필요',
       );
     }
