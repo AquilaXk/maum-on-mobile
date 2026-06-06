@@ -161,6 +161,39 @@ void main() {
     expect(find.text('지금 대화하기'), findsNothing);
   });
 
+  testWidgets('keeps home feed empty state free of helper explanation copy',
+      (tester) async {
+    final controller = HomeController(
+      homeRepository: const _EmptyFeedHomeRepository(),
+    );
+    await controller.load();
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: HomeScreen(
+          nickname: '마음이',
+          homeController: controller,
+          onWriteDiary: () {},
+          onWriteLetter: () {},
+          onViewStory: () {},
+          onOpenConsultation: () {},
+          onOpenNotifications: () {},
+          onOpenSettings: () {},
+          onLogout: () {},
+        ),
+      ),
+    );
+
+    await tester.ensureVisible(find.text('아직 공개된 스토리가 없습니다.'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('아직 공개된 스토리가 없습니다.'), findsOneWidget);
+    expect(
+      find.text('카테고리를 바꾸거나 잠시 뒤 다시 확인해 주세요.'),
+      findsNothing,
+    );
+  });
+
   testWidgets('routes draft continuation cards to their writing surfaces',
       (tester) async {
     final draftRepository = StorageDraftRecoveryRepository(
@@ -421,5 +454,31 @@ class _FakeHomeRepository implements HomeRepository {
         ),
       ],
     );
+  }
+}
+
+class _EmptyFeedHomeRepository implements HomeRepository {
+  const _EmptyFeedHomeRepository();
+
+  @override
+  Future<HomeStats> fetchStats() async {
+    return const HomeStats(
+      todayWorryCount: 0,
+      todayLetterCount: 0,
+      todayDiaryCount: 0,
+      summary: HomeSummary(
+        recoveryMessage: '',
+        primaryActionLabel: '',
+        primaryActionSurface: HomeActionSurface.diary,
+        feedMessage: '',
+      ),
+    );
+  }
+
+  @override
+  Future<HomeStoryPage> fetchStories({
+    HomeStoryCategory category = HomeStoryCategory.all,
+  }) async {
+    return const HomeStoryPage(last: true, items: []);
   }
 }

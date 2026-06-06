@@ -522,7 +522,6 @@ class _DraftContinuationSection extends StatelessWidget {
     if (state.drafts.isEmpty) {
       return const AppStateView.empty(
         title: '이어쓸 내용이 없습니다.',
-        message: '새 기록, 편지, 스토리, 상담을 바로 시작할 수 있습니다.',
         semanticLabel: '홈 이어쓰기 비어 있음',
       );
     }
@@ -919,7 +918,6 @@ class _FeedSection extends StatelessWidget {
     if (state.isFeedEmpty) {
       return const AppStateView.empty(
         title: '아직 공개된 스토리가 없습니다.',
-        message: '카테고리를 바꾸거나 잠시 뒤 다시 확인해 주세요.',
         semanticLabel: '홈 공개 스토리 목록 비어 있음',
       );
     }
