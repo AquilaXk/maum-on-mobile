@@ -26,7 +26,9 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey('home-category-daily')));
     await tester.pumpAndSettle();
-    expect(find.text('일상 QA 스토리'), findsOneWidget);
+    expect(find.text('작은 산책이 남긴 여유'), findsOneWidget);
+    expect(find.textContaining('QA'), findsNothing);
+    expect(find.textContaining('테스트'), findsNothing);
 
     await tester.tap(find.byKey(mobileQaRouteKey('consultation')));
     await tester.pumpAndSettle();
