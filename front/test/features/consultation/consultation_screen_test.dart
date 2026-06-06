@@ -141,6 +141,13 @@ void main() {
       findsNothing,
     );
 
+    final messageField = tester.widget<TextField>(
+      find.byKey(const ValueKey('consultation-message-field')),
+    );
+    expect(messageField.decoration?.counterText, isNull);
+    expect(messageField.decoration?.counter, isA<SizedBox>());
+    expect(messageField.decoration?.constraints?.minHeight, 56);
+
     final fieldRect = tester.getRect(
       find.byKey(const ValueKey('consultation-message-field')),
     );
@@ -148,6 +155,10 @@ void main() {
       find.byKey(const ValueKey('consultation-send-button')),
     );
 
+    expect(
+      (sendButtonRect.height - fieldRect.height).abs(),
+      lessThanOrEqualTo(1),
+    );
     expect(
       (sendButtonRect.center.dy - fieldRect.center.dy).abs(),
       lessThanOrEqualTo(1),
