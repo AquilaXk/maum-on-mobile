@@ -591,11 +591,6 @@ class _Composer extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final inputBlocked = state.inputBlockedBySafety;
-    final helperText = inputBlocked
-        ? '안전 안내 확인 후 다시 이용할 수 있습니다.'
-        : state.isStreaming
-            ? '답변을 작성 중입니다.'
-            : null;
 
     return SafeArea(
       key: const ValueKey('consultation-composer-section'),
@@ -609,7 +604,7 @@ class _Composer extends StatelessWidget {
         child: Padding(
           padding: const EdgeInsets.all(AppSpacing.md),
           child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               Expanded(
                 child: TextField(
@@ -619,26 +614,33 @@ class _Composer extends StatelessWidget {
                   minLines: 1,
                   maxLines: 4,
                   maxLength: ConsultationController.maxMessageLength,
-                  decoration: InputDecoration(
+                  buildCounter: (
+                    context, {
+                    required currentLength,
+                    required isFocused,
+                    required maxLength,
+                  }) =>
+                      null,
+                  decoration: const InputDecoration(
                     labelText: '고민을 입력해 주세요',
-                    helperText: helperText,
-                    border: const OutlineInputBorder(),
-                    counter: const SizedBox.shrink(),
-                    constraints: const BoxConstraints(minHeight: 56),
+                    border: OutlineInputBorder(),
+                    constraints: BoxConstraints(minHeight: 56),
                   ),
                   onChanged: inputBlocked ? null : onChanged,
                 ),
               ),
-              const SizedBox(width: AppSpacing.xs),
+              const SizedBox(width: AppSpacing.sm),
               SizedBox.square(
-                dimension: 56,
+                dimension: 52,
                 child: IconButton.filled(
                   key: const ValueKey('consultation-send-button'),
                   tooltip: inputBlocked ? '안전 안내 확인 필요' : '전송',
                   style: IconButton.styleFrom(
-                    fixedSize: const Size.square(56),
-                    minimumSize: const Size.square(56),
+                    fixedSize: const Size.square(52),
+                    minimumSize: const Size.square(52),
+                    maximumSize: const Size.square(52),
                     padding: EdgeInsets.zero,
+                    shape: const CircleBorder(),
                   ),
                   onPressed: state.canSubmit ? () => onSubmitted() : null,
                   icon: state.isSending
@@ -647,7 +649,7 @@ class _Composer extends StatelessWidget {
                           height: 18,
                           child: CircularProgressIndicator(strokeWidth: 2),
                         )
-                      : const Icon(Icons.send),
+                      : const Icon(Icons.arrow_upward_rounded),
                 ),
               ),
             ],
