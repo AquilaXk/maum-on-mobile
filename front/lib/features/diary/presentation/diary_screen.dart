@@ -546,8 +546,7 @@ class _SelectedEntriesSection extends StatelessWidget {
           const SizedBox(height: AppSpacing.xs),
           if (entries.isEmpty)
             const AppStateView.empty(
-              title: '선택한 날짜에 작성한 기록이 없습니다.',
-              message: '아래 입력 영역에서 오늘의 마음을 기록할 수 있습니다.',
+              title: '기록 없음',
               semanticLabel: '선택한 날짜 기록 비어 있음',
             )
           else
@@ -605,7 +604,6 @@ class _PublicEntriesSection extends StatelessWidget {
           const AppInlineSectionHeader(
             icon: Icons.groups_outlined,
             title: '공개 기록',
-            subtitle: '다른 사용자의 공개 기록을 읽으며 흐름을 이어갑니다.',
           ),
           const SizedBox(height: AppSpacing.xs),
           if (state.isPublicLoading)
@@ -624,8 +622,7 @@ class _PublicEntriesSection extends StatelessWidget {
             ],
             if (state.isPublicEmpty)
               const AppStateView.empty(
-                title: '아직 공개된 기록이 없습니다.',
-                message: '공개 기록이 생기면 이곳에 표시됩니다.',
+                title: '공개 기록 없음',
                 semanticLabel: '공개 기록 목록 비어 있음',
               ),
             for (final entry in state.publicEntries) ...[
@@ -647,9 +644,7 @@ class _PublicEntriesSection extends StatelessWidget {
           ],
           if (!state.isPublicLoading && state.publicEntries.isNotEmpty) ...[
             const SizedBox(height: AppSpacing.xs),
-            if (state.isLastPublicPage)
-              const AppNotice(message: '마지막 공개 기록입니다.')
-            else
+            if (!state.isLastPublicPage)
               OutlinedButton.icon(
                 key: const ValueKey('diary-public-load-more-button'),
                 onPressed: state.isPublicLoadingMore ||
