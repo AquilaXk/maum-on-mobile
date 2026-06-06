@@ -77,7 +77,13 @@ void main() {
       (tester) async {
     final repository = _FakeStoryRepository(
       storyPages: [
-        _storyPage([_summary(id: 1, title: '잠이 오지 않는 밤')]),
+        _storyPage([
+          _summary(
+            id: 1,
+            title: '잠이 오지 않는 밤',
+            summary: '작은 회복을 나누는 이야기',
+          ),
+        ]),
       ],
       details: [
         _detail(id: 1, title: '잠이 오지 않는 밤', content: '긴 이야기를 나눕니다.'),
@@ -103,7 +109,9 @@ void main() {
     expect(find.text('스토리 탐색 흐름'), findsNothing);
     expect(find.text('대화 확인 흐름'), findsNothing);
     expect(find.text('스토리 작성 흐름'), findsNothing);
-    expect(find.text('검색과 카테고리로 필요한 이야기를 좁혀 보세요.'), findsOneWidget);
+    expect(find.text('서로의 고민과 답변을 살펴봅니다.'), findsNothing);
+    expect(find.text('검색과 카테고리로 필요한 이야기를 좁혀 보세요.'), findsNothing);
+    expect(find.text('작은 회복을 나누는 이야기'), findsNothing);
     expect(find.byKey(const ValueKey('story-search-panel')), findsOneWidget);
     expect(find.text('잠이 오지 않는 밤'), findsOneWidget);
 
@@ -567,11 +575,15 @@ PageResponse<StoryComment> _commentPage(List<StoryComment> items) {
   );
 }
 
-StorySummary _summary({required int id, required String title}) {
+StorySummary _summary({
+  required int id,
+  required String title,
+  String summary = '요약',
+}) {
   return StorySummary(
     id: id,
     title: title,
-    summary: '요약',
+    summary: summary,
     authorNickname: '마음이',
     category: StoryCategory.worry,
     resolutionStatus: StoryResolutionStatus.ongoing,
