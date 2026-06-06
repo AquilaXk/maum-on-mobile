@@ -103,6 +103,57 @@ void main() {
     expect(find.text('오늘은 천천히 쉬어도 괜찮아요.'), findsOneWidget);
   });
 
+  testWidgets('hides composer count and aligns send action with input',
+      (tester) async {
+    tester.view.physicalSize = const Size(390, 640);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    final repository = _FakeConsultationRepository();
+    final controller = ConsultationController(repository: repository);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: ConsultationScreen(
+          controller: controller,
+          onBack: () {},
+        ),
+      ),
+    );
+    await tester.pump();
+    repository.emit(const ConsultationStreamEvent.connect('connected'));
+    await tester.pump();
+
+    expect(
+      find.text('0/${ConsultationController.maxMessageLength}'),
+      findsNothing,
+    );
+
+    await tester.enterText(
+      find.byKey(const ValueKey('consultation-message-field')),
+      '안녕',
+    );
+    await tester.pump();
+
+    expect(
+      find.text('2/${ConsultationController.maxMessageLength}'),
+      findsNothing,
+    );
+
+    final fieldRect = tester.getRect(
+      find.byKey(const ValueKey('consultation-message-field')),
+    );
+    final sendButtonRect = tester.getRect(
+      find.byKey(const ValueKey('consultation-send-button')),
+    );
+
+    expect(
+      (sendButtonRect.center.dy - fieldRect.center.dy).abs(),
+      lessThanOrEqualTo(1),
+    );
+  });
+
   testWidgets('shows reconnect action after a stream error', (tester) async {
     final repository = _FakeConsultationRepository();
     final controller = ConsultationController(

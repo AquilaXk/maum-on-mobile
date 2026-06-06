@@ -595,7 +595,7 @@ class _Composer extends StatelessWidget {
         ? '안전 안내 확인 후 다시 이용할 수 있습니다.'
         : state.isStreaming
             ? '답변을 작성 중입니다.'
-            : '${state.draft.length}/${ConsultationController.maxMessageLength}';
+            : null;
 
     return SafeArea(
       key: const ValueKey('consultation-composer-section'),
@@ -609,7 +609,7 @@ class _Composer extends StatelessWidget {
         child: Padding(
           padding: const EdgeInsets.all(AppSpacing.md),
           child: Row(
-            crossAxisAlignment: CrossAxisAlignment.end,
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Expanded(
                 child: TextField(
@@ -629,17 +629,25 @@ class _Composer extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: AppSpacing.xs),
-              IconButton.filled(
-                key: const ValueKey('consultation-send-button'),
-                tooltip: inputBlocked ? '안전 안내 확인 필요' : '전송',
-                onPressed: state.canSubmit ? () => onSubmitted() : null,
-                icon: state.isSending
-                    ? const SizedBox(
-                        width: 18,
-                        height: 18,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : const Icon(Icons.send),
+              SizedBox.square(
+                dimension: 56,
+                child: IconButton.filled(
+                  key: const ValueKey('consultation-send-button'),
+                  tooltip: inputBlocked ? '안전 안내 확인 필요' : '전송',
+                  style: IconButton.styleFrom(
+                    fixedSize: const Size.square(56),
+                    minimumSize: const Size.square(56),
+                    padding: EdgeInsets.zero,
+                  ),
+                  onPressed: state.canSubmit ? () => onSubmitted() : null,
+                  icon: state.isSending
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.send),
+                ),
               ),
             ],
           ),
