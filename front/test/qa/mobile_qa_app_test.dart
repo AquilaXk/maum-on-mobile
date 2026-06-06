@@ -18,6 +18,10 @@ void main() {
       find.text('새 기록, 편지, 스토리, 상담을 바로 시작할 수 있습니다.'),
       findsNothing,
     );
+    expect(find.text('오늘 마음 정리'), findsNothing);
+    expect(find.text('조용히 전하기'), findsNothing);
+    expect(find.text('함께 읽기'), findsNothing);
+    expect(find.text('지금 대화하기'), findsNothing);
     expect(find.textContaining('오늘의 마음'), findsWidgets);
 
     await tester.ensureVisible(

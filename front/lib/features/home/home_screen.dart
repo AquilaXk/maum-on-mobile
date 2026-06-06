@@ -615,7 +615,6 @@ class _ActionGrid extends StatelessWidget {
                   actionKey: const ValueKey('home-action-diary'),
                   surfaceKey: const ValueKey('home-action-diary-surface'),
                   title: '다이어리 쓰기',
-                  subtitle: '오늘 마음 정리',
                   icon: Icons.edit_note,
                   tone: AppStatusTone.warning,
                   onTap: onWriteDiary,
@@ -624,7 +623,6 @@ class _ActionGrid extends StatelessWidget {
                   actionKey: const ValueKey('home-action-letter'),
                   surfaceKey: const ValueKey('home-action-letter-surface'),
                   title: '편지 쓰기',
-                  subtitle: '조용히 전하기',
                   icon: Icons.mail_outline,
                   onTap: onWriteLetter,
                 ),
@@ -632,7 +630,6 @@ class _ActionGrid extends StatelessWidget {
                   actionKey: const ValueKey('home-action-story'),
                   surfaceKey: const ValueKey('home-action-story-surface'),
                   title: '스토리 보기',
-                  subtitle: '함께 읽기',
                   icon: Icons.forum_outlined,
                   tone: AppStatusTone.success,
                   onTap: onViewStory,
@@ -642,7 +639,6 @@ class _ActionGrid extends StatelessWidget {
                   surfaceKey:
                       const ValueKey('home-action-consultation-surface'),
                   title: '상담하기',
-                  subtitle: '지금 대화하기',
                   icon: Icons.chat_bubble_outline,
                   onTap: onOpenConsultation,
                 ),
@@ -728,7 +724,6 @@ class _HomeActionCard extends StatelessWidget {
     required this.actionKey,
     required this.surfaceKey,
     required this.title,
-    required this.subtitle,
     required this.icon,
     required this.onTap,
     this.tone = AppStatusTone.neutral,
@@ -737,7 +732,6 @@ class _HomeActionCard extends StatelessWidget {
   final Key actionKey;
   final Key surfaceKey;
   final String title;
-  final String subtitle;
   final IconData icon;
   final VoidCallback onTap;
   final AppStatusTone tone;
@@ -765,6 +759,7 @@ class _HomeActionCard extends StatelessWidget {
           child: Padding(
             padding: const EdgeInsets.all(AppSpacing.sm),
             child: Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
               children: [
                 DecoratedBox(
                   decoration: BoxDecoration(
@@ -778,30 +773,14 @@ class _HomeActionCard extends StatelessWidget {
                 ),
                 const SizedBox(width: AppSpacing.xs),
                 Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        title,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: theme.textTheme.titleSmall?.copyWith(
-                          color: colors.foreground,
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                      const SizedBox(height: AppSpacing.xxs),
-                      Text(
-                        subtitle,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: colors.foreground.withValues(alpha: 0.78),
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ],
+                  child: Text(
+                    title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.titleSmall?.copyWith(
+                      color: colors.foreground,
+                      fontWeight: FontWeight.w800,
+                    ),
                   ),
                 ),
               ],

@@ -152,6 +152,10 @@ void main() {
       find.byKey(const ValueKey('home-action-story-surface')),
       findsOneWidget,
     );
+    expect(find.text('오늘 마음 정리'), findsNothing);
+    expect(find.text('조용히 전하기'), findsNothing);
+    expect(find.text('함께 읽기'), findsNothing);
+    expect(find.text('지금 대화하기'), findsNothing);
   });
 
   testWidgets('routes draft continuation cards to their writing surfaces',
