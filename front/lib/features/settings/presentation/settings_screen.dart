@@ -269,8 +269,6 @@ class _PrivacyDisclosureSection extends StatelessWidget {
     return _SettingsSection(
       title: '개인정보와 지원',
       children: [
-        const Text(LegalDisclosures.dataExportGuidance),
-        const SizedBox(height: AppSpacing.md),
         LegalDisclosureLinks(
           keyPrefix: 'settings',
           onOpenExternalUri: onOpenExternalUri,
@@ -300,8 +298,6 @@ class _SupportContactSection extends StatelessWidget {
       key: const ValueKey('settings-support-section'),
       title: '고객지원',
       children: [
-        const Text('문의에는 앱 버전, 빌드 번호, 플랫폼, locale 진단 정보만 포함됩니다.'),
-        const SizedBox(height: AppSpacing.md),
         AppDetailRow(label: '앱 버전', value: diagnostics.appVersion),
         AppDetailRow(label: '빌드 번호', value: diagnostics.buildNumber),
         AppDetailRow(label: '플랫폼', value: diagnostics.platform),
