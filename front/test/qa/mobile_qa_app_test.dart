@@ -64,4 +64,25 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('계정 설정'), findsOneWidget);
   });
+
+  testWidgets('filters QA stories into the empty state without helper copy',
+      (tester) async {
+    await tester.pumpWidget(buildMobileQaApp());
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(mobileQaRouteKey('story')));
+    await tester.pumpAndSettle();
+    expect(find.text('오늘의 스토리'), findsOneWidget);
+
+    await tester.enterText(
+      find.byKey(const ValueKey('story-search-field')),
+      '없는 이야기',
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('story-search-button')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('조건에 맞는 스토리가 없습니다.'), findsOneWidget);
+    expect(find.text('검색어 또는 카테고리를 바꿔 다시 확인해 주세요.'), findsNothing);
+  });
 }

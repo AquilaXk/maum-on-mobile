@@ -343,24 +343,22 @@ class _QaStoryRepository implements StoryRepository {
     int page = 0,
     int size = 20,
   }) async {
+    final normalizedTitle = title?.trim();
+    final items = _qaStorySummaries.where((story) {
+      final matchesTitle = normalizedTitle == null ||
+          normalizedTitle.isEmpty ||
+          story.title.contains(normalizedTitle);
+      final matchesCategory =
+          category == StoryCategory.all || story.category == category;
+      return matchesTitle && matchesCategory;
+    }).toList(growable: false);
+
     return PageResponse(
-      items: const [
-        StorySummary(
-          id: 1,
-          title: '오늘의 스토리',
-          summary: '',
-          authorNickname: '마음이',
-          category: StoryCategory.daily,
-          resolutionStatus: StoryResolutionStatus.ongoing,
-          viewCount: 21,
-          createDate: '2026-06-05T08:00:00',
-          modifyDate: '2026-06-05T08:00:00',
-        ),
-      ],
+      items: items,
       page: page,
       size: size,
-      totalElements: 1,
-      totalPages: 1,
+      totalElements: items.length,
+      totalPages: items.isEmpty ? 0 : 1,
       last: true,
     );
   }
@@ -427,6 +425,20 @@ class _QaStoryRepository implements StoryRepository {
   @override
   Future<void> deleteComment(int commentId) async {}
 }
+
+const _qaStorySummaries = [
+  StorySummary(
+    id: 1,
+    title: '오늘의 스토리',
+    summary: '',
+    authorNickname: '마음이',
+    category: StoryCategory.daily,
+    resolutionStatus: StoryResolutionStatus.ongoing,
+    viewCount: 21,
+    createDate: '2026-06-05T08:00:00',
+    modifyDate: '2026-06-05T08:00:00',
+  ),
+];
 
 class _QaLetterRepository implements LetterRepository {
   const _QaLetterRepository();

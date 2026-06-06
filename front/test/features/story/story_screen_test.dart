@@ -218,6 +218,49 @@ void main() {
     expect(find.byType(AppNotice), findsNothing);
   });
 
+  testWidgets('keeps story list empty state free of helper explanation copy',
+      (tester) async {
+    final controller = StoryController(
+      storyRepository: _FakeStoryRepository(storyPages: [_storyPage([])]),
+      currentMemberId: 7,
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: StoryScreen(controller: controller, onBack: () {}),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('조건에 맞는 스토리가 없습니다.'), findsOneWidget);
+    expect(find.text('검색어 또는 카테고리를 바꿔 다시 확인해 주세요.'), findsNothing);
+  });
+
+  testWidgets('keeps story detail fallback free of helper explanation copy',
+      (tester) async {
+    final controller = StoryController(
+      storyRepository: _FakeStoryRepository(),
+      currentMemberId: 7,
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: StoryScreen(
+          controller: controller,
+          initialStoryId: 404,
+          onBack: () {},
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('스토리를 선택해 주세요.'), findsOneWidget);
+    expect(
+      find.text('목록에서 읽을 스토리를 선택하면 상세 내용을 볼 수 있습니다.'),
+      findsNothing,
+    );
+  });
+
   testWidgets('pull refresh reloads the visible story list', (tester) async {
     final repository = _FakeStoryRepository(
       storyPages: [
