@@ -253,7 +253,15 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('우선 확인'), findsOneWidget);
-    expect(find.text('미처리 신고 1건을 먼저 확인합니다.'), findsOneWidget);
+    expect(
+      find.text('서비스 지표와 회원, 편지, 신고 조치를 확인합니다.'),
+      findsNothing,
+    );
+    expect(
+      find.text('계정 이동과 세션 종료는 운영 중인 조치와 분리해서 확인합니다.'),
+      findsNothing,
+    );
+    expect(find.text('미처리 신고 1건을 먼저 확인합니다.'), findsNothing);
     expect(find.byKey(const ValueKey('operations-priority-reports-button')),
         findsOneWidget);
     expect(find.byKey(const ValueKey('operations-priority-letters-button')),

@@ -142,7 +142,6 @@ class _OperationsScreenState extends State<OperationsScreen> {
 
         return AppScreen(
           title: '운영 검수',
-          subtitle: '서비스 지표와 회원, 편지, 신고 조치를 확인합니다.',
           onBack: widget.onBack,
           onRefresh: widget.controller.load,
           children: [
@@ -424,7 +423,6 @@ class _OperationsPriorityPanel extends StatelessWidget {
   Widget build(BuildContext context) {
     return AppSectionCard(
       title: '우선 확인',
-      subtitle: _dashboardPriorityMessage(dashboard),
       child: _CompactActionWrap(
         children: [
           FilledButton.icon(
@@ -545,7 +543,6 @@ class _SystemRiskActionPanel extends StatelessWidget {
     return AppSectionCard(
       key: const ValueKey('operations-system-risk-panel'),
       title: '주의 작업',
-      subtitle: '계정 이동과 세션 종료는 운영 중인 조치와 분리해서 확인합니다.',
       child: _CompactActionWrap(
         children: [
           OutlinedButton.icon(
@@ -2286,22 +2283,6 @@ String _adminMemberLabel(AdminReportMember? member) {
     return '미배정';
   }
   return '${member.nickname} · ${member.email} · ${member.status}';
-}
-
-String _dashboardPriorityMessage(OperationsDashboard dashboard) {
-  if (dashboard.openReportCount > 0) {
-    return '미처리 신고 ${dashboard.openReportCount}건을 먼저 확인합니다.';
-  }
-
-  if (dashboard.receivableMemberCount == 0) {
-    return '편지 수신 가능 회원이 없어 회원 상태 확인이 필요합니다.';
-  }
-
-  if (dashboard.todayLetterCount > 0) {
-    return '오늘 편지 ${dashboard.todayLetterCount}건과 회원 상태를 함께 확인합니다.';
-  }
-
-  return '신고, 편지, 회원, 관측 순서로 운영 상태를 점검합니다.';
 }
 
 Future<bool> _launchExternalUri(Uri uri) {
