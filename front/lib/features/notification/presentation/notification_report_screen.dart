@@ -493,7 +493,6 @@ class _NotificationCenter extends StatelessWidget {
             if (state.isEmpty)
               const AppStateView.empty(
                 title: '아직 도착한 알림이 없습니다.',
-                message: '새 알림이 오면 이곳에 표시됩니다.',
                 semanticLabel: '알림 목록 비어 있음',
               ),
             for (final notification in state.notifications) ...[
