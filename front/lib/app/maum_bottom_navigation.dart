@@ -21,22 +21,30 @@ class MaumBottomNavigation extends StatelessWidget {
     final selectedRoute =
         routes.contains(currentRoute) ? currentRoute : routes.first;
 
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: colorScheme.surface,
-        border: Border(
-          top: BorderSide(color: colorScheme.outlineVariant),
-        ),
+    return SafeArea(
+      top: false,
+      minimum: const EdgeInsets.fromLTRB(
+        AppSpacing.md,
+        AppSpacing.xxs,
+        AppSpacing.md,
+        AppSpacing.xs,
       ),
-      child: SafeArea(
-        top: false,
+      child: DecoratedBox(
+        key: const ValueKey('app-bottom-navigation-surface'),
+        decoration: BoxDecoration(
+          color: colorScheme.surface.withValues(alpha: 0.96),
+          borderRadius: AppRadii.card,
+          border: Border.all(color: colorScheme.outlineVariant),
+          boxShadow: [
+            BoxShadow(
+              color: colorScheme.shadow.withValues(alpha: 0.08),
+              blurRadius: 18,
+              offset: const Offset(0, -4),
+            ),
+          ],
+        ),
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(
-            AppSpacing.md,
-            AppSpacing.xs,
-            AppSpacing.md,
-            AppSpacing.xs,
-          ),
+          padding: const EdgeInsets.all(AppSpacing.xxs),
           child: Row(
             children: [
               for (var index = 0; index < routes.length; index++)
@@ -80,10 +88,10 @@ class _MaumBottomNavigationItem extends StatelessWidget {
     final colorScheme = theme.colorScheme;
     final foreground =
         isSelected ? colorScheme.primary : colorScheme.onSurfaceVariant;
-    final indicatorColor = Color.lerp(
+    final selectedBackground = Color.lerp(
       colorScheme.surface,
       colorScheme.primaryContainer,
-      0.72,
+      0.82,
     )!;
 
     return Semantics(
@@ -100,8 +108,20 @@ class _MaumBottomNavigationItem extends StatelessWidget {
             child: InkWell(
               borderRadius: AppRadii.card,
               onTap: () => onSelected(route),
-              child: ConstrainedBox(
+              child: AnimatedContainer(
+                key: ValueKey('route-tab-${route.key}-indicator'),
+                duration: const Duration(milliseconds: 180),
+                curve: Curves.easeOut,
                 constraints: const BoxConstraints(minHeight: 64),
+                decoration: BoxDecoration(
+                  color: isSelected ? selectedBackground : Colors.transparent,
+                  borderRadius: AppRadii.card,
+                  border: isSelected
+                      ? Border.all(
+                          color: colorScheme.primary.withValues(alpha: 0.16),
+                        )
+                      : null,
+                ),
                 child: Padding(
                   padding: const EdgeInsets.symmetric(
                     horizontal: AppSpacing.xxs,
@@ -111,28 +131,10 @@ class _MaumBottomNavigationItem extends StatelessWidget {
                     mainAxisSize: MainAxisSize.min,
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      AnimatedContainer(
-                        key: isSelected
-                            ? ValueKey(
-                                'route-tab-${route.key}-selected-indicator',
-                              )
-                            : null,
-                        duration: const Duration(milliseconds: 180),
-                        curve: Curves.easeOut,
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: AppSpacing.md,
-                          vertical: AppSpacing.xxs,
-                        ),
-                        decoration: BoxDecoration(
-                          color:
-                              isSelected ? indicatorColor : Colors.transparent,
-                          borderRadius: AppRadii.status,
-                        ),
-                        child: Icon(
-                          isSelected ? route.selectedIcon : route.icon,
-                          size: 24,
-                          color: foreground,
-                        ),
+                      Icon(
+                        isSelected ? route.selectedIcon : route.icon,
+                        size: 24,
+                        color: foreground,
                       ),
                       const SizedBox(height: AppSpacing.xxs),
                       Text(

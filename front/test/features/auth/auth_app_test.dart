@@ -231,8 +231,22 @@ void main() {
       expect(
           find.byKey(const ValueKey('app-bottom-navigation')), findsOneWidget);
       expect(
-        find.byKey(const ValueKey('route-tab-home-selected-indicator')),
+        find.byKey(const ValueKey('app-bottom-navigation-surface')),
         findsOneWidget,
+      );
+      expect(
+        find.byKey(const ValueKey('route-tab-home-indicator')),
+        findsOneWidget,
+      );
+      expect(
+        tester
+            .getSize(
+              find.byKey(
+                const ValueKey('route-tab-home-indicator'),
+              ),
+            )
+            .height,
+        greaterThanOrEqualTo(64),
       );
       expect(
         [
@@ -281,20 +295,36 @@ void main() {
 
   testWidgets('marks home selected when the current route is not a primary tab',
       (tester) async {
-    await tester.pumpWidget(
-      MaterialApp(
-        home: AuthenticatedAppShell(
-          currentRoute: AuthenticatedRoute.settings,
-          onRouteSelected: (_) {},
-          child: const SizedBox.shrink(),
-        ),
-      ),
-    );
+    final semanticsHandle = tester.ensureSemantics();
 
-    expect(
-      find.byKey(const ValueKey('route-tab-home-selected-indicator')),
-      findsOneWidget,
-    );
+    try {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: AuthenticatedAppShell(
+            currentRoute: AuthenticatedRoute.settings,
+            onRouteSelected: (_) {},
+            child: const SizedBox.shrink(),
+          ),
+        ),
+      );
+
+      expect(
+        find.byKey(const ValueKey('route-tab-home-indicator')),
+        findsOneWidget,
+      );
+      expect(
+        tester.getSemantics(find.bySemanticsLabel('홈 Tab 1 of 5')),
+        matchesSemantics(
+          label: '홈 Tab 1 of 5',
+          isButton: true,
+          hasSelectedState: true,
+          isSelected: true,
+          hasTapAction: true,
+        ),
+      );
+    } finally {
+      semanticsHandle.dispose();
+    }
   });
 
   testWidgets('navigates authenticated users from home to diary',
