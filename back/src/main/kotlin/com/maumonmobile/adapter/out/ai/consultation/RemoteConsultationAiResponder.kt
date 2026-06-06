@@ -184,7 +184,20 @@ class RemoteConsultationAiResponder internal constructor(
         if (sanitized.isEmpty()) {
             throw ConsultationAiUnavailableException("상담 모델 응답이 비어 있습니다.")
         }
+        if (sanitized.hasInternalReviewMarker()) {
+            throw ConsultationAiUnavailableException("상담 모델 응답에 내부 검수 문구가 포함되어 있습니다.")
+        }
         return ConsultationAiResponse(chunks = sanitized)
+    }
+
+    private fun List<String>.hasInternalReviewMarker(): Boolean {
+        return any { chunk -> chunk.containsInternalReviewMarker() } ||
+            joinToString(separator = " ").containsInternalReviewMarker() ||
+            joinToString(separator = "").containsInternalReviewMarker()
+    }
+
+    private fun String.containsInternalReviewMarker(): Boolean {
+        return INTERNAL_REVIEW_MARKER_PATTERNS.any { pattern -> pattern.containsMatchIn(this) }
     }
 
     private fun firstVertexText(root: tools.jackson.databind.JsonNode): String? {
@@ -215,6 +228,30 @@ class RemoteConsultationAiResponder internal constructor(
 
     private fun minTimeout(left: Duration, right: Duration): Duration {
         return if (left <= right) left else right
+    }
+
+    companion object {
+        private const val INTERNAL_REVIEW_MARKER =
+            """(?:qa|테스트|샘플|placeholder|fixture|stub|스텁|내부\s*검수)"""
+        private const val INTERNAL_REVIEW_MESSAGE_SUFFIX = """(?:메시지|메세지|응답|답변|문구)"""
+        private const val INTERNAL_REVIEW_PHRASE_END = """(?:입니다\.?|[.!?。！？]|$)"""
+        private const val INTERNAL_REVIEW_STANDALONE_PREFIX =
+            """(?:^|[.!?。！？]\s*|(?:죄송합니다|응답|답변|다음\s*(?:응답|답변))\s*(?:은|는|입니다\.?)?\s*)"""
+
+        private val INTERNAL_REVIEW_MARKER_PATTERNS = listOf(
+            Regex(
+                """상담\s*답변\s*$INTERNAL_REVIEW_MARKER(\s*$INTERNAL_REVIEW_MARKER)*\s*(?:(?:$INTERNAL_REVIEW_MESSAGE_SUFFIX)\s*$INTERNAL_REVIEW_PHRASE_END|입니다\.?)""",
+                RegexOption.IGNORE_CASE,
+            ),
+            Regex(
+                """$INTERNAL_REVIEW_STANDALONE_PREFIX$INTERNAL_REVIEW_MARKER(\s*$INTERNAL_REVIEW_MARKER)*\s*$INTERNAL_REVIEW_MESSAGE_SUFFIX\s*$INTERNAL_REVIEW_PHRASE_END""",
+                RegexOption.IGNORE_CASE,
+            ),
+            Regex(
+                """$INTERNAL_REVIEW_STANDALONE_PREFIX\s*qa\s*,\s*테스트\s*,\s*샘플\s*,\s*placeholder\s*,\s*fixture""",
+                RegexOption.IGNORE_CASE,
+            ),
+        )
     }
 
     private fun String.toValidatedEndpointUri(): URI {

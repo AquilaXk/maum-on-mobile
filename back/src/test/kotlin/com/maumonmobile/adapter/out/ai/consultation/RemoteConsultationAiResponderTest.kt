@@ -307,6 +307,275 @@ class RemoteConsultationAiResponderTest {
     }
 
     @Test
+    fun rejectsInternalQaReplyChunks() {
+        val client = RecordingVertexAiGenerateContentClient(
+            responseBody = vertexResponse("""{"chunks":["상담 답변 QA메세지입니다."]}"""),
+        )
+        val responder = RemoteConsultationAiResponder(
+            properties = aiProperties(),
+            objectMapper = ObjectMapper(),
+            accessTokenProvider = { "vertex-token" },
+            generateContentClient = client,
+        )
+
+        assertThatThrownBy {
+            responder.generate(
+                ConsultationAiRequest(
+                    memberId = 11L,
+                    message = "오늘 마음이 힘들어요.",
+                    recentMessages = emptyList(),
+                    timeout = Duration.ofSeconds(2),
+                ),
+            )
+        }.isInstanceOf(ConsultationAiUnavailableException::class.java)
+            .hasMessageContaining("상담 모델 응답을 만들지 못했습니다.")
+            .hasRootCauseMessage("상담 모델 응답에 내부 검수 문구가 포함되어 있습니다.")
+    }
+
+    @Test
+    fun rejectsInternalQaReplySplitAcrossChunks() {
+        val client = RecordingVertexAiGenerateContentClient(
+            responseBody = vertexResponse("""{"chunks":["상담 답변","QA메세지입니다."]}"""),
+        )
+        val responder = RemoteConsultationAiResponder(
+            properties = aiProperties(),
+            objectMapper = ObjectMapper(),
+            accessTokenProvider = { "vertex-token" },
+            generateContentClient = client,
+        )
+
+        assertThatThrownBy {
+            responder.generate(
+                ConsultationAiRequest(
+                    memberId = 14L,
+                    message = "오늘 마음이 힘들어요.",
+                    recentMessages = emptyList(),
+                    timeout = Duration.ofSeconds(2),
+                ),
+            )
+        }.isInstanceOf(ConsultationAiUnavailableException::class.java)
+            .hasMessageContaining("상담 모델 응답을 만들지 못했습니다.")
+            .hasRootCauseMessage("상담 모델 응답에 내부 검수 문구가 포함되어 있습니다.")
+    }
+
+    @Test
+    fun rejectsInternalTestReplyVariant() {
+        val client = RecordingVertexAiGenerateContentClient(
+            responseBody = vertexResponse("""{"chunks":["상담 답변 테스트 메시지입니다."]}"""),
+        )
+        val responder = RemoteConsultationAiResponder(
+            properties = aiProperties(),
+            objectMapper = ObjectMapper(),
+            accessTokenProvider = { "vertex-token" },
+            generateContentClient = client,
+        )
+
+        assertThatThrownBy {
+            responder.generate(
+                ConsultationAiRequest(
+                    memberId = 15L,
+                    message = "오늘 마음이 힘들어요.",
+                    recentMessages = emptyList(),
+                    timeout = Duration.ofSeconds(2),
+                ),
+            )
+        }.isInstanceOf(ConsultationAiUnavailableException::class.java)
+            .hasMessageContaining("상담 모델 응답을 만들지 못했습니다.")
+            .hasRootCauseMessage("상담 모델 응답에 내부 검수 문구가 포함되어 있습니다.")
+    }
+
+    @Test
+    fun rejectsInternalSampleReplySplitAcrossChunks() {
+        val client = RecordingVertexAiGenerateContentClient(
+            responseBody = vertexResponse("""{"chunks":["상담 답변","샘플 메세지입니다."]}"""),
+        )
+        val responder = RemoteConsultationAiResponder(
+            properties = aiProperties(),
+            objectMapper = ObjectMapper(),
+            accessTokenProvider = { "vertex-token" },
+            generateContentClient = client,
+        )
+
+        assertThatThrownBy {
+            responder.generate(
+                ConsultationAiRequest(
+                    memberId = 16L,
+                    message = "오늘 마음이 힘들어요.",
+                    recentMessages = emptyList(),
+                    timeout = Duration.ofSeconds(2),
+                ),
+            )
+        }.isInstanceOf(ConsultationAiUnavailableException::class.java)
+            .hasMessageContaining("상담 모델 응답을 만들지 못했습니다.")
+            .hasRootCauseMessage("상담 모델 응답에 내부 검수 문구가 포함되어 있습니다.")
+    }
+
+    @Test
+    fun rejectsInternalDevelopmentMarkerReplyVariants() {
+        val internalReplies = listOf(
+            "상담 답변 QA 테스트 메시지입니다.",
+            "상담 답변 테스트 답변입니다.",
+            "상담 답변 placeholder 메시지입니다.",
+            "상담 답변 placeholder fixture 응답입니다.",
+            "상담 답변 fixture 응답입니다.",
+            "상담 답변 stub 문구입니다.",
+            "상담 답변 스텁 메시지입니다.",
+            "상담 답변 내부 검수 메시지입니다.",
+        )
+
+        internalReplies.forEachIndexed { index, reply ->
+            val client = RecordingVertexAiGenerateContentClient(
+                responseBody = vertexResponse("""{"chunks":["$reply"]}"""),
+            )
+            val responder = RemoteConsultationAiResponder(
+                properties = aiProperties(),
+                objectMapper = ObjectMapper(),
+                accessTokenProvider = { "vertex-token" },
+                generateContentClient = client,
+            )
+
+            assertThatThrownBy {
+                responder.generate(
+                    ConsultationAiRequest(
+                        memberId = 17L + index,
+                        message = "오늘 마음이 힘들어요.",
+                        recentMessages = emptyList(),
+                        timeout = Duration.ofSeconds(2),
+                    ),
+                )
+            }.isInstanceOf(ConsultationAiUnavailableException::class.java)
+                .hasMessageContaining("상담 모델 응답을 만들지 못했습니다.")
+                .hasRootCauseMessage("상담 모델 응답에 내부 검수 문구가 포함되어 있습니다.")
+        }
+    }
+
+    @Test
+    fun rejectsStandaloneInternalReplyVariants() {
+        val internalReplies = listOf(
+            "QA 테스트 메시지입니다.",
+            "QA 답변입니다.",
+            "죄송합니다. QA 테스트 메시지입니다.",
+            "응답은 QA, 테스트, 샘플, placeholder, fixture 같은 내부 검수/스텁 표현",
+            "샘플 응답입니다.",
+            "placeholder 문구",
+            "스텁 메시지입니다.",
+            "내부 검수 응답입니다.",
+            "QA, 테스트, 샘플, placeholder, fixture 같은 내부 검수/스텁 표현",
+        )
+
+        internalReplies.forEachIndexed { index, reply ->
+            val client = RecordingVertexAiGenerateContentClient(
+                responseBody = vertexResponse("""{"chunks":["$reply"]}"""),
+            )
+            val responder = RemoteConsultationAiResponder(
+                properties = aiProperties(),
+                objectMapper = ObjectMapper(),
+                accessTokenProvider = { "vertex-token" },
+                generateContentClient = client,
+            )
+
+            assertThatThrownBy {
+                responder.generate(
+                    ConsultationAiRequest(
+                        memberId = 40L + index,
+                        message = "오늘 마음이 힘들어요.",
+                        recentMessages = emptyList(),
+                        timeout = Duration.ofSeconds(2),
+                    ),
+                )
+            }.isInstanceOf(ConsultationAiUnavailableException::class.java)
+                .hasMessageContaining("상담 모델 응답을 만들지 못했습니다.")
+                .hasRootCauseMessage("상담 모델 응답에 내부 검수 문구가 포함되어 있습니다.")
+        }
+    }
+
+    @Test
+    fun allowsUserFacingTestContextReplies() {
+        val client = RecordingVertexAiGenerateContentClient(
+            responseBody = vertexResponse("""{"chunks":["심리 테스트 결과가 마음에 남아서 불안하셨겠어요."]}"""),
+        )
+        val responder = RemoteConsultationAiResponder(
+            properties = aiProperties(),
+            objectMapper = ObjectMapper(),
+            accessTokenProvider = { "vertex-token" },
+            generateContentClient = client,
+        )
+
+        val response = responder.generate(
+            ConsultationAiRequest(
+                memberId = 12L,
+                message = "심리 테스트 결과 때문에 불안해요.",
+                recentMessages = emptyList(),
+                timeout = Duration.ofSeconds(2),
+            ),
+        )
+
+        assertThat(response.chunks).containsExactly("심리 테스트 결과가 마음에 남아서 불안하셨겠어요.")
+    }
+
+    @Test
+    fun allowsUserFacingQaWorkContextReplies() {
+        val client = RecordingVertexAiGenerateContentClient(
+            responseBody = vertexResponse("""{"chunks":["QA 답변 업무에서 부담을 많이 느끼셨겠어요."]}"""),
+        )
+        val responder = RemoteConsultationAiResponder(
+            properties = aiProperties(),
+            objectMapper = ObjectMapper(),
+            accessTokenProvider = { "vertex-token" },
+            generateContentClient = client,
+        )
+
+        val response = responder.generate(
+            ConsultationAiRequest(
+                memberId = 13L,
+                message = "QA 답변 업무 때문에 지쳤어요.",
+                recentMessages = emptyList(),
+                timeout = Duration.ofSeconds(2),
+            ),
+        )
+
+        assertThat(response.chunks).containsExactly("QA 답변 업무에서 부담을 많이 느끼셨겠어요.")
+    }
+
+    @Test
+    fun allowsUserFacingDevelopmentWorkContextReplies() {
+        val allowedReplies = listOf(
+            "placeholder 문구 수정 때문에 부담이 크셨겠어요.",
+            "fixture 정리 업무가 계속 밀려 답답하셨겠어요.",
+            "stub 작업이 반복돼서 많이 지치셨겠어요.",
+            "스텁 코드 때문에 막막한 마음이 드셨겠어요.",
+            "내부 검수 업무가 계속 밀려 부담이 크셨겠어요.",
+            "QA 테스트 업무가 이어져 지치셨겠어요.",
+            "QA 테스트 메시지 작성 업무가 이어져 지치셨겠어요.",
+            "상담 답변 테스트 메시지 작성 업무 때문에 긴장하셨겠어요.",
+            "상담 답변 테스트 업무 때문에 긴장하셨겠어요.",
+        )
+
+        allowedReplies.forEachIndexed { index, reply ->
+            val client = RecordingVertexAiGenerateContentClient(
+                responseBody = vertexResponse("""{"chunks":["$reply"]}"""),
+            )
+            val responder = RemoteConsultationAiResponder(
+                properties = aiProperties(),
+                objectMapper = ObjectMapper(),
+                accessTokenProvider = { "vertex-token" },
+                generateContentClient = client,
+            )
+
+            val response = responder.generate(
+                ConsultationAiRequest(
+                    memberId = 30L + index,
+                    message = "개발 업무 때문에 지쳤어요.",
+                    recentMessages = emptyList(),
+                    timeout = Duration.ofSeconds(2),
+                ),
+            )
+
+            assertThat(response.chunks).containsExactly(reply)
+        }
+    }
+
+    @Test
     fun usesDedicatedConsultationTokenForNonVertexEndpoint() {
         val client = RecordingVertexAiGenerateContentClient(
             responseBody = vertexResponse("""{"chunks":["괜찮아요."]}"""),
