@@ -270,8 +270,6 @@ class _PrivacyDisclosureSection extends StatelessWidget {
       title: '개인정보와 지원',
       children: [
         const Text(LegalDisclosures.dataExportGuidance),
-        const SizedBox(height: AppSpacing.xs),
-        const Text('계정 삭제는 아래 회원 탈퇴에서 처리하며, 보존 정책을 먼저 확인해 주세요.'),
         const SizedBox(height: AppSpacing.md),
         LegalDisclosureLinks(
           keyPrefix: 'settings',
@@ -578,10 +576,7 @@ class _EmailSection extends StatelessWidget {
         TextField(
           key: const ValueKey('settings-email-field'),
           controller: emailController,
-          decoration: InputDecoration(
-            labelText: '이메일',
-            helperText: isSocialAccount ? '소셜 계정은 이메일을 변경할 수 없습니다.' : null,
-          ),
+          decoration: const InputDecoration(labelText: '이메일'),
           enabled: !isSocialAccount,
           keyboardType: TextInputType.emailAddress,
           textInputAction: TextInputAction.done,
@@ -628,10 +623,7 @@ class _PasswordSection extends StatelessWidget {
         TextField(
           key: const ValueKey('settings-current-password-field'),
           controller: currentPasswordController,
-          decoration: InputDecoration(
-            labelText: '현재 비밀번호',
-            helperText: isSocialAccount ? '소셜 계정은 비밀번호를 변경할 수 없습니다.' : null,
-          ),
+          decoration: const InputDecoration(labelText: '현재 비밀번호'),
           enabled: !isSocialAccount,
           obscureText: true,
           textInputAction: TextInputAction.next,
@@ -714,8 +706,6 @@ class _WithdrawalSection extends StatelessWidget {
     return _SettingsSection(
       title: '회원 탈퇴',
       children: [
-        const Text('탈퇴 전 데이터 내보내기와 보존 정책을 확인해 주세요.'),
-        const SizedBox(height: AppSpacing.md),
         if (!state.isWithdrawConfirmVisible)
           Align(
             alignment: Alignment.centerLeft,
