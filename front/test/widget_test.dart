@@ -19,7 +19,7 @@ void main() {
     expect(
         find.byKey(const ValueKey('maum-on-brand-wordmark')), findsOneWidget);
     expect(find.bySemanticsLabel('Maum On'), findsOneWidget);
-    expect(find.text('계정으로 마음 기록을 이어가세요.'), findsOneWidget);
+    expect(find.text('계정으로 마음 기록을 이어가세요.'), findsNothing);
     expect(find.text('로그인'), findsWidgets);
     expect(find.text('새 계정 만들기'), findsOneWidget);
   });
