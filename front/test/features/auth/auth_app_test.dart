@@ -31,8 +31,38 @@ import 'package:maum_on_mobile_front/features/settings/data/settings_repository.
 import 'package:maum_on_mobile_front/features/settings/domain/settings_models.dart';
 import 'package:maum_on_mobile_front/features/story/data/story_repository.dart';
 import 'package:maum_on_mobile_front/features/story/domain/story_models.dart';
+import 'package:maum_on_mobile_front/theme/app_theme.dart';
 
 void main() {
+  testWidgets('uses high contrast selected tab foreground in dark mode',
+      (tester) async {
+    final theme = buildDarkAppTheme();
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: theme,
+        home: AuthenticatedAppShell(
+          currentRoute: AuthenticatedRoute.diary,
+          onRouteSelected: (_) {},
+          child: const SizedBox.expand(),
+        ),
+      ),
+    );
+
+    final selectedTab = find.byKey(const ValueKey('route-tab-diary'));
+    expect(selectedTab, findsOneWidget);
+
+    final selectedLabel = tester.widget<Text>(
+      find.descendant(of: selectedTab, matching: find.text('기록')),
+    );
+    final selectedIcon = tester.widget<Icon>(
+      find.descendant(of: selectedTab, matching: find.byIcon(Icons.edit_note)),
+    );
+
+    expect(selectedLabel.style?.color, theme.colorScheme.onPrimaryContainer);
+    expect(selectedIcon.color, theme.colorScheme.onPrimaryContainer);
+  });
+
   testWidgets('restores a session and renders the authenticated home',
       (tester) async {
     await tester.pumpWidget(
