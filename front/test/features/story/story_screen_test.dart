@@ -5,6 +5,7 @@ import 'package:maum_on_mobile_front/features/story/application/story_controller
 import 'package:maum_on_mobile_front/features/story/data/story_repository.dart';
 import 'package:maum_on_mobile_front/features/story/domain/story_models.dart';
 import 'package:maum_on_mobile_front/features/story/presentation/story_screen.dart';
+import 'package:maum_on_mobile_front/shared/ui/app_design_system.dart';
 
 void main() {
   testWidgets('keeps story discovery controls compact on a phone viewport',
@@ -81,7 +82,7 @@ void main() {
           _summary(
             id: 1,
             title: '잠이 오지 않는 밤',
-            summary: '작은 회복을 나누는 이야기',
+            summary: '목록 요약 텍스트',
           ),
         ]),
       ],
@@ -109,9 +110,7 @@ void main() {
     expect(find.text('스토리 탐색 흐름'), findsNothing);
     expect(find.text('대화 확인 흐름'), findsNothing);
     expect(find.text('스토리 작성 흐름'), findsNothing);
-    expect(find.text('서로의 고민과 답변을 살펴봅니다.'), findsNothing);
-    expect(find.text('검색과 카테고리로 필요한 이야기를 좁혀 보세요.'), findsNothing);
-    expect(find.text('작은 회복을 나누는 이야기'), findsNothing);
+    expect(find.text('목록 요약 텍스트'), findsNothing);
     expect(find.byKey(const ValueKey('story-search-panel')), findsOneWidget);
     expect(find.text('잠이 오지 않는 밤'), findsOneWidget);
 
@@ -172,6 +171,9 @@ void main() {
     expect(repository.createdDrafts.single.category, StoryCategory.question);
     expect(find.text('스토리가 등록되었습니다.'), findsOneWidget);
     expect(find.text('질문 본문'), findsOneWidget);
+    final emptyState = tester.widget<AppStateView>(find.byType(AppStateView));
+    expect(emptyState.title, '아직 댓글이 없습니다.');
+    expect(emptyState.message, isNull);
   });
 
   testWidgets('loads the next story page from the list footer', (tester) async {
@@ -212,7 +214,8 @@ void main() {
 
     expect(find.text('첫 번째 이야기'), findsOneWidget);
     expect(find.text('두 번째 이야기'), findsOneWidget);
-    expect(find.text('마지막 스토리입니다.'), findsOneWidget);
+    expect(find.byKey(const ValueKey('story-load-more-button')), findsNothing);
+    expect(find.byType(AppNotice), findsNothing);
   });
 
   testWidgets('pull refresh reloads the visible story list', (tester) async {

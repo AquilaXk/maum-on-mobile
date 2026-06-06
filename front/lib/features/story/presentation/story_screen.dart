@@ -176,24 +176,23 @@ class _StoryListView extends StatelessWidget {
             ),
             const SizedBox(height: AppSpacing.sm),
           ],
-        if (!state.isListLoading && state.stories.isNotEmpty) ...[
+        if (!state.isListLoading &&
+            state.stories.isNotEmpty &&
+            !state.isLastStoryPage) ...[
           const SizedBox(height: AppSpacing.xs),
-          if (state.isLastStoryPage)
-            const AppNotice(message: '마지막 스토리입니다.')
-          else
-            OutlinedButton.icon(
-              key: const ValueKey('story-load-more-button'),
-              onPressed: state.isLoadingMore || state.errorMessage != null
-                  ? null
-                  : controller.loadMoreStories,
-              icon: state.isLoadingMore
-                  ? const SizedBox.square(
-                      dimension: 18,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : const Icon(Icons.expand_more),
-              label: Text(state.isLoadingMore ? '불러오는 중' : '더 보기'),
-            ),
+          OutlinedButton.icon(
+            key: const ValueKey('story-load-more-button'),
+            onPressed: state.isLoadingMore || state.errorMessage != null
+                ? null
+                : controller.loadMoreStories,
+            icon: state.isLoadingMore
+                ? const SizedBox.square(
+                    dimension: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Icons.expand_more),
+            label: Text(state.isLoadingMore ? '불러오는 중' : '더 보기'),
+          ),
         ],
       ],
     );
@@ -517,7 +516,6 @@ class _CommentList extends StatelessWidget {
     if (state.comments.isEmpty) {
       return const AppStateView.empty(
         title: '아직 댓글이 없습니다.',
-        message: '첫 댓글로 마음을 전할 수 있습니다.',
         semanticLabel: '스토리 댓글 비어 있음',
       );
     }
