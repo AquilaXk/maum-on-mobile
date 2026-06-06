@@ -80,7 +80,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byKey(const ValueKey('route-tab-home')), findsOneWidget);
-    expect(find.text('마음이님, 오늘의 마음을 이어가세요.'), findsOneWidget);
+    expect(find.text('마음이님, 오늘의 마음을 이어가세요.'), findsNothing);
     expect(find.text('로그아웃'), findsOneWidget);
   });
 
@@ -189,7 +189,7 @@ void main() {
 
     await tester.pumpAndSettle();
     expect(find.byKey(const ValueKey('route-tab-home')), findsOneWidget);
-    expect(find.text('마음이님, 오늘의 마음을 이어가세요.'), findsOneWidget);
+    expect(find.text('마음이님, 오늘의 마음을 이어가세요.'), findsNothing);
 
     await _tapVisibleText(tester, '다이어리 쓰기');
     expect(find.text('나의 기록'), findsOneWidget);
@@ -317,7 +317,7 @@ void main() {
 
       await tester.tap(find.byKey(const ValueKey('route-tab-home')));
       await tester.pumpAndSettle();
-      expect(find.text('마음이님, 오늘의 마음을 이어가세요.'), findsOneWidget);
+      expect(find.text('마음이님, 오늘의 마음을 이어가세요.'), findsNothing);
     } finally {
       semanticsHandle.dispose();
     }
@@ -402,7 +402,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(handled, isTrue);
-    expect(find.text('마음이님, 오늘의 마음을 이어가세요.'), findsOneWidget);
+    expect(find.text('마음이님, 오늘의 마음을 이어가세요.'), findsNothing);
     expect(find.text('나의 기록'), findsNothing);
   });
 
@@ -921,7 +921,7 @@ Future<void> _returnHome(WidgetTester tester) async {
   await tester.pumpAndSettle();
 
   expect(handled, isTrue);
-  expect(find.text('마음이님, 오늘의 마음을 이어가세요.'), findsOneWidget);
+  expect(find.text('마음이님, 오늘의 마음을 이어가세요.'), findsNothing);
 }
 
 class _FakeHomeRepository implements HomeRepository {

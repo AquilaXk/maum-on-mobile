@@ -91,7 +91,6 @@ class _HomeScreenState extends State<HomeScreen> {
 
         return AppScreen(
           title: 'Maum On',
-          subtitle: '${widget.nickname}님, 오늘의 마음을 이어가세요.',
           onRefresh: widget.onRefresh ?? widget.homeController.load,
           actions: [
             _HomeNotificationHeaderButton(
@@ -840,10 +839,6 @@ class _CategoryOverview extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        if (stats?.summary.feedMessage.isNotEmpty == true) ...[
-          AppNotice(message: stats!.summary.feedMessage),
-          const SizedBox(height: AppSpacing.xs),
-        ],
         Wrap(
           spacing: AppSpacing.xs,
           runSpacing: AppSpacing.xs,
