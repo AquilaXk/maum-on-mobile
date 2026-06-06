@@ -59,8 +59,8 @@ void main() {
       find.descendant(of: selectedTab, matching: find.byIcon(Icons.edit_note)),
     );
 
-    expect(selectedLabel.style?.color, theme.colorScheme.onPrimaryContainer);
-    expect(selectedIcon.color, theme.colorScheme.onPrimaryContainer);
+    expect(selectedLabel.style?.color, theme.colorScheme.onSurface);
+    expect(selectedIcon.color, theme.colorScheme.primary);
   });
 
   testWidgets('restores a session and renders the authenticated home',
@@ -268,16 +268,13 @@ void main() {
         find.byKey(const ValueKey('route-tab-home-indicator')),
         findsOneWidget,
       );
-      expect(
-        tester
-            .getSize(
-              find.byKey(
-                const ValueKey('route-tab-home-indicator'),
-              ),
-            )
-            .height,
-        greaterThanOrEqualTo(64),
+      final selectedIndicatorSize = tester.getSize(
+        find.byKey(
+          const ValueKey('route-tab-home-indicator'),
+        ),
       );
+      expect(selectedIndicatorSize.height, 3);
+      expect(selectedIndicatorSize.width, 24);
       expect(
         [
           'route-tab-home',
@@ -288,7 +285,12 @@ void main() {
         ].map((key) {
           return tester.getSize(find.byKey(ValueKey(key))).height;
         }),
-        everyElement(greaterThanOrEqualTo(64)),
+        everyElement(
+          allOf(
+            greaterThanOrEqualTo(52),
+            lessThanOrEqualTo(60),
+          ),
+        ),
       );
       expect(find.text('홈'), findsOneWidget);
       expect(find.text('기록'), findsOneWidget);
@@ -321,6 +323,46 @@ void main() {
     } finally {
       semanticsHandle.dispose();
     }
+  });
+
+  testWidgets('lets bottom navigation grow for accessibility text scaling',
+      (tester) async {
+    tester.view.physicalSize = const Size(320, 640);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        builder: (context, child) {
+          return MediaQuery(
+            data: MediaQuery.of(context).copyWith(
+              textScaler: const TextScaler.linear(2),
+            ),
+            child: child!,
+          );
+        },
+        home: AuthenticatedAppShell(
+          currentRoute: AuthenticatedRoute.consultation,
+          onRouteSelected: (_) {},
+          child: const SizedBox.expand(),
+        ),
+      ),
+    );
+
+    expect(tester.takeException(), isNull);
+    expect(
+      tester
+          .getSize(find.byKey(const ValueKey('route-tab-consultation')))
+          .height,
+      greaterThan(52),
+    );
+    expect(
+      tester.getSize(
+        find.byKey(const ValueKey('route-tab-consultation-indicator')),
+      ),
+      const Size(24, 3),
+    );
   });
 
   testWidgets('marks home selected when the current route is not a primary tab',

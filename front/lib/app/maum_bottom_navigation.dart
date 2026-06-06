@@ -24,27 +24,21 @@ class MaumBottomNavigation extends StatelessWidget {
     return SafeArea(
       top: false,
       minimum: const EdgeInsets.fromLTRB(
-        AppSpacing.md,
-        AppSpacing.xxs,
-        AppSpacing.md,
+        AppSpacing.sm,
+        0,
+        AppSpacing.sm,
         AppSpacing.xs,
       ),
       child: DecoratedBox(
         key: const ValueKey('app-bottom-navigation-surface'),
         decoration: BoxDecoration(
-          color: colorScheme.surface.withValues(alpha: 0.96),
-          borderRadius: AppRadii.card,
-          border: Border.all(color: colorScheme.outlineVariant),
-          boxShadow: [
-            BoxShadow(
-              color: colorScheme.shadow.withValues(alpha: 0.08),
-              blurRadius: 18,
-              offset: const Offset(0, -4),
-            ),
-          ],
+          color: colorScheme.surface.withValues(alpha: 0.98),
+          border: Border(
+            top: BorderSide(color: colorScheme.outlineVariant),
+          ),
         ),
         child: Padding(
-          padding: const EdgeInsets.all(AppSpacing.xxs),
+          padding: const EdgeInsets.only(top: AppSpacing.xxs),
           child: Row(
             children: [
               for (var index = 0; index < routes.length; index++)
@@ -86,14 +80,10 @@ class _MaumBottomNavigationItem extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
-    final foreground = isSelected
-        ? colorScheme.onPrimaryContainer
-        : colorScheme.onSurfaceVariant;
-    final selectedBackground = Color.lerp(
-      colorScheme.surface,
-      colorScheme.primaryContainer,
-      0.82,
-    )!;
+    final iconForeground =
+        isSelected ? colorScheme.primary : colorScheme.onSurfaceVariant;
+    final labelForeground =
+        isSelected ? colorScheme.onSurface : colorScheme.onSurfaceVariant;
 
     return Semantics(
       button: true,
@@ -105,51 +95,52 @@ class _MaumBottomNavigationItem extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xxs),
           child: Material(
             color: Colors.transparent,
-            borderRadius: AppRadii.card,
+            borderRadius: BorderRadius.circular(10),
             child: InkWell(
-              borderRadius: AppRadii.card,
+              borderRadius: BorderRadius.circular(10),
               onTap: () => onSelected(route),
-              child: AnimatedContainer(
-                key: ValueKey('route-tab-${route.key}-indicator'),
-                duration: const Duration(milliseconds: 180),
-                curve: Curves.easeOut,
-                constraints: const BoxConstraints(minHeight: 64),
-                decoration: BoxDecoration(
-                  color: isSelected ? selectedBackground : Colors.transparent,
-                  borderRadius: AppRadii.card,
-                  border: isSelected
-                      ? Border.all(
-                          color: colorScheme.primary.withValues(alpha: 0.16),
-                        )
-                      : null,
-                ),
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(minHeight: 52),
                 child: Padding(
                   padding: const EdgeInsets.symmetric(
                     horizontal: AppSpacing.xxs,
-                    vertical: AppSpacing.xs,
                   ),
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
+                      AnimatedContainer(
+                        key: ValueKey('route-tab-${route.key}-indicator'),
+                        duration: const Duration(milliseconds: 180),
+                        curve: Curves.easeOut,
+                        width: 24,
+                        height: 3,
+                        decoration: BoxDecoration(
+                          color: isSelected
+                              ? colorScheme.primary
+                              : Colors.transparent,
+                          borderRadius: BorderRadius.circular(999),
+                        ),
+                      ),
+                      const SizedBox(height: 5),
                       Icon(
                         isSelected ? route.selectedIcon : route.icon,
-                        size: 24,
-                        color: foreground,
+                        size: isSelected ? 23 : 22,
+                        color: iconForeground,
                       ),
-                      const SizedBox(height: AppSpacing.xxs),
+                      const SizedBox(height: 2),
                       Text(
                         route.navLabel,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: theme.textTheme.labelSmall?.copyWith(
-                              color: foreground,
+                              color: labelForeground,
                               fontWeight: isSelected
                                   ? FontWeight.w800
                                   : FontWeight.w700,
                             ) ??
                             TextStyle(
-                              color: foreground,
+                              color: labelForeground,
                               fontWeight: isSelected
                                   ? FontWeight.w800
                                   : FontWeight.w700,
