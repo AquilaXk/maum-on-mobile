@@ -22,8 +22,7 @@
       "file": "front/lib/features/legal/domain/legal_disclosures.dart",
       "patterns": [
         "privacyPolicyUrl = 'https://maum-on.app/privacy'",
-        "accountDeletionGuidance",
-        "dataExportGuidance"
+        "accountDeletionGuidance"
       ]
     },
     "settingsScreen": {

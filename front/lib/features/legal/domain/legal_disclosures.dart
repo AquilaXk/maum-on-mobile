@@ -66,7 +66,6 @@ class LegalDisclosures {
   ];
 
   static const accountDeletionGuidance = '계정 삭제는 로그인 후 설정의 회원 탈퇴에서 진행할 수 있습니다.';
-  static const dataExportGuidance = '내 데이터 내보내기와 탈퇴 보존 정책은 설정에서 확인할 수 있습니다.';
 }
 
 class SupportContactInfo {

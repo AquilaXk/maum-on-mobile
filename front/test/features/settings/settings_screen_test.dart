@@ -232,6 +232,14 @@ void main() {
       find.text('탈퇴 전 데이터 내보내기와 보존 정책을 확인해 주세요.'),
       findsNothing,
     );
+    expect(
+      find.text('내 데이터 내보내기와 탈퇴 보존 정책은 설정에서 확인할 수 있습니다.'),
+      findsNothing,
+    );
+    expect(
+      find.text('문의에는 앱 버전, 빌드 번호, 플랫폼, locale 진단 정보만 포함됩니다.'),
+      findsNothing,
+    );
 
     final emailField = tester.widget<TextField>(
       find.byKey(const ValueKey('settings-email-field')),
