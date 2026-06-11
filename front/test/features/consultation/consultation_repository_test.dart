@@ -203,6 +203,61 @@ void main() {
       expect(await tokenStore.readAccessToken(), isNull);
       expect(await tokenStore.readRefreshToken(), isNull);
     });
+
+    test('refreshes an expired access token before retrying the stream',
+        () async {
+      final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+      addTearDown(() => server.close(force: true));
+
+      final authHeaders = <String?>[];
+      var requestCount = 0;
+      unawaited(
+        server.forEach((request) async {
+          requestCount += 1;
+          authHeaders
+              .add(request.headers.value(HttpHeaders.authorizationHeader));
+          if (requestCount == 1) {
+            request.response.statusCode = HttpStatus.unauthorized;
+            await request.response.close();
+            return;
+          }
+
+          request.response
+            ..statusCode = HttpStatus.ok
+            ..headers.contentType = ContentType('text', 'event-stream');
+          request.response
+              .add(utf8.encode('event: connect\ndata: connected\n\n'));
+          await request.response.close();
+        }),
+      );
+      final tokenStore = MemoryAuthTokenStore(
+        initialTokens: const TokenPair(
+          accessToken: 'expired-access-token',
+          refreshToken: 'refresh-token',
+        ),
+      );
+      final client = HttpConsultationStreamClient(
+        apiConfig:
+            ApiConfig(baseUrl: Uri.parse('http://127.0.0.1:${server.port}')),
+        tokenStore: tokenStore,
+        tokenRefresher: const _FakeTokenRefresher(
+          TokenPair(
+            accessToken: 'refreshed-access-token',
+            refreshToken: 'refreshed-refresh-token',
+          ),
+        ),
+      );
+
+      final events = await client.connect().toList();
+
+      expect(events.single.type, ConsultationStreamEventType.connect);
+      expect(authHeaders, [
+        'Bearer expired-access-token',
+        'Bearer refreshed-access-token',
+      ]);
+      expect(await tokenStore.readAccessToken(), 'refreshed-access-token');
+      expect(await tokenStore.readRefreshToken(), 'refreshed-refresh-token');
+    });
   });
 }
 
@@ -248,4 +303,13 @@ class _FakeConsultationStreamClient implements ConsultationStreamClient {
     connectCount += 1;
     return Stream<ConsultationStreamEvent>.fromIterable(events);
   }
+}
+
+class _FakeTokenRefresher implements AuthTokenRefresher {
+  const _FakeTokenRefresher(this.tokens);
+
+  final TokenPair? tokens;
+
+  @override
+  Future<TokenPair?> refresh(String refreshToken) async => tokens;
 }

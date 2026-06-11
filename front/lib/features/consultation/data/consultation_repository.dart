@@ -90,18 +90,31 @@ class HttpConsultationStreamClient implements ConsultationStreamClient {
   HttpConsultationStreamClient({
     required ApiConfig apiConfig,
     required AuthTokenStore tokenStore,
+    AuthTokenRefresher? tokenRefresher,
+    AuthTokenRefreshCoordinator? tokenRefreshCoordinator,
     HttpClient? httpClient,
   })  : _baseUrl = apiConfig.baseUrl,
         _tokenStore = tokenStore,
+        _tokenRefresher = tokenRefresher,
+        _tokenRefreshCoordinator =
+            tokenRefreshCoordinator ?? AuthTokenRefreshCoordinator(),
         _httpClient =
             httpClient ?? (HttpClient()..connectionTimeout = _connectTimeout);
 
   final Uri _baseUrl;
   final AuthTokenStore _tokenStore;
+  final AuthTokenRefresher? _tokenRefresher;
+  final AuthTokenRefreshCoordinator _tokenRefreshCoordinator;
   final HttpClient _httpClient;
 
   @override
-  Stream<ConsultationStreamEvent> connect() async* {
+  Stream<ConsultationStreamEvent> connect() {
+    return _connect(hasRetriedUnauthorized: false);
+  }
+
+  Stream<ConsultationStreamEvent> _connect({
+    required bool hasRetriedUnauthorized,
+  }) async* {
     try {
       final accessToken = await _tokenStore.readAccessToken();
       final request = await _httpClient.getUrl(
@@ -116,8 +129,16 @@ class HttpConsultationStreamClient implements ConsultationStreamClient {
       final response = await request.close();
       final statusCode = response.statusCode;
       if (statusCode == HttpStatus.unauthorized) {
-        await _tokenStore.clear();
         await response.drain<void>();
+        final refreshed = await _refreshUnauthorizedToken(
+          hasRetried: hasRetriedUnauthorized,
+        );
+        if (refreshed) {
+          yield* _connect(hasRetriedUnauthorized: true);
+          return;
+        }
+
+        await _tokenStore.clear();
         throw const ApiClientException(
           kind: ApiErrorKind.unauthorized,
           message: '다시 로그인해 주세요.',
@@ -157,6 +178,33 @@ class HttpConsultationStreamClient implements ConsultationStreamClient {
         kind: ApiErrorKind.server,
         message: 'AI 상담 연결이 종료되었습니다. 다시 연결해 주세요.',
       );
+    }
+  }
+
+  Future<bool> _refreshUnauthorizedToken({required bool hasRetried}) async {
+    final tokenRefresher = _tokenRefresher;
+    if (hasRetried || tokenRefresher == null) {
+      return false;
+    }
+
+    final refreshToken = await _tokenStore.readRefreshToken();
+    if (refreshToken == null || refreshToken.isEmpty) {
+      return false;
+    }
+
+    try {
+      final tokens = await _tokenRefreshCoordinator.refresh(
+        refreshToken,
+        tokenRefresher.refresh,
+      );
+      if (tokens == null) {
+        return false;
+      }
+
+      await _tokenStore.saveTokens(tokens);
+      return true;
+    } on Object {
+      return false;
     }
   }
 }
