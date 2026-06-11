@@ -281,6 +281,9 @@ class ConsultationService(
         }
 
         val category = result.categories.toConsultationRiskCategory()
+        if (category == ConsultationRiskCategory.NONE) {
+            return allowSafetyAssessment()
+        }
         val severity = when (category) {
             ConsultationRiskCategory.SELF_HARM,
             ConsultationRiskCategory.VIOLENCE -> ConsultationRiskSeverity.CRITICAL
@@ -437,13 +440,13 @@ class ConsultationService(
     }
 }
 
-private fun List<ContentModerationCategory>.toConsultationRiskCategory(): ConsultationRiskCategory {
+internal fun List<ContentModerationCategory>.toConsultationRiskCategory(): ConsultationRiskCategory {
     return when {
         ContentModerationCategory.SELF_HARM in this -> ConsultationRiskCategory.SELF_HARM
         ContentModerationCategory.VIOLENCE in this -> ConsultationRiskCategory.VIOLENCE
         ContentModerationCategory.ABUSE in this -> ConsultationRiskCategory.ABUSE
         ContentModerationCategory.PROFANITY in this -> ConsultationRiskCategory.PROFANITY
-        else -> ConsultationRiskCategory.ABUSE
+        else -> ConsultationRiskCategory.NONE
     }
 }
 

@@ -60,19 +60,48 @@ class RuleBasedContentModerationClassifier : ContentModerationClassifier {
     private companion object {
         private const val BLOCK_MESSAGE = "위험도가 높은 표현이 포함되어 수정이 필요합니다."
         private const val REPORT_CONTENT_MAX_LENGTH = 300
+        // 테스트/로컬 분류기는 prefilter가 AI 검수로 넘긴 우회 표기까지 함께 판정한다.
         private val PROFANITY_TERMS = setOf(
-            "죽어",
-            "자살해",
             "꺼져",
             "병신",
             "시발",
+            "씨발",
+            "씨팔",
             "she발",
             "개새끼",
+            "좆같",
             "ㅅㅂ",
+            "ㅆㅂ",
             "ㅅㅣ발",
+            "ㅂㅅ",
+            "ㅄ",
+            "ㅈ같",
+            "쉬발",
         )
-        private val SELF_HARM_TERMS = setOf("죽고싶", "자살", "자해", "ㅈㅏ살", "ㅈㅏ해")
-        private val VIOLENCE_TERMS = setOf("죽일", "해치고싶", "때리고싶", "죽여버")
+        private val SELF_HARM_TERMS = setOf(
+            "죽고싶",
+            "자살",
+            "자살해",
+            "자해",
+            "목숨을끊",
+            "극단적선택",
+            "끝내고싶",
+            "ㅈㅏ살",
+            "ㅈㅏ해",
+            "ㅈㅎ",
+        )
+        private val VIOLENCE_TERMS = setOf(
+            "죽어",
+            "죽일",
+            "죽여버",
+            "죽어버",
+            "해치고싶",
+            "때리고싶",
+            "칼로",
+            "복수할거",
+            "ㅈㅇ버",
+            "죽ㅇ버",
+        )
         private val ABUSE_TERMS = setOf("학대", "폭행", "성폭력", "감금", "맞고있", "섬노예")
         private val SPAM_TERMS = setOf(
             "http://",

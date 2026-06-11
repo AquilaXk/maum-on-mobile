@@ -114,7 +114,7 @@ class ContentModerationPreFilter {
             Rule(
                 category = ContentModerationCategory.VIOLENCE,
                 terms = setOf("죽일", "해치고싶", "때리고싶"),
-                aliases = setOf("ㅈㅇ버", "죽ㅇ버"),
+                aliases = setOf("죽어", "ㅈㅇ버", "죽ㅇ버"),
             ),
             Rule(
                 category = ContentModerationCategory.ABUSE,

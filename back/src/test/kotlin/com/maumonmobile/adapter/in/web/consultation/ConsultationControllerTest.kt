@@ -2,12 +2,17 @@ package com.maumonmobile.adapter.`in`.web.consultation
 
 import com.jayway.jsonpath.JsonPath
 import com.maumonmobile.adapter.`in`.web.auth.signupVerifiedMember
+import com.maumonmobile.application.port.out.ContentModerationClassification
+import com.maumonmobile.application.port.out.ContentModerationClassificationRequest
+import com.maumonmobile.application.port.out.ContentModerationClassifier
 import com.maumonmobile.application.port.out.ConsultationAiRequest
 import com.maumonmobile.application.port.out.ConsultationAiResponder
 import com.maumonmobile.application.port.out.ConsultationAiResponse
 import com.maumonmobile.application.port.out.ConsultationAiUnavailableException
 import com.maumonmobile.application.port.out.ConsultationSafetyAuditRepository
 import com.maumonmobile.domain.consultation.ConsultationRiskSeverity
+import com.maumonmobile.domain.moderation.ContentModerationCategory
+import com.maumonmobile.domain.moderation.ContentModerationRiskLevel
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
@@ -38,13 +43,15 @@ class ConsultationControllerTest @Autowired constructor(
     private val mockMvc: MockMvc,
     private val consultationSafetyAuditRepository: ConsultationSafetyAuditRepository,
     private val consultationAiResponder: CapturingConsultationAiResponder,
+    private val contentModerationClassifier: CapturingContentModerationClassifier,
     private val jdbc: NamedParameterJdbcTemplate,
 ) {
     private val objectMapper = ObjectMapper()
 
     @BeforeEach
-    fun resetAiResponder() {
+    fun resetTestDoubles() {
         consultationAiResponder.clear()
+        contentModerationClassifier.clear()
     }
 
     @Test
@@ -309,6 +316,27 @@ class ConsultationControllerTest @Autowired constructor(
     }
 
     @Test
+    fun moderationCategoriesOutsideConsultationSafetyDoNotBlockChat() {
+        val member = signupAndLogin("consultation-pii-moderation@example.com", "분류이")
+        contentModerationClassifier.rejectAs(ContentModerationCategory.PERSONAL_INFO)
+
+        mockMvc.post("/api/v1/consultations/chat") {
+            header("Authorization", "Bearer ${member.accessToken}")
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"message":"ㅅㅣ발처럼 들릴 수 있지만 연락처는 010-1234-5678이에요."}"""
+        }
+            .andExpect {
+                status { isOk() }
+                jsonPath("$.data.accepted") { value(true) }
+                jsonPath("$.data.safety.category") { value("NONE") }
+                jsonPath("$.data.safety.actionPolicy") { value("ALLOW") }
+            }
+
+        assertThat(contentModerationClassifier.requests).hasSize(1)
+        assertThat(consultationAiResponder.requests).hasSize(1)
+    }
+
+    @Test
     fun repeatedCriticalSignalsReturnRateLimitedPolicy() {
         val member = signupAndLogin("consultation-rate@example.com", "반복이")
 
@@ -545,6 +573,34 @@ class ConsultationControllerTest @Autowired constructor(
         @Bean
         @Primary
         fun consultationAiResponder(): CapturingConsultationAiResponder = CapturingConsultationAiResponder()
+
+        @Bean
+        @Primary
+        fun contentModerationClassifier(): CapturingContentModerationClassifier = CapturingContentModerationClassifier()
+    }
+}
+
+class CapturingContentModerationClassifier : ContentModerationClassifier {
+    val requests = mutableListOf<ContentModerationClassificationRequest>()
+    private var result: ContentModerationClassification = ContentModerationClassification.safeFallback()
+
+    override fun classify(request: ContentModerationClassificationRequest): ContentModerationClassification {
+        requests += request
+        return result
+    }
+
+    fun rejectAs(category: ContentModerationCategory) {
+        result = ContentModerationClassification(
+            allowed = false,
+            riskLevel = ContentModerationRiskLevel.HIGH,
+            categories = listOf(category),
+            message = "상담 답변 생성 전에 처리할 수 있는 검수 결과입니다.",
+        )
+    }
+
+    fun clear() {
+        requests.clear()
+        result = ContentModerationClassification.safeFallback()
     }
 }
 
