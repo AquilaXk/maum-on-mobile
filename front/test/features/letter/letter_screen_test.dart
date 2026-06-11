@@ -331,6 +331,125 @@ void main() {
     expect(contentField.controller?.text, isEmpty);
   });
 
+  testWidgets('hides letter input counters while preserving limits',
+      (tester) async {
+    final semanticsHandle = tester.ensureSemantics();
+
+    final repository = _FakeLetterRepository(
+      statsQueue: [_stats()],
+      receivedPages: [_page([])],
+    );
+    final controller = LetterController(
+      letterRepository: repository,
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(home: LetterScreen(controller: controller, onBack: () {})),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('letter-compose-button')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('0/${LetterLimits.titleMaxLength}'), findsNothing);
+    expect(find.text('0/${LetterLimits.contentMaxLength}'), findsNothing);
+
+    final longTitle = List.filled(LetterLimits.titleMaxLength + 5, '제').join();
+    final longContent =
+        List.filled(LetterLimits.contentMaxLength + 5, '문').join();
+
+    await tester.enterText(
+      find.byKey(const ValueKey('letter-title-field')),
+      longTitle,
+    );
+    await tester.enterText(
+      find.byKey(const ValueKey('letter-content-field')),
+      longContent,
+    );
+    await tester.pump();
+
+    expect(
+      find.text(
+          '${LetterLimits.titleMaxLength}/${LetterLimits.titleMaxLength}'),
+      findsNothing,
+    );
+    expect(
+      find.text(
+        '${LetterLimits.contentMaxLength}/${LetterLimits.contentMaxLength}',
+      ),
+      findsNothing,
+    );
+    expect(
+      find.textContaining('/${LetterLimits.contentMaxLength}'),
+      findsNothing,
+    );
+    expect(
+      find.bySemanticsLabel(
+        '현재 글자 수 ${LetterLimits.titleMaxLength} / 최대 ${LetterLimits.titleMaxLength}',
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.bySemanticsLabel(
+        '현재 글자 수 ${LetterLimits.contentMaxLength} / 최대 ${LetterLimits.contentMaxLength}',
+      ),
+      findsOneWidget,
+    );
+
+    await tester
+        .ensureVisible(find.byKey(const ValueKey('letter-submit-button')));
+    await tester.tap(find.byKey(const ValueKey('letter-submit-button')));
+    await tester.pumpAndSettle();
+
+    expect(repository.createdDrafts.single.title.length,
+        LetterLimits.titleMaxLength);
+    expect(repository.createdDrafts.single.content.length,
+        LetterLimits.contentMaxLength);
+
+    final replyRepository = _FakeLetterRepository(
+      details: [_detail(id: 8, status: LetterStatus.accepted)],
+    );
+    final replyController = LetterController(
+      letterRepository: replyRepository,
+    );
+    await replyController.openLetterById(8);
+    await tester.pumpWidget(
+      MaterialApp(
+        home: LetterScreen(controller: replyController, onBack: () {}),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final longReply = List.filled(LetterLimits.replyMaxLength + 5, '답').join();
+    expect(find.text('0/${LetterLimits.replyMaxLength}'), findsNothing);
+
+    await tester.enterText(
+      find.byKey(const ValueKey('letter-reply-field')),
+      longReply,
+    );
+    await tester.pump();
+
+    expect(
+      find.text(
+          '${LetterLimits.replyMaxLength}/${LetterLimits.replyMaxLength}'),
+      findsNothing,
+    );
+    expect(
+      find.bySemanticsLabel(
+        '현재 글자 수 ${LetterLimits.replyMaxLength} / 최대 ${LetterLimits.replyMaxLength}',
+      ),
+      findsOneWidget,
+    );
+    await tester.ensureVisible(
+      find.byKey(const ValueKey('letter-reply-submit-button')),
+    );
+    await tester.tap(find.byKey(const ValueKey('letter-reply-submit-button')));
+    await tester.pumpAndSettle();
+
+    expect(replyRepository.replies.single.replyContent.length,
+        LetterLimits.replyMaxLength);
+    semanticsHandle.dispose();
+  });
+
   testWidgets('opens detail when launched from a letter notification',
       (tester) async {
     final repository = _FakeLetterRepository(
