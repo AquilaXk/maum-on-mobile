@@ -96,7 +96,8 @@ class RemoteContentModerationClassifier internal constructor(
             Classify this Maum On mobile user content.
             Return JSON only with fields: allowed, riskLevel, message, categories.
             riskLevel must be LOW or HIGH.
-            categories can include PROFANITY, PERSONAL_INFO, SPAM, INAPPROPRIATE.
+            categories can include PROFANITY, SELF_HARM, VIOLENCE, ABUSE, PERSONAL_INFO, SPAM, INAPPROPRIATE.
+            Block profanity, harassment, self-harm encouragement, violent threats, abuse or exploitation, personal information exposure, spam, and unsafe inappropriate content.
             targetType: ${request.target.name}
             text: ${request.text.take(endpoint.maxInputChars)}
         """.trimIndent()

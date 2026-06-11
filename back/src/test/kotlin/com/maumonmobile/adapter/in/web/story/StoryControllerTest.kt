@@ -176,7 +176,7 @@ class StoryControllerTest @Autowired constructor(
             .andExpect {
                 status { isBadRequest() }
                 jsonPath("$.error.code") { value("INVALID_REQUEST") }
-                jsonPath("$.error.message") { value("위험도가 높은 표현이 포함되어 수정이 필요합니다.") }
+                jsonPath("$.error.message") { value("폭력이나 위협으로 이어질 수 있는 표현이 포함되어 수정이 필요합니다.") }
             }
 
         val createResult = mockMvc.post("/api/v1/posts") {
@@ -198,7 +198,9 @@ class StoryControllerTest @Autowired constructor(
             .andExpect {
                 status { isBadRequest() }
                 jsonPath("$.error.code") { value("INVALID_REQUEST") }
-                jsonPath("$.error.message") { value("위험도가 높은 표현이 포함되어 수정이 필요합니다.") }
+                jsonPath("$.error.message") {
+                    value("전화번호, 이메일 등 개인을 특정할 수 있는 정보가 포함되어 수정이 필요합니다.")
+                }
             }
 
         mockMvc.get("/api/v1/posts/$postId/comments?page=0&size=20")

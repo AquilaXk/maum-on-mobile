@@ -306,7 +306,10 @@ class DiaryControllerTest @Autowired constructor(
         )
             .andExpect(status().isBadRequest)
             .andExpect(jsonPath("$.error.code").value("INVALID_REQUEST"))
-            .andExpect(jsonPath("$.error.message").value("위험도가 높은 표현이 포함되어 수정이 필요합니다."))
+            .andExpect(
+                jsonPath("$.error.message")
+                    .value("전화번호, 이메일 등 개인을 특정할 수 있는 정보가 포함되어 수정이 필요합니다."),
+            )
     }
 
     @Test

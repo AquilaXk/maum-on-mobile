@@ -59,7 +59,8 @@
         "COMMENT",
         "DIARY",
         "LETTER",
-        "REPORT"
+        "REPORT",
+        "CONSULTATION"
       ],
       "moderationRiskLevel": [
         "LOW",
@@ -67,6 +68,9 @@
       ],
       "moderationCategory": [
         "PROFANITY",
+        "SELF_HARM",
+        "VIOLENCE",
+        "ABUSE",
         "PERSONAL_INFO",
         "SPAM",
         "INAPPROPRIATE"

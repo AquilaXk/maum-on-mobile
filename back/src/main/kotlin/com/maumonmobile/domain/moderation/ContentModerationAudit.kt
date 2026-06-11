@@ -29,6 +29,8 @@ data class ContentModerationAuditEvent(
 )
 
 enum class ContentModerationModelStatus {
+    LOCAL_ALLOW,
+    LOCAL_BLOCK,
     SUCCESS,
     UNAVAILABLE,
     TIMEOUT,

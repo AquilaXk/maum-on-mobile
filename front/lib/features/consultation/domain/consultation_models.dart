@@ -28,13 +28,15 @@ enum ConsultationRiskCategory {
   none,
   selfHarm,
   violence,
-  abuse;
+  abuse,
+  profanity;
 
   static ConsultationRiskCategory fromApiValue(String value) {
     return switch (value) {
       'SELF_HARM' => ConsultationRiskCategory.selfHarm,
       'VIOLENCE' => ConsultationRiskCategory.violence,
       'ABUSE' => ConsultationRiskCategory.abuse,
+      'PROFANITY' => ConsultationRiskCategory.profanity,
       _ => ConsultationRiskCategory.none,
     };
   }

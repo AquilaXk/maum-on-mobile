@@ -231,7 +231,7 @@
       "canonical": "상담",
       "evidenceItems": [
         {"id": "store-consultation", "file": "contracts/store-listing/store-listing.json", "patterns": ["\"routeKey\": \"consultation\"", "상담"]},
-        {"id": "app-consultation", "file": "front/lib/app/app_routes.dart", "patterns": ["key: 'consultation'", "title: '상담'"]}
+        {"id": "app-consultation", "file": "front/lib/app/app_routes.dart", "patterns": ["key: 'consultation'", "title: 'AI 상담'"]}
       ]
     },
     {

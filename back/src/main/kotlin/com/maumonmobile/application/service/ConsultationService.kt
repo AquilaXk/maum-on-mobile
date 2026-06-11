@@ -24,6 +24,8 @@ import com.maumonmobile.domain.consultation.ConsultationRiskCategory
 import com.maumonmobile.domain.consultation.ConsultationRiskSeverity
 import com.maumonmobile.domain.consultation.ConsultationSafetyAssessment
 import com.maumonmobile.domain.consultation.ConsultationSafetyAuditEvent
+import com.maumonmobile.domain.moderation.ContentModerationCategory
+import com.maumonmobile.domain.moderation.ContentModerationTarget
 import com.maumonmobile.global.observability.MobileApiMetricsRegistry
 import com.maumonmobile.global.security.AuthenticatedUser
 import com.maumonmobile.global.web.ApiException
@@ -45,6 +47,7 @@ class ConsultationService(
     private val consultationAiResponder: ConsultationAiResponder,
     private val notificationDeliveryPort: NotificationDeliveryPort,
     private val metricsRegistry: MobileApiMetricsRegistry,
+    private val contentModerationService: ContentModerationService,
     @param:Value("\${app.consultation.ai.timeout:PT8S}")
     private val aiTimeout: Duration,
 ) : ConsultationUseCase {
@@ -72,6 +75,10 @@ class ConsultationService(
         val inputSafety = assessSafety(member.id, normalizedMessage, Instant.now())
         if (inputSafety.actionPolicy != ConsultationActionPolicy.ALLOW) {
             return handleSafetyIntervention(member, normalizedMessage, inputSafety)
+        }
+        val moderationSafety = assessModerationSafety(member.id, normalizedMessage, Instant.now())
+        if (moderationSafety.actionPolicy != ConsultationActionPolicy.ALLOW) {
+            return handleSafetyIntervention(member, normalizedMessage, moderationSafety)
         }
 
         val currentUserMessage = consultationRepository.appendMessage(
@@ -206,12 +213,7 @@ class ConsultationService(
         }
 
         if (category == ConsultationRiskCategory.NONE) {
-            return ConsultationSafetyAssessment(
-                category = ConsultationRiskCategory.NONE,
-                severity = ConsultationRiskSeverity.LOW,
-                actionPolicy = ConsultationActionPolicy.ALLOW,
-                message = "안전 조치가 필요하지 않습니다.",
-            )
+            return allowSafetyAssessment()
         }
 
         if (assistantResponse) {
@@ -226,7 +228,8 @@ class ConsultationService(
         val severity = when (category) {
             ConsultationRiskCategory.SELF_HARM,
             ConsultationRiskCategory.VIOLENCE -> ConsultationRiskSeverity.CRITICAL
-            ConsultationRiskCategory.ABUSE -> ConsultationRiskSeverity.HIGH
+            ConsultationRiskCategory.ABUSE,
+            ConsultationRiskCategory.PROFANITY -> ConsultationRiskSeverity.HIGH
             ConsultationRiskCategory.NONE -> ConsultationRiskSeverity.LOW
         }
         if (severity == ConsultationRiskSeverity.CRITICAL) {
@@ -257,8 +260,77 @@ class ConsultationService(
                 ConsultationRiskCategory.SELF_HARM -> SELF_HARM_MESSAGE
                 ConsultationRiskCategory.VIOLENCE -> VIOLENCE_MESSAGE
                 ConsultationRiskCategory.ABUSE -> ABUSE_MESSAGE
+                ConsultationRiskCategory.PROFANITY -> PROFANITY_MESSAGE
                 ConsultationRiskCategory.NONE -> "안전 조치가 필요하지 않습니다."
             },
+        )
+    }
+
+    private fun assessModerationSafety(
+        memberId: Long,
+        text: String,
+        now: Instant,
+    ): ConsultationSafetyAssessment {
+        val result = contentModerationService.reviewForService(
+            target = ContentModerationTarget.CONSULTATION,
+            memberId = memberId,
+            text,
+        )
+        if (result.allowed) {
+            return allowSafetyAssessment()
+        }
+
+        val category = result.categories.toConsultationRiskCategory()
+        if (category == ConsultationRiskCategory.NONE) {
+            return allowSafetyAssessment()
+        }
+        val severity = when (category) {
+            ConsultationRiskCategory.SELF_HARM,
+            ConsultationRiskCategory.VIOLENCE -> ConsultationRiskSeverity.CRITICAL
+            ConsultationRiskCategory.ABUSE,
+            ConsultationRiskCategory.PROFANITY -> ConsultationRiskSeverity.HIGH
+            ConsultationRiskCategory.NONE -> ConsultationRiskSeverity.LOW
+        }
+        if (severity == ConsultationRiskSeverity.CRITICAL) {
+            val recentCriticalCount = consultationSafetyAuditRepository.countSince(
+                memberId = memberId,
+                severity = ConsultationRiskSeverity.CRITICAL,
+                since = now.minus(SAFETY_RATE_WINDOW).toString(),
+            )
+            if (recentCriticalCount >= CRITICAL_RATE_LIMIT) {
+                return ConsultationSafetyAssessment(
+                    category = category,
+                    severity = severity,
+                    actionPolicy = ConsultationActionPolicy.RATE_LIMITED,
+                    message = RATE_LIMIT_MESSAGE,
+                )
+            }
+        }
+
+        return ConsultationSafetyAssessment(
+            category = category,
+            severity = severity,
+            actionPolicy = if (severity == ConsultationRiskSeverity.CRITICAL) {
+                ConsultationActionPolicy.BLOCK_AND_ESCALATE
+            } else {
+                ConsultationActionPolicy.SAFE_GUIDANCE
+            },
+            message = when (category) {
+                ConsultationRiskCategory.SELF_HARM -> SELF_HARM_MESSAGE
+                ConsultationRiskCategory.VIOLENCE -> VIOLENCE_MESSAGE
+                ConsultationRiskCategory.ABUSE -> ABUSE_MESSAGE
+                ConsultationRiskCategory.PROFANITY -> PROFANITY_MESSAGE
+                ConsultationRiskCategory.NONE -> result.message
+            },
+        )
+    }
+
+    private fun allowSafetyAssessment(): ConsultationSafetyAssessment {
+        return ConsultationSafetyAssessment(
+            category = ConsultationRiskCategory.NONE,
+            severity = ConsultationRiskSeverity.LOW,
+            actionPolicy = ConsultationActionPolicy.ALLOW,
+            message = "안전 조치가 필요하지 않습니다.",
         )
     }
 
@@ -356,6 +428,8 @@ class ConsultationService(
             "누군가를 해칠 위험이 있다면 지금 대화를 멈추고 안전한 거리부터 확보해 주세요. 즉시 위험하면 112 또는 119에 연락해 주세요."
         private const val ABUSE_MESSAGE =
             "학대나 폭력 위험이 있다면 안전한 장소로 이동하고 믿을 수 있는 사람이나 전문 기관에 도움을 요청해 주세요. 긴급하면 112 또는 119에 연락해 주세요."
+        private const val PROFANITY_MESSAGE =
+            "욕설이나 가족 비하처럼 상대를 해칠 수 있는 표현은 상담에서 다루지 않습니다. 표현을 줄이고 지금 느끼는 감정과 상황을 중심으로 다시 적어 주세요."
         private const val RATE_LIMIT_MESSAGE =
             "위기 표현이 반복되어 자동 답변을 잠시 중단합니다. 지금은 119, 112, 가까운 응급실 또는 신뢰할 수 있는 사람에게 즉시 도움을 요청해 주세요."
         private const val RESPONSE_REWRITE_MESSAGE =
@@ -363,6 +437,16 @@ class ConsultationService(
         private val SELF_HARM_TERMS = setOf("죽고 싶", "자해", "자살", "목숨을 끊", "끝내고 싶")
         private val VIOLENCE_TERMS = setOf("죽일", "해치고 싶", "때리고 싶", "칼로", "복수할 거")
         private val ABUSE_TERMS = setOf("학대", "맞고 있어", "폭행", "성폭력", "감금")
+    }
+}
+
+internal fun List<ContentModerationCategory>.toConsultationRiskCategory(): ConsultationRiskCategory {
+    return when {
+        ContentModerationCategory.SELF_HARM in this -> ConsultationRiskCategory.SELF_HARM
+        ContentModerationCategory.VIOLENCE in this -> ConsultationRiskCategory.VIOLENCE
+        ContentModerationCategory.ABUSE in this -> ConsultationRiskCategory.ABUSE
+        ContentModerationCategory.PROFANITY in this -> ConsultationRiskCategory.PROFANITY
+        else -> ConsultationRiskCategory.NONE
     }
 }
 

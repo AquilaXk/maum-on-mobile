@@ -10,6 +10,9 @@ import com.maumonmobile.application.port.out.ContentModerationClassifier
 import com.maumonmobile.application.port.out.ContentModerationUnavailableException
 import com.maumonmobile.domain.moderation.ContentModerationAuditDraft
 import com.maumonmobile.domain.moderation.ContentModerationModelStatus
+import com.maumonmobile.domain.moderation.ContentModerationPreFilter
+import com.maumonmobile.domain.moderation.ContentModerationPreFilterAction
+import com.maumonmobile.domain.moderation.ContentModerationPreFilterResult
 import com.maumonmobile.domain.moderation.ContentModerationResult
 import com.maumonmobile.domain.moderation.ContentModerationTarget
 import com.maumonmobile.global.observability.MobileApiMetricsRegistry
@@ -31,6 +34,7 @@ class ContentModerationService(
     private val auditRepository: ContentModerationAuditRepository,
     @param:Value("\${app.moderation.ai.timeout:PT4S}")
     private val moderationTimeout: Duration,
+    private val preFilter: ContentModerationPreFilter = ContentModerationPreFilter(),
 ) : ContentModerationUseCase {
 
     override fun review(user: AuthenticatedUser, command: ContentModerationCommand): ContentModerationResult {
@@ -53,6 +57,17 @@ class ContentModerationService(
         }
     }
 
+    fun reviewForService(
+        target: ContentModerationTarget,
+        memberId: Long?,
+        vararg values: String?,
+    ): ContentModerationResult {
+        val text = values
+            .mapNotNull { value -> value?.trim()?.takeIf(String::isNotEmpty) }
+            .joinToString(separator = "\n")
+        return reviewText(target = target, text = text, memberId = memberId)
+    }
+
     private fun reviewText(
         target: ContentModerationTarget,
         text: String,
@@ -61,23 +76,34 @@ class ContentModerationService(
         var modelStatus = ContentModerationModelStatus.SUCCESS
         lateinit var classification: ContentModerationClassification
         val latencyMs = measureNanoTime {
-            classification = try {
-                contentModerationClassifier.classify(
-                    ContentModerationClassificationRequest(
-                        target = target,
-                        text = text.take(MODEL_INPUT_MAX_LENGTH),
-                        timeout = moderationTimeout,
-                    ),
-                )
-            } catch (_: TimeoutException) {
-                modelStatus = ContentModerationModelStatus.TIMEOUT
-                ContentModerationClassification.safeFallback()
-            } catch (_: ContentModerationUnavailableException) {
-                modelStatus = ContentModerationModelStatus.UNAVAILABLE
-                ContentModerationClassification.safeFallback()
-            } catch (_: RuntimeException) {
-                modelStatus = ContentModerationModelStatus.FAILURE
-                ContentModerationClassification.safeFallback()
+            val preFilterResult = preFilter.evaluate(target = target, text = text)
+            classification = when (preFilterResult.action) {
+                ContentModerationPreFilterAction.ALLOW -> {
+                    modelStatus = ContentModerationModelStatus.LOCAL_ALLOW
+                    preFilterResult.toClassification(allowed = true)
+                }
+                ContentModerationPreFilterAction.BLOCK -> {
+                    modelStatus = ContentModerationModelStatus.LOCAL_BLOCK
+                    preFilterResult.toClassification(allowed = false)
+                }
+                ContentModerationPreFilterAction.REVIEW_WITH_AI -> try {
+                    contentModerationClassifier.classify(
+                        ContentModerationClassificationRequest(
+                            target = target,
+                            text = text.take(MODEL_INPUT_MAX_LENGTH),
+                            timeout = moderationTimeout,
+                        ),
+                    )
+                } catch (_: TimeoutException) {
+                    modelStatus = ContentModerationModelStatus.TIMEOUT
+                    ContentModerationClassification.safeFallback()
+                } catch (_: ContentModerationUnavailableException) {
+                    modelStatus = ContentModerationModelStatus.UNAVAILABLE
+                    ContentModerationClassification.safeFallback()
+                } catch (_: RuntimeException) {
+                    modelStatus = ContentModerationModelStatus.FAILURE
+                    ContentModerationClassification.safeFallback()
+                }
             }
         } / NANOSECONDS_PER_MILLISECOND
         metricsRegistry.recordContentModeration(
@@ -111,6 +137,17 @@ class ContentModerationService(
         private const val MODEL_INPUT_MAX_LENGTH = 2_000
         private const val NANOSECONDS_PER_MILLISECOND = 1_000_000L
     }
+}
+
+private fun ContentModerationPreFilterResult.toClassification(
+    allowed: Boolean,
+): ContentModerationClassification {
+    return ContentModerationClassification(
+        allowed = allowed,
+        riskLevel = riskLevel,
+        categories = categories,
+        message = message,
+    )
 }
 
 private val EMAIL_PATTERN = Regex("""[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}""")
