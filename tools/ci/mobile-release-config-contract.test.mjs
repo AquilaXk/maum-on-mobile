@@ -210,6 +210,7 @@ test("CI exposes manual Android and iOS release build preflights", () => {
   assert.match(workflow, /node --test tools\/ci\/mobile-release-config-contract\.test\.mjs/);
   assert.match(workflow, /MAUMON_ANDROID_KEYSTORE_BASE64/);
   assert.match(workflow, /MAUMON_API_BASE_URL: \$\{\{ secrets\.MAUMON_API_BASE_URL \}\}/);
+  assert.match(workflow, /MAUMON_ANDROID_LOGIN_PROVIDER_IDS: \$\{\{ vars\.MAUMON_ANDROID_LOGIN_PROVIDER_IDS \}\}/);
   assert.match(workflow, /inputs\.android_release_mode != 'skip'/);
   assert.match(workflow, /MAUMON_ANDROID_RELEASE_DRY_RUN: \$\{\{ inputs\.android_release_mode == 'dry-run' \}\}/);
   assert.match(workflow, /bash tools\/ci\/run-android-release-appbundle\.sh/);
@@ -234,6 +235,7 @@ test("CI exposes manual Android and iOS release build preflights", () => {
   );
   assert.match(workflow, /MAUMON_IOS_DEVELOPMENT_TEAM/);
   assert.match(workflow, /MAUMON_API_BASE_URL: \$\{\{ secrets\.MAUMON_API_BASE_URL \}\}/);
+  assert.match(workflow, /MAUMON_IOS_LOGIN_PROVIDER_IDS: \$\{\{ vars\.MAUMON_IOS_LOGIN_PROVIDER_IDS \}\}/);
   assert.match(workflow, /MAUMON_IOS_EXPORT_OPTIONS_PLIST_BASE64/);
   assert.match(workflow, /MAUMON_IOS_PROVISIONING_PROFILE_BASE64/);
   assert.match(workflow, /MAUMON_IOS_CERTIFICATE_P12_BASE64/);
@@ -276,7 +278,9 @@ test("Android release appbundle script fails clearly without signing and Firebas
   assert.ok((statSync(script).mode & 0o111) !== 0, "Android release appbundle script must be executable");
   assert.match(scriptContents, /tools\/flutterw/, "Android release appbundle script must use the repository Flutter wrapper");
   assert.match(scriptContents, /MAUMON_API_BASE_URL/, "Android release appbundle script must require the production API base URL");
+  assert.match(scriptContents, /MAUMON_ANDROID_LOGIN_PROVIDER_IDS/, "Android release appbundle script must support configured login providers");
   assert.match(scriptContents, /--dart-define=API_BASE_URL=\$\{MAUMON_API_BASE_URL\}/, "Android release appbundle script must inject API_BASE_URL into release builds");
+  assert.match(scriptContents, /--dart-define=LOGIN_PROVIDER_IDS="\$\{login_provider_ids\}"/, "Android release appbundle script must inject configured login providers");
 
   let output = "";
   try {
@@ -325,6 +329,7 @@ test("Android release appbundle script supports a signed dry run before building
     env: {
       ...process.env,
       MAUMON_API_BASE_URL: "https://api.maumon.example",
+      MAUMON_ANDROID_LOGIN_PROVIDER_IDS: "kakao",
       MAUMON_ANDROID_KEYSTORE_BASE64: "ZmFrZS1rZXlzdG9yZQ==",
       MAUMON_ANDROID_KEYSTORE_PASSWORD: "password",
       MAUMON_ANDROID_KEY_ALIAS: "maumon",
@@ -338,7 +343,7 @@ test("Android release appbundle script supports a signed dry run before building
   });
 
   assert.match(output, /Android release appbundle dry run ok/);
-  assert.match(output, /flutter build appbundle --release --dart-define=API_BASE_URL=https:\/\/api\.maumon\.example/);
+  assert.match(output, /flutter build appbundle --release --dart-define=API_BASE_URL=https:\/\/api\.maumon\.example --dart-define=LOGIN_PROVIDER_IDS=kakao/);
 });
 
 test("Android Play track submit script validates track inputs and writes closed-test evidence in dry run", () => {
@@ -439,10 +444,12 @@ test("iOS TestFlight archive script fails clearly without signing and upload inp
   assert.ok((statSync(script).mode & 0o111) !== 0, "iOS TestFlight archive script must be executable");
   assert.match(scriptContents, /tools\/flutterw/, "iOS archive script must use the repository Flutter wrapper");
   assert.match(scriptContents, /MAUMON_API_BASE_URL/, "iOS archive script must require the production API base URL");
+  assert.match(scriptContents, /MAUMON_IOS_LOGIN_PROVIDER_IDS/, "iOS archive script must support configured login providers");
   assert.match(scriptContents, /xcodebuild -version/, "iOS archive script must report the selected Xcode version");
   assert.match(scriptContents, /Xcode\\ 26\*/, "iOS archive script must enforce Xcode 26 for real archive/export");
   assert.match(scriptContents, /flutter build ipa --release/, "iOS archive script must produce an IPA");
   assert.match(scriptContents, /--dart-define=API_BASE_URL=\$\{MAUMON_API_BASE_URL\}/, "iOS archive script must inject API_BASE_URL into release builds");
+  assert.match(scriptContents, /--dart-define=LOGIN_PROVIDER_IDS="\$\{login_provider_ids\}"/, "iOS archive script must inject configured login providers");
   assert.match(scriptContents, /xcrun altool --upload-app/, "iOS archive script must support TestFlight upload");
 
   let output = "";
@@ -495,6 +502,7 @@ test("iOS TestFlight archive script supports dry-run before archive and upload",
     env: {
       ...process.env,
       MAUMON_API_BASE_URL: "https://api.maumon.example",
+      MAUMON_IOS_LOGIN_PROVIDER_IDS: "apple",
       MAUMON_IOS_RELEASE_DRY_RUN: "true",
       MAUMON_IOS_TESTFLIGHT_UPLOAD: "true",
     },
@@ -502,6 +510,6 @@ test("iOS TestFlight archive script supports dry-run before archive and upload",
   });
 
   assert.match(output, /iOS TestFlight archive dry run ok/);
-  assert.match(output, /flutter build ipa --release --dart-define=API_BASE_URL=https:\/\/api\.maumon\.example/);
+  assert.match(output, /flutter build ipa --release --dart-define=API_BASE_URL=https:\/\/api\.maumon\.example --dart-define=LOGIN_PROVIDER_IDS=apple/);
   assert.match(output, /TestFlight upload dry run/);
 });

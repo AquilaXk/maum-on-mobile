@@ -14,6 +14,7 @@ required_env=(
   MAUMON_FIREBASE_API_KEY
   MAUMON_FIREBASE_SENDER_ID
 )
+login_provider_ids="${MAUMON_ANDROID_LOGIN_PROVIDER_IDS:-}"
 missing_env=()
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -50,7 +51,7 @@ fi
 
 if [[ "${MAUMON_ANDROID_RELEASE_DRY_RUN:-false}" == "true" ]]; then
   echo "Android release appbundle dry run ok"
-  echo "flutter build appbundle --release --dart-define=API_BASE_URL=${MAUMON_API_BASE_URL}"
+  echo "flutter build appbundle --release --dart-define=API_BASE_URL=${MAUMON_API_BASE_URL} --dart-define=LOGIN_PROVIDER_IDS=${login_provider_ids}"
   exit 0
 fi
 
@@ -75,7 +76,9 @@ export MAUMON_ANDROID_KEYSTORE_PATH="${release_keystore}"
 
 cd "${front_dir}"
 "${repo_root}/tools/flutterw" pub get
-"${repo_root}/tools/flutterw" build appbundle --release --dart-define=API_BASE_URL="${MAUMON_API_BASE_URL}"
+"${repo_root}/tools/flutterw" build appbundle --release \
+  --dart-define=API_BASE_URL="${MAUMON_API_BASE_URL}" \
+  --dart-define=LOGIN_PROVIDER_IDS="${login_provider_ids}"
 
 bundle_path="${front_dir}/build/app/outputs/bundle/release/app-release.aab"
 if [[ ! -f "${bundle_path}" ]]; then
