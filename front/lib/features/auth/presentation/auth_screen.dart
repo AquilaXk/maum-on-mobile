@@ -175,7 +175,8 @@ class _AuthScreenState extends State<AuthScreen> {
                           Center(
                             child: TextButton.icon(
                               key: const ValueKey('auth-account-deletion-link'),
-                              onPressed: _showAccountDeletionGuidance,
+                              onPressed: () =>
+                                  _showAccountDeletionGuidance(context),
                               icon: const Icon(
                                 Icons.person_remove_outlined,
                                 size: 18,
@@ -692,9 +693,9 @@ class _AuthScreenState extends State<AuthScreen> {
     });
   }
 
-  Future<void> _showAccountDeletionGuidance() {
+  Future<void> _showAccountDeletionGuidance(BuildContext themedContext) {
     return showDialog<void>(
-      context: context,
+      context: themedContext,
       builder: (dialogContext) => AlertDialog(
         key: const ValueKey('auth-account-deletion-dialog'),
         title: const Text('회원 탈퇴'),

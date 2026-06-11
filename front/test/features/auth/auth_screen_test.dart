@@ -97,6 +97,31 @@ void main() {
     expect(panel.color, isNot(const Color(0xFF111827)));
   });
 
+  testWidgets('keeps account deletion dialog on auth theme in dark system mode',
+      (tester) async {
+    final repository = _FakeAuthRepository();
+    await tester.pumpWidget(
+      _AuthScreenHarness(
+        repository: repository,
+        theme: buildDarkAppTheme(),
+      ),
+    );
+
+    await tester.ensureVisible(
+      find.byKey(const ValueKey('auth-account-deletion-link')),
+    );
+    await tester.tap(find.byKey(const ValueKey('auth-account-deletion-link')));
+    await tester.pumpAndSettle();
+
+    final dialogContext = tester.element(
+      find.byKey(const ValueKey('auth-account-deletion-dialog')),
+    );
+    final dialogTheme = Theme.of(dialogContext);
+
+    expect(dialogTheme.colorScheme.brightness, Brightness.light);
+    expect(dialogTheme.colorScheme.surface, AppBrandColors.surface);
+  });
+
   testWidgets('signup validates fields before calling the repository',
       (tester) async {
     final repository = _FakeAuthRepository();
