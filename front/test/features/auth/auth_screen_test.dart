@@ -8,6 +8,7 @@ import 'package:maum_on_mobile_front/features/auth/deeplink/external_login.dart'
 import 'package:maum_on_mobile_front/features/auth/domain/auth_models.dart';
 import 'package:maum_on_mobile_front/features/auth/domain/login_provider_policy.dart';
 import 'package:maum_on_mobile_front/features/auth/presentation/auth_screen.dart';
+import 'package:maum_on_mobile_front/shared/ui/brand_identity.dart';
 import 'package:maum_on_mobile_front/theme/app_theme.dart';
 
 void main() {
@@ -76,6 +77,24 @@ void main() {
     expect(find.byKey(const ValueKey('auth-form-title-icon')), findsOneWidget);
     expect(find.byKey(const ValueKey('login-email-field')), findsOneWidget);
     expect(find.byKey(const ValueKey('login-password-field')), findsOneWidget);
+  });
+
+  testWidgets('keeps login panel on a light blue surface in dark system mode',
+      (tester) async {
+    final repository = _FakeAuthRepository();
+    await tester.pumpWidget(
+      _AuthScreenHarness(
+        repository: repository,
+        theme: buildDarkAppTheme(),
+      ),
+    );
+
+    final panel = tester.widget<Card>(
+      find.byKey(const ValueKey('auth-form-panel')),
+    );
+
+    expect(panel.color, AppBrandColors.surfaceStrong);
+    expect(panel.color, isNot(const Color(0xFF111827)));
   });
 
   testWidgets('signup validates fields before calling the repository',
@@ -526,6 +545,7 @@ class _AuthScreenHarness extends StatelessWidget {
     this.externalLoginController,
     this.loginProviders,
     this.platform,
+    this.theme,
   });
 
   final _FakeAuthRepository repository;
@@ -533,6 +553,7 @@ class _AuthScreenHarness extends StatelessWidget {
   final ExternalLoginController? externalLoginController;
   final List<LoginProvider>? loginProviders;
   final TargetPlatform? platform;
+  final ThemeData? theme;
 
   @override
   Widget build(BuildContext context) {
@@ -540,7 +561,7 @@ class _AuthScreenHarness extends StatelessWidget {
         controller ?? AuthController(authRepository: repository);
 
     return MaterialApp(
-      theme: buildAppTheme().copyWith(platform: platform),
+      theme: (theme ?? buildAppTheme()).copyWith(platform: platform),
       home: AnimatedBuilder(
         animation: Listenable.merge([
           authController,
