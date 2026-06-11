@@ -333,6 +333,8 @@ void main() {
 
   testWidgets('hides letter input counters while preserving limits',
       (tester) async {
+    final semanticsHandle = tester.ensureSemantics();
+
     final repository = _FakeLetterRepository(
       statsQueue: [_stats()],
       receivedPages: [_page([])],
@@ -380,6 +382,18 @@ void main() {
       find.textContaining('/${LetterLimits.contentMaxLength}'),
       findsNothing,
     );
+    expect(
+      find.bySemanticsLabel(
+        '현재 글자 수 ${LetterLimits.titleMaxLength} / 최대 ${LetterLimits.titleMaxLength}',
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.bySemanticsLabel(
+        '현재 글자 수 ${LetterLimits.contentMaxLength} / 최대 ${LetterLimits.contentMaxLength}',
+      ),
+      findsOneWidget,
+    );
 
     await tester
         .ensureVisible(find.byKey(const ValueKey('letter-submit-button')));
@@ -419,6 +433,12 @@ void main() {
           '${LetterLimits.replyMaxLength}/${LetterLimits.replyMaxLength}'),
       findsNothing,
     );
+    expect(
+      find.bySemanticsLabel(
+        '현재 글자 수 ${LetterLimits.replyMaxLength} / 최대 ${LetterLimits.replyMaxLength}',
+      ),
+      findsOneWidget,
+    );
     await tester.ensureVisible(
       find.byKey(const ValueKey('letter-reply-submit-button')),
     );
@@ -427,6 +447,7 @@ void main() {
 
     expect(replyRepository.replies.single.replyContent.length,
         LetterLimits.replyMaxLength);
+    semanticsHandle.dispose();
   });
 
   testWidgets('opens detail when launched from a letter notification',

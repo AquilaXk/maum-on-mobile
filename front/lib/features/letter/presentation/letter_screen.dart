@@ -683,7 +683,12 @@ Widget? _hideLengthCounter(
   required bool isFocused,
   required int? maxLength,
 }) {
-  return null;
+  final resolvedMaxLength = maxLength ?? currentLength;
+  return Semantics(
+    liveRegion: isFocused,
+    label: '현재 글자 수 $currentLength / 최대 $resolvedMaxLength',
+    child: const SizedBox.shrink(),
+  );
 }
 
 class _StatusPill extends StatelessWidget {
