@@ -12,6 +12,7 @@ import com.maumonmobile.application.port.out.ConsultationAiResponder
 import com.maumonmobile.application.port.out.ConsultationAiResponse
 import com.maumonmobile.application.port.out.ConsultationAiUnavailableException
 import com.maumonmobile.domain.consultation.ConsultationMessageSender
+import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.context.annotation.Profile
 import org.springframework.stereotype.Component
@@ -118,27 +119,47 @@ class RemoteConsultationAiResponder internal constructor(
                 "${message.sender.toPromptRole()}: ${message.content.take(endpoint.maxInputChars)}"
             }
             .ifBlank { "(none)" }
+        val userMessage = request.message.take(endpoint.maxInputChars)
+        val verbosePrompt = promptTemplate(
+            conversationState = conversationState,
+            recentMessages = recentMessages,
+            userMessage = userMessage,
+            consultationChecklist = verboseConsultationChecklist(),
+        )
+        if (endpoint.usesCompactPrompt() || verbosePrompt.length > endpoint.maxPromptChars) {
+            log.info(
+                "Using compact consultation prompt. chars={} maxPromptChars={}",
+                verbosePrompt.length,
+                endpoint.maxPromptChars,
+            )
+            return promptTemplate(
+                conversationState = conversationState,
+                recentMessages = recentMessages,
+                userMessage = userMessage,
+                consultationChecklist = compactConsultationChecklist(),
+            )
+        }
+
+        log.debug(
+            "Using verbose consultation prompt. chars={} maxPromptChars={}",
+            verbosePrompt.length,
+            endpoint.maxPromptChars,
+        )
+        return verbosePrompt
+    }
+
+    private fun promptTemplate(
+        conversationState: String,
+        recentMessages: String,
+        userMessage: String,
+        consultationChecklist: String,
+    ): String {
         return """
             너는 익명 상담 서비스 '마음 온'의 다정하고 따뜻한 공감 상담사야.
             conversationState: $conversationState
 
             일반 상담 모드 출력 체크리스트:
-            - 먼저 USER 입력을 상황 유형, 핵심 감정, 사용자가 원하는 도움으로 조용히 분류해.
-            - 상황 유형 예시는 업무/학업 압박, 관계 갈등, 수면 문제, 불안과 신체 반응, 무기력, 반복 사고, 선택 고민, 외로움, 분노야.
-            - 응답 전략은 사용자 유형에 맞춰 선택해. 감정 정리, 경계 세우기, 오늘 할 수 있는 작은 행동, 생각 분리, 도움 요청 중 하나만 고르고 이유를 드러내.
-            - 조언보다 사용자가 말한 구체적 장면과 몸 반응을 먼저 반영해.
-            - 최근 대화에서 마지막 사용자 감정과 직전 ASSISTANT 답변을 참고하되 그대로 반복하지 마.
-            - 직전 ASSISTANT의 시작 문장, 행동 제안, 후속 질문을 반복하지 마.
-            - 사용자의 표현을 한 번 자연스럽게 되짚어 감정을 알아차렸다는 느낌을 먼저 줘.
-            - 답변 구조는 공감 1문장, 작은 행동 제안 1개, 후속 질문 1개 순서로 작성해.
-            - 작은 다음 행동은 한 가지만 부담 없이 제안해.
-            - 마지막 문장은 사용자가 답하기 쉬운 질문 하나로 끝내고, 질문을 여러 개 나열하지 마.
-            - 질문은 정확히 1개만 포함하고 물음표도 1개 이하로 유지해.
-            - 이전 답변의 첫 문장이나 같은 위로 문장을 반복하지 마.
-            - 모든 답변에 호흡, 감정 하나, 괜찮아요 같은 표현을 반복해서 넣지 마.
-            - 사용자의 이메일, 전화번호, 실명, 주소, 소셜 계정, 위치 공유를 요구하지 마.
-            - QA, 테스트, 샘플, placeholder, fixture 같은 내부 검수/스텁 표현을 답변에 절대 포함하지 마.
-            - 답변은 한국어 3~4문장, 450자 이내로 정중하고 따뜻하게 작성하고 모바일에서 읽기 좋게 짧게 나눠.
+            $consultationChecklist
 
             안전 모드:
             - 의학적 진단을 대신하지 말고, 단정적인 판단이나 위험한 지시는 하지 마.
@@ -156,8 +177,41 @@ class RemoteConsultationAiResponder internal constructor(
 
             [이전 대화 맥락]
             $recentMessages
-            USER: ${request.message.take(endpoint.maxInputChars)}
+            USER: $userMessage
             ASSISTANT:
+        """.trimIndent()
+    }
+
+    private fun verboseConsultationChecklist(): String {
+        return """
+            - 먼저 USER 입력을 상황 유형, 핵심 감정, 사용자가 원하는 도움으로 조용히 분류해.
+            - 상황 유형 예시는 업무/학업 압박, 관계 갈등, 수면 문제, 불안과 신체 반응, 무기력, 반복 사고, 선택 고민, 외로움, 분노야.
+            - 응답 전략은 사용자 유형에 맞춰 선택해. 감정 정리, 경계 세우기, 오늘 할 수 있는 작은 행동, 생각 분리, 도움 요청 중 하나만 고르고 이유를 드러내.
+            - 조언보다 사용자가 말한 구체적 장면과 몸 반응을 먼저 반영해.
+            - 최근 대화에서 마지막 사용자 감정과 직전 ASSISTANT 답변을 참고하되 그대로 반복하지 마.
+            - 직전 ASSISTANT의 시작 문장, 행동 제안, 후속 질문을 반복하지 마.
+            - 사용자의 표현을 한 번 자연스럽게 되짚어 감정을 알아차렸다는 느낌을 먼저 줘.
+            - 답변 구조는 공감 1문장, 작은 행동 제안 1개, 후속 질문 1개 순서로 작성해.
+            - 작은 다음 행동은 한 가지만 부담 없이 제안해.
+            - 마지막 문장은 사용자가 답하기 쉬운 질문 하나로 끝내고, 질문을 여러 개 나열하지 마.
+            - 질문은 정확히 1개만 포함하고 물음표도 1개 이하로 유지해.
+            - 이전 답변의 첫 문장이나 같은 위로 문장을 반복하지 마.
+            - 모든 답변에 호흡, 감정 하나, 괜찮아요 같은 표현을 반복해서 넣지 마.
+            - 사용자의 이메일, 전화번호, 실명, 주소, 소셜 계정, 위치 공유를 요구하지 마.
+            - QA, 테스트, 샘플, placeholder, fixture 같은 내부 검수/스텁 표현을 답변에 절대 포함하지 마.
+            - 답변은 한국어 3~4문장, 450자 이내로 정중하고 따뜻하게 작성하고 모바일에서 읽기 좋게 짧게 나눠.
+        """.trimIndent()
+    }
+
+    private fun compactConsultationChecklist(): String {
+        return """
+            - 사용자의 표현을 한 번 자연스럽게 되짚고, 최근 대화와 직전 ASSISTANT 답변을 그대로 반복하지 마.
+            - 답변 구조는 공감 1문장, 작은 행동 제안 1개, 후속 질문 1개 순서로 작성해.
+            - 작은 다음 행동은 한 가지만 부담 없이 제안해.
+            - 질문은 정확히 1개만 포함하고 물음표도 1개 이하로 유지해.
+            - 사용자의 이메일, 전화번호, 실명, 주소, 소셜 계정, 위치 공유를 요구하지 마.
+            - QA, 테스트, 샘플, placeholder, fixture 같은 내부 검수/스텁 표현을 답변에 절대 포함하지 마.
+            - 답변은 한국어 3~4문장, 450자 이내로 정중하고 따뜻하게 작성해.
         """.trimIndent()
     }
 
@@ -239,6 +293,7 @@ class RemoteConsultationAiResponder internal constructor(
     }
 
     companion object {
+        private val log = LoggerFactory.getLogger(RemoteConsultationAiResponder::class.java)
         private const val INTERNAL_REVIEW_MARKER =
             """(?:qa|테스트|샘플|placeholder|fixture|stub|스텁|내부\s*검수)"""
         private const val INTERNAL_REVIEW_MESSAGE_SUFFIX = """(?:메시지|메세지|응답|답변|문구)"""

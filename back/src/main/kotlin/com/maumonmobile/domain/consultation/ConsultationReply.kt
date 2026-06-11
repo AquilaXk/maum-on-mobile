@@ -20,7 +20,7 @@ data class ConsultationReply(
                         "잠이 계속 끊기면 하루 전체가 무겁고 예민하게 느껴질 수 있어요. ",
                         "오늘 밤에는 해결해야 할 생각을 한 문장만 적어두고, 침대에서는 몸을 쉬게 하는 쪽에만 집중해 보세요.",
                     )
-                    normalized.containsAny(RELATIONSHIP_TERMS) -> listOf(
+                    normalized.hasRelationshipConcern() -> listOf(
                         "관계에서 마음을 많이 쓰고 있어서 작은 말도 오래 남는 상태처럼 보여요. ",
                         "지금은 상대에게 바로 답하기보다 내가 상처받은 지점을 짧게 적어보면 다음 말을 고르기 쉬워집니다.",
                     )
@@ -47,7 +47,7 @@ data class ConsultationReply(
         private const val LONG_MESSAGE_THRESHOLD = 300
         private val WORK_TERMS = setOf("출근", "상사", "회사", "직장", "업무", "야근", "퇴근")
         private val SLEEP_TERMS = setOf("새벽", "불면", "수면", "깨서", "잠들")
-        private val RELATIONSHIP_TERMS = setOf("친구", "가족", "연인", "부모", "관계", "말다툼", "헤어")
+        private val RELATIONSHIP_TERMS = setOf("친구", "가족", "연인", "부모", "말다툼", "헤어")
         private val ANXIETY_TERMS = setOf("불안", "심장", "두근", "긴장", "떨려", "공황")
         private val LOW_ENERGY_TERMS = setOf("무기력", "아무것도", "하기 싫", "지쳤", "번아웃")
 
@@ -66,15 +66,36 @@ data class ConsultationReply(
         private val SLEEP_PHRASES = setOf(
             "잠 못",
             "잠을 못",
+            "잠도 못",
             "잠이 안",
             "잠 안",
             "잠이 오지",
             "잠이 오질",
             "잠을 설",
+            "잠을 잘 못",
             "잠에서 깨",
             "잠 깨",
             "못 자",
             "못자",
+        )
+
+        private fun String.hasRelationshipConcern(): Boolean {
+            if (containsAny(RELATIONSHIP_TERMS)) {
+                return true
+            }
+
+            return RELATIONSHIP_PHRASES.any { phrase -> contains(phrase, ignoreCase = true) }
+        }
+
+        private val RELATIONSHIP_PHRASES = setOf(
+            "인간관계",
+            "대인관계",
+            "관계가",
+            "관계에서",
+            "관계 때문에",
+            "사람들과",
+            "사람들하고",
+            "사람들 사이",
         )
     }
 }

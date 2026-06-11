@@ -296,6 +296,92 @@ class RemoteConsultationAiResponderTest {
     }
 
     @Test
+    fun promptFallsBackToCompactChecklistWhenPromptExceedsConfiguredLimit() {
+        val client = RecordingVertexAiGenerateContentClient(
+            responseBody = vertexResponse("""{"chunks":["지금은 안전하게 정리해 볼게요."]}"""),
+        )
+        val properties = aiProperties().apply {
+            consultation.maxPromptChars = 1_200
+        }
+        val responder = RemoteConsultationAiResponder(
+            properties = properties,
+            objectMapper = ObjectMapper(),
+            accessTokenProvider = { "vertex-token" },
+            generateContentClient = client,
+        )
+
+        responder.generate(
+            ConsultationAiRequest(
+                memberId = 20L,
+                message = "요즘 마음이 복잡하고 일이 계속 밀려서 지쳤어요.",
+                recentMessages = (1..6).map { index ->
+                    ConsultationMessage(
+                        id = index.toLong(),
+                        memberId = 20L,
+                        sender = if (index % 2 == 0) {
+                            ConsultationMessageSender.ASSISTANT
+                        } else {
+                            ConsultationMessageSender.USER
+                        },
+                        content = "반복되는 고민과 업무 압박 때문에 마음이 무겁다는 대화 $index",
+                        createdAt = "2026-05-25T00:0${index}:00Z",
+                    )
+                },
+                timeout = Duration.ofSeconds(2),
+            ),
+        )
+
+        val prompt = ObjectMapper()
+            .readTree(client.requestBody!!)["contents"][0]["parts"][0]["text"]
+            .asString()
+
+        assertThat(prompt)
+            .contains(
+                "답변 구조는 공감 1문장, 작은 행동 제안 1개, 후속 질문 1개 순서",
+                "질문은 정확히 1개만 포함하고 물음표도 1개 이하",
+                "위기 신호가 보이면 공감보다 안전 확보를 먼저",
+                "Use this shape exactly",
+            )
+            .doesNotContain(
+                "상황 유형 예시는 업무/학업 압박",
+                "응답 전략은 사용자 유형에 맞춰 선택해",
+            )
+    }
+
+    @Test
+    fun promptCanUseCompactChecklistByConfiguration() {
+        val client = RecordingVertexAiGenerateContentClient(
+            responseBody = vertexResponse("""{"chunks":["짧게 정리해 볼게요."]}"""),
+        )
+        val properties = aiProperties().apply {
+            consultation.promptMode = "compact"
+        }
+        val responder = RemoteConsultationAiResponder(
+            properties = properties,
+            objectMapper = ObjectMapper(),
+            accessTokenProvider = { "vertex-token" },
+            generateContentClient = client,
+        )
+
+        responder.generate(
+            ConsultationAiRequest(
+                memberId = 21L,
+                message = "오늘 마음이 복잡해요.",
+                recentMessages = emptyList(),
+                timeout = Duration.ofSeconds(2),
+            ),
+        )
+
+        val prompt = ObjectMapper()
+            .readTree(client.requestBody!!)["contents"][0]["parts"][0]["text"]
+            .asString()
+
+        assertThat(prompt)
+            .contains("답변 구조는 공감 1문장")
+            .doesNotContain("상황 유형 예시는 업무/학업 압박")
+    }
+
+    @Test
     fun promptPrioritizesImmediateSafetyForCrisisSignals() {
         val client = RecordingVertexAiGenerateContentClient(
             responseBody = vertexResponse("""{"chunks":["지금은 안전이 먼저예요."]}"""),
