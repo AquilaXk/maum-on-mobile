@@ -22,4 +22,15 @@ class ConsultationReplyTest {
         assertThat(workReply).doesNotContain("가장 크게 느껴지는 감정부터")
         assertThat(sleepReply).doesNotContain("가장 크게 느껴지는 감정부터")
     }
+
+    @Test
+    fun forMessageDoesNotTreatTemporaryPauseAsSleepConcern() {
+        val reply = ConsultationReply
+            .forMessage("잠시 생각할 시간이 필요해서 오늘은 답을 못 하겠어요.")
+            .chunks
+            .joinToString("")
+
+        assertThat(reply).doesNotContain("잠이 계속 끊기면")
+        assertThat(reply).contains("말해 주신 내용")
+    }
 }

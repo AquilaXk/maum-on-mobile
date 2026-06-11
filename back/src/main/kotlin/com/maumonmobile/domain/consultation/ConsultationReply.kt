@@ -16,7 +16,7 @@ data class ConsultationReply(
                         "출근을 떠올릴 때 몸이 먼저 긴장할 만큼 부담이 커진 상태로 보여요. ",
                         "오늘 해야 할 일 하나와 잠시 미뤄도 되는 일 하나를 나눠 적어보면 압박이 조금 작아질 수 있어요.",
                     )
-                    normalized.containsAny(SLEEP_TERMS) -> listOf(
+                    normalized.hasSleepConcern() -> listOf(
                         "잠이 계속 끊기면 하루 전체가 무겁고 예민하게 느껴질 수 있어요. ",
                         "오늘 밤에는 해결해야 할 생각을 한 문장만 적어두고, 침대에서는 몸을 쉬게 하는 쪽에만 집중해 보세요.",
                     )
@@ -46,7 +46,7 @@ data class ConsultationReply(
 
         private const val LONG_MESSAGE_THRESHOLD = 300
         private val WORK_TERMS = setOf("출근", "상사", "회사", "직장", "업무", "야근", "퇴근")
-        private val SLEEP_TERMS = setOf("잠", "새벽", "불면", "수면", "깨서", "잠들")
+        private val SLEEP_TERMS = setOf("새벽", "불면", "수면", "깨서", "잠들")
         private val RELATIONSHIP_TERMS = setOf("친구", "가족", "연인", "부모", "관계", "말다툼", "헤어")
         private val ANXIETY_TERMS = setOf("불안", "심장", "두근", "긴장", "떨려", "공황")
         private val LOW_ENERGY_TERMS = setOf("무기력", "아무것도", "하기 싫", "지쳤", "번아웃")
@@ -54,5 +54,27 @@ data class ConsultationReply(
         private fun String.containsAny(terms: Set<String>): Boolean {
             return terms.any { term -> contains(term, ignoreCase = true) }
         }
+
+        private fun String.hasSleepConcern(): Boolean {
+            if (containsAny(SLEEP_TERMS)) {
+                return true
+            }
+
+            return SLEEP_PHRASES.any { phrase -> contains(phrase, ignoreCase = true) }
+        }
+
+        private val SLEEP_PHRASES = setOf(
+            "잠 못",
+            "잠을 못",
+            "잠이 안",
+            "잠 안",
+            "잠이 오지",
+            "잠이 오질",
+            "잠을 설",
+            "잠에서 깨",
+            "잠 깨",
+            "못 자",
+            "못자",
+        )
     }
 }
