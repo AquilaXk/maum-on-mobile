@@ -383,6 +383,48 @@ class RemoteConsultationAiResponderTest {
     }
 
     @Test
+    fun compactPromptPreservesCurrentUserMessageAfterDroppingHistory() {
+        val client = RecordingVertexAiGenerateContentClient(
+            responseBody = vertexResponse("""{"chunks":["핵심을 보고 답할게요."]}"""),
+        )
+        val responder = RemoteConsultationAiResponder(
+            properties = aiProperties(),
+            objectMapper = ObjectMapper(),
+            accessTokenProvider = { "vertex-token" },
+            generateContentClient = client,
+        )
+        val lateConcern = "마지막 핵심은 출근이 무서워요"
+
+        responder.generate(
+            ConsultationAiRequest(
+                memberId = 22L,
+                message = "가".repeat(900) + lateConcern,
+                recentMessages = (1..6).map { index ->
+                    ConsultationMessage(
+                        id = index.toLong(),
+                        memberId = 22L,
+                        sender = if (index % 2 == 0) {
+                            ConsultationMessageSender.ASSISTANT
+                        } else {
+                            ConsultationMessageSender.USER
+                        },
+                        content = "이전 대화 $index " + "나".repeat(1_000),
+                        createdAt = "2026-05-25T00:0${index}:00Z",
+                    )
+                },
+                timeout = Duration.ofSeconds(2),
+            ),
+        )
+
+        val prompt = ObjectMapper()
+            .readTree(client.requestBody!!)["contents"][0]["parts"][0]["text"]
+            .asString()
+
+        assertThat(prompt).contains("(축약됨)", lateConcern)
+        assertThat(prompt.length).isLessThanOrEqualTo(4_000)
+    }
+
+    @Test
     fun rejectsPromptLimitThatCannotFitCompactSafetyPrompt() {
         val properties = aiProperties().apply {
             consultation.maxPromptChars = 1_199

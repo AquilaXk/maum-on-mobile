@@ -185,7 +185,6 @@ class RemoteConsultationAiResponder internal constructor(
         )
         val userMessageBudget = (endpoint.maxPromptChars - promptWithoutUserMessage.length)
             .coerceAtLeast(0)
-            .coerceAtMost(COMPACT_USER_MESSAGE_CHARS)
         return compactPromptTemplate(
             conversationState = conversationState,
             recentMessages = minimumContext,
@@ -353,7 +352,6 @@ class RemoteConsultationAiResponder internal constructor(
     companion object {
         private val log = LoggerFactory.getLogger(RemoteConsultationAiResponder::class.java)
         private const val COMPACT_RECENT_MESSAGE_LIMIT = 2
-        private const val COMPACT_USER_MESSAGE_CHARS = 180
         private const val INTERNAL_REVIEW_MARKER =
             """(?:qa|테스트|샘플|placeholder|fixture|stub|스텁|내부\s*검수)"""
         private const val INTERNAL_REVIEW_MESSAGE_SUFFIX = """(?:메시지|메세지|응답|답변|문구)"""
