@@ -127,17 +127,18 @@ class RemoteConsultationAiResponder internal constructor(
             consultationChecklist = verboseConsultationChecklist(),
         )
         if (endpoint.usesCompactPrompt() || verbosePrompt.length > endpoint.maxPromptChars) {
-            log.info(
-                "Using compact consultation prompt. chars={} maxPromptChars={}",
-                verbosePrompt.length,
-                endpoint.maxPromptChars,
-            )
-            return promptTemplate(
+            val compactPrompt = compactPrompt(
                 conversationState = conversationState,
                 recentMessages = recentMessages,
                 userMessage = userMessage,
-                consultationChecklist = compactConsultationChecklist(),
             )
+            log.info(
+                "Using compact consultation prompt. originalChars={} compactChars={} maxPromptChars={}",
+                verbosePrompt.length,
+                compactPrompt.length,
+                endpoint.maxPromptChars,
+            )
+            return compactPrompt
         }
 
         log.debug(
@@ -146,6 +147,54 @@ class RemoteConsultationAiResponder internal constructor(
             endpoint.maxPromptChars,
         )
         return verbosePrompt
+    }
+
+    private fun compactPrompt(
+        conversationState: String,
+        recentMessages: String,
+        userMessage: String,
+    ): String {
+        val compactWithFullContext = compactPromptTemplate(
+            conversationState = conversationState,
+            recentMessages = recentMessages,
+            userMessage = userMessage,
+        )
+        if (compactWithFullContext.length <= endpoint.maxPromptChars) {
+            return compactWithFullContext
+        }
+
+        val compactRecentMessages = recentMessages
+            .lines()
+            .takeLast(COMPACT_RECENT_MESSAGE_LIMIT)
+            .joinToString("\n")
+            .ifBlank { "(none)" }
+        val compactWithRecentTail = compactPromptTemplate(
+            conversationState = conversationState,
+            recentMessages = compactRecentMessages,
+            userMessage = userMessage,
+        )
+        if (compactWithRecentTail.length <= endpoint.maxPromptChars) {
+            return compactWithRecentTail
+        }
+
+        return compactPromptTemplate(
+            conversationState = conversationState,
+            recentMessages = "(축약됨)",
+            userMessage = userMessage.take(COMPACT_USER_MESSAGE_CHARS),
+        )
+    }
+
+    private fun compactPromptTemplate(
+        conversationState: String,
+        recentMessages: String,
+        userMessage: String,
+    ): String {
+        return promptTemplate(
+            conversationState = conversationState,
+            recentMessages = recentMessages,
+            userMessage = userMessage,
+            consultationChecklist = compactConsultationChecklist(),
+        )
     }
 
     private fun promptTemplate(
@@ -205,13 +254,13 @@ class RemoteConsultationAiResponder internal constructor(
 
     private fun compactConsultationChecklist(): String {
         return """
-            - 사용자의 표현을 한 번 자연스럽게 되짚고, 최근 대화와 직전 ASSISTANT 답변을 그대로 반복하지 마.
+            - 사용자 표현을 되짚고 최근 대화와 직전 ASSISTANT 답변을 반복하지 마.
             - 답변 구조는 공감 1문장, 작은 행동 제안 1개, 후속 질문 1개 순서로 작성해.
-            - 작은 다음 행동은 한 가지만 부담 없이 제안해.
+            - 작은 다음 행동은 한 가지만 제안해.
             - 질문은 정확히 1개만 포함하고 물음표도 1개 이하로 유지해.
-            - 사용자의 이메일, 전화번호, 실명, 주소, 소셜 계정, 위치 공유를 요구하지 마.
-            - QA, 테스트, 샘플, placeholder, fixture 같은 내부 검수/스텁 표현을 답변에 절대 포함하지 마.
-            - 답변은 한국어 3~4문장, 450자 이내로 정중하고 따뜻하게 작성해.
+            - 이메일, 전화번호, 실명, 주소, 소셜 계정, 위치 공유를 요구하지 마.
+            - QA, 테스트, 샘플, placeholder, fixture, 내부 검수/스텁 표현을 쓰지 마.
+            - 한국어 3~4문장, 450자 이내로 정중하고 따뜻하게 작성해.
         """.trimIndent()
     }
 
@@ -294,6 +343,8 @@ class RemoteConsultationAiResponder internal constructor(
 
     companion object {
         private val log = LoggerFactory.getLogger(RemoteConsultationAiResponder::class.java)
+        private const val COMPACT_RECENT_MESSAGE_LIMIT = 2
+        private const val COMPACT_USER_MESSAGE_CHARS = 180
         private const val INTERNAL_REVIEW_MARKER =
             """(?:qa|테스트|샘플|placeholder|fixture|stub|스텁|내부\s*검수)"""
         private const val INTERNAL_REVIEW_MESSAGE_SUFFIX = """(?:메시지|메세지|응답|답변|문구)"""
