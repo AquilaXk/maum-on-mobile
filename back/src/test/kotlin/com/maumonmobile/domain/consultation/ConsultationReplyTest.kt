@@ -24,6 +24,23 @@ class ConsultationReplyTest {
     }
 
     @Test
+    fun forMessageUsesCounselingShapeAndAvoidsRepeatedGenericSuggestions() {
+        val replies = listOf(
+            ConsultationReply.forMessage("상사에게 계속 지적받아서 출근 생각만 해도 심장이 뛰어요."),
+            ConsultationReply.forMessage("잠을 못 자고 새벽마다 깨서 하루가 너무 무기력해요."),
+            ConsultationReply.forMessage("친구와 말다툼한 뒤 작은 말도 계속 떠올라요."),
+            ConsultationReply.forMessage("불안해서 가슴이 답답하고 손이 떨려요."),
+        ).map { reply -> reply.chunks.joinToString("") }
+
+        assertThat(replies.toSet()).hasSize(4)
+        replies.forEach { reply ->
+            assertThat(reply)
+                .endsWith("?")
+                .doesNotContain("따뜻한 차", "편안한 음악", "지금은 답변을 만들지 못했습니다")
+        }
+    }
+
+    @Test
     fun forMessageDoesNotTreatTemporaryPauseAsSleepConcern() {
         val reply = ConsultationReply
             .forMessage("잠시 생각할 시간이 필요해서 오늘은 답을 못 하겠어요.")

@@ -19,6 +19,7 @@ import com.maumonmobile.domain.auth.AuthMember
 import com.maumonmobile.domain.consultation.ConsultationActionPolicy
 import com.maumonmobile.domain.consultation.ConsultationMessage
 import com.maumonmobile.domain.consultation.ConsultationMessageSender
+import com.maumonmobile.domain.consultation.ConsultationReply
 import com.maumonmobile.domain.consultation.ConsultationRiskCategory
 import com.maumonmobile.domain.consultation.ConsultationRiskSeverity
 import com.maumonmobile.domain.consultation.ConsultationSafetyAssessment
@@ -271,24 +272,24 @@ class ConsultationService(
             val chunks = response.chunks.filter(String::isNotBlank)
             if (chunks.isEmpty()) {
                 metricsRegistry.recordAiModel("consultation", "empty")
-                fallbackReply()
+                fallbackReply(message)
             } else {
                 metricsRegistry.recordAiModel("consultation", "success")
                 ConsultationReplyResult(chunks = chunks)
             }
         } catch (_: ConsultationAiUnavailableException) {
             metricsRegistry.recordAiModel("consultation", "fallback")
-            fallbackReply()
+            fallbackReply(message)
         } catch (_: TimeoutException) {
             metricsRegistry.recordAiModel("consultation", "timeout")
-            fallbackReply()
+            fallbackReply(message)
         } catch (_: ExecutionException) {
             metricsRegistry.recordAiModel("consultation", "fallback")
-            fallbackReply()
+            fallbackReply(message)
         } catch (_: InterruptedException) {
             Thread.currentThread().interrupt()
             metricsRegistry.recordAiModel("consultation", "interrupted")
-            fallbackReply()
+            fallbackReply(message)
         }
     }
 
@@ -317,9 +318,9 @@ class ConsultationService(
             )
         }.get(aiTimeout.toMillis(), TimeUnit.MILLISECONDS)
 
-    private fun fallbackReply(): ConsultationReplyResult {
+    private fun fallbackReply(message: String): ConsultationReplyResult {
         return ConsultationReplyResult(
-            chunks = listOf(FALLBACK_MESSAGE),
+            chunks = listOf(ConsultationReply.forMessage(message).chunks.joinToString(separator = "")),
             fallback = true,
         )
     }
@@ -341,7 +342,6 @@ class ConsultationService(
     }
 
     private companion object {
-        private const val FALLBACK_MESSAGE = "지금은 답변을 만들지 못했습니다. 잠시 후 다시 시도해 주세요."
         private const val CONSULTATION_REPLY_EVENT = "consultation_reply"
         private const val SAFETY_AUDIT_PREVIEW_LENGTH = 120
         private const val AI_CONTEXT_MESSAGE_LIMIT = 6

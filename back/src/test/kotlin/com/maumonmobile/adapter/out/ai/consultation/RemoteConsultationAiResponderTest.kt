@@ -54,9 +54,11 @@ class RemoteConsultationAiResponderTest {
         assertThat(client.accessToken).isEqualTo("vertex-token")
         val requestJson = ObjectMapper().readTree(client.requestBody!!)
         assertThat(requestJson["contents"].toString()).contains("요즘 불안해요.", "어제도 불안했어요.")
-        assertThat(requestJson["generationConfig"].toString()).contains("maxOutputTokens")
+        assertThat(requestJson["generationConfig"]["maxOutputTokens"].asInt()).isEqualTo(1536)
         assertThat(requestJson["generationConfig"]["responseMimeType"].asString()).isEqualTo("application/json")
-        assertThat(requestJson["generationConfig"]["thinkingConfig"]["thinkingBudget"].asInt()).isEqualTo(0)
+        assertThat(requestJson["generationConfig"]["thinkingConfig"]["thinkingBudget"].asInt()).isEqualTo(1024)
+        assertThat(requestJson["generationConfig"]["responseSchema"].toString())
+            .contains("\"chunks\"", "\"array\"", "\"string\"", "Two to five")
     }
 
     @Test
@@ -98,11 +100,12 @@ class RemoteConsultationAiResponderTest {
             .contains(
                 "마음 온",
                 "다정하고 따뜻한 공감 상담사",
-                "chunks 배열은 1~3개",
+                "chunks 배열은 2~5개",
                 "마크다운",
                 "의학적 진단을 대신하지",
                 "요즘 마음이 지쳤어요.",
             )
+            .doesNotContain("Use this shape exactly")
     }
 
     @Test
@@ -238,10 +241,10 @@ class RemoteConsultationAiResponderTest {
             .contains(
                 "출력 체크리스트",
                 "최근 대화에서 마지막 사용자 감정과 직전 ASSISTANT 답변을 참고하되 그대로 반복하지 마",
-                "답변 구조는 공감 1문장, 작은 행동 제안 1개, 후속 질문 1개 순서",
+                "답변 구조는 공감, 의미 정리, 선택한 상담 렌즈에 따른 해석, 작은 행동 제안 1개, 후속 질문 1개 순서",
                 "질문은 정확히 1개만 포함하고 물음표도 1개 이하",
                 "이메일, 전화번호, 실명, 주소, 소셜 계정, 위치 공유를 요구하지 마",
-                "450자 이내",
+                "900자 이내",
             )
     }
 
@@ -296,12 +299,159 @@ class RemoteConsultationAiResponderTest {
     }
 
     @Test
+    fun promptSupportsDeepDiverseCounselingFrameworkForRichReplies() {
+        val client = RecordingVertexAiGenerateContentClient(
+            responseBody = vertexResponse("""{"chunks":["더 깊게 살펴볼게요."]}"""),
+        )
+        val responder = RemoteConsultationAiResponder(
+            properties = aiProperties(),
+            objectMapper = ObjectMapper(),
+            accessTokenProvider = { "vertex-token" },
+            generateContentClient = client,
+        )
+
+        responder.generate(
+            ConsultationAiRequest(
+                memberId = 25L,
+                message = "연인과 다툰 뒤 출근도 집중도 안 되고 계속 내가 잘못한 건지 곱씹게 돼요.",
+                recentMessages = listOf(
+                    ConsultationMessage(
+                        id = 70L,
+                        memberId = 25L,
+                        sender = ConsultationMessageSender.USER,
+                        content = "전에는 친구와 멀어진 일이 계속 떠올랐어요.",
+                        createdAt = "2026-05-25T00:00:00Z",
+                    ),
+                ),
+                timeout = Duration.ofSeconds(2),
+            ),
+        )
+
+        val prompt = ObjectMapper()
+            .readTree(client.requestBody!!)["contents"][0]["parts"][0]["text"]
+            .asString()
+
+        assertThat(prompt)
+            .contains(
+                "사례 개념화",
+                "사건-해석-감정-신체반응-욕구-자원",
+                "인지행동",
+                "ACT",
+                "DBT",
+                "동기강화",
+                "내러티브",
+                "자기연민",
+                "정서중심",
+                "대인관계 경계",
+                "상담 렌즈는 매번 하나 또는 둘만 선택",
+                "답변마다 다른 개입을 선택",
+                "깊이 있는 상담 답변",
+            )
+            .doesNotContain("Use this shape exactly")
+    }
+
+    @Test
+    fun promptListsRecentAssistantSuggestionsAsDoNotReuseMaterial() {
+        val client = RecordingVertexAiGenerateContentClient(
+            responseBody = vertexResponse("""{"chunks":["이번에는 다른 방법으로 살펴볼게요."]}"""),
+        )
+        val responder = RemoteConsultationAiResponder(
+            properties = aiProperties(),
+            objectMapper = ObjectMapper(),
+            accessTokenProvider = { "vertex-token" },
+            generateContentClient = client,
+        )
+
+        responder.generate(
+            ConsultationAiRequest(
+                memberId = 23L,
+                message = "이번에는 출근 전 가슴이 답답하고 손이 떨려요.",
+                recentMessages = listOf(
+                    ConsultationMessage(
+                        id = 50L,
+                        memberId = 23L,
+                        sender = ConsultationMessageSender.ASSISTANT,
+                        content = "잠들기 전 따뜻한 차 한 잔을 마셔보는 건 어떨까요?",
+                        createdAt = "2026-05-25T00:00:00Z",
+                    ),
+                    ConsultationMessage(
+                        id = 51L,
+                        memberId = 23L,
+                        sender = ConsultationMessageSender.ASSISTANT,
+                        content = "잠시 눈을 감고 편안한 음악을 들어보세요.",
+                        createdAt = "2026-05-25T00:01:00Z",
+                    ),
+                ),
+                timeout = Duration.ofSeconds(2),
+            ),
+        )
+
+        val prompt = ObjectMapper()
+            .readTree(client.requestBody!!)["contents"][0]["parts"][0]["text"]
+            .asString()
+
+        assertThat(prompt)
+            .contains(
+                "[최근 답변 반복 금지 소재]",
+                "따뜻한 차",
+                "편안한 음악",
+                "반복 금지 소재에 있는 표현이나 행동 제안을 다시 쓰지 마",
+                "사건-해석-감정-신체반응-욕구-자원",
+                "새로운 구체 행동",
+            )
+    }
+
+    @Test
+    fun promptCarriesCostFreeQualityGateRubricForModelReplies() {
+        val client = RecordingVertexAiGenerateContentClient(
+            responseBody = vertexResponse("""{"chunks":["상황에 맞춰 답할게요."]}"""),
+        )
+        val responder = RemoteConsultationAiResponder(
+            properties = aiProperties(),
+            objectMapper = ObjectMapper(),
+            accessTokenProvider = { "vertex-token" },
+            generateContentClient = client,
+        )
+
+        responder.generate(
+            ConsultationAiRequest(
+                memberId = 24L,
+                message = "상사에게 지적받은 뒤 출근 전부터 가슴이 답답해요.",
+                recentMessages = listOf(
+                    ConsultationMessage(
+                        id = 60L,
+                        memberId = 24L,
+                        sender = ConsultationMessageSender.ASSISTANT,
+                        content = "많이 힘드셨겠어요. 오늘은 따뜻한 차 한 잔을 마셔보세요.",
+                        createdAt = "2026-05-25T00:00:00Z",
+                    ),
+                ),
+                timeout = Duration.ofSeconds(2),
+            ),
+        )
+
+        val prompt = ObjectMapper()
+            .readTree(client.requestBody!!)["contents"][0]["parts"][0]["text"]
+            .asString()
+
+        assertThat(client.calls).isEqualTo(1)
+        assertThat(prompt)
+            .contains(
+                "응답 전 마지막 점검",
+                "Gemini 2.5 Flash",
+                "USER 입력의 구체 장면이나 신체 반응을 최소 1개 반영했는가",
+                "최근 답변 반복 금지 소재와 겹치면 다시 작성",
+                "고정 위로 문장으로 시작하지 않았는가",
+            )
+    }
+
+    @Test
     fun promptFallsBackToCompactChecklistWhenPromptExceedsConfiguredLimit() {
         val client = RecordingVertexAiGenerateContentClient(
             responseBody = vertexResponse("""{"chunks":["지금은 안전하게 정리해 볼게요."]}"""),
         )
         val properties = aiProperties().apply {
-            consultation.maxPromptChars = 1_200
+            consultation.maxPromptChars = 2_400
         }
         val responder = RemoteConsultationAiResponder(
             properties = properties,
@@ -337,15 +487,16 @@ class RemoteConsultationAiResponderTest {
 
         assertThat(prompt)
             .contains(
-                "답변 구조는 공감 1문장, 작은 행동 제안 1개, 후속 질문 1개 순서",
-                "질문은 정확히 1개만 포함하고 물음표도 1개 이하",
+                "공감, 의미 정리, 작은 행동, 후속 질문",
+                "질문은 1개만",
                 "위기 신호가 보이면 공감보다 안전 확보를 먼저",
-                "Use this shape exactly",
+                "제공된 JSON 스키마를 따르는 compact JSON",
             )
             .doesNotContain(
-                "상황 유형 예시는 업무/학업 압박",
-                "응답 전략은 사용자 유형에 맞춰 선택해",
+                "상담 렌즈 메뉴",
+                "사례 개념화 축",
             )
+            .doesNotContain("Use this shape exactly")
             .doesNotContain("\n            -")
         assertThat(prompt.length).isLessThanOrEqualTo(properties.consultation.maxPromptChars)
     }
@@ -379,8 +530,8 @@ class RemoteConsultationAiResponderTest {
             .asString()
 
         assertThat(prompt)
-            .contains("답변 구조는 공감 1문장")
-            .doesNotContain("상황 유형 예시는 업무/학업 압박")
+            .contains("공감, 의미 정리, 작은 행동, 후속 질문")
+            .doesNotContain("상담 렌즈 메뉴")
     }
 
     @Test
@@ -388,8 +539,11 @@ class RemoteConsultationAiResponderTest {
         val client = RecordingVertexAiGenerateContentClient(
             responseBody = vertexResponse("""{"chunks":["핵심을 보고 답할게요."]}"""),
         )
+        val properties = aiProperties().apply {
+            consultation.maxPromptChars = 2_400
+        }
         val responder = RemoteConsultationAiResponder(
-            properties = aiProperties(),
+            properties = properties,
             objectMapper = ObjectMapper(),
             accessTokenProvider = { "vertex-token" },
             generateContentClient = client,
@@ -422,13 +576,13 @@ class RemoteConsultationAiResponderTest {
             .asString()
 
         assertThat(prompt).contains("(축약됨)", lateConcern)
-        assertThat(prompt.length).isLessThanOrEqualTo(4_000)
+        assertThat(prompt.length).isLessThanOrEqualTo(properties.consultation.maxPromptChars)
     }
 
     @Test
     fun rejectsPromptLimitThatCannotFitCompactSafetyPrompt() {
         val properties = aiProperties().apply {
-            consultation.maxPromptChars = 1_199
+            consultation.maxPromptChars = 2_399
         }
 
         assertThatThrownBy {
@@ -440,6 +594,33 @@ class RemoteConsultationAiResponderTest {
             )
         }.isInstanceOf(IllegalArgumentException::class.java)
             .hasMessageContaining("max-prompt-chars")
+    }
+
+    @Test
+    fun acceptsGeminiFlashApiMaxOutputTokenLimit() {
+        val properties = aiProperties().apply {
+            consultation.maxOutputTokens = 65_536
+        }
+
+        val responder = RemoteConsultationAiResponder(
+            properties = properties,
+            objectMapper = ObjectMapper(),
+            accessTokenProvider = { "vertex-token" },
+            generateContentClient = RecordingVertexAiGenerateContentClient(
+                responseBody = vertexResponse("""{"chunks":["넉넉하게 답할게요."]}"""),
+            ),
+        )
+
+        val response = responder.generate(
+            ConsultationAiRequest(
+                memberId = 26L,
+                message = "오늘 마음이 복잡해서 길게 정리하고 싶어요.",
+                recentMessages = emptyList(),
+                timeout = Duration.ofSeconds(2),
+            ),
+        )
+
+        assertThat(response.chunks).containsExactly("넉넉하게 답할게요.")
     }
 
     @Test

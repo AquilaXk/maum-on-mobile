@@ -45,19 +45,27 @@ class RemoteAiEndpointProperties {
     var endpoint: String = ""
     var authorizationToken: String = ""
     var model: String = "gemini-2.5-flash"
-    var requestTimeout: Duration = Duration.ofSeconds(5)
+    var requestTimeout: Duration = Duration.ofSeconds(8)
     var maxAttempts: Int = 2
-    var maxInputChars: Int = 1_000
-    var recentMessageLimit: Int = 6
+    var maxInputChars: Int = 2_000
+    var recentMessageLimit: Int = 10
     var promptMode: String = PROMPT_MODE_VERBOSE
-    var maxPromptChars: Int = 4_000
+    var maxPromptChars: Int = 12_000
+    var maxOutputTokens: Int = 1_536
+    var thinkingBudget: Int = 1_024
 
     fun validate(name: String) {
         require(model.isNotBlank()) { "app.ai.$name.model is required." }
         require(maxAttempts >= 1) { "app.ai.$name.max-attempts must be at least 1." }
         require(maxInputChars >= 120) { "app.ai.$name.max-input-chars must be at least 120." }
         require(recentMessageLimit >= 0) { "app.ai.$name.recent-message-limit must not be negative." }
-        require(maxPromptChars >= 1_200) { "app.ai.$name.max-prompt-chars must be at least 1200." }
+        require(maxPromptChars >= 2_400) { "app.ai.$name.max-prompt-chars must be at least 2400." }
+        require(maxOutputTokens in 256..65_536) {
+            "app.ai.$name.max-output-tokens must be between 256 and 65536."
+        }
+        require(thinkingBudget == -1 || thinkingBudget in 0..24_576) {
+            "app.ai.$name.thinking-budget must be -1 or between 0 and 24576."
+        }
         require(promptMode.equals(PROMPT_MODE_VERBOSE, ignoreCase = true) ||
             promptMode.equals(PROMPT_MODE_COMPACT, ignoreCase = true)) {
             "app.ai.$name.prompt-mode must be verbose or compact."
