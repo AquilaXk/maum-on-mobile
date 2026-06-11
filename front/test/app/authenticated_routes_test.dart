@@ -29,5 +29,7 @@ void main() {
         '/settings',
       ],
     );
+    expect(AuthenticatedRoute.consultation.title, 'AI 상담');
+    expect(AuthenticatedRoute.consultation.navLabel, 'AI 상담');
   });
 }

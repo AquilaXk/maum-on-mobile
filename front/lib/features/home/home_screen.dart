@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 
-import '../../app/supported_platforms.dart';
 import '../../shared/ui/app_design_system.dart';
 import 'application/home_controller.dart';
 import 'domain/home_models.dart';
@@ -143,8 +142,6 @@ class _HomeScreenState extends State<HomeScreen> {
             _PopularStorySection(stats: state.stats),
             const SizedBox(height: AppSpacing.md),
             _FeedSection(state: state),
-            const SizedBox(height: AppSpacing.xl),
-            const _PlatformRow(),
           ],
         );
       },
@@ -636,7 +633,7 @@ class _ActionGrid extends StatelessWidget {
                   actionKey: const ValueKey('home-action-consultation'),
                   surfaceKey:
                       const ValueKey('home-action-consultation-surface'),
-                  title: '상담하기',
+                  title: 'AI 상담',
                   icon: Icons.chat_bubble_outline,
                   onTap: onOpenConsultation,
                 ),
@@ -976,25 +973,6 @@ class _StoryCard extends StatelessWidget {
           ],
         ),
       ),
-    );
-  }
-}
-
-class _PlatformRow extends StatelessWidget {
-  const _PlatformRow();
-
-  @override
-  Widget build(BuildContext context) {
-    return Wrap(
-      spacing: AppSpacing.xs,
-      runSpacing: AppSpacing.xs,
-      children: [
-        for (final platform in supportedPlatforms)
-          AppStatusPill(
-            label: platform.toUpperCase(),
-            tone: AppStatusTone.success,
-          ),
-      ],
     );
   }
 }

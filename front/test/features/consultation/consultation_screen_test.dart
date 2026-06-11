@@ -38,10 +38,11 @@ void main() {
     expect(find.byKey(const ValueKey('consultation-flow-panel')), findsNothing);
     expect(find.text('상담'), findsNothing);
     expect(find.text('상담 흐름'), findsNothing);
+    expect(find.text('AI 상담'), findsOneWidget);
     expect(find.text('연결'), findsNothing);
     expect(find.text('입력'), findsNothing);
     expect(find.text('응답'), findsNothing);
-    expect(find.text('상담 연결됨'), findsOneWidget);
+    expect(find.text('AI 상담 연결됨'), findsOneWidget);
     expect(find.text('메시지 1개'), findsOneWidget);
     expect(find.text('입력 가능'), findsOneWidget);
     expect(
@@ -67,7 +68,7 @@ void main() {
     await tester.pump();
 
     expect(repository.connectCount, 1);
-    expect(find.text('상담 연결됨'), findsOneWidget);
+    expect(find.text('AI 상담 연결됨'), findsOneWidget);
     expect(
       find.byKey(const ValueKey('consultation-status-toolbar')),
       findsOneWidget,

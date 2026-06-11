@@ -205,14 +205,19 @@ void main() {
     expect(find.byKey(const ValueKey('letter-title-field')), findsOneWidget);
     await _returnHome(tester);
 
-    await _tapVisibleText(tester, '상담하기');
+    await _tapVisibleKey(tester, const ValueKey('home-action-consultation'));
+    await tester.pump();
+    expect(find.text('AI 상담'), findsWidgets);
+    expect(
+      find.byKey(const ValueKey('consultation-message-field')),
+      findsOneWidget,
+    );
     await tester.pump();
     consultationRepository.emit(
       const ConsultationStreamEvent.connect('connected'),
     );
     await tester.pump();
-    expect(find.text('실시간 상담'), findsOneWidget);
-    expect(find.text('상담 연결됨'), findsOneWidget);
+    expect(find.text('AI 상담 연결됨'), findsOneWidget);
     await _returnHome(tester);
 
     await _tapVisibleText(tester, '알림/신고');
@@ -296,7 +301,7 @@ void main() {
       expect(find.text('기록'), findsOneWidget);
       expect(find.text('스토리'), findsOneWidget);
       expect(find.text('편지'), findsOneWidget);
-      expect(find.text('상담'), findsOneWidget);
+      expect(find.text('AI 상담'), findsWidgets);
       expect(
         tester.getSemantics(find.bySemanticsLabel('홈 Tab 1 of 5')),
         matchesSemantics(
@@ -522,8 +527,12 @@ void main() {
     );
     await tester.pump();
 
-    expect(find.text('실시간 상담'), findsOneWidget);
-    expect(find.text('상담 연결됨'), findsOneWidget);
+    expect(find.text('AI 상담'), findsWidgets);
+    expect(
+      find.byKey(const ValueKey('consultation-message-field')),
+      findsOneWidget,
+    );
+    expect(find.text('AI 상담 연결됨'), findsOneWidget);
     expect(consultationRepository.connectCount, 1);
   });
 
@@ -617,7 +626,11 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('실시간 상담'), findsOneWidget);
+    expect(find.text('AI 상담'), findsWidgets);
+    expect(
+      find.byKey(const ValueKey('consultation-message-field')),
+      findsOneWidget,
+    );
   });
 
   testWidgets('applies initial letter notification tap after session restore',
@@ -948,10 +961,42 @@ void main() {
     expect(find.text('이메일 또는 비밀번호가 맞지 않아요.'), findsOneWidget);
     expect(find.text('로그인'), findsWidgets);
   });
+
+  testWidgets('uses a scroll behavior without Android stretch overscroll',
+      (tester) async {
+    await tester.pumpWidget(
+      MaumOnMobileApp(
+        authRepository: _FakeAuthRepository(restoredSession: _session()),
+        homeRepository: const _FakeHomeRepository(),
+        listenForDeepLinks: false,
+      ),
+    );
+
+    final app = tester.widget<MaterialApp>(find.byType(MaterialApp));
+    final scrollBehavior = app.scrollBehavior;
+    expect(scrollBehavior, isNotNull);
+
+    final child = Container(key: const ValueKey('overscroll-child'));
+    final decorated = scrollBehavior!.buildOverscrollIndicator(
+      tester.element(find.byType(MaterialApp)),
+      child,
+      const ScrollableDetails.vertical(),
+    );
+
+    expect(decorated, same(child));
+  });
 }
 
 Future<void> _tapVisibleText(WidgetTester tester, String text) async {
   final finder = find.text(text);
+  await tester.ensureVisible(finder);
+  await tester.pumpAndSettle();
+  await tester.tap(finder);
+  await tester.pumpAndSettle();
+}
+
+Future<void> _tapVisibleKey(WidgetTester tester, Key key) async {
+  final finder = find.byKey(key);
   await tester.ensureVisible(finder);
   await tester.pumpAndSettle();
   await tester.tap(finder);

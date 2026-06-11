@@ -127,7 +127,7 @@ class NotificationItem {
       NotificationTapDestination.diary => '일기',
       NotificationTapDestination.story => '이야기',
       NotificationTapDestination.letter => '편지',
-      NotificationTapDestination.consultation => '상담',
+      NotificationTapDestination.consultation => 'AI 상담',
       NotificationTapDestination.operations => '운영',
       NotificationTapDestination.settings => '설정',
       NotificationTapDestination.notifications => '알림',
@@ -531,7 +531,7 @@ class NotificationStreamEvent {
       'consultation_reply' => NotificationStreamEvent._(
           type: NotificationStreamEventType.consultationReply,
           data: data,
-          message: message.isEmpty ? '상담 답변이 도착했습니다.' : message,
+          message: message.isEmpty ? 'AI 상담 답변이 도착했습니다.' : message,
           notificationType: payload.notificationType,
           targetType: payload.targetType,
           targetId: payload.targetId,

@@ -15,7 +15,7 @@ void main() {
     );
     expect(find.text('이어쓸 내용이 없습니다.'), findsNothing);
     expect(
-      find.text('새 기록, 편지, 스토리, 상담을 바로 시작할 수 있습니다.'),
+      find.text('새 기록, 편지, 스토리, AI 상담을 바로 시작할 수 있습니다.'),
       findsNothing,
     );
     expect(find.text('오늘 마음 정리'), findsNothing);
@@ -37,8 +37,12 @@ void main() {
 
     await tester.tap(find.byKey(mobileQaRouteKey('consultation')));
     await tester.pumpAndSettle();
-    expect(find.text('실시간 상담'), findsOneWidget);
-    expect(find.text('상담 연결됨'), findsOneWidget);
+    expect(find.text('AI 상담'), findsWidgets);
+    expect(find.text('AI 상담 연결됨'), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('consultation-message-field')),
+      findsOneWidget,
+    );
 
     await tester.enterText(
       find.byKey(const ValueKey('consultation-message-field')),
@@ -53,7 +57,7 @@ void main() {
         find.text(
             '말해줘서 고마워요. 지금 마음이 무거운 상태라면, 먼저 숨을 천천히 고르고 가장 크게 남은 감정 하나만 짚어봐요. 지금 제일 크게 느껴지는 감정은 무엇인가요?'),
         findsOneWidget);
-    expect(find.text('상담 연결됨'), findsOneWidget);
+    expect(find.text('AI 상담 연결됨'), findsOneWidget);
 
     await tester.tap(find.byKey(mobileQaRouteKey('home')));
     await tester.pumpAndSettle();

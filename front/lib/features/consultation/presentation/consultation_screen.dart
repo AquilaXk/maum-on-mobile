@@ -265,7 +265,7 @@ class _SafetyNotice extends StatelessWidget {
           AppStateView.risk(
             title: '즉시 도움 요청',
             message: safety.message,
-            semanticLabel: '상담 위험 상황 도움 안내. ${safety.message}',
+            semanticLabel: 'AI 상담 위험 상황 도움 안내. ${safety.message}',
           ),
           const SizedBox(height: AppSpacing.sm),
           AppResponsiveActionWrap(
@@ -298,7 +298,7 @@ class _SafetyNotice extends StatelessWidget {
             alignment: Alignment.centerLeft,
             child: Semantics(
               button: true,
-              label: '민감한 상담 기록 삭제',
+              label: '민감한 AI 상담 기록 삭제',
               child: TextButton.icon(
                 key: const ValueKey(
                   'consultation-delete-sensitive-button',
@@ -370,7 +370,7 @@ class _ConsultationHeader extends StatelessWidget {
         AppSpacing.xs,
       ),
       child: AppScreenHeader(
-        title: '실시간 상담',
+        title: 'AI 상담',
         onBack: onBack,
       ),
     );
@@ -424,7 +424,7 @@ class _ConsultationStatusToolbar extends StatelessWidget {
                 const SizedBox(width: AppSpacing.xs),
                 Expanded(
                   child: Text(
-                    '상담 상태',
+                    'AI 상담 상태',
                     style: theme.textTheme.titleMedium?.copyWith(
                       color: colorScheme.onPrimaryContainer,
                       fontWeight: FontWeight.w800,
@@ -434,7 +434,7 @@ class _ConsultationStatusToolbar extends StatelessWidget {
                 if (state.connectionState == ConsultationConnectionState.error)
                   IconButton.filledTonal(
                     key: const ValueKey('consultation-reconnect-button'),
-                    tooltip: '상담 다시 연결',
+                    tooltip: 'AI 상담 다시 연결',
                     onPressed: () => onReconnect(),
                     icon: const Icon(Icons.refresh),
                   ),
@@ -474,10 +474,10 @@ String _consultationStatusText(
   bool isStreaming,
 ) {
   return switch (connectionState) {
-    ConsultationConnectionState.idle => '상담 연결 대기',
+    ConsultationConnectionState.idle => 'AI 상담 연결 대기',
     ConsultationConnectionState.connecting => '자동 연결 중',
     ConsultationConnectionState.connected when isStreaming => '답변 작성 중',
-    ConsultationConnectionState.connected => '상담 연결됨',
+    ConsultationConnectionState.connected => 'AI 상담 연결됨',
     ConsultationConnectionState.reconnecting => '자동 재연결 중',
     ConsultationConnectionState.error => '재연결 필요',
   };
@@ -534,7 +534,7 @@ class _MessageBubble extends StatelessWidget {
                   ? Semantics(
                       container: true,
                       liveRegion: true,
-                      label: '상담사가 답변을 작성 중입니다.',
+                      label: 'AI가 답변을 작성 중입니다.',
                       child: ExcludeSemantics(
                         child: Row(
                           key: const ValueKey('consultation-typing-indicator'),

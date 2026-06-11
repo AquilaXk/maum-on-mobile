@@ -765,7 +765,7 @@ class _DataExportSection extends StatelessWidget {
       title: '내 데이터',
       children: [
         if (export == null)
-          const Text('기록, 이야기, 편지, 상담 요약, 계정 정보를 JSON 파일로 받을 수 있습니다.')
+          const Text('기록, 이야기, 편지, AI 상담 요약, 계정 정보를 JSON 파일로 받을 수 있습니다.')
         else ...[
           Text('상태: ${_exportStatusLabel(export.status)}'),
           if (export.expiresAt != null) ...[

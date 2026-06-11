@@ -576,7 +576,7 @@ class _QaNotificationRepository implements NotificationRepository {
     return const [
       NotificationItem(
         id: 1,
-        content: '상담 답변이 도착했습니다.',
+        content: 'AI 상담 답변이 도착했습니다.',
         type: 'consultation_reply',
         routeKey: 'consultation',
         targetType: 'CONSULTATION',
@@ -591,7 +591,7 @@ class _QaNotificationRepository implements NotificationRepository {
   Future<NotificationItem> markRead(int notificationId) async {
     return NotificationItem(
       id: notificationId,
-      content: '상담 답변이 도착했습니다.',
+      content: 'AI 상담 답변이 도착했습니다.',
       type: 'consultation_reply',
       routeKey: 'consultation',
       targetType: 'CONSULTATION',

@@ -112,7 +112,7 @@ class ConsultationController extends ChangeNotifier {
             ConsultationMessage(
               id: 'system-0',
               role: ConsultationMessageRole.system,
-              content: '상담을 시작하려면 메시지를 입력해 주세요.',
+              content: 'AI 상담을 시작하려면 메시지를 입력해 주세요.',
               createdAt: DateTime.fromMillisecondsSinceEpoch(0),
             ),
           ],
@@ -263,7 +263,7 @@ class ConsultationController extends ChangeNotifier {
     }
 
     if (_state.connectionState != ConsultationConnectionState.connected) {
-      _appendSystemMessage('상담 연결 후 메시지를 보낼 수 있습니다.');
+      _appendSystemMessage('AI 상담 연결 후 메시지를 보낼 수 있습니다.');
       return;
     }
 
@@ -300,7 +300,7 @@ class ConsultationController extends ChangeNotifier {
 
     if (_state.connectionState != ConsultationConnectionState.connected) {
       _setState(
-        _state.copyWith(errorMessage: '상담 연결 후 다시 시도해 주세요.'),
+        _state.copyWith(errorMessage: 'AI 상담 연결 후 다시 시도해 주세요.'),
       );
       return;
     }
@@ -382,7 +382,7 @@ class ConsultationController extends ChangeNotifier {
       if (!result.accepted) {
         throw const ApiClientException(
           kind: ApiErrorKind.server,
-          message: '상담 요청이 수락되지 않았습니다. 잠시 후 다시 시도해 주세요.',
+          message: 'AI 상담 요청이 수락되지 않았습니다. 잠시 후 다시 시도해 주세요.',
         );
       }
 
@@ -502,7 +502,7 @@ class ConsultationController extends ChangeNotifier {
           return;
         }
         final message =
-            event.data.isEmpty ? '상담 응답 생성 중 오류가 발생했습니다.' : event.data;
+            event.data.isEmpty ? 'AI 상담 응답 생성 중 오류가 발생했습니다.' : event.data;
         _replaceActiveAssistantWithSystem(message);
         _setState(
           _state.copyWith(
@@ -513,7 +513,7 @@ class ConsultationController extends ChangeNotifier {
         return;
       case ConsultationStreamEventType.streamError:
         _handleRecoverableStreamFailure(
-          event.data.isEmpty ? '상담 연결이 지연되고 있습니다.' : event.data,
+          event.data.isEmpty ? 'AI 상담 연결이 지연되고 있습니다.' : event.data,
         );
         return;
       case ConsultationStreamEventType.unknown:
@@ -547,7 +547,7 @@ class ConsultationController extends ChangeNotifier {
 
   void _handleStreamDone() {
     _streamSubscription = null;
-    _handleRecoverableStreamFailure('상담 연결이 종료되었습니다.');
+    _handleRecoverableStreamFailure('AI 상담 연결이 종료되었습니다.');
   }
 
   void _handleRecoverableStreamFailure(String message) {
@@ -573,7 +573,7 @@ class ConsultationController extends ChangeNotifier {
 
     if (_reconnectAttempt >= _reconnectBackoffDelays.length) {
       if (appendNotice) {
-        _appendConnectionNotice('상담 연결이 끊어졌습니다. 다시 연결해 주세요.');
+        _appendConnectionNotice('AI 상담 연결이 끊어졌습니다. 다시 연결해 주세요.');
       }
       _setState(
         _state.copyWith(
@@ -589,7 +589,7 @@ class ConsultationController extends ChangeNotifier {
     final delay = _reconnectBackoffDelays[_reconnectAttempt];
     _reconnectAttempt += 1;
     if (appendNotice) {
-      _appendConnectionNotice('상담 연결이 끊어졌습니다. 자동으로 다시 연결합니다.');
+      _appendConnectionNotice('AI 상담 연결이 끊어졌습니다. 자동으로 다시 연결합니다.');
     }
     _setState(
       _state.copyWith(
@@ -858,7 +858,7 @@ class ConsultationController extends ChangeNotifier {
       ConsultationMessage(
         id: 'system-0',
         role: ConsultationMessageRole.system,
-        content: '상담을 시작하려면 메시지를 입력해 주세요.',
+        content: 'AI 상담을 시작하려면 메시지를 입력해 주세요.',
         createdAt: DateTime.fromMillisecondsSinceEpoch(0),
       ),
     ];
@@ -870,7 +870,7 @@ class ConsultationController extends ChangeNotifier {
     }
 
     if (error is TimeoutException) {
-      return '상담 응답이 지연되고 있습니다. 잠시 후 다시 시도해 주세요.';
+      return 'AI 상담 응답이 지연되고 있습니다. 잠시 후 다시 시도해 주세요.';
     }
 
     return '요청을 처리하지 못했습니다.';
