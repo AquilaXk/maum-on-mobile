@@ -124,6 +124,26 @@ void main() {
       );
     });
 
+    test('restoreSession skips network when no local session token exists',
+        () async {
+      final transport = _FakeApiTransport([]);
+      final tokenStore = MemoryAuthTokenStore();
+      final repository = ApiAuthRepository(
+        apiClient: ApiClient(transport: transport, tokenStore: tokenStore),
+        tokenStore: tokenStore,
+      );
+
+      await expectLater(
+        repository.restoreSession(),
+        throwsA(
+          isA<ApiClientException>()
+              .having((error) => error.kind, 'kind', ApiErrorKind.unauthorized)
+              .having((error) => error.statusCode, 'statusCode', 401),
+        ),
+      );
+      expect(transport.requests, isEmpty);
+    });
+
     test('restoreSession refreshes an expired access token before restoring',
         () async {
       final transport = _FakeApiTransport([
