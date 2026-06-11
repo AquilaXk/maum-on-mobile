@@ -6,6 +6,7 @@ import '../domain/login_provider_policy.dart';
 import '../../legal/presentation/legal_disclosure_links.dart';
 import '../../../shared/ui/app_design_system.dart';
 import '../../../shared/ui/brand_identity.dart';
+import '../../../theme/app_theme.dart';
 
 enum AuthFormMode {
   login,
@@ -58,7 +59,8 @@ class _AuthScreenState extends State<AuthScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final rootTheme = Theme.of(context);
+    final theme = buildAppTheme().copyWith(platform: rootTheme.platform);
     final state = widget.controller.state;
     final externalLoginState = widget.externalLoginController?.state;
     final platform = theme.platform;
@@ -66,122 +68,129 @@ class _AuthScreenState extends State<AuthScreen> {
         state.isSubmitting || (externalLoginState?.isStarting ?? false);
     final secondaryActions = _secondaryActions(platform, isAuthBusy);
 
-    return Scaffold(
-      body: DecoratedBox(
-        key: const ValueKey('auth-blue-shell'),
-        decoration: const BoxDecoration(
-          color: AppBrandColors.backgroundBlue,
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [
-              Color(0xFFE7F2FF),
-              Color(0xFFF7FBFF),
-            ],
+    return Theme(
+      data: theme,
+      child: Scaffold(
+        body: DecoratedBox(
+          key: const ValueKey('auth-blue-shell'),
+          decoration: const BoxDecoration(
+            color: AppBrandColors.backgroundBlue,
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [
+                Color(0xFFE3F0FF),
+                Color(0xFFF6FBFF),
+              ],
+            ),
           ),
-        ),
-        child: SafeArea(
-          child: LayoutBuilder(
-            builder: (context, constraints) {
-              return SingleChildScrollView(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: AppSpacing.xl,
-                  vertical: AppSpacing.xxl,
-                ),
-                child: Center(
-                  child: ConstrainedBox(
-                    constraints: BoxConstraints(
-                      minHeight: constraints.maxHeight - AppSpacing.xxl * 2,
-                      maxWidth: 440,
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        const _AuthHeader(),
-                        const SizedBox(height: AppSpacing.xl),
-                        _AuthFormPanel(
-                          title: _modeTitle,
-                          icon: _submitIcon,
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
-                            children: [
-                              if (state.errorMessage != null) ...[
-                                _MessagePanel(
-                                  message: state.errorMessage!,
-                                  color: theme.colorScheme.errorContainer,
-                                  textColor: theme.colorScheme.onErrorContainer,
-                                  isError: true,
+          child: SafeArea(
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                return SingleChildScrollView(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: AppSpacing.xl,
+                    vertical: AppSpacing.xxl,
+                  ),
+                  child: Center(
+                    child: ConstrainedBox(
+                      constraints: BoxConstraints(
+                        minHeight: constraints.maxHeight - AppSpacing.xxl * 2,
+                        maxWidth: 440,
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const _AuthHeader(),
+                          const SizedBox(height: AppSpacing.xl),
+                          _AuthFormPanel(
+                            title: _modeTitle,
+                            icon: _submitIcon,
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                if (state.errorMessage != null) ...[
+                                  _MessagePanel(
+                                    message: state.errorMessage!,
+                                    color: theme.colorScheme.errorContainer,
+                                    textColor:
+                                        theme.colorScheme.onErrorContainer,
+                                    isError: true,
+                                  ),
+                                  const SizedBox(height: AppSpacing.lg),
+                                ],
+                                if (externalLoginState?.errorMessage !=
+                                    null) ...[
+                                  _MessagePanel(
+                                    message: externalLoginState!.errorMessage!,
+                                    color: theme.colorScheme.errorContainer,
+                                    textColor:
+                                        theme.colorScheme.onErrorContainer,
+                                    isError: true,
+                                  ),
+                                  const SizedBox(height: AppSpacing.lg),
+                                ],
+                                if (state.infoMessage != null) ...[
+                                  _MessagePanel(
+                                    message: state.infoMessage!,
+                                    color: theme.colorScheme.primaryContainer,
+                                    textColor:
+                                        theme.colorScheme.onPrimaryContainer,
+                                  ),
+                                  const SizedBox(height: AppSpacing.lg),
+                                ],
+                                ..._fieldsForMode(theme, isAuthBusy),
+                                const SizedBox(height: AppSpacing.xl),
+                                FilledButton.icon(
+                                  key: ValueKey(_submitButtonKey),
+                                  onPressed: isAuthBusy ? null : _submit,
+                                  icon: state.isSubmitting
+                                      ? SizedBox.square(
+                                          dimension: 18,
+                                          child: CircularProgressIndicator(
+                                            strokeWidth: 2,
+                                            color: theme.colorScheme.onPrimary,
+                                          ),
+                                        )
+                                      : Icon(_submitIcon),
+                                  label: Text(
+                                    state.isSubmitting ? '처리 중' : _submitLabel,
+                                  ),
                                 ),
-                                const SizedBox(height: AppSpacing.lg),
+                                if (secondaryActions.isNotEmpty) ...[
+                                  const SizedBox(height: AppSpacing.md),
+                                  ...secondaryActions,
+                                ],
                               ],
-                              if (externalLoginState?.errorMessage != null) ...[
-                                _MessagePanel(
-                                  message: externalLoginState!.errorMessage!,
-                                  color: theme.colorScheme.errorContainer,
-                                  textColor: theme.colorScheme.onErrorContainer,
-                                  isError: true,
-                                ),
-                                const SizedBox(height: AppSpacing.lg),
-                              ],
-                              if (state.infoMessage != null) ...[
-                                _MessagePanel(
-                                  message: state.infoMessage!,
-                                  color: theme.colorScheme.primaryContainer,
-                                  textColor:
-                                      theme.colorScheme.onPrimaryContainer,
-                                ),
-                                const SizedBox(height: AppSpacing.lg),
-                              ],
-                              ..._fieldsForMode(theme, isAuthBusy),
-                              const SizedBox(height: AppSpacing.xl),
-                              FilledButton.icon(
-                                key: ValueKey(_submitButtonKey),
-                                onPressed: isAuthBusy ? null : _submit,
-                                icon: state.isSubmitting
-                                    ? SizedBox.square(
-                                        dimension: 18,
-                                        child: CircularProgressIndicator(
-                                          strokeWidth: 2,
-                                          color: theme.colorScheme.onPrimary,
-                                        ),
-                                      )
-                                    : Icon(_submitIcon),
-                                label: Text(
-                                  state.isSubmitting ? '처리 중' : _submitLabel,
-                                ),
-                              ),
-                              if (secondaryActions.isNotEmpty) ...[
-                                const SizedBox(height: AppSpacing.md),
-                                ...secondaryActions,
-                              ],
-                            ],
-                          ),
-                        ),
-                        const SizedBox(height: AppSpacing.lg),
-                        LegalDisclosureLinks(
-                          keyPrefix: 'auth',
-                          onOpenExternalUri: widget.onOpenExternalUri,
-                          showAccountDeletionGuidance: false,
-                        ),
-                        const SizedBox(height: AppSpacing.xs),
-                        Center(
-                          child: TextButton.icon(
-                            key: const ValueKey('auth-account-deletion-link'),
-                            onPressed: _showAccountDeletionGuidance,
-                            icon: const Icon(
-                              Icons.person_remove_outlined,
-                              size: 18,
                             ),
-                            label: const Text('회원 탈퇴'),
                           ),
-                        ),
-                      ],
+                          const SizedBox(height: AppSpacing.lg),
+                          LegalDisclosureLinks(
+                            keyPrefix: 'auth',
+                            onOpenExternalUri: widget.onOpenExternalUri,
+                            showAccountDeletionGuidance: false,
+                          ),
+                          const SizedBox(height: AppSpacing.xs),
+                          Center(
+                            child: TextButton.icon(
+                              key: const ValueKey('auth-account-deletion-link'),
+                              onPressed: () =>
+                                  _showAccountDeletionGuidance(context),
+                              icon: const Icon(
+                                Icons.person_remove_outlined,
+                                size: 18,
+                              ),
+                              label: const Text('회원 탈퇴'),
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
-                ),
-              );
-            },
+                );
+              },
+            ),
           ),
         ),
       ),
@@ -684,9 +693,9 @@ class _AuthScreenState extends State<AuthScreen> {
     });
   }
 
-  Future<void> _showAccountDeletionGuidance() {
+  Future<void> _showAccountDeletionGuidance(BuildContext themedContext) {
     return showDialog<void>(
-      context: context,
+      context: themedContext,
       builder: (dialogContext) => AlertDialog(
         key: const ValueKey('auth-account-deletion-dialog'),
         title: const Text('회원 탈퇴'),
@@ -749,11 +758,12 @@ class _AuthFormPanel extends StatelessWidget {
     return Card(
       key: const ValueKey('auth-form-panel'),
       margin: EdgeInsets.zero,
-      color: theme.colorScheme.surface,
+      color: AppBrandColors.surfaceStrong,
+      surfaceTintColor: Colors.transparent,
       shape: RoundedRectangleBorder(
         borderRadius: AppRadii.card,
         side: BorderSide(
-          color: theme.colorScheme.primary.withValues(alpha: 0.14),
+          color: AppBrandColors.primaryBlue.withValues(alpha: 0.22),
         ),
       ),
       child: Padding(
