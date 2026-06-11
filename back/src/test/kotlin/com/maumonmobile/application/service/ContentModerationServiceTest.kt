@@ -19,17 +19,18 @@ import java.util.concurrent.TimeoutException
 class ContentModerationServiceTest {
 
     @Test
-    fun returnsClassifierResultAndRecordsTargetMetrics() {
+    fun usesClassifierOnlyWhenLocalFilterFindsSuspiciousContent() {
         val metrics = MobileApiMetricsRegistry()
-        val service = ContentModerationService(
-            contentModerationClassifier = FixedClassifier(
-                ContentModerationClassification(
-                    allowed = false,
-                    riskLevel = ContentModerationRiskLevel.HIGH,
-                    categories = listOf(ContentModerationCategory.SPAM),
-                    message = "수정이 필요합니다.",
-                ),
+        val classifier = CountingClassifier(
+            ContentModerationClassification(
+                allowed = false,
+                riskLevel = ContentModerationRiskLevel.HIGH,
+                categories = listOf(ContentModerationCategory.PROFANITY),
+                message = "수정이 필요합니다.",
             ),
+        )
+        val service = ContentModerationService(
+            contentModerationClassifier = classifier,
             metricsRegistry = metrics,
             auditRepository = InMemoryContentModerationAuditRepository(),
             moderationTimeout = Duration.ofSeconds(1),
@@ -37,13 +38,101 @@ class ContentModerationServiceTest {
 
         val result = service.review(
             user = AuthenticatedUser(id = "1", email = "user@example.com", roles = setOf("USER")),
-            command = ContentModerationCommand(targetType = "comment", text = "무료체험"),
+            command = ContentModerationCommand(targetType = "comment", text = "이건 ㅅㅣ발 같은 상황이에요."),
         )
 
         assertThat(result.allowed).isFalse()
-        assertThat(result.categories).containsExactly(ContentModerationCategory.SPAM)
+        assertThat(result.categories).containsExactly(ContentModerationCategory.PROFANITY)
+        assertThat(classifier.requests).hasSize(1)
+        assertThat(classifier.requests.single().target.name).isEqualTo("COMMENT")
         assertThat(metrics.snapshot().ai.contentModeration)
             .containsEntry("COMMENT.HIGH.blocked", 1)
+    }
+
+    @Test
+    fun allowsClearlySafeContentWithoutCallingClassifier() {
+        val auditRepository = InMemoryContentModerationAuditRepository()
+        val classifier = CountingClassifier(
+            ContentModerationClassification.safeFallback(),
+        )
+        val service = ContentModerationService(
+            contentModerationClassifier = classifier,
+            metricsRegistry = MobileApiMetricsRegistry(),
+            auditRepository = auditRepository,
+            moderationTimeout = Duration.ofSeconds(1),
+        )
+
+        val result = service.review(
+            user = AuthenticatedUser(id = "3", email = "safe@example.com", roles = setOf("USER")),
+            command = ContentModerationCommand(targetType = "letter", text = "오늘 힘들었지만 차분히 이야기하고 싶어요."),
+        )
+
+        assertThat(result.allowed).isTrue()
+        assertThat(result.riskLevel).isEqualTo(ContentModerationRiskLevel.LOW)
+        assertThat(result.categories).isEmpty()
+        assertThat(classifier.requests).isEmpty()
+        assertThat(auditRepository.findRecent(10).single().modelStatus)
+            .isEqualTo(ContentModerationModelStatus.LOCAL_ALLOW)
+    }
+
+    @Test
+    fun blocksObviousUnsafeContentWithoutCallingClassifier() {
+        val auditRepository = InMemoryContentModerationAuditRepository()
+        val classifier = CountingClassifier(
+            ContentModerationClassification(
+                allowed = true,
+                riskLevel = ContentModerationRiskLevel.LOW,
+                categories = emptyList(),
+                message = "허용",
+            ),
+        )
+        val service = ContentModerationService(
+            contentModerationClassifier = classifier,
+            metricsRegistry = MobileApiMetricsRegistry(),
+            auditRepository = auditRepository,
+            moderationTimeout = Duration.ofSeconds(1),
+        )
+
+        val result = service.review(
+            user = AuthenticatedUser(id = "4", email = "blocked@example.com", roles = setOf("USER")),
+            command = ContentModerationCommand(targetType = "story", text = "너 진짜 시발 병신이야."),
+        )
+
+        assertThat(result.allowed).isFalse()
+        assertThat(result.riskLevel).isEqualTo(ContentModerationRiskLevel.HIGH)
+        assertThat(result.categories).containsExactly(ContentModerationCategory.PROFANITY)
+        assertThat(result.message).contains("표현")
+        assertThat(classifier.requests).isEmpty()
+        assertThat(auditRepository.findRecent(10).single().modelStatus)
+            .isEqualTo(ContentModerationModelStatus.LOCAL_BLOCK)
+    }
+
+    @Test
+    fun blocksMixedScriptProfanityAndFamilyAbuseWithoutCallingClassifier() {
+        val classifier = CountingClassifier(
+            ContentModerationClassification.safeFallback(),
+        )
+        val service = ContentModerationService(
+            contentModerationClassifier = classifier,
+            metricsRegistry = MobileApiMetricsRegistry(),
+            auditRepository = InMemoryContentModerationAuditRepository(),
+            moderationTimeout = Duration.ofSeconds(1),
+        )
+
+        val mixedScriptProfanity = service.review(
+            user = AuthenticatedUser(id = "5", email = "mixed@example.com", roles = setOf("USER")),
+            command = ContentModerationCommand(targetType = "comment", text = "she발아"),
+        )
+        val familyAbuse = service.review(
+            user = AuthenticatedUser(id = "6", email = "family@example.com", roles = setOf("USER")),
+            command = ContentModerationCommand(targetType = "comment", text = "너희 어머니 섬노예"),
+        )
+
+        assertThat(mixedScriptProfanity.allowed).isFalse()
+        assertThat(mixedScriptProfanity.categories).contains(ContentModerationCategory.PROFANITY)
+        assertThat(familyAbuse.allowed).isFalse()
+        assertThat(familyAbuse.categories).contains(ContentModerationCategory.ABUSE)
+        assertThat(classifier.requests).isEmpty()
     }
 
     @Test
@@ -58,7 +147,7 @@ class ContentModerationServiceTest {
 
         val result = service.review(
             user = AuthenticatedUser(id = "2", email = "user2@example.com", roles = setOf("USER")),
-            command = ContentModerationCommand(targetType = "story", text = "평범한 글"),
+            command = ContentModerationCommand(targetType = "story", text = "이건 ㅅㅣ발 같은 상황이에요."),
         )
 
         assertThat(result.allowed).isFalse()
@@ -115,7 +204,7 @@ class ContentModerationServiceTest {
 
         val result = service.review(
             user = AuthenticatedUser(id = "8", email = "timeout@example.com", roles = setOf("USER")),
-            command = ContentModerationCommand(targetType = "letter", text = "모델 지연 케이스"),
+            command = ContentModerationCommand(targetType = "letter", text = "이건 ㅅㅣ발 같은 상황이에요."),
         )
 
         assertThat(result.allowed).isFalse()
@@ -130,6 +219,17 @@ private class FixedClassifier(
     private val result: ContentModerationClassification,
 ) : ContentModerationClassifier {
     override fun classify(request: ContentModerationClassificationRequest): ContentModerationClassification {
+        return result
+    }
+}
+
+private class CountingClassifier(
+    private val result: ContentModerationClassification,
+) : ContentModerationClassifier {
+    val requests = mutableListOf<ContentModerationClassificationRequest>()
+
+    override fun classify(request: ContentModerationClassificationRequest): ContentModerationClassification {
+        requests += request
         return result
     }
 }

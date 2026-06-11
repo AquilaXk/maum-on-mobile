@@ -276,6 +276,39 @@ class ConsultationControllerTest @Autowired constructor(
     }
 
     @Test
+    fun profanityInputReturnsSafetyGuidanceWithoutCallingConsultationModel() {
+        val member = signupAndLogin("consultation-profanity@example.com", "검수이")
+
+        mockMvc.post("/api/v1/consultations/chat") {
+            header("Authorization", "Bearer ${member.accessToken}")
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"message":"시발 병신아"}"""
+        }
+            .andExpect {
+                status { isOk() }
+                jsonPath("$.data.accepted") { value(false) }
+                jsonPath("$.data.safety.category") { value("PROFANITY") }
+                jsonPath("$.data.safety.severity") { value("HIGH") }
+                jsonPath("$.data.safety.actionPolicy") { value("SAFE_GUIDANCE") }
+                jsonPath("$.data.safety.message") { value(org.hamcrest.Matchers.containsString("욕설")) }
+            }
+
+        mockMvc.get("/api/v1/consultations/recent") {
+            header("Authorization", "Bearer ${member.accessToken}")
+        }
+            .andExpect {
+                status { isOk() }
+                jsonPath("$.data.messages[0].role") { value("USER") }
+                jsonPath("$.data.messages[0].sensitive") { value(true) }
+                jsonPath("$.data.messages[1].role") { value("SYSTEM") }
+                jsonPath("$.data.messages[1].sensitive") { value(true) }
+                jsonPath("$.data.messages[1].content") { value(org.hamcrest.Matchers.containsString("욕설")) }
+            }
+
+        assertThat(consultationAiResponder.requests).isEmpty()
+    }
+
+    @Test
     fun repeatedCriticalSignalsReturnRateLimitedPolicy() {
         val member = signupAndLogin("consultation-rate@example.com", "반복이")
 

@@ -15,9 +15,19 @@ class RuleBasedContentModerationClassifier : ContentModerationClassifier {
     override fun classify(request: ContentModerationClassificationRequest): ContentModerationClassification {
         val categories = linkedSetOf<ContentModerationCategory>()
         val normalized = request.text.lowercase()
+        val compact = normalized.replace(Regex("""[^0-9a-z가-힣ㄱ-ㅎㅏ-ㅣ]+"""), "")
 
-        if (PROFANITY_TERMS.any { term -> normalized.contains(term) }) {
+        if (PROFANITY_TERMS.any { term -> compact.contains(term) }) {
             categories += ContentModerationCategory.PROFANITY
+        }
+        if (SELF_HARM_TERMS.any { term -> compact.contains(term) }) {
+            categories += ContentModerationCategory.SELF_HARM
+        }
+        if (VIOLENCE_TERMS.any { term -> compact.contains(term) }) {
+            categories += ContentModerationCategory.VIOLENCE
+        }
+        if (ABUSE_TERMS.any { term -> compact.contains(term) }) {
+            categories += ContentModerationCategory.ABUSE
         }
         if (PERSONAL_INFO_PATTERNS.any { pattern -> pattern.containsMatchIn(request.text) }) {
             categories += ContentModerationCategory.PERSONAL_INFO
@@ -56,8 +66,14 @@ class RuleBasedContentModerationClassifier : ContentModerationClassifier {
             "꺼져",
             "병신",
             "시발",
+            "she발",
             "개새끼",
+            "ㅅㅂ",
+            "ㅅㅣ발",
         )
+        private val SELF_HARM_TERMS = setOf("죽고싶", "자살", "자해", "ㅈㅏ살", "ㅈㅏ해")
+        private val VIOLENCE_TERMS = setOf("죽일", "해치고싶", "때리고싶", "죽여버")
+        private val ABUSE_TERMS = setOf("학대", "폭행", "성폭력", "감금", "맞고있", "섬노예")
         private val SPAM_TERMS = setOf(
             "http://",
             "https://",

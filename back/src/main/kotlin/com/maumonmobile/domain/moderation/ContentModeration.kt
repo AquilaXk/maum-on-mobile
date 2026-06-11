@@ -13,6 +13,7 @@ enum class ContentModerationTarget {
     DIARY,
     LETTER,
     REPORT,
+    CONSULTATION,
 }
 
 enum class ContentModerationRiskLevel {
@@ -22,6 +23,9 @@ enum class ContentModerationRiskLevel {
 
 enum class ContentModerationCategory {
     PROFANITY,
+    SELF_HARM,
+    VIOLENCE,
+    ABUSE,
     PERSONAL_INFO,
     SPAM,
     INAPPROPRIATE,

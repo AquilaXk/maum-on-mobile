@@ -5,7 +5,8 @@ enum ContentModerationTarget {
   comment(apiValue: 'COMMENT'),
   diary(apiValue: 'DIARY'),
   letter(apiValue: 'LETTER'),
-  report(apiValue: 'REPORT');
+  report(apiValue: 'REPORT'),
+  consultation(apiValue: 'CONSULTATION');
 
   const ContentModerationTarget({required this.apiValue});
 
@@ -31,6 +32,9 @@ enum ContentModerationRiskLevel {
 
 enum ContentModerationCategory {
   profanity(apiValue: 'PROFANITY'),
+  selfHarm(apiValue: 'SELF_HARM'),
+  violence(apiValue: 'VIOLENCE'),
+  abuse(apiValue: 'ABUSE'),
   personalInfo(apiValue: 'PERSONAL_INFO'),
   spam(apiValue: 'SPAM'),
   inappropriate(apiValue: 'INAPPROPRIATE');
@@ -42,6 +46,9 @@ enum ContentModerationCategory {
   static ContentModerationCategory fromApiValue(String value) {
     return switch (value) {
       'PROFANITY' => ContentModerationCategory.profanity,
+      'SELF_HARM' => ContentModerationCategory.selfHarm,
+      'VIOLENCE' => ContentModerationCategory.violence,
+      'ABUSE' => ContentModerationCategory.abuse,
       'PERSONAL_INFO' => ContentModerationCategory.personalInfo,
       'SPAM' => ContentModerationCategory.spam,
       'INAPPROPRIATE' => ContentModerationCategory.inappropriate,
@@ -184,6 +191,7 @@ extension ContentModerationTargetLabel on ContentModerationTarget {
       ContentModerationTarget.diary => '기록',
       ContentModerationTarget.letter => '편지',
       ContentModerationTarget.report => '신고 내용',
+      ContentModerationTarget.consultation => 'AI 상담',
     };
   }
 }
@@ -205,6 +213,12 @@ extension on ContentModerationCategory {
     return switch (this) {
       ContentModerationCategory.profanity =>
         '비난, 욕설, 위협으로 읽힐 수 있는 표현을 부드럽게 바꿔 주세요.',
+      ContentModerationCategory.selfHarm =>
+        '자해나 극단적 선택을 부추기거나 구체화하는 표현은 도움 요청 중심으로 바꿔 주세요.',
+      ContentModerationCategory.violence =>
+        '폭력, 위협, 보복으로 읽힐 수 있는 표현은 안전 확보와 감정 설명 중심으로 바꿔 주세요.',
+      ContentModerationCategory.abuse =>
+        '학대, 착취, 가족 비하로 읽힐 수 있는 표현은 구체적인 도움 요청이나 상황 설명으로 바꿔 주세요.',
       ContentModerationCategory.personalInfo =>
         '전화번호, 이메일, 주소처럼 개인을 특정할 수 있는 표현을 지워 주세요.',
       ContentModerationCategory.spam => '광고, 반복 홍보, 외부 유도 표현을 줄여 주세요.',

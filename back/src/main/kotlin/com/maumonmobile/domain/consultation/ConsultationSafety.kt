@@ -22,6 +22,7 @@ enum class ConsultationRiskCategory {
     SELF_HARM,
     VIOLENCE,
     ABUSE,
+    PROFANITY,
 }
 
 enum class ConsultationRiskSeverity {

@@ -33,8 +33,8 @@ class ContentModerationControllerTest @Autowired constructor(
                 jsonPath("$.success") { value(true) }
                 jsonPath("$.data.allowed") { value(false) }
                 jsonPath("$.data.riskLevel") { value("HIGH") }
-                jsonPath("$.data.message") { value("위험도가 높은 표현이 포함되어 수정이 필요합니다.") }
-                jsonPath("$.data.categories[0]") { value("PROFANITY") }
+                jsonPath("$.data.message") { value("폭력이나 위협으로 이어질 수 있는 표현이 포함되어 수정이 필요합니다.") }
+                jsonPath("$.data.categories[0]") { value("VIOLENCE") }
             }
     }
 
