@@ -498,6 +498,7 @@ jobs:
         if: ${{ github.event_name == 'workflow_dispatch' && inputs.android_release_mode != 'skip' && steps.scaffold.outputs.present == 'true' && steps.scaffold.outputs.stack == 'flutter' }}
         env:
           MAUMON_API_BASE_URL: ${{ secrets.MAUMON_API_BASE_URL }}
+          MAUMON_ANDROID_LOGIN_PROVIDER_IDS: ${{ vars.MAUMON_ANDROID_LOGIN_PROVIDER_IDS }}
           MAUMON_ANDROID_RELEASE_DRY_RUN: ${{ inputs.android_release_mode == 'dry-run' }}
           MAUMON_ANDROID_KEYSTORE_BASE64: ${{ secrets.MAUMON_ANDROID_KEYSTORE_BASE64 }}
           MAUMON_ANDROID_KEYSTORE_PASSWORD: ${{ secrets.MAUMON_ANDROID_KEYSTORE_PASSWORD }}
@@ -667,6 +668,7 @@ jobs:
         if: ${{ github.event_name == 'workflow_dispatch' && inputs.ios_release_mode != 'skip' && steps.scaffold.outputs.present == 'true' && steps.scaffold.outputs.stack == 'flutter' }}
         env:
           MAUMON_API_BASE_URL: ${{ secrets.MAUMON_API_BASE_URL }}
+          MAUMON_IOS_LOGIN_PROVIDER_IDS: ${{ vars.MAUMON_IOS_LOGIN_PROVIDER_IDS }}
           MAUMON_IOS_RELEASE_DRY_RUN: ${{ inputs.ios_release_mode == 'dry-run' }}
           MAUMON_IOS_TESTFLIGHT_UPLOAD: ${{ inputs.ios_release_mode == 'upload' }}
           MAUMON_RELEASE_MANIFEST_PATH: contracts/release-manifest/current-release.json

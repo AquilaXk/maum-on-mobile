@@ -8,6 +8,7 @@ upload="${MAUMON_IOS_TESTFLIGHT_UPLOAD:-false}"
 base_env=(
   MAUMON_API_BASE_URL
 )
+login_provider_ids="${MAUMON_IOS_LOGIN_PROVIDER_IDS:-}"
 signing_env=(
   MAUMON_IOS_DEVELOPMENT_TEAM
   MAUMON_IOS_EXPORT_OPTIONS_PLIST_BASE64
@@ -127,7 +128,7 @@ if [[ "${dry_run}" == "true" ]]; then
   echo "release manifest: ${release_manifest_abs:-none}"
   echo "release notes length: ${#release_notes}"
   echo "tester notes length: ${#tester_notes}"
-  echo "flutter build ipa --release --dart-define=API_BASE_URL=${MAUMON_API_BASE_URL} --export-options-plist <decoded export options>"
+  echo "flutter build ipa --release --dart-define=API_BASE_URL=${MAUMON_API_BASE_URL} --dart-define=LOGIN_PROVIDER_IDS=${login_provider_ids} --export-options-plist <decoded export options>"
   if [[ "${upload}" == "true" ]]; then
     echo "TestFlight upload dry run: xcrun altool --upload-app --type ios --file <ipa>"
   else
@@ -199,7 +200,10 @@ cp "${profile_path}" "${HOME}/Library/MobileDevice/Provisioning Profiles/maumon.
 
 cd "${front_dir}"
 "${repo_root}/tools/flutterw" pub get
-"${repo_root}/tools/flutterw" build ipa --release --dart-define=API_BASE_URL="${MAUMON_API_BASE_URL}" --export-options-plist "${export_options_path}"
+"${repo_root}/tools/flutterw" build ipa --release \
+  --dart-define=API_BASE_URL="${MAUMON_API_BASE_URL}" \
+  --dart-define=LOGIN_PROVIDER_IDS="${login_provider_ids}" \
+  --export-options-plist "${export_options_path}"
 
 ipa_path="$(find "${front_dir}/build/ios/ipa" -name '*.ipa' -print -quit)"
 if [[ -z "${ipa_path}" || ! -f "${ipa_path}" ]]; then
