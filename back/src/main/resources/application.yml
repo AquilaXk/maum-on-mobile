@@ -84,12 +84,14 @@ app:
       endpoint: ${AI_CONSULTATION_ENDPOINT:}
       authorization-token: ${AI_CONSULTATION_AUTHORIZATION_TOKEN:}
       model: ${AI_CONSULTATION_MODEL:gemini-2.5-flash}
-      request-timeout: ${AI_CONSULTATION_REQUEST_TIMEOUT:PT5S}
+      request-timeout: ${AI_CONSULTATION_REQUEST_TIMEOUT:PT8S}
       max-attempts: ${AI_CONSULTATION_MAX_ATTEMPTS:2}
-      max-input-chars: ${AI_CONSULTATION_MAX_INPUT_CHARS:1000}
-      recent-message-limit: ${AI_CONSULTATION_RECENT_MESSAGE_LIMIT:6}
+      max-input-chars: ${AI_CONSULTATION_MAX_INPUT_CHARS:2000}
+      recent-message-limit: ${AI_CONSULTATION_RECENT_MESSAGE_LIMIT:10}
       prompt-mode: ${AI_CONSULTATION_PROMPT_MODE:verbose}
-      max-prompt-chars: ${AI_CONSULTATION_MAX_PROMPT_CHARS:4000}
+      max-prompt-chars: ${AI_CONSULTATION_MAX_PROMPT_CHARS:12000}
+      max-output-tokens: ${AI_CONSULTATION_MAX_OUTPUT_TOKENS:1536}
+      thinking-budget: ${AI_CONSULTATION_THINKING_BUDGET:1024}
     moderation:
       endpoint: ${AI_MODERATION_ENDPOINT:}
       authorization-token: ${AI_MODERATION_AUTHORIZATION_TOKEN:}

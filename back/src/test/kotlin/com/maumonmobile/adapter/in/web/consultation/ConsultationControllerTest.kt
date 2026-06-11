@@ -169,7 +169,7 @@ class ConsultationControllerTest @Autowired constructor(
         mockMvc.post("/api/v1/consultations/chat") {
             header("Authorization", "Bearer ${member.accessToken}")
             contentType = MediaType.APPLICATION_JSON
-            content = """{"message":"응답 실패를 재현해요."}"""
+            content = """{"message":"응답 실패 때문에 출근 생각만 해도 심장이 뛰어요."}"""
         }
             .andExpect {
                 status { isOk() }
@@ -183,7 +183,9 @@ class ConsultationControllerTest @Autowired constructor(
         val requestId = chunk["requestId"]?.toString()
         assertThat(requestId).isNotBlank()
         assertThat(chunk["sequence"]).isEqualTo(0)
-        assertThat(chunk["chunk"]).isEqualTo("지금은 답변을 만들지 못했습니다. 잠시 후 다시 시도해 주세요.")
+        assertThat(chunk["chunk"].toString())
+            .contains("출근")
+            .doesNotContain("지금은 답변을 만들지 못했습니다")
         assertThat(done["requestId"]).isEqualTo(requestId)
         assertThat(done["sequence"]).isEqualTo(1)
         assertThat(done["done"]).isEqualTo(true)
@@ -348,7 +350,7 @@ class ConsultationControllerTest @Autowired constructor(
         mockMvc.post("/api/v1/consultations/chat") {
             header("Authorization", "Bearer ${member.accessToken}")
             contentType = MediaType.APPLICATION_JSON
-            content = """{"message":"응답 실패를 재현해요."}"""
+            content = """{"message":"응답 실패 때문에 출근 생각만 해도 심장이 뛰어요."}"""
         }
             .andExpect {
                 status { isOk() }
@@ -363,7 +365,10 @@ class ConsultationControllerTest @Autowired constructor(
                 jsonPath("$.data.messages[0].role") { value("USER") }
                 jsonPath("$.data.messages[1].role") { value("ASSISTANT") }
                 jsonPath("$.data.messages[1].content") {
-                    value("지금은 답변을 만들지 못했습니다. 잠시 후 다시 시도해 주세요.")
+                    value(org.hamcrest.Matchers.containsString("출근"))
+                }
+                jsonPath("$.data.messages[1].content") {
+                    value(org.hamcrest.Matchers.not(org.hamcrest.Matchers.containsString("지금은 답변을 만들지 못했습니다")))
                 }
             }
     }
@@ -377,7 +382,7 @@ class ConsultationControllerTest @Autowired constructor(
             mockMvc.post("/api/v1/consultations/chat") {
                 header("Authorization", "Bearer ${member.accessToken}")
                 contentType = MediaType.APPLICATION_JSON
-                content = """{"message":"응답 지연을 재현해요."}"""
+                content = """{"message":"응답 지연 때문에 잠을 못 자고 새벽마다 깨요."}"""
             }
                 .andExpect {
                     status { isOk() }
@@ -394,7 +399,10 @@ class ConsultationControllerTest @Autowired constructor(
                 jsonPath("$.data.messages[0].role") { value("USER") }
                 jsonPath("$.data.messages[1].role") { value("ASSISTANT") }
                 jsonPath("$.data.messages[1].content") {
-                    value("지금은 답변을 만들지 못했습니다. 잠시 후 다시 시도해 주세요.")
+                    value(org.hamcrest.Matchers.containsString("잠"))
+                }
+                jsonPath("$.data.messages[1].content") {
+                    value(org.hamcrest.Matchers.not(org.hamcrest.Matchers.containsString("지금은 답변을 만들지 못했습니다")))
                 }
             }
     }
