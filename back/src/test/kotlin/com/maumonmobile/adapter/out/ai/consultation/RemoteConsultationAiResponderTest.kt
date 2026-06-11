@@ -597,6 +597,33 @@ class RemoteConsultationAiResponderTest {
     }
 
     @Test
+    fun acceptsGeminiFlashApiMaxOutputTokenLimit() {
+        val properties = aiProperties().apply {
+            consultation.maxOutputTokens = 65_536
+        }
+
+        val responder = RemoteConsultationAiResponder(
+            properties = properties,
+            objectMapper = ObjectMapper(),
+            accessTokenProvider = { "vertex-token" },
+            generateContentClient = RecordingVertexAiGenerateContentClient(
+                responseBody = vertexResponse("""{"chunks":["넉넉하게 답할게요."]}"""),
+            ),
+        )
+
+        val response = responder.generate(
+            ConsultationAiRequest(
+                memberId = 26L,
+                message = "오늘 마음이 복잡해서 길게 정리하고 싶어요.",
+                recentMessages = emptyList(),
+                timeout = Duration.ofSeconds(2),
+            ),
+        )
+
+        assertThat(response.chunks).containsExactly("넉넉하게 답할게요.")
+    }
+
+    @Test
     fun promptPrioritizesImmediateSafetyForCrisisSignals() {
         val client = RecordingVertexAiGenerateContentClient(
             responseBody = vertexResponse("""{"chunks":["지금은 안전이 먼저예요."]}"""),

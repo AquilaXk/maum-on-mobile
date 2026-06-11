@@ -60,8 +60,8 @@ class RemoteAiEndpointProperties {
         require(maxInputChars >= 120) { "app.ai.$name.max-input-chars must be at least 120." }
         require(recentMessageLimit >= 0) { "app.ai.$name.recent-message-limit must not be negative." }
         require(maxPromptChars >= 2_400) { "app.ai.$name.max-prompt-chars must be at least 2400." }
-        require(maxOutputTokens in 256..4_096) {
-            "app.ai.$name.max-output-tokens must be between 256 and 4096."
+        require(maxOutputTokens in 256..65_536) {
+            "app.ai.$name.max-output-tokens must be between 256 and 65536."
         }
         require(thinkingBudget == -1 || thinkingBudget in 0..24_576) {
             "app.ai.$name.thinking-budget must be -1 or between 0 and 24576."
