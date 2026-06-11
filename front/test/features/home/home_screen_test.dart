@@ -6,6 +6,7 @@ import 'package:maum_on_mobile_front/features/home/application/home_controller.d
 import 'package:maum_on_mobile_front/features/home/data/home_repository.dart';
 import 'package:maum_on_mobile_front/features/home/domain/home_models.dart';
 import 'package:maum_on_mobile_front/features/home/home_screen.dart';
+import 'package:maum_on_mobile_front/shared/ui/brand_identity.dart';
 import 'package:maum_on_mobile_front/theme/app_theme.dart';
 
 void main() {
@@ -159,6 +160,56 @@ void main() {
     expect(find.text('조용히 전하기'), findsNothing);
     expect(find.text('함께 읽기'), findsNothing);
     expect(find.text('지금 대화하기'), findsNothing);
+  });
+
+  testWidgets('keeps dark home surfaces cohesive with the blue brand shell',
+      (tester) async {
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    final controller = HomeController(
+      homeRepository: const _FakeHomeRepository(),
+    );
+    await controller.load();
+
+    final theme = buildDarkAppTheme();
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: theme,
+        home: HomeScreen(
+          nickname: '마음이',
+          homeController: controller,
+          onWriteDiary: () {},
+          onWriteLetter: () {},
+          onViewStory: () {},
+          onOpenConsultation: () {},
+          onOpenNotifications: () {},
+          onOpenSettings: () {},
+          onLogout: () {},
+        ),
+      ),
+    );
+
+    final primaryPanel = tester.widget<DecoratedBox>(
+      find.byKey(const ValueKey('home-primary-actions-panel')),
+    );
+    final primaryPanelDecoration = primaryPanel.decoration as BoxDecoration;
+    expect(primaryPanelDecoration.color, const Color(0xFF15314D));
+
+    final diarySurface = tester.widget<DecoratedBox>(
+      find.byKey(const ValueKey('home-action-diary-surface')),
+    );
+    expect(
+      (diarySurface.decoration as BoxDecoration).color,
+      const Color(0xFF244C79),
+    );
+
+    final wordmark = tester.widget<MaumOnBrandWordmark>(
+      find.byKey(const ValueKey('maum-on-brand-wordmark')),
+    );
+    expect(wordmark.foregroundColor, theme.colorScheme.onSurface);
   });
 
   testWidgets('keeps home feed empty state free of helper explanation copy',

@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:maum_on_mobile_front/features/auth/application/auth_controller.dart';
 import 'package:maum_on_mobile_front/features/auth/data/auth_repository.dart';
@@ -77,6 +78,40 @@ void main() {
     expect(find.byKey(const ValueKey('auth-form-title-icon')), findsOneWidget);
     expect(find.byKey(const ValueKey('login-email-field')), findsOneWidget);
     expect(find.byKey(const ValueKey('login-password-field')), findsOneWidget);
+  });
+
+  testWidgets('blends the auth background into the login panel surface',
+      (tester) async {
+    final repository = _FakeAuthRepository();
+    await tester.pumpWidget(
+      _AuthScreenHarness(repository: repository),
+    );
+
+    final shell = tester.widget<DecoratedBox>(
+      find.byKey(const ValueKey('auth-blue-shell')),
+    );
+    final decoration = shell.decoration as BoxDecoration;
+    final gradient = decoration.gradient as LinearGradient;
+
+    expect(gradient.colors, [
+      const Color(0xFFE8F3FF),
+      AppBrandColors.surfaceStrong,
+    ]);
+  });
+
+  testWidgets('uses dark system status icons on the light auth shell',
+      (tester) async {
+    final repository = _FakeAuthRepository();
+    await tester.pumpWidget(
+      _AuthScreenHarness(repository: repository),
+    );
+
+    final overlay = tester.widget<AnnotatedRegion<SystemUiOverlayStyle>>(
+      find.byKey(const ValueKey('auth-system-ui-overlay')),
+    );
+
+    expect(overlay.value.statusBarIconBrightness, Brightness.dark);
+    expect(overlay.value.statusBarBrightness, Brightness.light);
   });
 
   testWidgets('keeps login panel on a light blue surface in dark system mode',

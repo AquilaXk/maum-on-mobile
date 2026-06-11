@@ -19,6 +19,17 @@ void main() {
     );
   });
 
+  test('uses a branded dark surface stack instead of the default navy shell',
+      () {
+    final theme = buildDarkAppTheme();
+
+    expect(theme.scaffoldBackgroundColor, const Color(0xFF102A43));
+    expect(theme.colorScheme.surface, const Color(0xFF15314D));
+    expect(theme.colorScheme.surfaceContainerHighest, const Color(0xFF1D4265));
+    expect(theme.cardTheme.color, const Color(0xFF15314D));
+    expect(theme.colorScheme.outlineVariant, const Color(0xFF37658C));
+  });
+
   testWidgets('keeps the mobile design shell stable with larger text',
       (tester) async {
     tester.view.physicalSize = const Size(360, 780);

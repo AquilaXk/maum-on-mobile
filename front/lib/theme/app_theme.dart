@@ -22,21 +22,23 @@ ThemeData _buildTheme(Brightness brightness) {
     secondary: AppBrandColors.iconBlue,
     onSecondary: Colors.white,
     primaryContainer:
-        isDark ? const Color(0xFF173B71) : const Color(0xFFDCEBFF),
+        isDark ? const Color(0xFF244C79) : const Color(0xFFDCEBFF),
     onPrimaryContainer:
         isDark ? const Color(0xFFDCEBFF) : const Color(0xFF1F3150),
     secondaryContainer:
-        isDark ? const Color(0xFF0B3A52) : const Color(0xFFEAF6FF),
+        isDark ? const Color(0xFF164557) : const Color(0xFFEAF6FF),
     onSecondaryContainer:
         isDark ? const Color(0xFFEAF6FF) : const Color(0xFF1F3150),
-    surface: isDark ? const Color(0xFF111827) : AppBrandColors.surface,
+    surface: isDark ? AppBrandColors.darkSurfaceBlue : AppBrandColors.surface,
     onSurface: isDark ? const Color(0xFFE8EEF8) : AppBrandColors.foreground,
-    surfaceContainerHighest:
-        isDark ? const Color(0xFF1E293B) : AppBrandColors.surfaceStrong,
-    onSurfaceVariant:
-        isDark ? const Color(0xFFC5D2E4) : AppBrandColors.mutedForeground,
+    surfaceContainerHighest: isDark
+        ? AppBrandColors.darkSurfaceStrongBlue
+        : AppBrandColors.surfaceStrong,
+    onSurfaceVariant: isDark
+        ? AppBrandColors.darkMutedForeground
+        : AppBrandColors.mutedForeground,
     outlineVariant:
-        isDark ? const Color(0xFF324154) : AppBrandColors.borderSoft,
+        isDark ? AppBrandColors.darkBorderBlue : AppBrandColors.borderSoft,
   );
   final textTheme = const TextTheme(
     displaySmall: TextStyle(
@@ -83,17 +85,20 @@ ThemeData _buildTheme(Brightness brightness) {
   return ThemeData(
     useMaterial3: true,
     colorScheme: colorScheme,
-    scaffoldBackgroundColor:
-        isDark ? const Color(0xFF0F172A) : AppBrandColors.backgroundBlue,
+    scaffoldBackgroundColor: isDark
+        ? AppBrandColors.darkBackgroundBlue
+        : AppBrandColors.backgroundBlue,
     textTheme: textTheme,
     dividerColor: colorScheme.outlineVariant,
     cardTheme: CardThemeData(
       elevation: 0,
-      color: isDark ? const Color(0xFF111827) : AppBrandColors.surface,
+      color: isDark ? AppBrandColors.darkSurfaceBlue : AppBrandColors.surface,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(8),
         side: BorderSide(
-          color: isDark ? const Color(0xFF324154) : AppBrandColors.borderSoft,
+          color: isDark
+              ? AppBrandColors.darkBorderBlue
+              : AppBrandColors.borderSoft,
         ),
       ),
     ),
@@ -112,7 +117,7 @@ ThemeData _buildTheme(Brightness brightness) {
     ),
     inputDecorationTheme: InputDecorationTheme(
       filled: true,
-      fillColor: isDark ? const Color(0xFF111827) : AppBrandColors.surface,
+      fillColor: isDark ? const Color(0xFF12304B) : AppBrandColors.surface,
       border: inputBorder,
       enabledBorder: inputBorder.copyWith(
         borderSide: BorderSide(color: colorScheme.outlineVariant),

@@ -1031,11 +1031,11 @@ _HomeActionColors _homeActionColors(
 
   return switch (tone) {
     AppStatusTone.success => _HomeActionColors(
-        background: isDark ? const Color(0xFF123A5C) : const Color(0xFFEAF6FF),
+        background: isDark ? const Color(0xFF1A4A5A) : const Color(0xFFEAF6FF),
         foreground: isDark ? const Color(0xFFEAF6FF) : const Color(0xFF1F4D72),
       ),
     AppStatusTone.warning => _HomeActionColors(
-        background: isDark ? const Color(0xFF173B71) : const Color(0xFFE8F1FF),
+        background: isDark ? const Color(0xFF244C79) : const Color(0xFFE8F1FF),
         foreground: isDark ? const Color(0xFFDCEBFF) : const Color(0xFF244C8A),
       ),
     AppStatusTone.danger => _HomeActionColors(
@@ -1043,8 +1043,12 @@ _HomeActionColors _homeActionColors(
         foreground: colorScheme.onErrorContainer,
       ),
     AppStatusTone.neutral => _HomeActionColors(
-        background: colorScheme.primaryContainer,
-        foreground: colorScheme.onPrimaryContainer,
+        background: isDark
+            ? colorScheme.surfaceContainerHighest
+            : colorScheme.primaryContainer,
+        foreground: isDark
+            ? colorScheme.onSurfaceVariant
+            : colorScheme.onPrimaryContainer,
       ),
   };
 }
