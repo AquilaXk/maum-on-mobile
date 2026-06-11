@@ -129,7 +129,7 @@ class HttpConsultationStreamClient implements ConsultationStreamClient {
         await response.drain<void>();
         throw ApiClientException(
           kind: ApiErrorKind.server,
-          message: '상담 연결을 시작하지 못했습니다.',
+          message: 'AI 상담 연결을 시작하지 못했습니다.',
           statusCode: statusCode,
         );
       }
@@ -145,17 +145,17 @@ class HttpConsultationStreamClient implements ConsultationStreamClient {
     } on SocketException {
       throw const ApiClientException(
         kind: ApiErrorKind.network,
-        message: '상담 연결을 시작하지 못했습니다. 네트워크 상태를 확인해 주세요.',
+        message: 'AI 상담 연결을 시작하지 못했습니다. 네트워크 상태를 확인해 주세요.',
       );
     } on TimeoutException {
       throw const ApiClientException(
         kind: ApiErrorKind.network,
-        message: '상담 연결 시간이 초과되었습니다. 네트워크 상태를 확인해 주세요.',
+        message: 'AI 상담 연결 시간이 초과되었습니다. 네트워크 상태를 확인해 주세요.',
       );
     } on HttpException {
       throw const ApiClientException(
         kind: ApiErrorKind.server,
-        message: '상담 연결이 종료되었습니다. 다시 연결해 주세요.',
+        message: 'AI 상담 연결이 종료되었습니다. 다시 연결해 주세요.',
       );
     }
   }

@@ -209,6 +209,9 @@ class _MaumOnMobileAppState extends State<MaumOnMobileApp>
       theme: buildAppTheme(),
       darkTheme: buildDarkAppTheme(),
       themeMode: ThemeMode.system,
+      scrollBehavior: const MaterialScrollBehavior().copyWith(
+        overscroll: false,
+      ),
       home: PopScope<void>(
         canPop: _route == AuthenticatedRoute.home,
         onPopInvokedWithResult: (didPop, _) {

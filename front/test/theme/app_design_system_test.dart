@@ -79,7 +79,7 @@ void main() {
             ),
             SizedBox(height: AppSpacing.md),
             AppStatusPill(
-              label: '상담 연결됨',
+              label: 'AI 상담 연결됨',
               tone: AppStatusTone.success,
             ),
           ],
@@ -89,7 +89,7 @@ void main() {
 
     expect(find.byType(SingleChildScrollView), findsOneWidget);
     expect(find.text('마음 기록'), findsOneWidget);
-    expect(find.text('상담 연결됨'), findsOneWidget);
+    expect(find.text('AI 상담 연결됨'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 

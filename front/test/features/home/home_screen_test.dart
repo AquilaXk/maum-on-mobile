@@ -48,13 +48,15 @@ void main() {
         findsOneWidget);
     expect(find.text('이어쓸 내용이 없습니다.'), findsNothing);
     expect(
-      find.text('새 기록, 편지, 스토리, 상담을 바로 시작할 수 있습니다.'),
+      find.text('새 기록, 편지, 스토리, AI 상담을 바로 시작할 수 있습니다.'),
       findsNothing,
     );
     expect(find.text('고민 이야기가 가장 활발합니다.'), findsNothing);
     expect(find.text('최근 인기'), findsOneWidget);
     expect(find.text('오늘 너무 지쳐요'), findsWidgets);
     expect(find.byKey(const ValueKey('home-feed-story-1')), findsOneWidget);
+    expect(find.text('ANDROID'), findsNothing);
+    expect(find.text('IOS'), findsNothing);
 
     final questionChip = find.byKey(const ValueKey('home-category-question'));
     await tester.ensureVisible(questionChip);
@@ -326,6 +328,7 @@ void main() {
     );
 
     expect(find.text('읽지 않은 알림 2개 · 실시간 연결됨'), findsOneWidget);
+    expect(find.text('AI 상담'), findsOneWidget);
 
     await _tapVisibleKey(tester, const ValueKey('home-action-diary'));
     await _tapVisibleKey(tester, const ValueKey('home-action-letter'));

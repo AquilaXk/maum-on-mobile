@@ -37,7 +37,7 @@ void main() {
     );
     await tester.pumpAndSettle();
     notificationRepository.emit(
-      const NotificationStreamEvent.replyArrival('상담 답변이 도착했습니다.'),
+      const NotificationStreamEvent.replyArrival('AI 상담 답변이 도착했습니다.'),
     );
     await tester.pumpAndSettle();
 

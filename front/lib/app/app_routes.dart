@@ -54,8 +54,8 @@ enum AuthenticatedRoute {
   consultation(
     key: 'consultation',
     path: '/consultation',
-    title: '상담',
-    navLabel: '상담',
+    title: 'AI 상담',
+    navLabel: 'AI 상담',
     icon: Icons.chat_bubble_outline,
     selectedIcon: Icons.chat_bubble,
     primaryTab: true,

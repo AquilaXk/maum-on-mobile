@@ -26,7 +26,7 @@ enum HomeActionSurface {
   diary(label: '마음 기록', actionLabel: '기록 이어가기'),
   story(label: '스토리', actionLabel: '스토리 이어가기'),
   letter(label: '비밀 편지', actionLabel: '편지 이어가기'),
-  consultation(label: '상담', actionLabel: '상담 이어가기');
+  consultation(label: 'AI 상담', actionLabel: 'AI 상담 이어가기');
 
   const HomeActionSurface({
     required this.label,

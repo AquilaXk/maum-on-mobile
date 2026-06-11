@@ -526,7 +526,7 @@ void main() {
       expect(repository.cancelCount, 1);
       expect(
         controller.state.messages.last.content,
-        contains('상담 응답이 지연되고 있습니다'),
+        contains('AI 상담 응답이 지연되고 있습니다'),
       );
     });
 
