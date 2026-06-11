@@ -211,12 +211,13 @@ class RemoteConsultationAiResponder internal constructor(
         userMessage: String,
         consultationChecklist: String,
     ): String {
+        val indentedChecklist = consultationChecklist.replace("\n", "\n            ")
         return """
             너는 익명 상담 서비스 '마음 온'의 다정하고 따뜻한 공감 상담사야.
             conversationState: $conversationState
 
             일반 상담 모드 출력 체크리스트:
-            $consultationChecklist
+            $indentedChecklist
 
             안전 모드:
             - 의학적 진단을 대신하지 말고, 단정적인 판단이나 위험한 지시는 하지 마.

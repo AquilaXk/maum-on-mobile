@@ -346,6 +346,7 @@ class RemoteConsultationAiResponderTest {
                 "상황 유형 예시는 업무/학업 압박",
                 "응답 전략은 사용자 유형에 맞춰 선택해",
             )
+            .doesNotContain("\n            -")
         assertThat(prompt.length).isLessThanOrEqualTo(properties.consultation.maxPromptChars)
     }
 
