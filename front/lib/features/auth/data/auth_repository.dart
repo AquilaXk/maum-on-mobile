@@ -101,6 +101,17 @@ class ApiAuthRepository implements AuthRepository {
 
   @override
   Future<AuthSession> restoreSession() async {
+    final accessToken = await _tokenStore.readAccessToken();
+    final refreshToken = await _tokenStore.readRefreshToken();
+    if ((accessToken == null || accessToken.isEmpty) &&
+        (refreshToken == null || refreshToken.isEmpty)) {
+      throw const ApiClientException(
+        kind: ApiErrorKind.unauthorized,
+        message: '다시 로그인해 주세요.',
+        statusCode: 401,
+      );
+    }
+
     final session = await _apiClient.get<AuthSession>(
       '/api/v1/auth/session',
       parser: AuthSession.fromJson,
