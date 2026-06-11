@@ -31,6 +31,9 @@ class ContentModerationPreFilter {
                 categories += rule.category
             }
         }
+        if (containsFamilyExploitation(compact)) {
+            categories += ContentModerationCategory.ABUSE
+        }
         if (categories.isNotEmpty()) {
             return ContentModerationPreFilterResult.block(categories.toList(), messageFor(categories))
         }
@@ -85,7 +88,23 @@ class ContentModerationPreFilter {
         private val DIRECT_RULES = listOf(
             Rule(
                 category = ContentModerationCategory.PROFANITY,
-                terms = setOf("시발", "씨발", "씨팔", "she발", "병신", "개새끼", "꺼져", "좆같"),
+                terms = setOf(
+                    "시발",
+                    "씨발",
+                    "씨팔",
+                    "she발",
+                    "쉬발",
+                    "쉬2발",
+                    "야발",
+                    "병신",
+                    "개새끼",
+                    "꺼져",
+                    "좆같",
+                    "느금마",
+                    "느그엄마",
+                    "니엄마",
+                    "니애미",
+                ),
             ),
             Rule(
                 category = ContentModerationCategory.SELF_HARM,
@@ -97,14 +116,14 @@ class ContentModerationPreFilter {
             ),
             Rule(
                 category = ContentModerationCategory.ABUSE,
-                terms = setOf("학대", "폭행", "성폭력", "감금", "맞고있", "섬노예"),
+                terms = setOf("학대", "폭행", "성폭력", "감금", "맞고있", "섬노예", "착취"),
             ),
         )
         private val SUSPICIOUS_RULES = listOf(
             Rule(
                 category = ContentModerationCategory.PROFANITY,
-                terms = setOf("시발", "씨발", "she발", "병신", "개새끼"),
-                aliases = setOf("ㅅㅂ", "ㅆㅂ", "ㅅㅣ발", "ㅂㅅ", "ㅄ", "ㅈ같", "쉬발"),
+                terms = setOf("시발", "씨발", "she발", "쉬발", "병신", "개새끼", "느금마", "니애미"),
+                aliases = setOf("ㅅㅂ", "ㅆㅂ", "ㅅㅣ발", "ㅂㅅ", "ㅄ", "ㅈ같", "쉬발", "쉬2발", "시바"),
             ),
             Rule(
                 category = ContentModerationCategory.SELF_HARM,
@@ -118,10 +137,27 @@ class ContentModerationPreFilter {
             ),
             Rule(
                 category = ContentModerationCategory.ABUSE,
-                terms = setOf("학대", "폭행", "성폭력", "감금"),
-                aliases = setOf("ㅎㄷ", "ㅍㅎ"),
+                terms = setOf("학대", "폭행", "성폭력", "감금", "섬노예", "착취"),
+                aliases = setOf("ㅎㄷ", "ㅍㅎ", "노예"),
             ),
         )
+        private val FAMILY_TARGET_TERMS = setOf(
+            "너희어머니",
+            "니어머니",
+            "어머니",
+            "너희엄마",
+            "느그엄마",
+            "니엄마",
+            "엄마",
+            "니애미",
+            "애미",
+        )
+        private val EXPLOITATION_TERMS = setOf("섬노예", "노예", "감금", "착취", "팔려", "학대")
+
+        private fun containsFamilyExploitation(compact: String): Boolean {
+            return FAMILY_TARGET_TERMS.any { term -> compact.contains(term.compactForModeration()) } &&
+                EXPLOITATION_TERMS.any { term -> compact.contains(term.compactForModeration()) }
+        }
     }
 
     private data class Rule(

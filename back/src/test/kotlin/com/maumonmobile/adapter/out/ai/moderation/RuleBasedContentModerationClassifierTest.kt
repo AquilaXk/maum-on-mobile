@@ -17,6 +17,8 @@ class RuleBasedContentModerationClassifierTest {
         assertCategory("씨팔", ContentModerationCategory.PROFANITY)
         assertCategory("좆같", ContentModerationCategory.PROFANITY)
         assertCategory("ㅅㅣ발", ContentModerationCategory.PROFANITY)
+        assertCategory("쉬2발아", ContentModerationCategory.PROFANITY)
+        assertCategory("느그 엄마", ContentModerationCategory.PROFANITY)
 
         assertCategory("목숨을끊", ContentModerationCategory.SELF_HARM)
         assertCategory("극단적선택", ContentModerationCategory.SELF_HARM)
@@ -27,6 +29,9 @@ class RuleBasedContentModerationClassifierTest {
         assertCategory("죽어버", ContentModerationCategory.VIOLENCE)
         assertCategory("칼로", ContentModerationCategory.VIOLENCE)
         assertCategory("복수할거", ContentModerationCategory.VIOLENCE)
+
+        assertCategory("너희 어머니 노예", ContentModerationCategory.ABUSE)
+        assertCategory("너희 어머니 섬노예", ContentModerationCategory.ABUSE)
     }
 
     private fun assertCategory(text: String, category: ContentModerationCategory) {

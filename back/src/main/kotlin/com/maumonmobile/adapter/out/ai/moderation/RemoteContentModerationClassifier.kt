@@ -98,6 +98,8 @@ class RemoteContentModerationClassifier internal constructor(
             riskLevel must be LOW or HIGH.
             categories can include PROFANITY, SELF_HARM, VIOLENCE, ABUSE, PERSONAL_INFO, SPAM, INAPPROPRIATE.
             Block profanity, harassment, self-harm encouragement, violent threats, abuse or exploitation, personal information exposure, spam, and unsafe inappropriate content.
+            Treat mixed-script, spacing, consonant-only, or digit-substituted profanity as PROFANITY.
+            Treat family-directed degradation combined with slavery, confinement, exploitation, or abuse terms as ABUSE even when euphemistic or spaced out.
             targetType: ${request.target.name}
             text: ${request.text.take(endpoint.maxInputChars)}
         """.trimIndent()

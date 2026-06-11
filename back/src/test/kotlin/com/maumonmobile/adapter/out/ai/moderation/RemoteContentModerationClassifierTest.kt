@@ -50,6 +50,7 @@ class RemoteContentModerationClassifierTest {
         assertThat(client.accessToken).isEqualTo("vertex-token")
         val requestJson = ObjectMapper().readTree(client.requestBody!!)
         assertThat(requestJson["contents"].toString()).contains("COMMENT", "무료체험")
+        assertThat(requestJson["contents"].toString()).contains("digit-substituted", "family-directed")
         assertThat(requestJson["generationConfig"]!!["responseMimeType"].asString()).isEqualTo("application/json")
     }
 
