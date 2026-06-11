@@ -313,7 +313,7 @@ class RemoteConsultationAiResponderTest {
         responder.generate(
             ConsultationAiRequest(
                 memberId = 20L,
-                message = "요즘 마음이 복잡하고 일이 계속 밀려서 지쳤어요.",
+                message = "요즘 마음이 복잡하고 일이 계속 밀려서 지쳤어요. " + "가".repeat(1_000),
                 recentMessages = (1..6).map { index ->
                     ConsultationMessage(
                         id = index.toLong(),
@@ -380,6 +380,23 @@ class RemoteConsultationAiResponderTest {
         assertThat(prompt)
             .contains("답변 구조는 공감 1문장")
             .doesNotContain("상황 유형 예시는 업무/학업 압박")
+    }
+
+    @Test
+    fun rejectsPromptLimitThatCannotFitCompactSafetyPrompt() {
+        val properties = aiProperties().apply {
+            consultation.maxPromptChars = 1_199
+        }
+
+        assertThatThrownBy {
+            RemoteConsultationAiResponder(
+                properties = properties,
+                objectMapper = ObjectMapper(),
+                accessTokenProvider = { "vertex-token" },
+                generateContentClient = RecordingVertexAiGenerateContentClient(),
+            )
+        }.isInstanceOf(IllegalArgumentException::class.java)
+            .hasMessageContaining("max-prompt-chars")
     }
 
     @Test

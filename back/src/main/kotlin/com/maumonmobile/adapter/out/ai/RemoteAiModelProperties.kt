@@ -57,7 +57,7 @@ class RemoteAiEndpointProperties {
         require(maxAttempts >= 1) { "app.ai.$name.max-attempts must be at least 1." }
         require(maxInputChars >= 120) { "app.ai.$name.max-input-chars must be at least 120." }
         require(recentMessageLimit >= 0) { "app.ai.$name.recent-message-limit must not be negative." }
-        require(maxPromptChars >= 1_000) { "app.ai.$name.max-prompt-chars must be at least 1000." }
+        require(maxPromptChars >= 1_200) { "app.ai.$name.max-prompt-chars must be at least 1200." }
         require(promptMode.equals(PROMPT_MODE_VERBOSE, ignoreCase = true) ||
             promptMode.equals(PROMPT_MODE_COMPACT, ignoreCase = true)) {
             "app.ai.$name.prompt-mode must be verbose or compact."

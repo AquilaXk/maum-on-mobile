@@ -177,10 +177,19 @@ class RemoteConsultationAiResponder internal constructor(
             return compactWithRecentTail
         }
 
+        val minimumContext = "(축약됨)"
+        val promptWithoutUserMessage = compactPromptTemplate(
+            conversationState = conversationState,
+            recentMessages = minimumContext,
+            userMessage = "",
+        )
+        val userMessageBudget = (endpoint.maxPromptChars - promptWithoutUserMessage.length)
+            .coerceAtLeast(0)
+            .coerceAtMost(COMPACT_USER_MESSAGE_CHARS)
         return compactPromptTemplate(
             conversationState = conversationState,
-            recentMessages = "(축약됨)",
-            userMessage = userMessage.take(COMPACT_USER_MESSAGE_CHARS),
+            recentMessages = minimumContext,
+            userMessage = userMessage.take(userMessageBudget),
         )
     }
 
