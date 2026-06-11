@@ -147,7 +147,10 @@ class AppScreenHeader extends StatelessWidget {
                 const SizedBox(height: AppSpacing.xxs),
               ],
               if (title == 'Maum On')
-                const MaumOnBrandWordmark(height: 36)
+                MaumOnBrandWordmark(
+                  height: 36,
+                  foregroundColor: theme.colorScheme.onSurface,
+                )
               else
                 Text(
                   title,
