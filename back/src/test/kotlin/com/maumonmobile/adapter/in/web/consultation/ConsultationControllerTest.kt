@@ -316,6 +316,70 @@ class ConsultationControllerTest @Autowired constructor(
     }
 
     @Test
+    fun unsafeAssistantReplyIsReplacedWithSafetyGuidance() {
+        val member = signupAndLogin("consultation-unsafe-reply@example.com", "응답이")
+        consultationAiResponder.responseChunks = listOf("너희 어머니 섬노예")
+
+        mockMvc.post("/api/v1/consultations/chat") {
+            header("Authorization", "Bearer ${member.accessToken}")
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"message":"오늘 기분이 복잡해요."}"""
+        }
+            .andExpect {
+                status { isOk() }
+                jsonPath("$.data.accepted") { value(false) }
+                jsonPath("$.data.safety.category") { value("ABUSE") }
+                jsonPath("$.data.safety.severity") { value("HIGH") }
+                jsonPath("$.data.safety.actionPolicy") { value("SAFE_GUIDANCE") }
+                jsonPath("$.data.safety.message") { value(org.hamcrest.Matchers.containsString("안전하지 않은 답변")) }
+            }
+
+        mockMvc.get("/api/v1/consultations/recent") {
+            header("Authorization", "Bearer ${member.accessToken}")
+        }
+            .andExpect {
+                status { isOk() }
+                jsonPath("$.data.messages[0].role") { value("USER") }
+                jsonPath("$.data.messages[0].sensitive") { value(false) }
+                jsonPath("$.data.messages[1].role") { value("SYSTEM") }
+                jsonPath("$.data.messages[1].sensitive") { value(true) }
+                jsonPath("$.data.messages[1].content") { value(org.hamcrest.Matchers.containsString("안전하지 않은 답변")) }
+            }
+    }
+
+    @Test
+    fun obfuscatedProfanityAssistantReplyIsReplacedWithSafetyGuidance() {
+        val member = signupAndLogin("consultation-unsafe-profane-reply@example.com", "응답검수")
+        consultationAiResponder.responseChunks = listOf("ㅅㅂ 꺼져")
+
+        mockMvc.post("/api/v1/consultations/chat") {
+            header("Authorization", "Bearer ${member.accessToken}")
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"message":"오늘 기분이 복잡해요."}"""
+        }
+            .andExpect {
+                status { isOk() }
+                jsonPath("$.data.accepted") { value(false) }
+                jsonPath("$.data.safety.category") { value("PROFANITY") }
+                jsonPath("$.data.safety.severity") { value("HIGH") }
+                jsonPath("$.data.safety.actionPolicy") { value("SAFE_GUIDANCE") }
+                jsonPath("$.data.safety.message") { value(org.hamcrest.Matchers.containsString("안전하지 않은 답변")) }
+            }
+
+        mockMvc.get("/api/v1/consultations/recent") {
+            header("Authorization", "Bearer ${member.accessToken}")
+        }
+            .andExpect {
+                status { isOk() }
+                jsonPath("$.data.messages[0].role") { value("USER") }
+                jsonPath("$.data.messages[0].sensitive") { value(false) }
+                jsonPath("$.data.messages[1].role") { value("SYSTEM") }
+                jsonPath("$.data.messages[1].sensitive") { value(true) }
+                jsonPath("$.data.messages[1].content") { value(org.hamcrest.Matchers.containsString("안전하지 않은 답변")) }
+            }
+    }
+
+    @Test
     fun moderationCategoriesOutsideConsultationSafetyDoNotBlockChat() {
         val member = signupAndLogin("consultation-pii-moderation@example.com", "분류이")
         contentModerationClassifier.rejectAs(ContentModerationCategory.PERSONAL_INFO)
@@ -323,7 +387,7 @@ class ConsultationControllerTest @Autowired constructor(
         mockMvc.post("/api/v1/consultations/chat") {
             header("Authorization", "Bearer ${member.accessToken}")
             contentType = MediaType.APPLICATION_JSON
-            content = """{"message":"ㅅㅣ발처럼 들릴 수 있지만 연락처는 010-1234-5678이에요."}"""
+            content = """{"message":"노예처럼 일했다는 은유 표현이에요."}"""
         }
             .andExpect {
                 status { isOk() }
@@ -607,6 +671,7 @@ class CapturingContentModerationClassifier : ContentModerationClassifier {
 class CapturingConsultationAiResponder : ConsultationAiResponder {
     val requests = mutableListOf<ConsultationAiRequest>()
     var responseDelayMs: Long = 0
+    var responseChunks: List<String> = listOf("함께 ", "살펴볼게요.")
 
     override fun generate(request: ConsultationAiRequest): ConsultationAiResponse {
         requests += request
@@ -616,12 +681,13 @@ class CapturingConsultationAiResponder : ConsultationAiResponder {
         if (request.message.contains("응답 실패")) {
             throw ConsultationAiUnavailableException("fake failure")
         }
-        return ConsultationAiResponse(chunks = listOf("함께 ", "살펴볼게요."))
+        return ConsultationAiResponse(chunks = responseChunks)
     }
 
     fun clear() {
         requests.clear()
         responseDelayMs = 0
+        responseChunks = listOf("함께 ", "살펴볼게요.")
     }
 }
 

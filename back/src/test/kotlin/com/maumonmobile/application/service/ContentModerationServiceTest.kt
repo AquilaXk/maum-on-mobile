@@ -127,11 +127,29 @@ class ContentModerationServiceTest {
             user = AuthenticatedUser(id = "6", email = "family@example.com", roles = setOf("USER")),
             command = ContentModerationCommand(targetType = "comment", text = "너희 어머니 섬노예"),
         )
+        val familyAbuseWithSpacing = service.review(
+            user = AuthenticatedUser(id = "9", email = "family-spacing@example.com", roles = setOf("USER")),
+            command = ContentModerationCommand(targetType = "comment", text = "너희 어머니 노예"),
+        )
+        val familyInsult = service.review(
+            user = AuthenticatedUser(id = "10", email = "family-insult@example.com", roles = setOf("USER")),
+            command = ContentModerationCommand(targetType = "comment", text = "느그 엄마"),
+        )
+        val numericProfanity = service.review(
+            user = AuthenticatedUser(id = "11", email = "numeric-profane@example.com", roles = setOf("USER")),
+            command = ContentModerationCommand(targetType = "comment", text = "쉬2발아"),
+        )
 
         assertThat(mixedScriptProfanity.allowed).isFalse()
         assertThat(mixedScriptProfanity.categories).contains(ContentModerationCategory.PROFANITY)
         assertThat(familyAbuse.allowed).isFalse()
         assertThat(familyAbuse.categories).contains(ContentModerationCategory.ABUSE)
+        assertThat(familyAbuseWithSpacing.allowed).isFalse()
+        assertThat(familyAbuseWithSpacing.categories).contains(ContentModerationCategory.ABUSE)
+        assertThat(familyInsult.allowed).isFalse()
+        assertThat(familyInsult.categories).contains(ContentModerationCategory.PROFANITY)
+        assertThat(numericProfanity.allowed).isFalse()
+        assertThat(numericProfanity.categories).contains(ContentModerationCategory.PROFANITY)
         assertThat(classifier.requests).isEmpty()
     }
 
