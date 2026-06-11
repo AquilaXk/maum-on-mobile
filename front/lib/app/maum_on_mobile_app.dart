@@ -909,6 +909,8 @@ class _MaumOnMobileAppState extends State<MaumOnMobileApp>
       streamClient: HttpConsultationStreamClient(
         apiConfig: _apiConfig,
         tokenStore: _tokenStore,
+        tokenRefresher: _tokenRefresher(),
+        tokenRefreshCoordinator: _tokenRefreshCoordinator,
       ),
     );
   }
