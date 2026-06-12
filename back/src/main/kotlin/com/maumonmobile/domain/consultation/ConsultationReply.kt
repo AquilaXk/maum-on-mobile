@@ -63,7 +63,7 @@ data class ConsultationReply(
 
         private const val LONG_MESSAGE_THRESHOLD = 300
         private val WORK_TERMS = setOf("출근", "상사", "회사", "직장", "업무", "야근", "퇴근")
-        private val WORK_CRITICISM_TERMS = setOf("지적", "혼나", "꾸중", "비난", "평가", "싫은 소리")
+        private val WORK_CRITICISM_TERMS = setOf("지적", "혼나", "꾸중", "비난", "싫은 소리")
         private val SLEEP_TERMS = setOf("새벽", "불면", "수면", "깨서", "잠들")
         private val RELATIONSHIP_TERMS = setOf("친구", "가족", "연인", "부모", "말다툼", "헤어")
         private val ANXIETY_TERMS = setOf("불안", "심장", "두근", "긴장", "떨려", "공황")

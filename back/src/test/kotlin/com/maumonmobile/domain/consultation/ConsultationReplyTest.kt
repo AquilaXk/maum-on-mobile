@@ -78,6 +78,18 @@ class ConsultationReplyTest {
     }
 
     @Test
+    fun forMessageDoesNotTreatUpcomingWorkEvaluationAsRepeatedCriticism() {
+        val reply = ConsultationReply
+            .forMessage("회사 평가를 앞두고 불안해요.")
+            .chunks
+            .joinToString("")
+
+        assertThat(reply)
+            .contains("출근이나 업무")
+            .doesNotContain("반복된 지적", "지적 장면")
+    }
+
+    @Test
     fun forMessageDoesNotTreatTemporaryPauseAsSleepConcern() {
         val reply = ConsultationReply
             .forMessage("잠시 생각할 시간이 필요해서 오늘은 답을 못 하겠어요.")
