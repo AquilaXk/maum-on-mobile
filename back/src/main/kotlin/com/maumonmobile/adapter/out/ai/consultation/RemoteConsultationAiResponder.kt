@@ -382,7 +382,14 @@ class RemoteConsultationAiResponder internal constructor(
         if (sanitized.hasInternalReviewMarker()) {
             throw ConsultationAiUnavailableException("상담 모델 응답에 내부 검수 문구가 포함되어 있습니다.")
         }
+        sanitized.forEach { chunk -> chunk.requireValidLength() }
         return ConsultationAiResponse(chunks = sanitized)
+    }
+
+    private fun String.requireValidLength() {
+        if (length !in MIN_CHUNK_CHARS..MAX_CHUNK_CHARS) {
+            throw ConsultationAiUnavailableException("상담 모델 응답 청크 길이가 허용 범위를 벗어났습니다.")
+        }
     }
 
     private fun List<String>.hasInternalReviewMarker(): Boolean {
@@ -428,6 +435,8 @@ class RemoteConsultationAiResponder internal constructor(
     companion object {
         private val log = LoggerFactory.getLogger(RemoteConsultationAiResponder::class.java)
         private const val COMPACT_RECENT_MESSAGE_LIMIT = 2
+        private const val MIN_CHUNK_CHARS = 24
+        private const val MAX_CHUNK_CHARS = 420
         private const val INTERNAL_REVIEW_MARKER =
             """(?:qa|테스트|샘플|placeholder|fixture|stub|스텁|내부\s*검수)"""
         private const val INTERNAL_REVIEW_MESSAGE_SUFFIX = """(?:메시지|메세지|응답|답변|문구)"""
