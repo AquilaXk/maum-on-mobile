@@ -287,6 +287,13 @@ void main() {
       );
       final selectedDecoration = selectedSurface.decoration as BoxDecoration?;
       expect(selectedDecoration?.color, isNotNull);
+      final selectedSurfaceSize = tester.getSize(
+        find.byKey(const ValueKey('route-tab-home-surface')),
+      );
+      final selectedSurfaceRadius =
+          selectedDecoration!.borderRadius as BorderRadius;
+      expect(selectedSurfaceSize.width, lessThanOrEqualTo(76));
+      expect(selectedSurfaceRadius.topLeft.x, greaterThanOrEqualTo(18));
       expect(
         [
           'route-tab-home',
