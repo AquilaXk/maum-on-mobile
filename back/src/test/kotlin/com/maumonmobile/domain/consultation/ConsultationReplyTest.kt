@@ -90,6 +90,18 @@ class ConsultationReplyTest {
     }
 
     @Test
+    fun forMessageDoesNotTreatSelfBlameAsExternalWorkCriticism() {
+        val reply = ConsultationReply
+            .forMessage("회사에서 실수한 뒤 자기비난이 멈추지 않아요.")
+            .chunks
+            .joinToString("")
+
+        assertThat(reply)
+            .contains("출근이나 업무")
+            .doesNotContain("반복된 지적", "지적 장면")
+    }
+
+    @Test
     fun forMessageDoesNotTreatTemporaryPauseAsSleepConcern() {
         val reply = ConsultationReply
             .forMessage("잠시 생각할 시간이 필요해서 오늘은 답을 못 하겠어요.")
