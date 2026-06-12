@@ -190,6 +190,7 @@ class RemoteConsultationAiResponder internal constructor(
             return compactWithFullContext
         }
 
+        val compactRepetitionMaterial = repetitionMaterial.compactRepetitionMaterial()
         val compactRecentMessages = recentMessages
             .lines()
             .takeLast(COMPACT_RECENT_MESSAGE_LIMIT)
@@ -198,7 +199,7 @@ class RemoteConsultationAiResponder internal constructor(
         val compactWithRecentTail = compactPromptTemplate(
             conversationState = conversationState,
             recentMessages = compactRecentMessages,
-            repetitionMaterial = repetitionMaterial,
+            repetitionMaterial = compactRepetitionMaterial,
             userMessage = userMessage,
         )
         if (compactWithRecentTail.length <= endpoint.maxPromptChars) {
@@ -209,7 +210,7 @@ class RemoteConsultationAiResponder internal constructor(
         val promptWithoutUserMessage = compactPromptTemplate(
             conversationState = conversationState,
             recentMessages = minimumContext,
-            repetitionMaterial = repetitionMaterial,
+            repetitionMaterial = compactRepetitionMaterial,
             userMessage = "",
         )
         val userMessageBudget = (endpoint.maxPromptChars - promptWithoutUserMessage.length)
@@ -217,8 +218,8 @@ class RemoteConsultationAiResponder internal constructor(
         return compactPromptTemplate(
             conversationState = conversationState,
             recentMessages = minimumContext,
-            repetitionMaterial = repetitionMaterial,
-            userMessage = userMessage.take(userMessageBudget),
+            repetitionMaterial = compactRepetitionMaterial,
+            userMessage = userMessage.takePromptTail(userMessageBudget),
         )
     }
 
@@ -238,15 +239,99 @@ class RemoteConsultationAiResponder internal constructor(
     }
 
     private fun recentAssistantRepetitionMaterial(recentMessages: List<ConsultationMessage>): String {
-        val assistantText = recentMessages
+        val recentAssistantMessages = recentMessages
             .filter { message -> message.sender == ConsultationMessageSender.ASSISTANT }
-            .joinToString(separator = "\n") { message -> message.content }
-        val materials = REPETITIVE_REPLY_MATERIALS
+            .takeLast(RECENT_ASSISTANT_REPETITION_LIMIT)
+        val assistantText = recentAssistantMessages.joinToString(separator = "\n") { message -> message.content }
+        val fixedMaterials = REPETITIVE_REPLY_MATERIALS
             .filter { material -> assistantText.contains(material, ignoreCase = true) }
-            .distinct()
+        val extractedMaterials = recentAssistantMessages
+            .flatMap { message -> message.content.toRecentReplyRepetitionMaterials() }
+        val materials = (fixedMaterials + extractedMaterials)
+            .map { material -> material.toRepetitionMaterial() }
+            .filter(String::isNotBlank)
+            .distinctBy { material -> material.normalizedRepetitionKey() }
+            .take(MAX_REPETITION_MATERIAL_ITEMS)
         return materials
             .joinToString(separator = "\n") { material -> "- $material" }
             .ifBlank { "(none)" }
+    }
+
+    private fun String.toRecentReplyRepetitionMaterials(): List<String> {
+        val sentences = toPromptSentences()
+        if (sentences.isEmpty()) {
+            return emptyList()
+        }
+
+        val opening = sentences.firstOrNull()
+        val action = sentences.firstOrNull { sentence -> sentence.containsActionCue() }
+        val question = sentences.lastOrNull { sentence -> sentence.endsWith("?") || sentence.endsWith("？") }
+        return listOfNotNull(opening, action, question)
+            .distinctBy { material -> material.normalizedRepetitionKey() }
+    }
+
+    private fun String.toPromptSentences(): List<String> {
+        val normalized = replace(Regex("\\s+"), " ").trim()
+        if (normalized.isBlank()) {
+            return emptyList()
+        }
+
+        val sentences = mutableListOf<String>()
+        var startIndex = 0
+        normalized.forEachIndexed { index, char ->
+            if (char in SENTENCE_END_CHARS) {
+                sentences += normalized.substring(startIndex, index + 1).trim()
+                startIndex = index + 1
+            }
+        }
+        if (startIndex < normalized.length) {
+            sentences += normalized.substring(startIndex).trim()
+        }
+        return sentences.filter(String::isNotBlank)
+    }
+
+    private fun String.containsActionCue(): Boolean {
+        return ACTION_CUE_PATTERNS.any { pattern -> pattern.containsMatchIn(this) }
+    }
+
+    private fun String.toRepetitionMaterial(): String {
+        val normalized = replace(Regex("\\s+"), " ").trim()
+        return if (normalized.length <= MAX_REPETITION_MATERIAL_CHARS) {
+            normalized
+        } else {
+            normalized.take(MAX_REPETITION_MATERIAL_CHARS).trimEnd()
+        }
+    }
+
+    private fun String.normalizedRepetitionKey(): String {
+        return lowercase()
+            .replace(Regex("[\\s\\p{Punct}]+"), "")
+            .take(MAX_REPETITION_KEY_CHARS)
+    }
+
+    private fun String.compactRepetitionMaterial(): String {
+        if (this == "(none)") {
+            return this
+        }
+        return lines()
+            .map(String::trim)
+            .filter(String::isNotBlank)
+            .take(COMPACT_REPETITION_MATERIAL_ITEMS)
+            .joinToString(separator = "\n") { line -> line.take(COMPACT_REPETITION_MATERIAL_CHARS).trimEnd() }
+            .ifBlank { "(none)" }
+    }
+
+    private fun String.takePromptTail(limit: Int): String {
+        if (limit <= 0) {
+            return ""
+        }
+        if (length <= limit) {
+            return this
+        }
+        if (limit <= PROMPT_TRUNCATION_MARKER.length) {
+            return takeLast(limit)
+        }
+        return PROMPT_TRUNCATION_MARKER + takeLast(limit - PROMPT_TRUNCATION_MARKER.length)
     }
 
     private fun promptTemplate(
@@ -256,14 +341,13 @@ class RemoteConsultationAiResponder internal constructor(
         userMessage: String,
         consultationChecklist: String,
     ): String {
-        val indentedChecklist = consultationChecklist.replace("\n", "\n            ")
         return """
             너는 익명 상담 서비스 '마음 온'의 다정하고 따뜻한 공감 상담사야.
             목표는 사용자가 혼자 정리하기 어려운 감정, 생각, 몸 반응, 관계 맥락을 안전하게 탐색하도록 돕는 것이야.
             conversationState: $conversationState
 
             일반 상담 모드 출력 체크리스트:
-            $indentedChecklist
+            $PROMPT_CHECKLIST_PLACEHOLDER
 
             안전 모드:
             - 의학적 진단을 대신하지 말고, 단정적인 판단이나 위험한 지시는 하지 마.
@@ -276,18 +360,23 @@ class RemoteConsultationAiResponder internal constructor(
 
             최근 대화는 맥락으로만 사용하고, 사용자에게 개인정보나 연락처를 새로 요구하지 마.
             반복 금지 소재에 있는 표현이나 행동 제안을 다시 쓰지 마.
+            반복 금지 소재에는 최근 답변의 시작 문장, 행동 제안, 후속 질문이 포함돼. 같은 시작 말투, 같은 행동, 같은 질문을 피하고 사용자 입력에 맞는 다른 개입을 선택해.
             제공된 JSON 스키마를 따르는 compact JSON만 반환하고, 마크다운이나 코드블록은 쓰지 마.
             chunks 배열은 2~5개로 만들고, 각 항목은 빈 문자열이 아니어야 해.
 
             [이전 대화 맥락]
-            $recentMessages
+            $PROMPT_RECENT_MESSAGES_PLACEHOLDER
 
             [최근 답변 반복 금지 소재]
-            $repetitionMaterial
+            $PROMPT_REPETITION_MATERIAL_PLACEHOLDER
 
-            USER: $userMessage
+            USER: $PROMPT_USER_MESSAGE_PLACEHOLDER
             ASSISTANT:
         """.trimIndent()
+            .replace(PROMPT_CHECKLIST_PLACEHOLDER, consultationChecklist)
+            .replace(PROMPT_RECENT_MESSAGES_PLACEHOLDER, recentMessages)
+            .replace(PROMPT_REPETITION_MATERIAL_PLACEHOLDER, repetitionMaterial)
+            .replace(PROMPT_USER_MESSAGE_PLACEHOLDER, userMessage)
     }
 
     private fun verboseConsultationChecklist(): String {
@@ -314,6 +403,7 @@ class RemoteConsultationAiResponder internal constructor(
             - 답변마다 다른 개입을 선택해. 같은 사용자라도 업무 압박, 관계 갈등, 불안, 수면, 무기력, 반복 사고가 다르면 접근을 바꿔.
             - 깊이 있는 상담 답변을 위해 표면 조언보다 사용자가 놓친 감정의 기능, 반복되는 해석, 충족되지 않은 욕구, 지금 가진 자원 중 하나를 짚어줘.
             - 최근 답변에 이미 나온 소재 대신 사용자 장면에 맞는 새로운 구체 행동 1개를 제안해.
+            - 최근 답변의 시작 문장, 행동 제안, 후속 질문과 비슷하면 같은 의미라도 다른 상담 렌즈와 다른 장면 기반 행동으로 다시 써.
             - 조언보다 사용자가 말한 구체적 장면과 몸 반응을 먼저 반영해.
             - 최근 대화에서 마지막 사용자 감정과 직전 ASSISTANT 답변을 참고하되 그대로 반복하지 마.
             - 직전 ASSISTANT의 시작 문장, 행동 제안, 후속 질문을 반복하지 마.
@@ -446,6 +536,17 @@ class RemoteConsultationAiResponder internal constructor(
     companion object {
         private val log = LoggerFactory.getLogger(RemoteConsultationAiResponder::class.java)
         private const val COMPACT_RECENT_MESSAGE_LIMIT = 2
+        private const val COMPACT_REPETITION_MATERIAL_ITEMS = 2
+        private const val COMPACT_REPETITION_MATERIAL_CHARS = 120
+        private const val RECENT_ASSISTANT_REPETITION_LIMIT = 3
+        private const val MAX_REPETITION_MATERIAL_ITEMS = 8
+        private const val MAX_REPETITION_MATERIAL_CHARS = 160
+        private const val MAX_REPETITION_KEY_CHARS = 80
+        private const val PROMPT_TRUNCATION_MARKER = "(앞부분 축약) "
+        private const val PROMPT_CHECKLIST_PLACEHOLDER = "{{CONSULTATION_CHECKLIST}}"
+        private const val PROMPT_RECENT_MESSAGES_PLACEHOLDER = "{{RECENT_MESSAGES}}"
+        private const val PROMPT_REPETITION_MATERIAL_PLACEHOLDER = "{{REPETITION_MATERIAL}}"
+        private const val PROMPT_USER_MESSAGE_PLACEHOLDER = "{{USER_MESSAGE}}"
         private const val MIN_CHUNK_CHARS = 24
         private const val MAX_CHUNK_CHARS = 420
         private const val MAX_FALLBACK_ANSWER_CHARS = 900
@@ -465,6 +566,34 @@ class RemoteConsultationAiResponder internal constructor(
             "물 한 잔",
             "산책",
             "눈을 감고",
+            "5-4-3-2-1",
+            "몸이 먼저 위험을 감지",
+            "현재 공간",
+            "차 한 잔",
+        )
+
+        private val SENTENCE_END_CHARS = setOf('.', '!', '?', '。', '！', '？')
+
+        private val ACTION_CUE_PATTERNS = listOf(
+            Regex("""해\s*보(?:세요|는|자|면|기)?"""),
+            Regex("""시도해\s*보(?:세요|는|자|면|기)?"""),
+            Regex("""적어\s*보(?:세요|는|자|면|기)?"""),
+            Regex("""확인해\s*보(?:세요|는|자|면|기)?"""),
+            Regex("""마셔\s*보(?:세요|는|자|면|기)?"""),
+            Regex("""걸어\s*보(?:세요|는|자|면|기)?"""),
+            Regex("""말해\s*보(?:세요|는|자|면|기)?"""),
+            Regex("""나눠\s*보(?:세요|는|자|면|기)?"""),
+            Regex("""쉬어\s*보(?:세요|는|자|면|기)?"""),
+            Regex("""써\s*보(?:세요|는|자|면|기)?"""),
+            Regex("""내려놓(?:아도|기|고|는)?"""),
+            Regex("""고르(?:며|고|기|자|세요)?"""),
+            Regex("""누르(?:는|고|며|세요)?"""),
+            Regex("""돌아와\s*보(?:세요|는|자|면|기)?"""),
+            Regex("""준비해\s*보(?:세요|는|자|면|기)?"""),
+            Regex("""선택해\s*보(?:세요|는|자|면|기)?"""),
+            Regex("""정리해\s*보(?:세요|는|자|면|기)?"""),
+            Regex("""살펴\s*보(?:세요|는|자|면|기)?"""),
+            Regex("""잡고"""),
         )
 
         private val INTERNAL_REVIEW_MARKER_PATTERNS = listOf(
