@@ -175,6 +175,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                 dataExport: state.dataExport,
                               ),
                               const SizedBox(height: AppSpacing.lg),
+                              const _SettingsGroupHeader(
+                                key: ValueKey('settings-routine-group-header'),
+                                icon: Icons.tune_outlined,
+                                title: '자주 쓰는 계정 설정',
+                              ),
+                              const SizedBox(height: AppSpacing.sm),
                               _ProfileSection(
                                 nicknameController: _nicknameController,
                                 isSubmitting: state.isSubmitting,
@@ -191,6 +197,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                 onSave: widget.controller.saveEmail,
                               ),
                               const SizedBox(height: AppSpacing.lg),
+                              _RandomReceiveSection(
+                                value: settings.randomReceiveAllowed,
+                                isSubmitting: state.isSubmitting,
+                                onChanged: (_) =>
+                                    widget.controller.toggleRandomSetting(),
+                              ),
+                              const SizedBox(height: AppSpacing.lg),
+                              const _SettingsGroupHeader(
+                                key: ValueKey('settings-security-group-header'),
+                                icon: Icons.security_outlined,
+                                title: '보안과 데이터',
+                              ),
+                              const SizedBox(height: AppSpacing.sm),
                               _PasswordSection(
                                 currentPasswordController:
                                     _currentPasswordController,
@@ -202,13 +221,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                 onNewPasswordChanged:
                                     widget.controller.updateNewPasswordDraft,
                                 onSave: widget.controller.savePassword,
-                              ),
-                              const SizedBox(height: AppSpacing.lg),
-                              _RandomReceiveSection(
-                                value: settings.randomReceiveAllowed,
-                                isSubmitting: state.isSubmitting,
-                                onChanged: (_) =>
-                                    widget.controller.toggleRandomSetting(),
                               ),
                               const SizedBox(height: AppSpacing.lg),
                               _DataExportSection(
@@ -223,6 +235,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                 policy: settings.retentionPolicy,
                               ),
                               const SizedBox(height: AppSpacing.lg),
+                              const _SettingsGroupHeader(
+                                key: ValueKey('settings-support-group-header'),
+                                icon: Icons.support_agent_outlined,
+                                title: '도움과 정책',
+                              ),
+                              const SizedBox(height: AppSpacing.sm),
                               _PrivacyDisclosureSection(
                                 onOpenExternalUri: widget.onOpenExternalUri,
                               ),
@@ -233,6 +251,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                 onCopyDiagnostics: widget.onCopyDiagnostics,
                               ),
                               const SizedBox(height: AppSpacing.lg),
+                              const _SettingsGroupHeader(
+                                key: ValueKey('settings-danger-group-header'),
+                                icon: Icons.warning_amber_outlined,
+                                title: '위험 작업',
+                              ),
+                              const SizedBox(height: AppSpacing.sm),
                               _WithdrawalSection(
                                 state: state,
                                 withdrawPasswordController:
@@ -255,6 +279,25 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ),
         );
       },
+    );
+  }
+}
+
+class _SettingsGroupHeader extends StatelessWidget {
+  const _SettingsGroupHeader({
+    required this.icon,
+    required this.title,
+    super.key,
+  });
+
+  final IconData icon;
+  final String title;
+
+  @override
+  Widget build(BuildContext context) {
+    return AppInlineSectionHeader(
+      icon: icon,
+      title: title,
     );
   }
 }
