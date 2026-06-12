@@ -43,7 +43,12 @@ void main() {
     expect(find.text('입력'), findsNothing);
     expect(find.text('응답'), findsNothing);
     expect(find.text('AI 상담 연결됨'), findsOneWidget);
-    expect(find.text('메시지 1개'), findsOneWidget);
+    expect(find.text('대화 0개'), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('consultation-empty-state')),
+      findsOneWidget,
+    );
+    expect(find.text('상담 대기 중'), findsOneWidget);
     expect(find.text('입력 가능'), findsOneWidget);
     expect(
       find.byKey(const ValueKey('consultation-composer-section')),
@@ -73,7 +78,7 @@ void main() {
       find.byKey(const ValueKey('consultation-status-toolbar')),
       findsOneWidget,
     );
-    expect(find.text('메시지 1개'), findsOneWidget);
+    expect(find.text('대화 0개'), findsOneWidget);
     expect(find.byKey(const ValueKey('consultation-chat-section')),
         findsOneWidget);
     expect(
@@ -243,6 +248,48 @@ void main() {
       (fixedSendButtonRect.center.dy - expandedFieldRect.center.dy).abs(),
       lessThanOrEqualTo(1),
     );
+  });
+
+  testWidgets('keeps composer above the keyboard inset on a phone viewport',
+      (tester) async {
+    tester.view.physicalSize = const Size(390, 640);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    final repository = _FakeConsultationRepository();
+    final controller = ConsultationController(repository: repository);
+    const keyboardInset = 260.0;
+
+    await tester.pumpWidget(
+      MaterialApp(
+        builder: (context, child) {
+          return MediaQuery(
+            data: MediaQuery.of(context).copyWith(
+              viewInsets: const EdgeInsets.only(bottom: keyboardInset),
+            ),
+            child: child!,
+          );
+        },
+        home: ConsultationScreen(
+          controller: controller,
+          onBack: () {},
+        ),
+      ),
+    );
+    await tester.pump();
+    repository.emit(const ConsultationStreamEvent.connect('connected'));
+    await tester.pumpAndSettle();
+
+    final composerRect = tester.getRect(
+      find.byKey(const ValueKey('consultation-composer-section')),
+    );
+
+    expect(
+      composerRect.bottom,
+      lessThanOrEqualTo(640 - keyboardInset),
+    );
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('shows reconnect action after a stream error', (tester) async {

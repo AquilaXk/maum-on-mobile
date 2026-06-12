@@ -127,16 +127,9 @@ class _ConsultationScreenState extends State<ConsultationScreen>
                 ),
                 Expanded(
                   key: const ValueKey('consultation-chat-section'),
-                  child: ListView.builder(
-                    key: const ValueKey('consultation-message-list'),
+                  child: _ConversationList(
                     controller: _scrollController,
-                    keyboardDismissBehavior:
-                        ScrollViewKeyboardDismissBehavior.onDrag,
-                    padding: const EdgeInsets.all(16),
-                    itemCount: state.messages.length,
-                    itemBuilder: (context, index) {
-                      return _MessageBubble(message: state.messages[index]);
-                    },
+                    messages: state.messages,
                   ),
                 ),
                 _Composer(
@@ -394,6 +387,7 @@ class _ConsultationStatusToolbar extends StatelessWidget {
       state.connectionState,
       state.isStreaming,
     );
+    final conversationMessageCount = _conversationMessageCount(state.messages);
     final inputLabel = state.inputBlockedBySafety
         ? '안전 확인 필요'
         : state.isSending
@@ -450,7 +444,7 @@ class _ConsultationStatusToolbar extends StatelessWidget {
                   label: statusText,
                   tone: _consultationStatusTone(state.connectionState),
                 ),
-                AppStatusPill(label: '메시지 ${state.messages.length}개'),
+                AppStatusPill(label: '대화 $conversationMessageCount개'),
                 AppStatusPill(
                   label: inputLabel,
                   tone: state.inputBlockedBySafety
@@ -494,6 +488,68 @@ AppStatusTone _consultationStatusTone(
     ConsultationConnectionState.error => AppStatusTone.danger,
     ConsultationConnectionState.idle => AppStatusTone.neutral,
   };
+}
+
+int _conversationMessageCount(List<ConsultationMessage> messages) {
+  return messages.where((message) {
+    return (message.role == ConsultationMessageRole.user ||
+            message.role == ConsultationMessageRole.assistant) &&
+        message.content.trim().isNotEmpty;
+  }).length;
+}
+
+class _ConversationList extends StatelessWidget {
+  const _ConversationList({
+    required this.controller,
+    required this.messages,
+  });
+
+  final ScrollController controller;
+  final List<ConsultationMessage> messages;
+
+  @override
+  Widget build(BuildContext context) {
+    final visibleMessages = messages
+        .where((message) => !_isInitialSystemMessage(message))
+        .toList(growable: false);
+    final showEmptyState = visibleMessages.isEmpty;
+
+    return ListView.builder(
+      key: const ValueKey('consultation-message-list'),
+      controller: controller,
+      keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+      padding: const EdgeInsets.all(16),
+      itemCount: showEmptyState ? 1 : visibleMessages.length,
+      itemBuilder: (context, index) {
+        if (showEmptyState) {
+          return const _ConsultationEmptyState();
+        }
+
+        return _MessageBubble(message: visibleMessages[index]);
+      },
+    );
+  }
+}
+
+bool _isInitialSystemMessage(ConsultationMessage message) {
+  return message.id == 'system-0' &&
+      message.role == ConsultationMessageRole.system;
+}
+
+class _ConsultationEmptyState extends StatelessWidget {
+  const _ConsultationEmptyState();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Padding(
+      key: ValueKey('consultation-empty-state'),
+      padding: EdgeInsets.only(top: AppSpacing.md),
+      child: AppStateView.empty(
+        title: '상담 대기 중',
+        message: '지금 떠오르는 마음을 적어 주세요.',
+      ),
+    );
+  }
 }
 
 class _MessageBubble extends StatelessWidget {
