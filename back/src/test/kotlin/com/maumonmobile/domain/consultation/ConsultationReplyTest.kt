@@ -66,6 +66,18 @@ class ConsultationReplyTest {
     }
 
     @Test
+    fun forMessageDoesNotAssumeCriticismForGenericWorkConcern() {
+        val reply = ConsultationReply
+            .forMessage("업무가 너무 많아서 지쳤어요.")
+            .chunks
+            .joinToString("")
+
+        assertThat(reply)
+            .contains("업무 전체", "10분")
+            .doesNotContain("반복된 지적", "지적 장면")
+    }
+
+    @Test
     fun forMessageDoesNotTreatTemporaryPauseAsSleepConcern() {
         val reply = ConsultationReply
             .forMessage("잠시 생각할 시간이 필요해서 오늘은 답을 못 하겠어요.")
