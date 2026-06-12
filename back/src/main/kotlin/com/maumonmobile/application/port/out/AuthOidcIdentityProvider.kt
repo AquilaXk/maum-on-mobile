@@ -7,6 +7,7 @@ data class AuthOidcTokenCommand(
     val redirectUri: String,
     val clientId: String,
     val expectedNonce: String,
+    val clientSecret: String? = null,
 )
 
 data class AuthOidcIdentity(
