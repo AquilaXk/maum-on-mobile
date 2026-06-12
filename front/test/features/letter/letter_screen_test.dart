@@ -72,6 +72,7 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('letter-compose-button')));
     await tester.pumpAndSettle();
 
+    expect(find.byKey(const ValueKey('letter-compose-button')), findsNothing);
     await tester
         .ensureVisible(find.byKey(const ValueKey('letter-submit-button')));
     await tester.pumpAndSettle();
@@ -535,6 +536,7 @@ void main() {
 
     expect(find.byKey(const ValueKey('letter-title-field')), findsOneWidget);
     expect(find.byKey(const ValueKey('letter-content-field')), findsOneWidget);
+    expect(find.byKey(const ValueKey('letter-compose-button')), findsNothing);
     expect(find.byKey(const ValueKey('letter-flow-panel')), findsNothing);
     expect(find.text('편지 작성 흐름'), findsNothing);
   });

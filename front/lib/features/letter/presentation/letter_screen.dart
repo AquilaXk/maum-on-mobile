@@ -85,12 +85,13 @@ class _LetterScreenState extends State<LetterScreen> {
               ? widget.controller.load
               : null,
           actions: [
-            FilledButton.icon(
-              key: const ValueKey('letter-compose-button'),
-              onPressed: widget.controller.startCompose,
-              icon: const Icon(Icons.edit_outlined),
-              label: const Text('새 편지'),
-            ),
+            if (state.mode != LetterViewMode.compose)
+              FilledButton.icon(
+                key: const ValueKey('letter-compose-button'),
+                onPressed: widget.controller.startCompose,
+                icon: const Icon(Icons.edit_outlined),
+                label: const Text('새 편지'),
+              ),
           ],
           children: [
             if (state.moderationFeedback != null) ...[
