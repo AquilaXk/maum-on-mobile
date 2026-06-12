@@ -52,6 +52,10 @@ app:
       excluded-paths:
         - /api/health
         - /actuator/health
+    cors:
+      allowed-origins: ${APP_SECURITY_CORS_ALLOWED_ORIGINS:}
+      allowed-origin-patterns: ${APP_SECURITY_CORS_ALLOWED_ORIGIN_PATTERNS:http://localhost:*,http://127.0.0.1:*}
+      max-age: ${APP_SECURITY_CORS_MAX_AGE:PT1H}
   notifications:
     push:
       request-timeout: ${PUSH_REQUEST_TIMEOUT:PT5S}

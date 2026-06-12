@@ -8,6 +8,13 @@ void main() {
     await tester.pumpWidget(buildMobileQaApp());
     await tester.pumpAndSettle();
 
+    expect(find.textContaining('관리자'), findsNothing);
+    expect(find.textContaining('운영 공간'), findsNothing);
+    expect(find.textContaining('관리자 콘솔'), findsNothing);
+    expect(find.textContaining('신고 관리'), findsNothing);
+    expect(find.textContaining('회원 관리'), findsNothing);
+    expect(find.textContaining('편지 관리'), findsNothing);
+    expect(find.textContaining('/api/v1/admin'), findsNothing);
     expect(find.byKey(const ValueKey('home-primary-panel')), findsNothing);
     expect(
       find.byKey(const ValueKey('home-primary-actions-panel')),
@@ -67,6 +74,9 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('home-action-settings')));
     await tester.pumpAndSettle();
     expect(find.text('계정 설정'), findsOneWidget);
+    expect(find.textContaining('관리자'), findsNothing);
+    expect(find.textContaining('운영 공간'), findsNothing);
+    expect(find.textContaining('관리자 콘솔'), findsNothing);
   });
 
   testWidgets('filters QA stories into the empty state without helper copy',

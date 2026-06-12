@@ -12,6 +12,9 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder
 import org.springframework.security.crypto.password.PasswordEncoder
 import org.springframework.security.web.SecurityFilterChain
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter
+import org.springframework.web.cors.CorsConfiguration
+import org.springframework.web.cors.CorsConfigurationSource
+import org.springframework.web.cors.UrlBasedCorsConfigurationSource
 
 @Configuration(proxyBeanMethods = false)
 @EnableWebSecurity
@@ -19,11 +22,13 @@ class SecurityConfig(
     private val jwtAuthenticationFilter: JwtAuthenticationFilter,
     private val restAuthenticationEntryPoint: RestAuthenticationEntryPoint,
     private val environment: Environment,
+    private val corsProperties: CorsProperties,
 ) {
 
     @Bean
     fun securityFilterChain(http: HttpSecurity): SecurityFilterChain {
         http
+            .cors { }
             .csrf { csrf -> csrf.disable() }
             .sessionManagement { session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS) }
             .exceptionHandling { exceptionHandling ->
@@ -75,6 +80,23 @@ class SecurityConfig(
             .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter::class.java)
 
         return http.build()
+    }
+
+    @Bean
+    fun corsConfigurationSource(): CorsConfigurationSource {
+        val configuration = CorsConfiguration().apply {
+            allowedOrigins = corsProperties.normalizedAllowedOrigins
+            allowedOriginPatterns = corsProperties.normalizedAllowedOriginPatterns
+            allowedMethods = corsProperties.normalizedAllowedMethods
+            allowedHeaders = corsProperties.normalizedAllowedHeaders
+            exposedHeaders = corsProperties.normalizedExposedHeaders
+            allowCredentials = false
+            maxAge = corsProperties.maxAge.seconds
+        }
+
+        return UrlBasedCorsConfigurationSource().apply {
+            registerCorsConfiguration("/api/**", configuration)
+        }
     }
 
     @Bean
