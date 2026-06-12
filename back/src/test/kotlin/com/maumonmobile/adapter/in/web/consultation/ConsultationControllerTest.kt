@@ -107,6 +107,39 @@ class ConsultationControllerTest @Autowired constructor(
     }
 
     @Test
+    fun chatStoresReadableReplyWhenModelChunksOmitSentenceSpacing() {
+        val member = signupAndLogin("consultation-readable-history@example.com", "문장이")
+        consultationAiResponder.responseChunks = listOf(
+            "마음이 불안하다고 이야기해주셨네요.",
+            "지금은 발바닥 감각을 천천히 느껴보면 좋아요.",
+        )
+
+        mockMvc.post("/api/v1/consultations/chat") {
+            header("Authorization", "Bearer ${member.accessToken}")
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"message":"오늘 불안한 마음을 줄이고 싶어요."}"""
+        }
+            .andExpect {
+                status { isOk() }
+            }
+
+        val events = consultationStreamEvents(member.memberId.toLong())
+        val secondChunk = events[1].data.toJsonMap()
+        assertThat(secondChunk["chunk"]).isEqualTo(" 지금은 발바닥 감각을 천천히 느껴보면 좋아요.")
+
+        mockMvc.get("/api/v1/consultations/recent") {
+            header("Authorization", "Bearer ${member.accessToken}")
+        }
+            .andExpect {
+                status { isOk() }
+                jsonPath("$.data.messages[1].role") { value("ASSISTANT") }
+                jsonPath("$.data.messages[1].content") {
+                    value("마음이 불안하다고 이야기해주셨네요. 지금은 발바닥 감각을 천천히 느껴보면 좋아요.")
+                }
+            }
+    }
+
+    @Test
     fun promptContextExcludesCurrentUserMessageFromRecentHistory() {
         val member = signupAndLogin("consultation-context@example.com", "문맥이")
 
