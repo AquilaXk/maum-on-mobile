@@ -41,6 +41,67 @@ class ConsultationReplyTest {
     }
 
     @Test
+    fun forMessageUsesDifferentCounselingInterventionsForEachConcernType() {
+        val workReply = ConsultationReply
+            .forMessage("상사에게 계속 지적받아서 출근 생각만 해도 심장이 뛰어요.")
+            .chunks
+            .joinToString("")
+        val sleepReply = ConsultationReply
+            .forMessage("잠을 못 자고 새벽마다 깨서 하루가 너무 무기력해요.")
+            .chunks
+            .joinToString("")
+        val relationshipReply = ConsultationReply
+            .forMessage("친구와 말다툼한 뒤 작은 말도 계속 떠올라요.")
+            .chunks
+            .joinToString("")
+        val anxietyReply = ConsultationReply
+            .forMessage("불안해서 가슴이 답답하고 손이 떨려요.")
+            .chunks
+            .joinToString("")
+
+        assertThat(workReply).contains("평가받는 시간", "10분")
+        assertThat(sleepReply).contains("생각 주차", "침대")
+        assertThat(relationshipReply).contains("나 전달문", "상처받은 지점")
+        assertThat(anxietyReply).contains("5-4-3-2-1", "몸")
+    }
+
+    @Test
+    fun forMessageDoesNotAssumeCriticismForGenericWorkConcern() {
+        val reply = ConsultationReply
+            .forMessage("업무가 너무 많아서 지쳤어요.")
+            .chunks
+            .joinToString("")
+
+        assertThat(reply)
+            .contains("업무 전체", "10분")
+            .doesNotContain("반복된 지적", "지적 장면")
+    }
+
+    @Test
+    fun forMessageDoesNotTreatUpcomingWorkEvaluationAsRepeatedCriticism() {
+        val reply = ConsultationReply
+            .forMessage("회사 평가를 앞두고 불안해요.")
+            .chunks
+            .joinToString("")
+
+        assertThat(reply)
+            .contains("출근이나 업무")
+            .doesNotContain("반복된 지적", "지적 장면")
+    }
+
+    @Test
+    fun forMessageDoesNotTreatSelfBlameAsExternalWorkCriticism() {
+        val reply = ConsultationReply
+            .forMessage("회사에서 실수한 뒤 자기비난이 멈추지 않아요.")
+            .chunks
+            .joinToString("")
+
+        assertThat(reply)
+            .contains("출근이나 업무")
+            .doesNotContain("반복된 지적", "지적 장면")
+    }
+
+    @Test
     fun forMessageDoesNotTreatTemporaryPauseAsSleepConcern() {
         val reply = ConsultationReply
             .forMessage("잠시 생각할 시간이 필요해서 오늘은 답을 못 하겠어요.")

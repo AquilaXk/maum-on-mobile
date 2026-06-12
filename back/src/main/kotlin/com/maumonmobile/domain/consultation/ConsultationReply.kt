@@ -12,24 +12,34 @@ data class ConsultationReply(
             val normalized = message.trim()
             return ConsultationReply(
                 chunks = when {
+                    normalized.hasWorkCriticismConcern() -> listOf(
+                        "출근을 떠올릴 때 몸이 먼저 긴장한다면 회사 시간이 평가받는 시간처럼 느껴지고 있을 수 있어요. ",
+                        "심장이 뛰는 반응은 약해서가 아니라 반복된 지적을 몸이 위험 신호처럼 기억한 결과일 수 있습니다. ",
+                        "오늘은 해야 할 일 하나와 잠시 미뤄도 되는 일 하나를 나눠 적고, 첫 시작은 10분으로 줄여보세요. ",
+                        "출근 전 가장 먼저 떠오르는 지적 장면은 무엇인가요?",
+                    )
                     normalized.containsAny(WORK_TERMS) -> listOf(
-                        "출근을 떠올릴 때 몸이 먼저 긴장할 만큼 부담이 커진 상태로 보여요. ",
-                        "오늘 해야 할 일 하나와 잠시 미뤄도 되는 일 하나를 나눠 적고, 첫 시작은 10분으로 줄여보세요. ",
-                        "출근 전 몸이 가장 먼저 긴장하는 순간은 언제인가요?",
+                        "출근이나 업무가 한꺼번에 몰리면 일 전체가 하나의 큰 덩어리처럼 느껴져 더 지칠 수 있어요. ",
+                        "지금은 능력 문제가 아니라 우선순위와 회복 여지가 동시에 부족해진 상태일 수 있습니다. ",
+                        "오늘은 업무 전체를 해결하려 하기보다 반드시 해야 할 일 하나와 미뤄도 되는 일 하나를 나누고, 첫 시작을 10분으로 줄여보세요. ",
+                        "지금 가장 먼저 작게 나눌 수 있는 업무는 무엇인가요?",
                     )
                     normalized.hasSleepConcern() -> listOf(
-                        "잠이 계속 끊기면 하루 전체가 무겁고 예민하게 느껴질 수 있어요. ",
-                        "오늘 밤에는 해결해야 할 생각을 한 문장만 적어두고, 침대에서는 몸을 쉬게 하는 쪽에만 집중해 보세요. ",
+                        "잠이 계속 끊기면 몸이 회복할 틈을 잃어서 하루 전체가 무겁고 예민하게 느껴질 수 있어요. ",
+                        "새벽에 떠오르는 생각을 그 자리에서 해결하려 하면 뇌가 더 깨어나기 쉬워요. ",
+                        "오늘 밤에는 침대에 눕기 전 생각 주차 메모 한 줄만 남기고, 침대에서는 해결보다 쉬는 감각에 집중해 보세요. ",
                         "새벽에 깼을 때 가장 먼저 떠오르는 생각은 무엇인가요?",
                     )
                     normalized.hasRelationshipConcern() -> listOf(
                         "관계에서 마음을 많이 쓰고 있어서 작은 말도 오래 남는 상태처럼 보여요. ",
-                        "지금은 상대에게 바로 답하기보다 내가 상처받은 지점을 짧게 적어보면 다음 말을 고르기 쉬워집니다. ",
+                        "오래 남는 말은 존중받고 싶은 욕구나 안전하게 연결되고 싶은 마음을 건드렸을 수 있습니다. ",
+                        "지금은 상대에게 바로 답하기보다 내가 상처받은 지점을 짧게 적고, 나 전달문으로 바꿔보면 다음 말을 고르기 쉬워집니다. ",
                         "그 대화에서 가장 오래 남은 말은 무엇인가요?",
                     )
                     normalized.containsAny(ANXIETY_TERMS) -> listOf(
                         "불안이 생각뿐 아니라 몸의 반응으로도 올라오는 순간이라 많이 놀라셨을 것 같아요. ",
-                        "지금은 주변에서 실제로 확인할 수 있는 물건 하나를 정해 시선을 잠깐 붙잡아 보세요. ",
+                        "몸이 먼저 위험을 감지하면 머리로 괜찮다고 말해도 가슴 답답함이나 떨림이 남을 수 있습니다. ",
+                        "지금은 5-4-3-2-1 방식으로 보이는 것 다섯 가지부터 천천히 확인하며 현재 공간으로 돌아와 보세요. ",
                         "그 답답함이 가장 커지는 상황은 언제인가요?",
                     )
                     normalized.containsAny(LOW_ENERGY_TERMS) -> listOf(
@@ -53,6 +63,7 @@ data class ConsultationReply(
 
         private const val LONG_MESSAGE_THRESHOLD = 300
         private val WORK_TERMS = setOf("출근", "상사", "회사", "직장", "업무", "야근", "퇴근")
+        private val WORK_CRITICISM_TERMS = setOf("지적", "혼나", "꾸중", "싫은 소리")
         private val SLEEP_TERMS = setOf("새벽", "불면", "수면", "깨서", "잠들")
         private val RELATIONSHIP_TERMS = setOf("친구", "가족", "연인", "부모", "말다툼", "헤어")
         private val ANXIETY_TERMS = setOf("불안", "심장", "두근", "긴장", "떨려", "공황")
@@ -92,6 +103,10 @@ data class ConsultationReply(
             }
 
             return RELATIONSHIP_PHRASES.any { phrase -> contains(phrase, ignoreCase = true) }
+        }
+
+        private fun String.hasWorkCriticismConcern(): Boolean {
+            return containsAny(WORK_TERMS) && containsAny(WORK_CRITICISM_TERMS)
         }
 
         private val RELATIONSHIP_PHRASES = setOf(
