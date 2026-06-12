@@ -69,6 +69,7 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('story-create-button')));
     await tester.pumpAndSettle();
 
+    expect(find.byKey(const ValueKey('story-create-button')), findsNothing);
     await tester.ensureVisible(
       find.byKey(const ValueKey('story-submit-button')),
     );
@@ -100,7 +101,10 @@ void main() {
         _detail(id: 1, title: '잠이 오지 않는 밤', content: '긴 이야기를 나눕니다.'),
       ],
       commentPages: [
-        _commentPage([_comment(id: 10, content: '천천히 쉬어도 괜찮아요.')]),
+        _commentPage(
+          [_comment(id: 10, content: '천천히 쉬어도 괜찮아요.')],
+          totalElements: 45,
+        ),
       ],
     );
     final controller = StoryController(
@@ -129,6 +133,9 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('긴 이야기를 나눕니다.'), findsOneWidget);
+    expect(find.byKey(const ValueKey('story-comment-section-header')),
+        findsOneWidget);
+    expect(find.text('댓글 45개'), findsOneWidget);
     expect(find.text('천천히 쉬어도 괜찮아요.'), findsOneWidget);
     expect(find.byKey(const ValueKey('story-flow-panel')), findsNothing);
   });
@@ -620,12 +627,15 @@ PageResponse<StorySummary> _storyPage(
   );
 }
 
-PageResponse<StoryComment> _commentPage(List<StoryComment> items) {
+PageResponse<StoryComment> _commentPage(
+  List<StoryComment> items, {
+  int? totalElements,
+}) {
   return PageResponse(
     items: items,
     page: 0,
     size: 20,
-    totalElements: items.length,
+    totalElements: totalElements ?? items.length,
     totalPages: 1,
     last: true,
   );

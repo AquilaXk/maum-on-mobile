@@ -21,6 +21,7 @@ class StoryState {
     this.mode = StoryViewMode.list,
     this.stories = const [],
     this.comments = const [],
+    this.commentTotalCount = 0,
     this.selectedStory,
     this.selectedCategory = StoryCategory.all,
     this.searchQuery = '',
@@ -49,6 +50,7 @@ class StoryState {
   final StoryViewMode mode;
   final List<StorySummary> stories;
   final List<StoryComment> comments;
+  final int commentTotalCount;
   final StoryDetail? selectedStory;
   final StoryCategory selectedCategory;
   final String searchQuery;
@@ -110,6 +112,7 @@ class StoryState {
     StoryViewMode? mode,
     List<StorySummary>? stories,
     List<StoryComment>? comments,
+    int? commentTotalCount,
     StoryDetail? selectedStory,
     bool clearSelectedStory = false,
     StoryCategory? selectedCategory,
@@ -146,6 +149,7 @@ class StoryState {
       mode: mode ?? this.mode,
       stories: stories ?? this.stories,
       comments: comments ?? this.comments,
+      commentTotalCount: commentTotalCount ?? this.commentTotalCount,
       selectedStory:
           clearSelectedStory ? null : selectedStory ?? this.selectedStory,
       selectedCategory: selectedCategory ?? this.selectedCategory,
@@ -338,6 +342,7 @@ class StoryController extends ChangeNotifier {
         _state.copyWith(
           selectedStory: detail,
           comments: commentsPage.items,
+          commentTotalCount: commentsPage.totalElements,
           isDetailLoading: false,
           commentDraft: commentDraft,
           clearActiveReplyCommentId: true,
@@ -359,6 +364,7 @@ class StoryController extends ChangeNotifier {
         mode: StoryViewMode.list,
         clearSelectedStory: true,
         comments: const [],
+        commentTotalCount: 0,
         clearActiveReplyCommentId: true,
         replyDrafts: const {},
         clearEditingStoryId: true,
@@ -523,6 +529,7 @@ class StoryController extends ChangeNotifier {
           mode: StoryViewMode.list,
           clearSelectedStory: true,
           comments: const [],
+          commentTotalCount: 0,
           clearActiveReplyCommentId: true,
           replyDrafts: const {},
           isSubmitting: false,
@@ -645,6 +652,7 @@ class StoryController extends ChangeNotifier {
       _setState(
         _state.copyWith(
           comments: commentsPage.items,
+          commentTotalCount: commentsPage.totalElements,
           commentDraft: '',
           isSubmitting: false,
           noticeMessage: '댓글이 등록되었습니다.',
@@ -686,6 +694,7 @@ class StoryController extends ChangeNotifier {
       _setState(
         _state.copyWith(
           comments: commentsPage.items,
+          commentTotalCount: commentsPage.totalElements,
           replyDrafts: nextDrafts,
           clearActiveReplyCommentId: true,
           isSubmitting: false,
@@ -841,6 +850,7 @@ class StoryController extends ChangeNotifier {
       _setState(
         _state.copyWith(
           comments: commentsPage.items,
+          commentTotalCount: commentsPage.totalElements,
           isSubmitting: false,
           clearEditingCommentId: true,
           editingCommentContent: '',
@@ -867,6 +877,7 @@ class StoryController extends ChangeNotifier {
       _setState(
         _state.copyWith(
           comments: commentsPage.items,
+          commentTotalCount: commentsPage.totalElements,
           isSubmitting: false,
           noticeMessage: '댓글이 삭제되었습니다.',
         ),

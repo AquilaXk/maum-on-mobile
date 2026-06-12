@@ -90,4 +90,20 @@ void main() {
     expect(find.text('조건에 맞는 스토리가 없습니다.'), findsOneWidget);
     expect(find.text('검색어 또는 카테고리를 바꿔 다시 확인해 주세요.'), findsNothing);
   });
+
+  testWidgets('opens QA story detail with comment context', (tester) async {
+    await tester.pumpWidget(buildMobileQaApp());
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(mobileQaRouteKey('story')));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.byKey(const ValueKey('story-card-1')));
+    await tester.tap(find.byKey(const ValueKey('story-card-1')));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const ValueKey('story-comment-section-header')),
+        findsOneWidget);
+    expect(find.text('댓글 1개'), findsOneWidget);
+    expect(find.text('천천히 들어줄게요.'), findsOneWidget);
+  });
 }

@@ -88,12 +88,13 @@ class _StoryScreenState extends State<StoryScreen> {
               ? widget.controller.loadStories
               : null,
           actions: [
-            FilledButton.icon(
-              key: const ValueKey('story-create-button'),
-              onPressed: widget.controller.startCreate,
-              icon: const Icon(Icons.edit_outlined),
-              label: const Text('글쓰기'),
-            ),
+            if (state.mode != StoryViewMode.editor)
+              FilledButton.icon(
+                key: const ValueKey('story-create-button'),
+                onPressed: widget.controller.startCreate,
+                icon: const Icon(Icons.edit_outlined),
+                label: const Text('글쓰기'),
+              ),
           ],
           children: [
             if (state.moderationFeedback != null) ...[
@@ -437,10 +438,30 @@ class _StoryDetailView extends StatelessWidget {
           ),
         ],
         const SizedBox(height: AppSpacing.xl),
+        _CommentSectionHeader(
+          commentCount: state.commentTotalCount,
+        ),
+        const SizedBox(height: AppSpacing.sm),
         _CommentComposer(state: state, controller: controller),
         const SizedBox(height: AppSpacing.md),
         _CommentList(state: state, controller: controller),
       ],
+    );
+  }
+}
+
+class _CommentSectionHeader extends StatelessWidget {
+  const _CommentSectionHeader({required this.commentCount});
+
+  final int commentCount;
+
+  @override
+  Widget build(BuildContext context) {
+    return AppInlineSectionHeader(
+      key: const ValueKey('story-comment-section-header'),
+      icon: Icons.mode_comment_outlined,
+      title: '댓글',
+      trailing: AppStatusPill(label: '댓글 $commentCount개'),
     );
   }
 }

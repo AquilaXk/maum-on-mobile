@@ -399,10 +399,20 @@ class _QaStoryRepository implements StoryRepository {
     int size = 20,
   }) async {
     return PageResponse(
-      items: const [],
+      items: const [
+        StoryComment(
+          id: 1,
+          content: '천천히 들어줄게요.',
+          authorId: 8,
+          authorNickname: '마음친구',
+          postId: 1,
+          createDate: '2026-06-05T08:10:00',
+          modifyDate: '2026-06-05T08:10:00',
+        ),
+      ],
       page: page,
       size: size,
-      totalElements: 0,
+      totalElements: 1,
       totalPages: 1,
       last: true,
     );
