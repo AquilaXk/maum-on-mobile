@@ -61,7 +61,6 @@ class RemoteConsultationAiResponderTest {
         val chunksSchema = responseSchema["properties"]["chunks"]
         assertThat(responseSchema.toString())
             .contains("\"chunks\"", "\"array\"", "\"string\"", "Two to five")
-        assertThat(responseSchema["additionalProperties"].asBoolean()).isFalse()
         assertThat(chunksSchema["minItems"].asInt()).isEqualTo(2)
         assertThat(chunksSchema["maxItems"].asInt()).isEqualTo(5)
         assertThat(chunksSchema["items"]["description"].asString())

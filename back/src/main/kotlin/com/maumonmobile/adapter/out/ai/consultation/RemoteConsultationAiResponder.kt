@@ -113,7 +113,6 @@ class RemoteConsultationAiResponder internal constructor(
     private fun consultationResponseSchema(): Map<String, Any> {
         return mapOf(
             "type" to "object",
-            "additionalProperties" to false,
             "properties" to mapOf(
                 "chunks" to mapOf(
                     "type" to "array",
