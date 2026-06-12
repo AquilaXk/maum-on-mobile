@@ -34,7 +34,6 @@ class MobileApiSnapshotContractTest {
                 "consultation",
                 "notification",
                 "settings",
-                "operations",
                 "moderation",
                 "report",
             )
