@@ -367,7 +367,8 @@ class RemoteConsultationAiResponder internal constructor(
             runCatching { objectMapper.readTree(extractJsonObject(text)) }
                 .getOrElse { throw ConsultationAiUnavailableException("상담 모델 응답을 해석하지 못했습니다.", it) }
         } ?: root
-        val chunks = payload["chunks"]?.takeIf { node -> node.isArray }?.map { node -> node.asString() }
+        val chunkNodes = payload["chunks"]?.takeIf { node -> node.isArray }
+        val chunks = chunkNodes?.map { node -> node.asString() }
             ?: listOfNotNull(
                 payload["text"]?.asString(),
                 payload["answer"]?.asString(),
@@ -382,13 +383,23 @@ class RemoteConsultationAiResponder internal constructor(
         if (sanitized.hasInternalReviewMarker()) {
             throw ConsultationAiUnavailableException("상담 모델 응답에 내부 검수 문구가 포함되어 있습니다.")
         }
-        sanitized.forEach { chunk -> chunk.requireValidLength() }
+        if (chunkNodes != null) {
+            sanitized.forEach { chunk -> chunk.requireValidChunkLength() }
+        } else {
+            sanitized.forEach { answer -> answer.requireValidFallbackAnswerLength() }
+        }
         return ConsultationAiResponse(chunks = sanitized)
     }
 
-    private fun String.requireValidLength() {
+    private fun String.requireValidChunkLength() {
         if (length !in MIN_CHUNK_CHARS..MAX_CHUNK_CHARS) {
             throw ConsultationAiUnavailableException("상담 모델 응답 청크 길이가 허용 범위를 벗어났습니다.")
+        }
+    }
+
+    private fun String.requireValidFallbackAnswerLength() {
+        if (length > MAX_FALLBACK_ANSWER_CHARS) {
+            throw ConsultationAiUnavailableException("상담 모델 응답 전체 길이가 허용 범위를 벗어났습니다.")
         }
     }
 
@@ -437,6 +448,7 @@ class RemoteConsultationAiResponder internal constructor(
         private const val COMPACT_RECENT_MESSAGE_LIMIT = 2
         private const val MIN_CHUNK_CHARS = 24
         private const val MAX_CHUNK_CHARS = 420
+        private const val MAX_FALLBACK_ANSWER_CHARS = 900
         private const val INTERNAL_REVIEW_MARKER =
             """(?:qa|테스트|샘플|placeholder|fixture|stub|스텁|내부\s*검수)"""
         private const val INTERNAL_REVIEW_MESSAGE_SUFFIX = """(?:메시지|메세지|응답|답변|문구)"""

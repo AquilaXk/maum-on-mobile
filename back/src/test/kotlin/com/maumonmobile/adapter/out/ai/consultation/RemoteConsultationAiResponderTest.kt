@@ -804,6 +804,60 @@ class RemoteConsultationAiResponderTest {
     }
 
     @Test
+    fun acceptsLegacyTopLevelAnswerLongerThanChunkLimit() {
+        val legacyReply = "지금 마음이 무겁게 느껴지는 이유를 한 번에 해결하려 하기보다, 오늘 버틸 수 있는 장면 하나부터 차분히 나누어 보자는 안내입니다. ".repeat(8).trim()
+        assertThat(legacyReply.length).isGreaterThan(420).isLessThanOrEqualTo(900)
+        val client = RecordingVertexAiGenerateContentClient(
+            responseBody = vertexResponse("""{"answer":"$legacyReply"}"""),
+        )
+        val responder = RemoteConsultationAiResponder(
+            properties = aiProperties(),
+            objectMapper = ObjectMapper(),
+            accessTokenProvider = { "vertex-token" },
+            generateContentClient = client,
+        )
+
+        val response = responder.generate(
+            ConsultationAiRequest(
+                memberId = 81L,
+                message = "오늘 마음이 너무 복잡해요.",
+                recentMessages = emptyList(),
+                timeout = Duration.ofSeconds(2),
+            ),
+        )
+
+        assertThat(response.chunks).containsExactly(legacyReply)
+    }
+
+    @Test
+    fun rejectsLegacyTopLevelAnswerOverPromptLimit() {
+        val legacyReply = "지금 마음이 무겁게 느껴지는 이유를 한 번에 해결하려 하기보다, 오늘 버틸 수 있는 장면 하나부터 차분히 나누어 보자는 안내입니다. ".repeat(13).trim()
+        assertThat(legacyReply.length).isGreaterThan(900)
+        val client = RecordingVertexAiGenerateContentClient(
+            responseBody = vertexResponse("""{"answer":"$legacyReply"}"""),
+        )
+        val responder = RemoteConsultationAiResponder(
+            properties = aiProperties(),
+            objectMapper = ObjectMapper(),
+            accessTokenProvider = { "vertex-token" },
+            generateContentClient = client,
+        )
+
+        assertThatThrownBy {
+            responder.generate(
+                ConsultationAiRequest(
+                    memberId = 82L,
+                    message = "오늘 마음이 너무 복잡해요.",
+                    recentMessages = emptyList(),
+                    timeout = Duration.ofSeconds(2),
+                ),
+            )
+        }.isInstanceOf(ConsultationAiUnavailableException::class.java)
+            .hasMessageContaining("상담 모델 응답을 만들지 못했습니다.")
+            .hasRootCauseMessage("상담 모델 응답 전체 길이가 허용 범위를 벗어났습니다.")
+    }
+
+    @Test
     fun rejectsInternalQaReplyChunks() {
         val client = RecordingVertexAiGenerateContentClient(
             responseBody = vertexResponse("""{"chunks":["상담 답변 QA메세지입니다."]}"""),
