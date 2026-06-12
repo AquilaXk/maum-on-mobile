@@ -12,7 +12,6 @@ void main() {
         'letter',
         'consultation',
         'notifications',
-        'operations',
         'settings',
       ],
     );
@@ -25,9 +24,12 @@ void main() {
         '/letters',
         '/consultation',
         '/notifications',
-        '/operations',
         '/settings',
       ],
+    );
+    expect(
+      AuthenticatedRoute.values.map((route) => route.key),
+      isNot(contains('operations')),
     );
     expect(AuthenticatedRoute.consultation.title, 'AI 상담');
     expect(AuthenticatedRoute.consultation.navLabel, 'AI 상담');

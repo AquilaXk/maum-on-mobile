@@ -24,7 +24,6 @@ test("mobile usability release criteria cover every launch screen and state", ()
     "consultation",
     "notifications",
     "settings",
-    "operations",
   ]) {
     assert.ok(screenIds.has(requiredScreen), `Missing launch screen criteria: ${requiredScreen}`);
   }

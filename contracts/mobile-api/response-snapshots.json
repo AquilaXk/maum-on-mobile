@@ -542,101 +542,6 @@
       }
     },
     {
-      "id": "operations.dashboard.success",
-      "area": "operations",
-      "method": "GET",
-      "path": "/api/v1/admin/operations/dashboard",
-      "contract": "envelope",
-      "parser": "operations.dashboard",
-      "response": {
-        "success": true,
-        "data": {
-          "todayReportCount": 3,
-          "openReportCount": 2,
-          "processedReportCount": 1,
-          "todayLetterCount": 7,
-          "todayDiaryCount": 4,
-          "receivableMemberCount": 20,
-          "blockedMemberCount": 1,
-          "adminMemberCount": 2,
-          "unassignedLetterCount": 0,
-          "todayAdminActionCount": 5
-        }
-      }
-    },
-    {
-      "id": "operations.metrics.success",
-      "area": "operations",
-      "method": "GET",
-      "path": "/api/v1/operations/api-metrics",
-      "contract": "envelope",
-      "parser": "operations.metrics",
-      "response": {
-        "success": true,
-        "data": {
-          "sampleCount": 3,
-          "endpoints": [
-            {
-              "endpoint": "GET /api/v1/posts",
-              "requestCount": 10,
-              "successRate": 0.99,
-              "p95LatencyMs": 120,
-              "errorCodes": {
-                "UNAUTHORIZED": 1
-              }
-            }
-          ],
-          "writeRecovery": {
-            "duplicatePreventions": {
-              "story.create": 1
-            },
-            "imageLifecycle": {
-              "diary.upload": 1
-            }
-          },
-          "notifications": {
-            "pushDelivery": {
-              "success": 2
-            }
-          },
-          "ai": {
-            "model": {
-              "consultation.fallback": 1
-            },
-            "contentModeration": {
-              "blocked": 1
-            },
-            "consultationSafety": {
-              "SELF_HARM.BLOCK_AND_ESCALATE": 1
-            }
-          },
-          "client": {
-            "events": {
-              "APP_START": 1,
-              "SCREEN_VIEW": 2
-            },
-            "routes": {
-              "home": 2
-            },
-            "platforms": {
-              "android": 2,
-              "ios": 1
-            },
-            "appVersions": {
-              "0.1.0": 3
-            },
-            "networkStatus": {
-              "wifi": 3
-            },
-            "p95DurationMs": {
-              "APP_START": 420
-            },
-            "dropped": {}
-          }
-        }
-      }
-    },
-    {
       "id": "moderation.review.success",
       "area": "moderation",
       "method": "POST",
@@ -657,45 +562,15 @@
       }
     },
     {
-      "id": "report.admin-list.success",
+      "id": "report.create.success",
       "area": "report",
-      "method": "GET",
-      "path": "/api/v1/admin/reports",
+      "method": "POST",
+      "path": "/api/v1/reports",
       "contract": "envelope",
-      "parser": "report.adminList",
+      "parser": "report.create",
       "response": {
         "success": true,
-        "data": [
-          {
-            "id": 71,
-            "targetId": 21,
-            "targetType": "POST",
-            "reason": "PROFANITY",
-            "content": "공격적인 표현이 있습니다.",
-            "status": "OPEN",
-            "createdAt": "2026-05-26T08:00:00",
-            "targetTitle": "잠이 오지 않는 밤",
-            "targetPreview": "밤마다 생각이 많아요.",
-            "reporter": {
-              "id": 2,
-              "email": "reporter@example.com",
-              "nickname": "신고자",
-              "role": "USER",
-              "status": "ACTIVE"
-            },
-            "targetOwner": {
-              "id": 1,
-              "email": "writer@example.com",
-              "nickname": "작성자",
-              "role": "USER",
-              "status": "ACTIVE"
-            },
-            "actionReason": null,
-            "handledBy": null,
-            "handledAt": null,
-            "actionCount": 0
-          }
-        ]
+        "data": 71
       }
     }
   ]

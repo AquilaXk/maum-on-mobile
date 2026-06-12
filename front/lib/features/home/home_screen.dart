@@ -15,11 +15,9 @@ class HomeScreen extends StatefulWidget {
     required this.onOpenNotifications,
     required this.onOpenSettings,
     required this.onLogout,
-    this.isAdmin = false,
     this.unreadNotificationCount = 0,
     this.hasLiveNotificationConnection = false,
     this.onRefresh,
-    this.onOpenOperations,
     super.key,
   });
 
@@ -32,11 +30,9 @@ class HomeScreen extends StatefulWidget {
   final VoidCallback onOpenNotifications;
   final VoidCallback onOpenSettings;
   final VoidCallback onLogout;
-  final bool isAdmin;
   final int unreadNotificationCount;
   final bool hasLiveNotificationConnection;
   final Future<void> Function()? onRefresh;
-  final VoidCallback? onOpenOperations;
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
@@ -115,8 +111,6 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
             const SizedBox(height: AppSpacing.lg),
             _AccountToolsSection(
-              isAdmin: widget.isAdmin,
-              onOpenOperations: widget.onOpenOperations,
               onOpenSettings: widget.onOpenSettings,
               onLogout: widget.onLogout,
             ),
@@ -648,16 +642,12 @@ class _ActionGrid extends StatelessWidget {
 
 class _AccountToolsSection extends StatelessWidget {
   const _AccountToolsSection({
-    required this.isAdmin,
     required this.onOpenSettings,
     required this.onLogout,
-    this.onOpenOperations,
   });
 
-  final bool isAdmin;
   final VoidCallback onOpenSettings;
   final VoidCallback onLogout;
-  final VoidCallback? onOpenOperations;
 
   @override
   Widget build(BuildContext context) {
@@ -685,13 +675,6 @@ class _AccountToolsSection extends StatelessWidget {
                 spacing: AppSpacing.xs,
                 runSpacing: AppSpacing.xs,
                 children: [
-                  if (isAdmin && onOpenOperations != null)
-                    OutlinedButton.icon(
-                      key: const ValueKey('home-operations-button'),
-                      onPressed: onOpenOperations,
-                      icon: const Icon(Icons.admin_panel_settings_outlined),
-                      label: const Text('운영 검수'),
-                    ),
                   OutlinedButton.icon(
                     key: const ValueKey('home-action-settings'),
                     onPressed: onOpenSettings,

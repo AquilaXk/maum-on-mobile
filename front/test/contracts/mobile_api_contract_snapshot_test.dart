@@ -11,7 +11,6 @@ import 'package:maum_on_mobile_front/features/home/domain/home_models.dart';
 import 'package:maum_on_mobile_front/features/letter/domain/letter_models.dart';
 import 'package:maum_on_mobile_front/features/moderation/domain/content_moderation_models.dart';
 import 'package:maum_on_mobile_front/features/notification/domain/notification_models.dart';
-import 'package:maum_on_mobile_front/features/operations/domain/operations_models.dart';
 import 'package:maum_on_mobile_front/features/report/domain/report_models.dart';
 import 'package:maum_on_mobile_front/features/settings/domain/settings_models.dart';
 import 'package:maum_on_mobile_front/features/story/domain/story_models.dart';
@@ -33,7 +32,6 @@ void main() {
         'consultation',
         'notification',
         'settings',
-        'operations',
         'moderation',
         'report',
       });
@@ -186,18 +184,28 @@ Object? _parseSnapshot(String parser, Object? json) {
     'notification.deviceToken' => NotificationDeviceTokenResult.fromJson(json),
     'settings.profile' => MemberSettings.fromJson(json),
     'settings.exportJob' => MemberDataExportJob.fromJson(json),
-    'operations.dashboard' => OperationsDashboard.fromJson(json),
-    'operations.metrics' => MobileApiMetricsSnapshot.fromJson(json),
     'moderation.review' => ContentModerationResult.fromJson(json),
-    'report.adminList' => _list(json, 'admin report list')
-        .map(AdminReportSummary.fromJson)
-        .toList(growable: false),
+    'report.create' => _parseReportId(json),
     'raw' => json,
     _ => throw FormatException(
         'Unknown mobile API snapshot parser "$parser". '
         'Update front/test/contracts/mobile_api_contract_snapshot_test.dart.',
       ),
   };
+}
+
+int _parseReportId(Object? json) {
+  if (json is int) {
+    return json;
+  }
+  if (json is num) {
+    return json.toInt();
+  }
+  final parsed = int.tryParse(json?.toString() ?? '');
+  if (parsed == null) {
+    throw const FormatException('Expected report id.');
+  }
+  return parsed;
 }
 
 void _expectEnumValues(

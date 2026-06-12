@@ -19,7 +19,6 @@ test("mobile performance gate manifest covers long-running domain scenarios", ()
     "letter.flow",
     "report.flow",
     "notification.flow",
-    "operations.actions",
   ]) {
     assert.ok(scenarioIds.has(requiredScenario), `Missing performance scenario: ${requiredScenario}`);
   }

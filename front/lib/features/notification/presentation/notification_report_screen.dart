@@ -652,8 +652,6 @@ IconData _notificationIcon(NotificationItem notification) {
     NotificationTapDestination.story => Icons.forum_outlined,
     NotificationTapDestination.letter => Icons.mail_outline,
     NotificationTapDestination.consultation => Icons.chat_bubble_outline,
-    NotificationTapDestination.operations =>
-      Icons.admin_panel_settings_outlined,
     NotificationTapDestination.settings => Icons.settings_outlined,
     NotificationTapDestination.notifications => Icons.notifications_none,
   };
@@ -662,7 +660,6 @@ IconData _notificationIcon(NotificationItem notification) {
 AppStatusTone _notificationDestinationTone(NotificationItem notification) {
   return switch (notification.destination) {
     NotificationTapDestination.notifications => AppStatusTone.neutral,
-    NotificationTapDestination.operations => AppStatusTone.warning,
     _ => AppStatusTone.success,
   };
 }

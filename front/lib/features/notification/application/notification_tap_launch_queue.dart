@@ -122,8 +122,6 @@ class NotificationTapLaunchQueue {
     final missingTarget = switch (payload.destination) {
       NotificationTapDestination.letter =>
         payload.letterId == null || payload.letterId! <= 0,
-      NotificationTapDestination.operations =>
-        payload.reportId == null || payload.reportId! <= 0,
       NotificationTapDestination.story => payload.hasTargetReference &&
           (payload.storyId == null || payload.storyId! <= 0),
       NotificationTapDestination.diary => payload.hasTargetReference &&

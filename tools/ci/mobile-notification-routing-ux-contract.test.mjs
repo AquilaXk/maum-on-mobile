@@ -23,14 +23,13 @@ test("mobile notification routing UX contract covers every actionable notificati
     "reply_arrival",
     "consultation_reply",
     "report_status",
-    "operations_action",
     "fallback",
   ]) {
     assert.ok(routes.has(type), `Missing notification UX route: ${type}`);
   }
 
   for (const route of routes.values()) {
-    assert.match(route.destination, /^(letter|consultation|notifications|operations)$/);
+    assert.match(route.destination, /^(letter|consultation|notifications)$/);
     assert.ok(route.fallback.destination === "notifications", `${route.type} must fall back to notifications`);
     assert.ok(route.tapBehavior.markReadBeforeNavigate, `${route.type} must mark read before navigation`);
     assert.ok(route.tapBehavior.dedupeByNotificationId, `${route.type} must dedupe tap handling`);

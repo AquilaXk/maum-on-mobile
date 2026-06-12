@@ -33,7 +33,6 @@ test("mobile API response snapshots cover core parser and release-gate areas", (
     "letter",
     "moderation",
     "notification",
-    "operations",
     "report",
     "settings",
     "story",
@@ -45,7 +44,7 @@ test("mobile API response snapshots cover core parser and release-gate areas", (
     "story.list.success",
     "diary.list.success",
     "notification.list.success",
-    "operations.metrics.success",
+    "report.create.success",
   ]) {
     assert.ok(ids.has(requiredId), `Missing mobile API snapshot: ${requiredId}`);
   }

@@ -44,7 +44,6 @@ enum NotificationTapDestination {
   story,
   letter,
   consultation,
-  operations,
   settings,
 }
 
@@ -128,7 +127,6 @@ class NotificationItem {
       NotificationTapDestination.story => '이야기',
       NotificationTapDestination.letter => '편지',
       NotificationTapDestination.consultation => 'AI 상담',
-      NotificationTapDestination.operations => '운영',
       NotificationTapDestination.settings => '설정',
       NotificationTapDestination.notifications => '알림',
     };
@@ -320,10 +318,6 @@ NotificationTapDestination _destinationFromRouteKey(
       NotificationTapDestination.letter,
     'consultation' || 'consultation_reply' =>
       NotificationTapDestination.consultation,
-    'operations' || 'operations_action' || 'admin' || 'report' ||
-    'reports' ||
-    'report_status' =>
-      NotificationTapDestination.operations,
     'settings' || 'setting' || 'account' || 'profile' =>
       NotificationTapDestination.settings,
     _ => null,
@@ -338,7 +332,7 @@ NotificationTapDestination _destinationFromRouteKey(
     'POST' || 'STORY' || 'COMMENT' => NotificationTapDestination.story,
     'LETTER' => NotificationTapDestination.letter,
     'CONSULTATION' => NotificationTapDestination.consultation,
-    'REPORT' => NotificationTapDestination.operations,
+    'REPORT' => NotificationTapDestination.notifications,
     'SETTINGS' || 'ACCOUNT' || 'PROFILE' => NotificationTapDestination.settings,
     _ => NotificationTapDestination.notifications,
   };

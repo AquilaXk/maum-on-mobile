@@ -53,7 +53,7 @@ void main() {
     });
     expect(
       legacyReportPayload.destination,
-      NotificationTapDestination.operations,
+      NotificationTapDestination.notifications,
     );
     expect(legacyReportPayload.reportId, 12);
     expect(

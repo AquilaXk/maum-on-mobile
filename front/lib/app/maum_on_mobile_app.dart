@@ -36,10 +36,6 @@ import '../features/notification/data/notification_repository.dart';
 import '../features/notification/data/push_notification_permission_client.dart';
 import '../features/notification/domain/notification_models.dart';
 import '../features/notification/presentation/notification_report_screen.dart';
-import '../features/operations/application/operations_controller.dart';
-import '../features/operations/data/operations_repository.dart';
-import '../features/operations/domain/operations_models.dart';
-import '../features/operations/presentation/operations_screen.dart';
 import '../features/report/application/report_controller.dart';
 import '../features/report/data/report_repository.dart';
 import '../features/report/domain/report_models.dart';
@@ -65,7 +61,6 @@ class MaumOnMobileApp extends StatefulWidget {
     this.notificationRepository,
     this.pushNotificationPermissionClient,
     this.reportRepository,
-    this.operationsRepository,
     this.settingsRepository,
     this.diaryRepository,
     this.diaryImageRepository,
@@ -89,7 +84,6 @@ class MaumOnMobileApp extends StatefulWidget {
   final NotificationRepository? notificationRepository;
   final PushNotificationPermissionClient? pushNotificationPermissionClient;
   final ReportRepository? reportRepository;
-  final OperationsRepository? operationsRepository;
   final SettingsRepository? settingsRepository;
   final DiaryRepository? diaryRepository;
   final DiaryImageRepository? diaryImageRepository;
@@ -138,8 +132,6 @@ class _MaumOnMobileAppState extends State<MaumOnMobileApp>
   int? _notificationMemberId;
   ReportController? _reportController;
   int? _reportMemberId;
-  OperationsController? _operationsController;
-  int? _operationsMemberId;
   SettingsController? _settingsController;
   int? _settingsMemberId;
   DiaryController? _diaryController;
@@ -157,7 +149,6 @@ class _MaumOnMobileAppState extends State<MaumOnMobileApp>
   NotificationTapPayload? _pendingNotificationTap;
   int? _pendingLetterId;
   int? _pendingStoryId;
-  int? _pendingOperationsReportId;
   String? _pendingNotificationNotice;
   AuthenticatedRoute _route = AuthenticatedRoute.home;
   late final DraftRecoveryRepository _draftRecoveryRepository =
@@ -188,7 +179,6 @@ class _MaumOnMobileAppState extends State<MaumOnMobileApp>
     _disposeConsultationController();
     _disposeNotificationController();
     _disposeReportController();
-    _disposeOperationsController();
     _disposeSettingsController();
     _disposeDiaryController();
     _disposeStoryController();
@@ -256,10 +246,7 @@ class _MaumOnMobileAppState extends State<MaumOnMobileApp>
                 onRouteSelected: _selectPrimaryRoute,
                 child: _buildAuthenticatedRoute(
                   memberId: state.member!.id,
-                  email: state.member!.email,
                   nickname: state.member!.nickname,
-                  role: state.member!.role,
-                  status: state.member!.status,
                 ),
               ),
             );
@@ -271,10 +258,7 @@ class _MaumOnMobileAppState extends State<MaumOnMobileApp>
 
   Widget _buildAuthenticatedRoute({
     required int memberId,
-    required String email,
     required String nickname,
-    required String role,
-    required String status,
   }) {
     return switch (_route) {
       AuthenticatedRoute.diary => DiaryScreen(
@@ -288,25 +272,6 @@ class _MaumOnMobileAppState extends State<MaumOnMobileApp>
           onBack: _returnHome,
         ),
       AuthenticatedRoute.notifications => _buildNotificationRoute(memberId),
-      AuthenticatedRoute.operations => role == 'ADMIN'
-          ? OperationsScreen(
-              controller: _operationsControllerForPendingTarget(memberId),
-              onBack: _returnHome,
-              adminProfile: OperationsAdminProfile(
-                id: memberId,
-                email: email,
-                nickname: nickname,
-                role: role,
-                status: status,
-              ),
-              onOpenSettings: () => _openRoute(AuthenticatedRoute.settings),
-              onLogout: _logout,
-            )
-          : _buildHomeRoute(
-              memberId: memberId,
-              nickname: nickname,
-              isAdmin: false,
-            ),
       AuthenticatedRoute.settings => SettingsScreen(
           controller: _settingsControllerFor(memberId),
           supportContactInfo: _supportContactInfo(),
@@ -317,10 +282,6 @@ class _MaumOnMobileAppState extends State<MaumOnMobileApp>
       AuthenticatedRoute.home => _buildHomeRoute(
           memberId: memberId,
           nickname: nickname,
-          isAdmin: role == 'ADMIN',
-          onOpenOperations: role == 'ADMIN'
-              ? () => _openRoute(AuthenticatedRoute.operations)
-              : null,
         ),
     };
   }
@@ -328,8 +289,6 @@ class _MaumOnMobileAppState extends State<MaumOnMobileApp>
   Widget _buildHomeRoute({
     required int memberId,
     required String nickname,
-    required bool isAdmin,
-    VoidCallback? onOpenOperations,
   }) {
     final homeController = _homeControllerFor(memberId);
     final notificationController = _homeNotificationControllerFor(memberId);
@@ -360,8 +319,6 @@ class _MaumOnMobileAppState extends State<MaumOnMobileApp>
         onOpenSettings: () => _openRoute(AuthenticatedRoute.settings),
         unreadNotificationCount: unreadCount,
         hasLiveNotificationConnection: hasLiveConnection,
-        isAdmin: isAdmin,
-        onOpenOperations: onOpenOperations,
         onLogout: _logout,
       );
     }
@@ -451,7 +408,6 @@ class _MaumOnMobileAppState extends State<MaumOnMobileApp>
     _pendingReportTarget = null;
     _pendingLetterId = null;
     _pendingStoryId = null;
-    _pendingOperationsReportId = null;
     _pendingNotificationNotice = null;
     _route = AuthenticatedRoute.home;
     _authenticatedSessionKey = null;
@@ -477,7 +433,6 @@ class _MaumOnMobileAppState extends State<MaumOnMobileApp>
     _pendingReportTarget = null;
     _pendingLetterId = null;
     _pendingStoryId = null;
-    _pendingOperationsReportId = null;
     _pendingNotificationNotice = null;
     _route = AuthenticatedRoute.home;
     _authenticatedSessionKey = sessionKey;
@@ -492,10 +447,6 @@ class _MaumOnMobileAppState extends State<MaumOnMobileApp>
 
   void _handleControllerSessionInvalidated() {
     unawaited(_invalidateAuthenticatedSession('다시 로그인해 주세요.'));
-  }
-
-  void _handleOperationsSessionInvalidated(String message) {
-    unawaited(_invalidateAuthenticatedSession(message));
   }
 
   Future<void> _invalidateAuthenticatedSession(String message) {
@@ -519,7 +470,6 @@ class _MaumOnMobileAppState extends State<MaumOnMobileApp>
     _pendingReportTarget = null;
     _pendingLetterId = null;
     _pendingStoryId = null;
-    _pendingOperationsReportId = null;
     _pendingNotificationNotice = null;
     _openLetterComposer = false;
     _route = AuthenticatedRoute.home;
@@ -536,7 +486,6 @@ class _MaumOnMobileAppState extends State<MaumOnMobileApp>
     _pendingReportTarget = null;
     _pendingLetterId = null;
     _pendingStoryId = null;
-    _pendingOperationsReportId = null;
     _pendingNotificationNotice = null;
     _openLetterComposer = false;
     _route = AuthenticatedRoute.home;
@@ -588,7 +537,6 @@ class _MaumOnMobileAppState extends State<MaumOnMobileApp>
       _pendingReportTarget = null;
       _pendingLetterId = null;
       _pendingStoryId = null;
-      _pendingOperationsReportId = null;
       _pendingNotificationNotice = null;
       _route = route;
     });
@@ -600,7 +548,6 @@ class _MaumOnMobileAppState extends State<MaumOnMobileApp>
       _pendingReportTarget = null;
       _pendingLetterId = null;
       _pendingStoryId = null;
-      _pendingOperationsReportId = null;
       _pendingNotificationNotice = null;
       _route = AuthenticatedRoute.home;
     });
@@ -611,7 +558,6 @@ class _MaumOnMobileAppState extends State<MaumOnMobileApp>
     _disposeConsultationController();
     _disposeNotificationController(unregisterPushToken: unregisterPushToken);
     _disposeReportController();
-    _disposeOperationsController();
     _disposeSettingsController();
     _disposeDiaryController();
     _disposeStoryController();
@@ -731,40 +677,6 @@ class _MaumOnMobileAppState extends State<MaumOnMobileApp>
     _reportController?.dispose();
     _reportController = null;
     _reportMemberId = null;
-  }
-
-  OperationsController _operationsControllerFor(int memberId) {
-    final currentController = _operationsController;
-    if (currentController != null && _operationsMemberId == memberId) {
-      return currentController;
-    }
-
-    currentController?.dispose();
-    _operationsMemberId = memberId;
-    return _operationsController = OperationsController(
-      reportRepository:
-          widget.reportRepository ?? _buildDefaultReportRepository(),
-      operationsRepository:
-          widget.operationsRepository ?? _buildDefaultOperationsRepository(),
-      systemEnvironment: _operationsSystemEnvironment(),
-      onUnauthorized: _handleOperationsSessionInvalidated,
-    );
-  }
-
-  OperationsController _operationsControllerForPendingTarget(int memberId) {
-    final controller = _operationsControllerFor(memberId);
-    final reportId = _pendingOperationsReportId;
-    if (reportId != null) {
-      _pendingOperationsReportId = null;
-      unawaited(controller.openReportById(reportId));
-    }
-    return controller;
-  }
-
-  void _disposeOperationsController() {
-    _operationsController?.dispose();
-    _operationsController = null;
-    _operationsMemberId = null;
   }
 
   SettingsController _settingsControllerFor(int memberId) {
@@ -928,31 +840,6 @@ class _MaumOnMobileAppState extends State<MaumOnMobileApp>
     );
   }
 
-  OperationsRepository _buildDefaultOperationsRepository() {
-    return ApiOperationsRepository(
-      apiClient: _sessionApiClient(tokenRefresher: _tokenRefresher()),
-    );
-  }
-
-  OperationsSystemEnvironment _operationsSystemEnvironment() {
-    return OperationsSystemEnvironment(
-      apiEndpoint: _apiConfig.baseUrl.toString(),
-      appVersion: const String.fromEnvironment(
-        'APP_VERSION',
-        defaultValue: '0.1.0',
-      ),
-      buildNumber: const String.fromEnvironment(
-        'APP_BUILD_NUMBER',
-        defaultValue: '1',
-      ),
-      platform: _platformLabel(defaultTargetPlatform),
-      observabilityToolUrl: const String.fromEnvironment(
-        'OBSERVABILITY_TOOL_URL',
-        defaultValue: '',
-      ),
-    );
-  }
-
   SupportContactInfo _supportContactInfo() {
     return SupportContactInfo(
       supportEmail: LegalDisclosures.supportEmail,
@@ -1068,7 +955,6 @@ class _MaumOnMobileAppState extends State<MaumOnMobileApp>
     _pendingReportTarget = null;
     _pendingLetterId = null;
     _pendingStoryId = null;
-    _pendingOperationsReportId = null;
     _pendingNotificationNotice = null;
     _route = switch (payload.destination) {
       NotificationTapDestination.diary => AuthenticatedRoute.diary,
@@ -1076,7 +962,6 @@ class _MaumOnMobileAppState extends State<MaumOnMobileApp>
       NotificationTapDestination.letter => _letterRouteFor(payload),
       NotificationTapDestination.consultation =>
         AuthenticatedRoute.consultation,
-      NotificationTapDestination.operations => _operationsRouteFor(payload),
       NotificationTapDestination.settings => AuthenticatedRoute.settings,
       NotificationTapDestination.notifications =>
         AuthenticatedRoute.notifications,
@@ -1106,17 +991,6 @@ class _MaumOnMobileAppState extends State<MaumOnMobileApp>
 
     _pendingStoryId = storyId;
     return AuthenticatedRoute.story;
-  }
-
-  AuthenticatedRoute _operationsRouteFor(NotificationTapPayload payload) {
-    final reportId = payload.reportId;
-    if (reportId == null || reportId <= 0) {
-      _pendingNotificationNotice = '운영 항목을 바로 열 수 없어 알림 목록에 머뭅니다.';
-      return AuthenticatedRoute.notifications;
-    }
-
-    _pendingOperationsReportId = reportId;
-    return AuthenticatedRoute.operations;
   }
 
   void _openNotificationItem(NotificationItem notification) {

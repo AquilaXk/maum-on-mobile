@@ -86,26 +86,6 @@
       ]
     },
     {
-      "id": "operations-review-support",
-      "file": "front/lib/features/operations/presentation/operations_screen.dart",
-      "patterns": [
-        "operations-review-support-card",
-        "심사 대응",
-        "App Store review",
-        "Google Play review"
-      ]
-    },
-    {
-      "id": "operations-review-support-test",
-      "file": "front/test/features/operations/operations_screen_test.dart",
-      "patterns": [
-        "operations-review-support-card",
-        "support@maum-on.app",
-        "privacy@maum-on.app",
-        "https://maum-on.app/status"
-      ]
-    },
-    {
       "id": "app-release-support-env",
       "file": "front/lib/app/maum_on_mobile_app.dart",
       "patterns": [

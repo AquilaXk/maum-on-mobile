@@ -79,7 +79,7 @@
     {
       "id": "mobile-api-contract-version-source",
       "file": "contracts/mobile-api/response-snapshots.json",
-      "patterns": ["\"version\": 1", "\"endpoints\""]
+      "patterns": ["\"version\": 1", "\"snapshots\"", "\"path\""]
     },
     {
       "id": "android-store-notes-source",

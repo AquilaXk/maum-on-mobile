@@ -25,21 +25,17 @@ test("store review seed contract declares protected backend seed inputs", () => 
   assert.equal(contract.secretOptIn.headerName, "X-Maumon-Review-Seed-Secret");
   assert.ok(contract.secretOptIn.secretNames.includes("MAUMON_STORE_REVIEW_SEED_SECRET"));
   assert.ok(contract.secretOptIn.secretNames.includes("MAUMON_REVIEW_ACCOUNT_PASSWORD"));
-  assert.ok(contract.secretOptIn.secretNames.includes("MAUMON_REVIEW_OPERATIONS_PASSWORD"));
+  assert.ok(!contract.secretOptIn.secretNames.includes("MAUMON_REVIEW_OPERATIONS_PASSWORD"));
 });
 
-test("store review seed contract covers reviewer and operations access", () => {
+test("store review seed contract covers reviewer access", () => {
   const contract = readJson(contractPath);
   const accounts = new Map(contract.accounts.map((account) => [account.id, account]));
 
   assert.equal(accounts.get("reviewer").role, "USER");
-  assert.equal(accounts.get("operations").role, "ADMIN");
   assert.equal(accounts.get("reviewer").emailSecretName, "MAUMON_REVIEW_ACCOUNT_EMAIL");
-  assert.equal(accounts.get("operations").emailSecretName, "MAUMON_REVIEW_OPERATIONS_EMAIL");
   assert.ok(accounts.get("reviewer").accessPaths.includes("auth.login"));
-  assert.ok(accounts.get("operations").accessPaths.includes("admin.members"));
-  assert.ok(accounts.get("operations").accessPaths.includes("admin.reports"));
-  assert.ok(accounts.get("operations").accessPaths.includes("admin.letters"));
+  assert.ok(!accounts.has("operations"));
 });
 
 test("store review seed contract covers required journey data", () => {
