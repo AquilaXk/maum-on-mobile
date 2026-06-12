@@ -171,6 +171,7 @@ jobs:
       - Linux
       - ARM64
       - oci-a1-deploy
+    timeout-minutes: 30
     environment:
       name: ${{ needs.prepare.outputs.environment }}
     permissions:
@@ -190,7 +191,6 @@ jobs:
         with:
           distribution: temurin
           java-version: "21"
-          cache: gradle
 
       - name: Build backend jar
         working-directory: back
