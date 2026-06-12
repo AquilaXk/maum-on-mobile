@@ -33,10 +33,12 @@ import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc
+import org.springframework.http.HttpHeaders
 import org.springframework.http.MediaType
 import org.springframework.test.context.ActiveProfiles
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.get
+import org.springframework.test.web.servlet.options
 import org.springframework.test.web.servlet.patch
 import org.springframework.test.web.servlet.post
 import java.time.Instant
@@ -56,6 +58,22 @@ class AdminOperationsControllerTest @Autowired constructor(
     private val storyRepository: StoryRepository,
     private val jwtTokenProvider: JwtTokenProvider,
 ) {
+
+    @Test
+    fun adminApiAllowsConfiguredCorsPreflight() {
+        mockMvc.options("/api/v1/admin/dashboard") {
+            header(HttpHeaders.ORIGIN, "http://localhost:59749")
+            header(HttpHeaders.ACCESS_CONTROL_REQUEST_METHOD, "GET")
+            header(HttpHeaders.ACCESS_CONTROL_REQUEST_HEADERS, "Authorization, Content-Type")
+        }
+            .andExpect {
+                status { isOk() }
+                header { string(HttpHeaders.ACCESS_CONTROL_ALLOW_ORIGIN, "http://localhost:59749") }
+                header { string(HttpHeaders.ACCESS_CONTROL_ALLOW_METHODS, containsString("GET")) }
+                header { string(HttpHeaders.ACCESS_CONTROL_ALLOW_HEADERS, containsString("Authorization")) }
+                header { string(HttpHeaders.ACCESS_CONTROL_ALLOW_HEADERS, containsString("Content-Type")) }
+            }
+    }
 
     @Test
     fun adminReadsDashboardAndMemberListWithFilters() {

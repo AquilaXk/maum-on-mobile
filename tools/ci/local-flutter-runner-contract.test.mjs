@@ -66,6 +66,11 @@ test("local mobile check script runs Flutter checks from the app directory", () 
   assert.match(script, /flutter pub get/, "Local checks must install Flutter dependencies");
   assert.match(script, /flutter analyze/, "Local checks must run static analysis");
   assert.match(script, /flutter test/, "Local checks must run tests");
+  assert.match(
+    script,
+    /flutter build web --target lib\/admin_main\.dart --dart-define=API_BASE_URL=http:\/\/localhost:8080/,
+    "Local checks must build the separated admin web entrypoint"
+  );
   assert.match(script, /--doctor/, "Local checks must expose a doctor-only mode");
   assert.match(script, /ANDROID_HOME|ANDROID_SDK_ROOT/, "Doctor mode must inspect Android SDK environment");
   assert.match(script, /DEVELOPER_DIR/, "Doctor mode must select the full local Xcode when Command Line Tools are active");

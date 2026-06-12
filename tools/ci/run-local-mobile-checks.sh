@@ -116,3 +116,4 @@ cd "${repo_root}/front"
 run_flutter "flutter pub get" pub get --enforce-lockfile
 run_flutter "flutter analyze" analyze
 run_flutter "flutter test" test
+run_flutter "flutter build web --target lib/admin_main.dart --dart-define=API_BASE_URL=http://localhost:8080" build web --target lib/admin_main.dart --dart-define=API_BASE_URL=http://localhost:8080

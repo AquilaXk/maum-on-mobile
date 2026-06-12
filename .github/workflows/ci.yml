@@ -383,6 +383,7 @@ jobs:
           set -euo pipefail
           flutter analyze
           flutter test
+          flutter build web --target lib/admin_main.dart --dart-define=API_BASE_URL=http://localhost:8080
 
       - name: Set up Node.js
         if: ${{ steps.scaffold.outputs.present == 'true' && steps.scaffold.outputs.stack == 'node' }}

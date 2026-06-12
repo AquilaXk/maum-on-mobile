@@ -69,6 +69,10 @@ test("frontend job supports Flutter and Node scaffolds", async () => {
   assert.match(frontend, /flutter pub get/);
   assert.match(frontend, /flutter analyze/);
   assert.match(frontend, /flutter test/);
+  assert.match(
+    frontend,
+    /flutter build web --target lib\/admin_main\.dart --dart-define=API_BASE_URL=http:\/\/localhost:8080/,
+  );
   assert.match(frontend, /\[\[ -f front\/package\.json \]\]/);
   assert.match(frontend, /echo "stack=node"/);
 });
