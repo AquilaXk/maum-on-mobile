@@ -84,6 +84,8 @@ class _MaumBottomNavigationItem extends StatelessWidget {
         isSelected ? colorScheme.primary : colorScheme.onSurfaceVariant;
     final labelForeground =
         isSelected ? colorScheme.onSurface : colorScheme.onSurfaceVariant;
+    final selectedSurfaceColor =
+        colorScheme.primaryContainer.withValues(alpha: 0.42);
 
     return Semantics(
       button: true,
@@ -93,60 +95,69 @@ class _MaumBottomNavigationItem extends StatelessWidget {
       child: ExcludeSemantics(
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xxs),
-          child: Material(
-            color: Colors.transparent,
-            borderRadius: BorderRadius.circular(10),
-            child: InkWell(
+          child: AnimatedContainer(
+            key: ValueKey('route-tab-${route.key}-surface'),
+            duration: const Duration(milliseconds: 180),
+            curve: Curves.easeOut,
+            decoration: BoxDecoration(
+              color: isSelected ? selectedSurfaceColor : Colors.transparent,
               borderRadius: BorderRadius.circular(10),
-              onTap: () => onSelected(route),
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(minHeight: 52),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: AppSpacing.xxs,
-                  ),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      AnimatedContainer(
-                        key: ValueKey('route-tab-${route.key}-indicator'),
-                        duration: const Duration(milliseconds: 180),
-                        curve: Curves.easeOut,
-                        width: 24,
-                        height: 3,
-                        decoration: BoxDecoration(
-                          color: isSelected
-                              ? colorScheme.primary
-                              : Colors.transparent,
-                          borderRadius: BorderRadius.circular(999),
+            ),
+            child: Material(
+              color: Colors.transparent,
+              borderRadius: BorderRadius.circular(10),
+              child: InkWell(
+                borderRadius: BorderRadius.circular(10),
+                onTap: () => onSelected(route),
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(minHeight: 52),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: AppSpacing.xxs,
+                    ),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        AnimatedContainer(
+                          key: ValueKey('route-tab-${route.key}-indicator'),
+                          duration: const Duration(milliseconds: 180),
+                          curve: Curves.easeOut,
+                          width: 24,
+                          height: 3,
+                          decoration: BoxDecoration(
+                            color: isSelected
+                                ? colorScheme.primary
+                                : Colors.transparent,
+                            borderRadius: BorderRadius.circular(999),
+                          ),
                         ),
-                      ),
-                      const SizedBox(height: 5),
-                      Icon(
-                        isSelected ? route.selectedIcon : route.icon,
-                        size: isSelected ? 23 : 22,
-                        color: iconForeground,
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        route.navLabel,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: theme.textTheme.labelSmall?.copyWith(
-                              color: labelForeground,
-                              fontWeight: isSelected
-                                  ? FontWeight.w800
-                                  : FontWeight.w700,
-                            ) ??
-                            TextStyle(
-                              color: labelForeground,
-                              fontWeight: isSelected
-                                  ? FontWeight.w800
-                                  : FontWeight.w700,
-                            ),
-                      ),
-                    ],
+                        const SizedBox(height: 5),
+                        Icon(
+                          isSelected ? route.selectedIcon : route.icon,
+                          size: isSelected ? 23 : 22,
+                          color: iconForeground,
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          route.navLabel,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.textTheme.labelSmall?.copyWith(
+                                color: labelForeground,
+                                fontWeight: isSelected
+                                    ? FontWeight.w800
+                                    : FontWeight.w700,
+                              ) ??
+                              TextStyle(
+                                color: labelForeground,
+                                fontWeight: isSelected
+                                    ? FontWeight.w800
+                                    : FontWeight.w700,
+                              ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ),

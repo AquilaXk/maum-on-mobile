@@ -271,6 +271,10 @@ void main() {
         find.byKey(const ValueKey('route-tab-home-indicator')),
         findsOneWidget,
       );
+      expect(
+        find.byKey(const ValueKey('route-tab-home-surface')),
+        findsOneWidget,
+      );
       final selectedIndicatorSize = tester.getSize(
         find.byKey(
           const ValueKey('route-tab-home-indicator'),
@@ -278,6 +282,11 @@ void main() {
       );
       expect(selectedIndicatorSize.height, 3);
       expect(selectedIndicatorSize.width, 24);
+      final selectedSurface = tester.widget<AnimatedContainer>(
+        find.byKey(const ValueKey('route-tab-home-surface')),
+      );
+      final selectedDecoration = selectedSurface.decoration as BoxDecoration?;
+      expect(selectedDecoration?.color, isNotNull);
       expect(
         [
           'route-tab-home',

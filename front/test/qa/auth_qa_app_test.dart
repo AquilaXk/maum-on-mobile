@@ -1,6 +1,7 @@
-import 'package:flutter/widgets.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:maum_on_mobile_front/qa/auth_qa_app.dart';
+import 'package:maum_on_mobile_front/shared/ui/brand_identity.dart';
 
 void main() {
   testWidgets('renders the auth QA app through signup verification',
@@ -12,12 +13,13 @@ void main() {
     expect(find.byKey(const ValueKey('auth-form-panel')), findsOneWidget);
     expect(find.byKey(const ValueKey('login-email-field')), findsOneWidget);
     expect(find.byKey(const ValueKey('login-submit-button')), findsOneWidget);
-    expect(find.byKey(const ValueKey('quick-login-provider-row')),
-        findsNothing);
+    expect(
+        find.byKey(const ValueKey('quick-login-provider-row')), findsNothing);
 
     await tester.tap(find.text('새 계정 만들기'));
     await tester.pumpAndSettle();
-    expect(find.byKey(const ValueKey('signup-email-verification-request-button')),
+    expect(
+        find.byKey(const ValueKey('signup-email-verification-request-button')),
         findsOneWidget);
 
     await tester.enterText(
@@ -36,5 +38,28 @@ void main() {
     );
     expect(find.byKey(const ValueKey('signup-nickname-field')), findsOneWidget);
     expect(find.byKey(const ValueKey('signup-submit-button')), findsOneWidget);
+  });
+
+  testWidgets('uses the shared dark app theme in dark system mode',
+      (tester) async {
+    tester.binding.platformDispatcher.platformBrightnessTestValue =
+        Brightness.dark;
+    addTearDown(
+      tester.binding.platformDispatcher.clearPlatformBrightnessTestValue,
+    );
+
+    await tester.pumpWidget(buildAuthQaApp());
+    await tester.pumpAndSettle();
+
+    final shell = tester.widget<DecoratedBox>(
+      find.byKey(const ValueKey('auth-blue-shell')),
+    );
+    final shellDecoration = shell.decoration as BoxDecoration;
+    final panelTheme = Theme.of(
+      tester.element(find.byKey(const ValueKey('auth-form-panel'))),
+    );
+
+    expect(shellDecoration.color, AppBrandColors.darkBackgroundBlue);
+    expect(panelTheme.colorScheme.brightness, Brightness.dark);
   });
 }
