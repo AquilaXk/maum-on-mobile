@@ -77,6 +77,7 @@ void main() {
     await tester.tap(find.byKey(mobileQaRouteKey('story')));
     await tester.pumpAndSettle();
     expect(find.text('오늘의 스토리'), findsOneWidget);
+    expect(find.text('마음을 천천히 꺼내 놓는 연습을 하고 있어요.'), findsOneWidget);
 
     await tester.enterText(
       find.byKey(const ValueKey('story-search-field')),
