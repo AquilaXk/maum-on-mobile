@@ -38,6 +38,76 @@ void main() {
       expect(controller.state.messages.last.content, '천천히 호흡해 볼까요?');
     });
 
+    test('keeps streamed sentence chunks readable when they omit spacing',
+        () async {
+      final repository = _FakeConsultationRepository();
+      final controller = ConsultationController(repository: repository);
+
+      await controller.connect();
+      repository.emit(const ConsultationStreamEvent.connect('connected'));
+      controller.updateDraft('문장 사이 공백을 확인해 주세요');
+      await controller.submitMessage();
+      repository
+        ..emit(
+          const ConsultationStreamEvent.chat(
+            '마음이 불안하다고 이야기해주셨네요.',
+            requestId: 'reply-spacing',
+            sequence: 0,
+          ),
+        )
+        ..emit(
+          const ConsultationStreamEvent.chat(
+            '지금은 발바닥 감각을 천천히 느껴보면 좋아요.',
+            requestId: 'reply-spacing',
+            sequence: 1,
+          ),
+        )
+        ..emit(
+          const ConsultationStreamEvent.done(
+            requestId: 'reply-spacing',
+            sequence: 2,
+          ),
+        );
+
+      expect(
+        controller.state.messages.last.content,
+        '마음이 불안하다고 이야기해주셨네요. 지금은 발바닥 감각을 천천히 느껴보면 좋아요.',
+      );
+    });
+
+    test('keeps mid-word streamed chunks attached', () async {
+      final repository = _FakeConsultationRepository();
+      final controller = ConsultationController(repository: repository);
+
+      await controller.connect();
+      repository.emit(const ConsultationStreamEvent.connect('connected'));
+      controller.updateDraft('단어 중간 조각을 확인해 주세요');
+      await controller.submitMessage();
+      repository
+        ..emit(
+          const ConsultationStreamEvent.chat(
+            '불',
+            requestId: 'reply-word',
+            sequence: 0,
+          ),
+        )
+        ..emit(
+          const ConsultationStreamEvent.chat(
+            '안한 마음',
+            requestId: 'reply-word',
+            sequence: 1,
+          ),
+        )
+        ..emit(
+          const ConsultationStreamEvent.done(
+            requestId: 'reply-word',
+            sequence: 2,
+          ),
+        );
+
+      expect(controller.state.messages.last.content, '불안한 마음');
+    });
+
     test('ignores duplicated streamed chunks with the same request sequence',
         () async {
       final repository = _FakeConsultationRepository();

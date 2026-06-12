@@ -682,7 +682,12 @@ class ConsultationController extends ChangeNotifier {
         messages: [
           for (final message in _state.messages)
             if (message.id == messageId)
-              message.copyWith(content: '${message.content}$chunk')
+              message.copyWith(
+                content: _mergeAssistantChunkContent(
+                  message.content,
+                  chunk,
+                ),
+              )
             else
               message,
         ],
@@ -999,4 +1004,35 @@ class ConsultationController extends ChangeNotifier {
     _responseTimeoutTimer?.cancel();
     _responseTimeoutTimer = null;
   }
+}
+
+String _mergeAssistantChunkContent(String current, String chunk) {
+  if (current.isEmpty || chunk.isEmpty) {
+    return '$current$chunk';
+  }
+  if (_hasBoundarySpacing(current, chunk) ||
+      !_endsWithSentencePunctuation(current)) {
+    return '$current$chunk';
+  }
+  return '$current $chunk';
+}
+
+bool _hasBoundarySpacing(String current, String chunk) {
+  return current[current.length - 1].trim().isEmpty ||
+      chunk[0].trim().isEmpty;
+}
+
+bool _endsWithSentencePunctuation(String value) {
+  var index = value.length - 1;
+  while (index >= 0 && _isClosingPunctuation(value[index])) {
+    index -= 1;
+  }
+  if (index < 0) {
+    return false;
+  }
+  return '.!?…。！？'.contains(value[index]);
+}
+
+bool _isClosingPunctuation(String value) {
+  return '"\'’”)]}』」'.contains(value);
 }

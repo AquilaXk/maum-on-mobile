@@ -345,7 +345,9 @@ class ConsultationService(
     ): ConsultationReplyResult {
         return try {
             val response = generateWithTimeout(member, message, currentUserMessageId)
-            val chunks = response.chunks.filter(String::isNotBlank)
+            val chunks = response.chunks
+                .filter(String::isNotBlank)
+                .readableConsultationChunks()
             if (chunks.isEmpty()) {
                 metricsRegistry.recordAiModel("consultation", "empty")
                 fallbackReply(message)
@@ -491,6 +493,8 @@ internal fun List<ContentModerationCategory>.toConsultationRiskCategory(): Consu
 }
 
 private const val MODEL_TEXT_LIMIT = 1_000
+private val CONSULTATION_SENTENCE_PUNCTUATION = setOf('.', '!', '?', '…', '。', '！', '？')
+private val CONSULTATION_CLOSING_PUNCTUATION = setOf('"', '\'', '’', '”', ')', ']', '}', '』', '」')
 private val EMAIL_PATTERN = Regex("""[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}""")
 private val PHONE_PATTERN = Regex("""01[016789][-.\s]?\d{3,4}[-.\s]?\d{4}""")
 
@@ -522,6 +526,48 @@ private fun String.minimizeForModel(): String {
     return replace(EMAIL_PATTERN, "[email]")
         .replace(PHONE_PATTERN, "[phone]")
         .take(MODEL_TEXT_LIMIT)
+}
+
+private fun List<String>.readableConsultationChunks(): List<String> {
+    if (size < 2) {
+        return this
+    }
+
+    return fold(mutableListOf<String>()) { readableChunks, chunk ->
+        val previous = readableChunks.lastOrNull()
+        readableChunks += if (previous != null && shouldInsertConsultationChunkSpacing(previous, chunk)) {
+            " $chunk"
+        } else {
+            chunk
+        }
+        readableChunks
+    }
+}
+
+private fun shouldInsertConsultationChunkSpacing(previous: String, next: String): Boolean {
+    if (previous.isEmpty() || next.isEmpty()) {
+        return false
+    }
+    if (previous.last().isWhitespace() || next.first().isWhitespace()) {
+        return false
+    }
+    return previous.lastMeaningfulChunkChar()?.isConsultationSentencePunctuation() == true
+}
+
+private fun String.lastMeaningfulChunkChar(): Char? {
+    var index = lastIndex
+    while (index >= 0 && this[index].isConsultationClosingPunctuation()) {
+        index -= 1
+    }
+    return if (index >= 0) this[index] else null
+}
+
+private fun Char.isConsultationSentencePunctuation(): Boolean {
+    return this in CONSULTATION_SENTENCE_PUNCTUATION
+}
+
+private fun Char.isConsultationClosingPunctuation(): Boolean {
+    return this in CONSULTATION_CLOSING_PUNCTUATION
 }
 
 private fun ConsultationMessage.toResult(): ConsultationMessageResult {
