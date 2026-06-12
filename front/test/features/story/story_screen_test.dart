@@ -69,6 +69,7 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('story-create-button')));
     await tester.pumpAndSettle();
 
+    expect(find.byKey(const ValueKey('story-create-button')), findsNothing);
     await tester.ensureVisible(
       find.byKey(const ValueKey('story-submit-button')),
     );
@@ -129,6 +130,9 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('긴 이야기를 나눕니다.'), findsOneWidget);
+    expect(find.byKey(const ValueKey('story-comment-section-header')),
+        findsOneWidget);
+    expect(find.text('댓글 1개'), findsOneWidget);
     expect(find.text('천천히 쉬어도 괜찮아요.'), findsOneWidget);
     expect(find.byKey(const ValueKey('story-flow-panel')), findsNothing);
   });
