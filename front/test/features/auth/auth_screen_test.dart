@@ -91,12 +91,57 @@ void main() {
       find.byKey(const ValueKey('auth-blue-shell')),
     );
     final decoration = shell.decoration as BoxDecoration;
-    final gradient = decoration.gradient as LinearGradient;
 
-    expect(gradient.colors, [
-      const Color(0xFFE8F3FF),
-      AppBrandColors.surfaceStrong,
-    ]);
+    expect(decoration.gradient, isNull);
+    expect(decoration.color, AppBrandColors.backgroundBlue);
+  });
+
+  testWidgets('connects the auth shell and panel with blue surfaces',
+      (tester) async {
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    final repository = _FakeAuthRepository();
+    await tester.pumpWidget(
+      _AuthScreenHarness(repository: repository),
+    );
+
+    final shell = tester.widget<DecoratedBox>(
+      find.byKey(const ValueKey('auth-blue-shell')),
+    );
+    final shellDecoration = shell.decoration as BoxDecoration;
+    expect(shellDecoration.gradient, isNull);
+    expect(shellDecoration.color, AppBrandColors.backgroundBlue);
+
+    final panel = tester.widget(find.byKey(const ValueKey('auth-form-panel')));
+    expect(panel, isA<DecoratedBox>());
+    final panelDecoration = (panel as DecoratedBox).decoration as BoxDecoration;
+    expect(panelDecoration.color, const Color(0xFFF4F8FF));
+    expect(
+      panelDecoration.border,
+      isA<Border>().having(
+        (border) => border.top.color,
+        'border color',
+        AppBrandColors.borderSoft,
+      ),
+    );
+  });
+
+  testWidgets('keeps auth layout valid while viewport metrics settle',
+      (tester) async {
+    tester.view.physicalSize = const Size(390, 40);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    final repository = _FakeAuthRepository();
+    await tester.pumpWidget(
+      _AuthScreenHarness(repository: repository),
+    );
+
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('uses dark system status icons on the light auth shell',
@@ -124,12 +169,14 @@ void main() {
       ),
     );
 
-    final panel = tester.widget<Card>(
+    final panel = tester.widget<DecoratedBox>(
       find.byKey(const ValueKey('auth-form-panel')),
     );
 
-    expect(panel.color, AppBrandColors.surfaceStrong);
-    expect(panel.color, isNot(const Color(0xFF111827)));
+    final decoration = panel.decoration as BoxDecoration;
+
+    expect(decoration.color, const Color(0xFFF4F8FF));
+    expect(decoration.color, isNot(const Color(0xFF111827)));
   });
 
   testWidgets('keeps account deletion dialog on auth theme in dark system mode',
