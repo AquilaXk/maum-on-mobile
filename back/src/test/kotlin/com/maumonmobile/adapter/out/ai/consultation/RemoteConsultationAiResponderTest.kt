@@ -486,6 +486,60 @@ class RemoteConsultationAiResponderTest {
     }
 
     @Test
+    fun promptExtractsRecentAssistantOpeningActionAndQuestionAsDoNotReuseMaterial() {
+        val client = RecordingVertexAiGenerateContentClient(
+            responseBody = vertexResponse("""{"chunks":["$VALID_REPLY"]}"""),
+        )
+        val responder = RemoteConsultationAiResponder(
+            properties = aiProperties(),
+            objectMapper = ObjectMapper(),
+            accessTokenProvider = { "vertex-token" },
+            generateContentClient = client,
+        )
+
+        responder.generate(
+            ConsultationAiRequest(
+                memberId = 29L,
+                message = "퇴근하고 나면 계속 멍하고 아무것도 못 하겠어요.",
+                recentMessages = listOf(
+                    ConsultationMessage(
+                        id = 90L,
+                        memberId = 29L,
+                        sender = ConsultationMessageSender.ASSISTANT,
+                        content = "퇴근 후 마음이 비어 있는 건 에너지가 바닥났다는 신호일 수 있어요. 오늘은 책상 위에서 펜 하나를 잡고 지금 느끼는 압박을 한 단어로 적어보세요. 그 무기력함은 어느 순간 가장 크게 올라오나요?",
+                        createdAt = "2026-05-25T00:00:00Z",
+                    ),
+                    ConsultationMessage(
+                        id = 91L,
+                        memberId = 29L,
+                        sender = ConsultationMessageSender.ASSISTANT,
+                        content = "상사에게 지적받은 장면이 계속 떠오르면 몸이 먼저 긴장할 수 있어요. 회의 전에 발바닥을 바닥에 누르는 감각을 10초만 확인해 보세요. 지금 가장 두려운 평가는 무엇인가요?",
+                        createdAt = "2026-05-25T00:01:00Z",
+                    ),
+                ),
+                timeout = Duration.ofSeconds(2),
+            ),
+        )
+
+        val prompt = ObjectMapper()
+            .readTree(client.requestBody!!)["contents"][0]["parts"][0]["text"]
+            .asString()
+        val repetitionSection = prompt
+            .substringAfter("[최근 답변 반복 금지 소재]")
+            .substringBefore("USER:")
+
+        assertThat(repetitionSection)
+            .contains(
+                "퇴근 후 마음이 비어 있는 건 에너지가 바닥났다는 신호일 수 있어요",
+                "책상 위에서 펜 하나를 잡고 지금 느끼는 압박을 한 단어로 적어보세요",
+                "그 무기력함은 어느 순간 가장 크게 올라오나요",
+                "상사에게 지적받은 장면이 계속 떠오르면 몸이 먼저 긴장할 수 있어요",
+                "발바닥을 바닥에 누르는 감각을 10초만 확인해 보세요",
+                "지금 가장 두려운 평가는 무엇인가요",
+            )
+    }
+
+    @Test
     fun promptCarriesCostFreeQualityGateRubricForModelReplies() {
         val client = RecordingVertexAiGenerateContentClient(
             responseBody = vertexResponse("""{"chunks":["$VALID_REPLY"]}"""),
