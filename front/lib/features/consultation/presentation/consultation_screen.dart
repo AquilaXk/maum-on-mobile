@@ -9,12 +9,12 @@ import '../domain/consultation_models.dart';
 class ConsultationScreen extends StatefulWidget {
   const ConsultationScreen({
     required this.controller,
-    required this.onBack,
+    this.onBack,
     super.key,
   });
 
   final ConsultationController controller;
-  final VoidCallback onBack;
+  final VoidCallback? onBack;
 
   @override
   State<ConsultationScreen> createState() => _ConsultationScreenState();
@@ -351,7 +351,7 @@ class _ConsultationHeader extends StatelessWidget {
   });
 
   final ConsultationConnectionState connectionState;
-  final VoidCallback onBack;
+  final VoidCallback? onBack;
 
   @override
   Widget build(BuildContext context) {

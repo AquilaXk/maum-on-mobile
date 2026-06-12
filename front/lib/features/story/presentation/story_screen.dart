@@ -8,13 +8,13 @@ import '../domain/story_models.dart';
 class StoryScreen extends StatefulWidget {
   const StoryScreen({
     required this.controller,
-    required this.onBack,
+    this.onBack,
     this.initialStoryId,
     super.key,
   });
 
   final StoryController controller;
-  final VoidCallback onBack;
+  final VoidCallback? onBack;
   final int? initialStoryId;
 
   @override
@@ -80,10 +80,12 @@ class _StoryScreenState extends State<StoryScreen> {
       animation: widget.controller,
       builder: (context, _) {
         final state = widget.controller.state;
+        final onHeaderBack =
+            state.mode == StoryViewMode.list ? null : widget.onBack;
 
         return AppScreen(
           title: '스토리',
-          onBack: widget.onBack,
+          onBack: onHeaderBack,
           onRefresh: state.mode == StoryViewMode.list
               ? widget.controller.loadStories
               : null,
