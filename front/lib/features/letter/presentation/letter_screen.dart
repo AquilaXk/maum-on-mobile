@@ -8,7 +8,7 @@ import '../domain/letter_models.dart';
 class LetterScreen extends StatefulWidget {
   const LetterScreen({
     required this.controller,
-    required this.onBack,
+    this.onBack,
     this.initiallyCompose = false,
     this.initialLetterId,
     this.onOpenRandomReceiveSettings,
@@ -16,7 +16,7 @@ class LetterScreen extends StatefulWidget {
   });
 
   final LetterController controller;
-  final VoidCallback onBack;
+  final VoidCallback? onBack;
   final bool initiallyCompose;
   final int? initialLetterId;
   final VoidCallback? onOpenRandomReceiveSettings;
@@ -77,10 +77,12 @@ class _LetterScreenState extends State<LetterScreen> {
       animation: widget.controller,
       builder: (context, _) {
         final state = widget.controller.state;
+        final onHeaderBack =
+            state.mode == LetterViewMode.mailbox ? null : widget.onBack;
 
         return AppScreen(
           title: '편지함',
-          onBack: widget.onBack,
+          onBack: onHeaderBack,
           onRefresh: state.mode == LetterViewMode.mailbox
               ? widget.controller.load
               : null,

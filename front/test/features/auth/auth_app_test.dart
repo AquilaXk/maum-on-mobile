@@ -361,6 +361,46 @@ void main() {
     }
   });
 
+  testWidgets('hides home back action on primary tab landing screens',
+      (tester) async {
+    await tester.pumpWidget(
+      MaumOnMobileApp(
+        authRepository: _FakeAuthRepository(restoredSession: _session()),
+        homeRepository: const _FakeHomeRepository(),
+        diaryRepository: _FakeDiaryRepository(),
+        diaryImagePicker: const _FakeDiaryImagePicker(),
+        storyRepository: _FakeStoryRepository(),
+        letterRepository: _FakeLetterRepository(),
+        consultationRepository: _FakeConsultationRepository(),
+        listenForDeepLinks: false,
+      ),
+    );
+
+    await tester.pumpAndSettle();
+    expect(find.byTooltip('홈으로'), findsNothing);
+
+    final tabLandingChecks = [
+      (const ValueKey('route-tab-diary'), find.text('나의 기록')),
+      (
+        const ValueKey('route-tab-story'),
+        find.byKey(const ValueKey('story-create-button')),
+      ),
+      (const ValueKey('route-tab-letter'), find.text('편지함')),
+      (
+        const ValueKey('route-tab-consultation'),
+        find.byKey(const ValueKey('consultation-message-field')),
+      ),
+    ];
+
+    for (final (tabKey, landingFinder) in tabLandingChecks) {
+      await tester.tap(find.byKey(tabKey));
+      await tester.pumpAndSettle();
+
+      expect(landingFinder, findsOneWidget);
+      expect(find.byTooltip('홈으로'), findsNothing);
+    }
+  });
+
   testWidgets('lets bottom navigation grow for accessibility text scaling',
       (tester) async {
     tester.view.physicalSize = const Size(320, 640);

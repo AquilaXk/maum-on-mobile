@@ -13,13 +13,13 @@ class DiaryScreen extends StatefulWidget {
   const DiaryScreen({
     required this.controller,
     required this.imagePicker,
-    required this.onBack,
+    this.onBack,
     super.key,
   });
 
   final DiaryController controller;
   final DiaryImagePicker imagePicker;
-  final VoidCallback onBack;
+  final VoidCallback? onBack;
 
   @override
   State<DiaryScreen> createState() => _DiaryScreenState();
