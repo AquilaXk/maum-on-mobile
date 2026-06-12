@@ -18,7 +18,7 @@ class RemoteConsultationAiResponderTest {
     @Test
     fun sendsVertexGenerateContentRequestToGeminiFlashModel() {
         val client = RecordingVertexAiGenerateContentClient(
-            responseBody = vertexResponse("""{"chunks":["함께 ","정리해요."]}"""),
+            responseBody = vertexResponse("""{"chunks":[" $VALID_REPLY ","$VALID_REPLY_ALT"]}"""),
         )
         val responder = RemoteConsultationAiResponder(
             properties = aiProperties(),
@@ -44,7 +44,7 @@ class RemoteConsultationAiResponderTest {
             ),
         )
 
-        assertThat(response.chunks).containsExactly("함께", "정리해요.")
+        assertThat(response.chunks).containsExactly(VALID_REPLY, VALID_REPLY_ALT)
         assertThat(client.endpoint).isEqualTo(
             URI.create(
                 "https://us-central1-aiplatform.googleapis.com/v1/projects/maum-on-mobile-dev" +
@@ -57,14 +57,20 @@ class RemoteConsultationAiResponderTest {
         assertThat(requestJson["generationConfig"]["maxOutputTokens"].asInt()).isEqualTo(1536)
         assertThat(requestJson["generationConfig"]["responseMimeType"].asString()).isEqualTo("application/json")
         assertThat(requestJson["generationConfig"]["thinkingConfig"]["thinkingBudget"].asInt()).isEqualTo(1024)
-        assertThat(requestJson["generationConfig"]["responseSchema"].toString())
+        val responseSchema = requestJson["generationConfig"]["responseSchema"]
+        val chunksSchema = responseSchema["properties"]["chunks"]
+        assertThat(responseSchema.toString())
             .contains("\"chunks\"", "\"array\"", "\"string\"", "Two to five")
+        assertThat(chunksSchema["minItems"].asInt()).isEqualTo(2)
+        assertThat(chunksSchema["maxItems"].asInt()).isEqualTo(5)
+        assertThat(chunksSchema["items"]["description"].asString())
+            .contains("24자 이상", "420자 이하")
     }
 
     @Test
     fun usesConfiguredVertexConsultationEndpointWithServiceAccountToken() {
         val client = RecordingVertexAiGenerateContentClient(
-            responseBody = vertexResponse("""{"chunks":["괜찮아요."]}"""),
+            responseBody = vertexResponse("""{"chunks":["$VALID_REPLY"]}"""),
         )
         val properties = aiProperties().apply {
             consultation.endpoint =
@@ -111,7 +117,7 @@ class RemoteConsultationAiResponderTest {
     @Test
     fun promptGuidesEmpathyActionAndOneFollowUpQuestionForShortConversations() {
         val client = RecordingVertexAiGenerateContentClient(
-            responseBody = vertexResponse("""{"chunks":["마음이 많이 무거우셨겠어요."]}"""),
+            responseBody = vertexResponse("""{"chunks":["$VALID_REPLY"]}"""),
         )
         val responder = RemoteConsultationAiResponder(
             properties = aiProperties(),
@@ -146,7 +152,7 @@ class RemoteConsultationAiResponderTest {
     @Test
     fun promptSeparatesConversationContextNormalToneAndSafetyTone() {
         val client = RecordingVertexAiGenerateContentClient(
-            responseBody = vertexResponse("""{"chunks":["그 부담이 오래 이어져서 지치셨겠어요."]}"""),
+            responseBody = vertexResponse("""{"chunks":["$VALID_REPLY"]}"""),
         )
         val responder = RemoteConsultationAiResponder(
             properties = aiProperties(),
@@ -200,7 +206,7 @@ class RemoteConsultationAiResponderTest {
     @Test
     fun promptDefinesContextualReplyChecklistAndPersonalDataBoundaries() {
         val client = RecordingVertexAiGenerateContentClient(
-            responseBody = vertexResponse("""{"chunks":["계속 버티느라 많이 지치셨겠어요."]}"""),
+            responseBody = vertexResponse("""{"chunks":["$VALID_REPLY"]}"""),
         )
         val responder = RemoteConsultationAiResponder(
             properties = aiProperties(),
@@ -251,7 +257,7 @@ class RemoteConsultationAiResponderTest {
     @Test
     fun promptRequiresCaseSpecificStrategyAndAvoidsTemplateRepetition() {
         val client = RecordingVertexAiGenerateContentClient(
-            responseBody = vertexResponse("""{"chunks":["그 상황에 맞춰 함께 살펴볼게요."]}"""),
+            responseBody = vertexResponse("""{"chunks":["$VALID_REPLY"]}"""),
         )
         val responder = RemoteConsultationAiResponder(
             properties = aiProperties(),
@@ -301,7 +307,7 @@ class RemoteConsultationAiResponderTest {
     @Test
     fun promptSupportsDeepDiverseCounselingFrameworkForRichReplies() {
         val client = RecordingVertexAiGenerateContentClient(
-            responseBody = vertexResponse("""{"chunks":["더 깊게 살펴볼게요."]}"""),
+            responseBody = vertexResponse("""{"chunks":["$VALID_REPLY"]}"""),
         )
         val responder = RemoteConsultationAiResponder(
             properties = aiProperties(),
@@ -351,9 +357,49 @@ class RemoteConsultationAiResponderTest {
     }
 
     @Test
+    fun promptCarriesScenarioPlaybookForCostFreeQualityRegression() {
+        val client = RecordingVertexAiGenerateContentClient(
+            responseBody = vertexResponse("""{"chunks":["$VALID_REPLY"]}"""),
+        )
+        val responder = RemoteConsultationAiResponder(
+            properties = aiProperties(),
+            objectMapper = ObjectMapper(),
+            accessTokenProvider = { "vertex-token" },
+            generateContentClient = client,
+        )
+
+        responder.generate(
+            ConsultationAiRequest(
+                memberId = 28L,
+                message = "잠도 못 자고 연인과 다툰 뒤 계속 제 잘못만 생각나요.",
+                recentMessages = emptyList(),
+                timeout = Duration.ofSeconds(2),
+            ),
+        )
+
+        val prompt = ObjectMapper()
+            .readTree(client.requestBody!!)["contents"][0]["parts"][0]["text"]
+            .asString()
+
+        assertThat(prompt)
+            .contains(
+                "시나리오별 접근 지도",
+                "불안/공황: 신체 감각을 안전 신호로 재해석",
+                "수면 문제: 해결 시도보다 각성 낮추기",
+                "관계 갈등: 경계와 욕구를 분리",
+                "자기비난: 책임과 정체성을 분리",
+                "무기력: 의지 부족으로 단정하지 말고 에너지 보존",
+                "상실/외로움: 결핍을 인정하고 연결 자원",
+                "분노: 감정 아래 침해된 기준",
+                "업무/학업 압박: 평가 위협과 실행 단위를 분리",
+                "선택 고민: 가치 기준과 안전 기준",
+            )
+    }
+
+    @Test
     fun promptRequiresCounselingMicroSkillsAndAnswersUserIntentFirst() {
         val client = RecordingVertexAiGenerateContentClient(
-            responseBody = vertexResponse("""{"chunks":["질문 의도부터 붙잡아 답할게요."]}"""),
+            responseBody = vertexResponse("""{"chunks":["$VALID_REPLY"]}"""),
         )
         val responder = RemoteConsultationAiResponder(
             properties = aiProperties(),
@@ -391,7 +437,7 @@ class RemoteConsultationAiResponderTest {
     @Test
     fun promptListsRecentAssistantSuggestionsAsDoNotReuseMaterial() {
         val client = RecordingVertexAiGenerateContentClient(
-            responseBody = vertexResponse("""{"chunks":["이번에는 다른 방법으로 살펴볼게요."]}"""),
+            responseBody = vertexResponse("""{"chunks":["$VALID_REPLY"]}"""),
         )
         val responder = RemoteConsultationAiResponder(
             properties = aiProperties(),
@@ -442,7 +488,7 @@ class RemoteConsultationAiResponderTest {
     @Test
     fun promptCarriesCostFreeQualityGateRubricForModelReplies() {
         val client = RecordingVertexAiGenerateContentClient(
-            responseBody = vertexResponse("""{"chunks":["상황에 맞춰 답할게요."]}"""),
+            responseBody = vertexResponse("""{"chunks":["$VALID_REPLY"]}"""),
         )
         val responder = RemoteConsultationAiResponder(
             properties = aiProperties(),
@@ -486,7 +532,7 @@ class RemoteConsultationAiResponderTest {
     @Test
     fun promptFallsBackToCompactChecklistWhenPromptExceedsConfiguredLimit() {
         val client = RecordingVertexAiGenerateContentClient(
-            responseBody = vertexResponse("""{"chunks":["지금은 안전하게 정리해 볼게요."]}"""),
+            responseBody = vertexResponse("""{"chunks":["$VALID_REPLY"]}"""),
         )
         val properties = aiProperties().apply {
             consultation.maxPromptChars = 2_400
@@ -542,7 +588,7 @@ class RemoteConsultationAiResponderTest {
     @Test
     fun promptCanUseCompactChecklistByConfiguration() {
         val client = RecordingVertexAiGenerateContentClient(
-            responseBody = vertexResponse("""{"chunks":["짧게 정리해 볼게요."]}"""),
+            responseBody = vertexResponse("""{"chunks":["$VALID_REPLY"]}"""),
         )
         val properties = aiProperties().apply {
             consultation.promptMode = "compact"
@@ -575,7 +621,7 @@ class RemoteConsultationAiResponderTest {
     @Test
     fun compactPromptPreservesCurrentUserMessageAfterDroppingHistory() {
         val client = RecordingVertexAiGenerateContentClient(
-            responseBody = vertexResponse("""{"chunks":["핵심을 보고 답할게요."]}"""),
+            responseBody = vertexResponse("""{"chunks":["$VALID_REPLY"]}"""),
         )
         val properties = aiProperties().apply {
             consultation.maxPromptChars = 2_400
@@ -645,7 +691,7 @@ class RemoteConsultationAiResponderTest {
             objectMapper = ObjectMapper(),
             accessTokenProvider = { "vertex-token" },
             generateContentClient = RecordingVertexAiGenerateContentClient(
-                responseBody = vertexResponse("""{"chunks":["넉넉하게 답할게요."]}"""),
+                responseBody = vertexResponse("""{"chunks":["$VALID_REPLY"]}"""),
             ),
         )
 
@@ -658,13 +704,13 @@ class RemoteConsultationAiResponderTest {
             ),
         )
 
-        assertThat(response.chunks).containsExactly("넉넉하게 답할게요.")
+        assertThat(response.chunks).containsExactly(VALID_REPLY)
     }
 
     @Test
     fun promptPrioritizesImmediateSafetyForCrisisSignals() {
         val client = RecordingVertexAiGenerateContentClient(
-            responseBody = vertexResponse("""{"chunks":["지금은 안전이 먼저예요."]}"""),
+            responseBody = vertexResponse("""{"chunks":["$VALID_REPLY"]}"""),
         )
         val responder = RemoteConsultationAiResponder(
             properties = aiProperties(),
@@ -699,7 +745,7 @@ class RemoteConsultationAiResponderTest {
     @Test
     fun promptDoesNotExposeInternalMemberIdToModel() {
         val client = RecordingVertexAiGenerateContentClient(
-            responseBody = vertexResponse("""{"chunks":["함께 살펴볼게요."]}"""),
+            responseBody = vertexResponse("""{"chunks":["$VALID_REPLY"]}"""),
         )
         val responder = RemoteConsultationAiResponder(
             properties = aiProperties(),
@@ -722,6 +768,93 @@ class RemoteConsultationAiResponderTest {
             .asString()
 
         assertThat(prompt).doesNotContain("memberId", "memberId: 7")
+    }
+
+    @Test
+    fun rejectsResponseChunksOutsideLengthRange() {
+        val invalidReplies = listOf(
+            "짧아요.",
+            "상담 답변이 모바일 화면에서 읽기 어려울 만큼 길어지는 상황을 막기 위한 문장입니다.".repeat(15),
+        )
+
+        invalidReplies.forEachIndexed { index, reply ->
+            val client = RecordingVertexAiGenerateContentClient(
+                responseBody = vertexResponse("""{"chunks":["$reply"]}"""),
+            )
+            val responder = RemoteConsultationAiResponder(
+                properties = aiProperties(),
+                objectMapper = ObjectMapper(),
+                accessTokenProvider = { "vertex-token" },
+                generateContentClient = client,
+            )
+
+            assertThatThrownBy {
+                responder.generate(
+                    ConsultationAiRequest(
+                        memberId = 80L + index,
+                        message = "오늘 마음이 힘들어요.",
+                        recentMessages = emptyList(),
+                        timeout = Duration.ofSeconds(2),
+                    ),
+                )
+            }.isInstanceOf(ConsultationAiUnavailableException::class.java)
+                .hasMessageContaining("상담 모델 응답을 만들지 못했습니다.")
+                .hasRootCauseMessage("상담 모델 응답 청크 길이가 허용 범위를 벗어났습니다.")
+        }
+    }
+
+    @Test
+    fun acceptsLegacyTopLevelAnswerLongerThanChunkLimit() {
+        val legacyReply = "지금 마음이 무겁게 느껴지는 이유를 한 번에 해결하려 하기보다, 오늘 버틸 수 있는 장면 하나부터 차분히 나누어 보자는 안내입니다. ".repeat(8).trim()
+        assertThat(legacyReply.length).isGreaterThan(420).isLessThanOrEqualTo(900)
+        val client = RecordingVertexAiGenerateContentClient(
+            responseBody = vertexResponse("""{"answer":"$legacyReply"}"""),
+        )
+        val responder = RemoteConsultationAiResponder(
+            properties = aiProperties(),
+            objectMapper = ObjectMapper(),
+            accessTokenProvider = { "vertex-token" },
+            generateContentClient = client,
+        )
+
+        val response = responder.generate(
+            ConsultationAiRequest(
+                memberId = 81L,
+                message = "오늘 마음이 너무 복잡해요.",
+                recentMessages = emptyList(),
+                timeout = Duration.ofSeconds(2),
+            ),
+        )
+
+        assertThat(response.chunks).containsExactly(legacyReply)
+    }
+
+    @Test
+    fun rejectsLegacyTopLevelAnswerOverPromptLimit() {
+        val legacyReply = "지금 마음이 무겁게 느껴지는 이유를 한 번에 해결하려 하기보다, 오늘 버틸 수 있는 장면 하나부터 차분히 나누어 보자는 안내입니다. ".repeat(13).trim()
+        assertThat(legacyReply.length).isGreaterThan(900)
+        val client = RecordingVertexAiGenerateContentClient(
+            responseBody = vertexResponse("""{"answer":"$legacyReply"}"""),
+        )
+        val responder = RemoteConsultationAiResponder(
+            properties = aiProperties(),
+            objectMapper = ObjectMapper(),
+            accessTokenProvider = { "vertex-token" },
+            generateContentClient = client,
+        )
+
+        assertThatThrownBy {
+            responder.generate(
+                ConsultationAiRequest(
+                    memberId = 82L,
+                    message = "오늘 마음이 너무 복잡해요.",
+                    recentMessages = emptyList(),
+                    timeout = Duration.ofSeconds(2),
+                ),
+            )
+        }.isInstanceOf(ConsultationAiUnavailableException::class.java)
+            .hasMessageContaining("상담 모델 응답을 만들지 못했습니다.")
+            .hasRootCauseMessage("상담 모델 응답 전체 길이가 허용 범위를 벗어났습니다.")
     }
 
     @Test
@@ -961,15 +1094,15 @@ class RemoteConsultationAiResponderTest {
     @Test
     fun allowsUserFacingDevelopmentWorkContextReplies() {
         val allowedReplies = listOf(
-            "placeholder 문구 수정 때문에 부담이 크셨겠어요.",
-            "fixture 정리 업무가 계속 밀려 답답하셨겠어요.",
-            "stub 작업이 반복돼서 많이 지치셨겠어요.",
-            "스텁 코드 때문에 막막한 마음이 드셨겠어요.",
-            "내부 검수 업무가 계속 밀려 부담이 크셨겠어요.",
-            "QA 테스트 업무가 이어져 지치셨겠어요.",
-            "QA 테스트 메시지 작성 업무가 이어져 지치셨겠어요.",
-            "상담 답변 테스트 메시지 작성 업무 때문에 긴장하셨겠어요.",
-            "상담 답변 테스트 업무 때문에 긴장하셨겠어요.",
+            "placeholder 문구 수정 업무 때문에 오늘도 부담이 크게 느껴지셨겠어요.",
+            "fixture 정리 업무가 계속 밀려서 답답함과 피로가 같이 올라왔겠어요.",
+            "stub 작업이 반복되면서 집중력이 떨어지고 지친 마음이 커지셨겠어요.",
+            "스텁 코드 때문에 막막한 마음이 들어 시작 장벽이 높아졌겠어요.",
+            "내부 검수 업무가 계속 밀리면서 책임감과 부담이 함께 커졌겠어요.",
+            "QA 테스트 업무가 이어져서 몸과 마음이 모두 지치셨을 것 같아요.",
+            "QA 테스트 메시지 작성 업무가 반복돼서 피로감이 많이 쌓이셨겠어요.",
+            "상담 답변 테스트 메시지 작성 업무 때문에 긴장과 부담이 함께 오셨겠어요.",
+            "상담 답변 테스트 업무 때문에 결과를 계속 의식하게 되어 긴장하셨겠어요.",
         )
 
         allowedReplies.forEachIndexed { index, reply ->
@@ -999,7 +1132,7 @@ class RemoteConsultationAiResponderTest {
     @Test
     fun usesDedicatedConsultationTokenForNonVertexEndpoint() {
         val client = RecordingVertexAiGenerateContentClient(
-            responseBody = vertexResponse("""{"chunks":["괜찮아요."]}"""),
+            responseBody = vertexResponse("""{"chunks":["$VALID_REPLY"]}"""),
         )
         val properties = aiProperties().apply {
             consultation.endpoint = "https://ai.example.com/v1/consultation:generateContent"
@@ -1046,7 +1179,7 @@ class RemoteConsultationAiResponderTest {
     @Test
     fun doesNotTreatLookalikeVertexHostAsVertexEndpoint() {
         val client = RecordingVertexAiGenerateContentClient(
-            responseBody = vertexResponse("""{"chunks":["괜찮아요."]}"""),
+            responseBody = vertexResponse("""{"chunks":["$VALID_REPLY"]}"""),
         )
         val properties = aiProperties().apply {
             consultation.endpoint = "https://aiplatform.googleapis.com.evil.example/v1/consultation:generateContent"
@@ -1110,6 +1243,9 @@ class RemoteConsultationAiResponderTest {
         }
     }
 }
+
+private const val VALID_REPLY = "지금 느끼는 부담을 안전하게 다룰 수 있도록 함께 차분히 정리해 볼게요."
+private const val VALID_REPLY_ALT = "오늘은 통제할 수 있는 작은 행동 하나만 정해서 마음을 가볍게 해볼게요."
 
 private class RecordingVertexAiGenerateContentClient(
     private val responseBody: String = "",
