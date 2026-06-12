@@ -113,13 +113,16 @@ class RemoteConsultationAiResponder internal constructor(
     private fun consultationResponseSchema(): Map<String, Any> {
         return mapOf(
             "type" to "object",
+            "additionalProperties" to false,
             "properties" to mapOf(
                 "chunks" to mapOf(
                     "type" to "array",
                     "description" to "Two to five rich Korean counseling response parts for a mobile chat UI.",
+                    "minItems" to 2,
+                    "maxItems" to 5,
                     "items" to mapOf(
                         "type" to "string",
-                        "description" to "A non-empty, warm, specific Korean counseling paragraph.",
+                        "description" to "A non-empty, warm, specific Korean counseling paragraph, 24자 이상 420자 이하.",
                     ),
                 ),
             ),
@@ -294,6 +297,16 @@ class RemoteConsultationAiResponder internal constructor(
             - Gemini 2.5 Flash 최적화: 먼저 짧고 명확하게 사례 개념화를 한 뒤 최종 출력에는 JSON만 남겨.
             - 사례 개념화 축: 사건-해석-감정-신체반응-욕구-자원-위험신호를 분리하고, 이번 답변에서 가장 중요한 2~3개만 드러내.
             - 상황 유형 예시는 업무/학업 압박, 관계 갈등, 수면 문제, 불안과 신체 반응, 무기력, 반복 사고, 선택 고민, 외로움, 분노, 죄책감, 상실감, 자기비난, 완벽주의야.
+            - 시나리오별 접근 지도:
+              - 불안/공황: 신체 감각을 안전 신호로 재해석하고 현재 공간의 단서 1개로 돌아오게 도와.
+              - 수면 문제: 해결 시도보다 각성 낮추기, 생각 주차, 침대와 걱정 분리를 우선해.
+              - 관계 갈등: 경계와 욕구를 분리하고 상대를 단정하지 않는 대화 문장을 준비하게 해.
+              - 자기비난: 책임과 정체성을 분리하고 사용자가 통제 가능한 작은 책임만 남겨.
+              - 무기력: 의지 부족으로 단정하지 말고 에너지 보존, 회복 행동, 시작 장벽 축소를 다뤄.
+              - 상실/외로움: 결핍을 인정하고 연결 자원, 애도 리듬, 하루를 버티는 의식을 함께 찾아.
+              - 분노: 감정 아래 침해된 기준, 안전한 거리, 행동 전 지연 시간을 짚어.
+              - 업무/학업 압박: 평가 위협과 실행 단위를 분리하고 우선순위와 회복 여지를 함께 본다.
+              - 선택 고민: 가치 기준과 안전 기준을 나눠 비교하고 정답 단정보다 다음 확인 행동을 제안해.
             - 상담 렌즈 메뉴: 인지행동, ACT, DBT, 동기강화, 내러티브, 자기연민, 정서중심, 대인관계 경계, 문제 해결, 신체 기반 안정화 중에서 선택해.
             - 상담 렌즈는 매번 하나 또는 둘만 선택하고, 최근 답변과 다른 렌즈를 우선해.
             - 상담 미세기술 메뉴: 반영, 명료화, 정서 확인, 정상화, 재구성, 행동 실험 중 이번 답변에 맞는 2개만 자연스럽게 사용해.

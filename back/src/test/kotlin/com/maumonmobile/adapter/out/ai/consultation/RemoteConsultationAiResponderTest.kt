@@ -57,8 +57,15 @@ class RemoteConsultationAiResponderTest {
         assertThat(requestJson["generationConfig"]["maxOutputTokens"].asInt()).isEqualTo(1536)
         assertThat(requestJson["generationConfig"]["responseMimeType"].asString()).isEqualTo("application/json")
         assertThat(requestJson["generationConfig"]["thinkingConfig"]["thinkingBudget"].asInt()).isEqualTo(1024)
-        assertThat(requestJson["generationConfig"]["responseSchema"].toString())
+        val responseSchema = requestJson["generationConfig"]["responseSchema"]
+        val chunksSchema = responseSchema["properties"]["chunks"]
+        assertThat(responseSchema.toString())
             .contains("\"chunks\"", "\"array\"", "\"string\"", "Two to five")
+        assertThat(responseSchema["additionalProperties"].asBoolean()).isFalse()
+        assertThat(chunksSchema["minItems"].asInt()).isEqualTo(2)
+        assertThat(chunksSchema["maxItems"].asInt()).isEqualTo(5)
+        assertThat(chunksSchema["items"]["description"].asString())
+            .contains("24자 이상", "420자 이하")
     }
 
     @Test
@@ -348,6 +355,46 @@ class RemoteConsultationAiResponderTest {
                 "깊이 있는 상담 답변",
             )
             .doesNotContain("Use this shape exactly")
+    }
+
+    @Test
+    fun promptCarriesScenarioPlaybookForCostFreeQualityRegression() {
+        val client = RecordingVertexAiGenerateContentClient(
+            responseBody = vertexResponse("""{"chunks":["상황에 맞는 관점으로 살펴볼게요."]}"""),
+        )
+        val responder = RemoteConsultationAiResponder(
+            properties = aiProperties(),
+            objectMapper = ObjectMapper(),
+            accessTokenProvider = { "vertex-token" },
+            generateContentClient = client,
+        )
+
+        responder.generate(
+            ConsultationAiRequest(
+                memberId = 28L,
+                message = "잠도 못 자고 연인과 다툰 뒤 계속 제 잘못만 생각나요.",
+                recentMessages = emptyList(),
+                timeout = Duration.ofSeconds(2),
+            ),
+        )
+
+        val prompt = ObjectMapper()
+            .readTree(client.requestBody!!)["contents"][0]["parts"][0]["text"]
+            .asString()
+
+        assertThat(prompt)
+            .contains(
+                "시나리오별 접근 지도",
+                "불안/공황: 신체 감각을 안전 신호로 재해석",
+                "수면 문제: 해결 시도보다 각성 낮추기",
+                "관계 갈등: 경계와 욕구를 분리",
+                "자기비난: 책임과 정체성을 분리",
+                "무기력: 의지 부족으로 단정하지 말고 에너지 보존",
+                "상실/외로움: 결핍을 인정하고 연결 자원",
+                "분노: 감정 아래 침해된 기준",
+                "업무/학업 압박: 평가 위협과 실행 단위를 분리",
+                "선택 고민: 가치 기준과 안전 기준",
+            )
     }
 
     @Test
