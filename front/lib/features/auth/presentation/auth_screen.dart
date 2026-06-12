@@ -91,7 +91,8 @@ class _AuthScreenState extends State<AuthScreen> {
                 builder: (context, constraints) {
                   final minContentHeight =
                       (constraints.maxHeight - AppSpacing.xxl * 2)
-                          .clamp(0.0, double.infinity);
+                          .clamp(0.0, double.infinity)
+                          .toDouble();
                   return SingleChildScrollView(
                     padding: const EdgeInsets.symmetric(
                       horizontal: AppSpacing.xl,
