@@ -706,6 +706,7 @@ class _HomePrimaryActionCard extends StatelessWidget {
     return Semantics(
       button: true,
       label: '$title, $subtitle',
+      onTap: onTap,
       child: ExcludeSemantics(
         child: DecoratedBox(
           key: primaryKey,
@@ -810,6 +811,7 @@ class _HomeActionCard extends StatelessWidget {
     return Semantics(
       button: true,
       label: title,
+      onTap: onTap,
       child: ExcludeSemantics(
         child: DecoratedBox(
           key: surfaceKey,

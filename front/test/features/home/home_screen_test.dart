@@ -240,10 +240,24 @@ void main() {
         ),
       );
 
-      expect(find.bySemanticsLabel('AI 상담, 지금 마음을 바로 정리하기'), findsOneWidget);
-      expect(find.bySemanticsLabel('기록'), findsOneWidget);
-      expect(find.bySemanticsLabel('편지'), findsOneWidget);
-      expect(find.bySemanticsLabel('스토리'), findsOneWidget);
+      final consultation =
+          find.bySemanticsLabel('AI 상담, 지금 마음을 바로 정리하기');
+      final diary = find.bySemanticsLabel('기록');
+      final letter = find.bySemanticsLabel('편지');
+      final story = find.bySemanticsLabel('스토리');
+      expect(consultation, findsOneWidget);
+      expect(diary, findsOneWidget);
+      expect(letter, findsOneWidget);
+      expect(story, findsOneWidget);
+      for (final action in [consultation, diary, letter, story]) {
+        expect(
+          tester.getSemantics(action),
+          matchesSemantics(
+            isButton: true,
+            hasTapAction: true,
+          ),
+        );
+      }
     } finally {
       semantics.dispose();
     }
