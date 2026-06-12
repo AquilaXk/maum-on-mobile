@@ -36,6 +36,16 @@ void main() {
     expect(
         find.byKey(const ValueKey('story-category-question')), findsOneWidget);
     expect(find.text('1개의 스토리'), findsOneWidget);
+
+    final searchButton = tester.widget<FilledButton>(
+      find.byKey(const ValueKey('story-search-button')),
+    );
+    final searchButtonColor =
+        searchButton.style?.backgroundColor?.resolve(<WidgetState>{});
+    final colorScheme = Theme.of(
+      tester.element(find.byKey(const ValueKey('story-search-button'))),
+    ).colorScheme;
+    expect(searchButtonColor, colorScheme.primary);
   });
 
   testWidgets('stacks story editor actions on a narrow phone viewport',
@@ -110,7 +120,7 @@ void main() {
     expect(find.text('스토리 탐색 흐름'), findsNothing);
     expect(find.text('대화 확인 흐름'), findsNothing);
     expect(find.text('스토리 작성 흐름'), findsNothing);
-    expect(find.text('목록 요약 텍스트'), findsNothing);
+    expect(find.text('목록 요약 텍스트'), findsOneWidget);
     expect(find.byKey(const ValueKey('story-search-panel')), findsOneWidget);
     expect(find.text('잠이 오지 않는 밤'), findsOneWidget);
 

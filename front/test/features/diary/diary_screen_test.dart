@@ -48,6 +48,11 @@ void main() {
     expect(find.text('선택한 날 1개'), findsOneWidget);
     expect(find.text('다른 사용자의 공개 기록을 읽으며 흐름을 이어갑니다.'), findsNothing);
     expect(find.text('공개 기록이 생기면 이곳에 표시됩니다.'), findsNothing);
+
+    final quickWriteWidth = tester
+        .getSize(find.byKey(const ValueKey('diary-quick-write-button')))
+        .width;
+    expect(quickWriteWidth, greaterThanOrEqualTo(250));
   });
 
   testWidgets('stacks diary attachment actions on a narrow phone viewport',

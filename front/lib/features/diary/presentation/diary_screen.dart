@@ -348,6 +348,11 @@ class _DiaryQuickCapturePanel extends StatelessWidget {
                   label: state.isEditing ? '수정 중' : state.category.label,
                   tone: AppStatusTone.success,
                 ),
+              ],
+            ),
+            const SizedBox(height: AppSpacing.sm),
+            AppResponsiveActionWrap(
+              children: [
                 FilledButton.icon(
                   key: const ValueKey('diary-quick-write-button'),
                   onPressed: onWritePressed,

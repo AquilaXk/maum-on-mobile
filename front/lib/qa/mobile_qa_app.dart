@@ -427,7 +427,7 @@ const _qaStorySummaries = [
   StorySummary(
     id: 1,
     title: '오늘의 스토리',
-    summary: '',
+    summary: '마음을 천천히 꺼내 놓는 연습을 하고 있어요.',
     authorNickname: '마음이',
     category: StoryCategory.daily,
     resolutionStatus: StoryResolutionStatus.ongoing,

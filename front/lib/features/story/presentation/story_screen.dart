@@ -210,6 +210,7 @@ class _StoryDiscoveryStrip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final storyCountLabel = '${state.stories.length}개의 스토리';
+    final colorScheme = Theme.of(context).colorScheme;
 
     return Card(
       key: const ValueKey('story-discovery-strip'),
@@ -250,10 +251,14 @@ class _StoryDiscoveryStrip extends StatelessWidget {
               runSpacing: AppSpacing.xs,
               crossAxisAlignment: WrapCrossAlignment.center,
               children: [
-                FilledButton.tonalIcon(
+                FilledButton.icon(
                   key: const ValueKey('story-search-button'),
                   onPressed:
                       state.isListLoading ? null : controller.loadStories,
+                  style: FilledButton.styleFrom(
+                    backgroundColor: colorScheme.primary,
+                    foregroundColor: colorScheme.onPrimary,
+                  ),
                   icon: const Icon(Icons.manage_search),
                   label: const Text('검색'),
                 ),
@@ -308,6 +313,8 @@ class _StoryListCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final summary = story.summary.trim();
+
     return AppContentCard(
       key: ValueKey('story-card-${story.id}'),
       leadingIcon: Icons.forum_outlined,
@@ -320,9 +327,16 @@ class _StoryListCard extends StatelessWidget {
         ),
         AppStatusPill(label: story.resolutionStatus.label),
       ],
+      content: summary.isEmpty
+          ? null
+          : Text(
+              summary,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
       onTap: onTap,
       semanticLabel:
-          '스토리 항목: ${story.title}, ${story.category.label}, 조회 ${story.viewCount}',
+          '스토리 항목: ${story.title}, $summary, ${story.category.label}, 조회 ${story.viewCount}',
     );
   }
 }
