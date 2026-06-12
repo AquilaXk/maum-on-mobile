@@ -173,6 +173,43 @@ void main() {
     }
   });
 
+  testWidgets('separates unread and read notifications in the list',
+      (tester) async {
+    final notificationRepository = _MixedNotificationRepository();
+    final reportRepository = _FakeReportRepository();
+    final notificationController = NotificationController(
+      repository: notificationRepository,
+    );
+    final reportController = ReportController(repository: reportRepository);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: NotificationReportScreen(
+          notificationController: notificationController,
+          reportController: reportController,
+          onBack: () {},
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const ValueKey('notification-unread-section-header')),
+        findsOneWidget);
+    expect(find.text('새 알림 1개'), findsOneWidget);
+    expect(find.byKey(const ValueKey('notification-read-section-header')),
+        findsOneWidget);
+    expect(find.text('읽은 알림 1개'), findsOneWidget);
+
+    final unreadRect = tester.getRect(
+      find.byKey(const ValueKey('notification-card-11')),
+    );
+    final readRect = tester.getRect(
+      find.byKey(const ValueKey('notification-card-12')),
+    );
+
+    expect(readRect.top, greaterThan(unreadRect.bottom));
+  });
+
   testWidgets('stacks report target fields on a narrow phone viewport',
       (tester) async {
     tester.view.physicalSize = const Size(320, 780);
@@ -328,6 +365,35 @@ class _EmptyNotificationRepository extends _FakeNotificationRepository {
   @override
   Future<NotificationBulkReadResult> markAllRead() async {
     return const NotificationBulkReadResult(updatedCount: 0);
+  }
+}
+
+class _MixedNotificationRepository extends _FakeNotificationRepository {
+  @override
+  Future<List<NotificationItem>> fetchNotifications() async {
+    return const [
+      NotificationItem(
+        id: 11,
+        content: '새 댓글이 도착했습니다.',
+        type: 'story_comment',
+        targetType: 'POST',
+        targetId: 21,
+        routeKey: 'story',
+        isRead: false,
+        createdAt: '2026-05-24T09:00:00',
+      ),
+      NotificationItem(
+        id: 12,
+        content: '이전 알림입니다.',
+        type: 'letter_read',
+        targetType: 'LETTER',
+        targetId: 12,
+        routeKey: 'letter',
+        isRead: true,
+        createdAt: '2026-05-24T08:00:00',
+        readAt: '2026-05-24T08:10:00',
+      ),
+    ];
   }
 }
 

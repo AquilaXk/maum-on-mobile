@@ -452,6 +452,11 @@ class _NotificationCenter extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final unreadNotifications =
+        state.notifications.where((notification) => !notification.isRead);
+    final readNotifications =
+        state.notifications.where((notification) => notification.isRead);
+
     if (state.isLoading && !state.hasLoaded) {
       return const Center(
         child: Padding(
@@ -495,16 +500,58 @@ class _NotificationCenter extends StatelessWidget {
                 title: '아직 도착한 알림이 없습니다.',
                 semanticLabel: '알림 목록 비어 있음',
               ),
-            for (final notification in state.notifications) ...[
-              _NotificationTile(
-                notification: notification,
-                onOpenNotification: onOpenNotification,
+            if (unreadNotifications.isNotEmpty) ...[
+              _NotificationListSectionHeader(
+                key: const ValueKey('notification-unread-section-header'),
+                title: '새 알림 ${unreadNotifications.length}개',
+                icon: Icons.notifications_active_outlined,
               ),
               const SizedBox(height: AppSpacing.sm),
+              for (final notification in unreadNotifications) ...[
+                _NotificationTile(
+                  notification: notification,
+                  onOpenNotification: onOpenNotification,
+                ),
+                const SizedBox(height: AppSpacing.sm),
+              ],
+            ],
+            if (readNotifications.isNotEmpty) ...[
+              _NotificationListSectionHeader(
+                key: const ValueKey('notification-read-section-header'),
+                title: '읽은 알림 ${readNotifications.length}개',
+                icon: Icons.mark_email_read_outlined,
+              ),
+              const SizedBox(height: AppSpacing.sm),
+              for (final notification in readNotifications) ...[
+                _NotificationTile(
+                  notification: notification,
+                  onOpenNotification: onOpenNotification,
+                ),
+                const SizedBox(height: AppSpacing.sm),
+              ],
             ],
           ],
         ),
       ),
+    );
+  }
+}
+
+class _NotificationListSectionHeader extends StatelessWidget {
+  const _NotificationListSectionHeader({
+    required this.title,
+    required this.icon,
+    super.key,
+  });
+
+  final String title;
+  final IconData icon;
+
+  @override
+  Widget build(BuildContext context) {
+    return AppInlineSectionHeader(
+      icon: icon,
+      title: title,
     );
   }
 }

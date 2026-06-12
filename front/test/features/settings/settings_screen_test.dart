@@ -42,6 +42,39 @@ void main() {
       find.byKey(const ValueKey('settings-profile-section')),
       findsOneWidget,
     );
+    expect(
+      find.byKey(const ValueKey('settings-routine-group-header')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey('settings-security-group-header')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey('settings-support-group-header')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey('settings-danger-group-header')),
+      findsOneWidget,
+    );
+
+    final routineTop = tester
+        .getRect(find.byKey(const ValueKey('settings-routine-group-header')))
+        .top;
+    final profileTop = tester
+        .getRect(find.byKey(const ValueKey('settings-profile-section')))
+        .top;
+    final securityTop = tester
+        .getRect(find.byKey(const ValueKey('settings-security-group-header')))
+        .top;
+    final dangerTop = tester
+        .getRect(find.byKey(const ValueKey('settings-danger-group-header')))
+        .top;
+
+    expect(profileTop, greaterThan(routineTop));
+    expect(securityTop, greaterThan(profileTop));
+    expect(dangerTop, greaterThan(securityTop));
 
     final scrollView = tester.widget<SingleChildScrollView>(
       find.byKey(const ValueKey('settings-scroll')),
