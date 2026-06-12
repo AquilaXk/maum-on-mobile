@@ -61,7 +61,18 @@ class _AuthScreenState extends State<AuthScreen> {
   @override
   Widget build(BuildContext context) {
     final rootTheme = Theme.of(context);
-    final theme = buildAppTheme().copyWith(platform: rootTheme.platform);
+    final useDarkTheme = rootTheme.colorScheme.brightness == Brightness.dark;
+    final theme = (useDarkTheme ? buildDarkAppTheme() : buildAppTheme())
+        .copyWith(platform: rootTheme.platform);
+    final overlayStyle = SystemUiOverlayStyle(
+      statusBarColor: Colors.transparent,
+      statusBarIconBrightness:
+          useDarkTheme ? Brightness.light : Brightness.dark,
+      statusBarBrightness: useDarkTheme ? Brightness.dark : Brightness.light,
+      systemNavigationBarColor: theme.scaffoldBackgroundColor,
+      systemNavigationBarIconBrightness:
+          useDarkTheme ? Brightness.light : Brightness.dark,
+    );
     final state = widget.controller.state;
     final externalLoginState = widget.externalLoginController?.state;
     final platform = theme.platform;
@@ -71,20 +82,14 @@ class _AuthScreenState extends State<AuthScreen> {
 
     return AnnotatedRegion<SystemUiOverlayStyle>(
       key: const ValueKey('auth-system-ui-overlay'),
-      value: const SystemUiOverlayStyle(
-        statusBarColor: Colors.transparent,
-        statusBarIconBrightness: Brightness.dark,
-        statusBarBrightness: Brightness.light,
-        systemNavigationBarColor: AppBrandColors.backgroundBlue,
-        systemNavigationBarIconBrightness: Brightness.dark,
-      ),
+      value: overlayStyle,
       child: Theme(
         data: theme,
         child: Scaffold(
           body: DecoratedBox(
             key: const ValueKey('auth-blue-shell'),
-            decoration: const BoxDecoration(
-              color: AppBrandColors.backgroundBlue,
+            decoration: BoxDecoration(
+              color: theme.scaffoldBackgroundColor,
             ),
             child: SafeArea(
               child: LayoutBuilder(
@@ -740,12 +745,12 @@ class _AuthHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const Column(
+    return Column(
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
         MaumOnBrandWordmark(
           height: 44,
-          foregroundColor: AppBrandColors.foreground,
+          foregroundColor: Theme.of(context).colorScheme.onSurface,
         ),
       ],
     );
@@ -766,16 +771,21 @@ class _AuthFormPanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final panelColor = theme.cardColor;
+    final shadowColor = colorScheme.brightness == Brightness.dark
+        ? Colors.black.withValues(alpha: 0.24)
+        : AppBrandColors.primaryBlue.withValues(alpha: 0.08);
 
     return DecoratedBox(
       key: const ValueKey('auth-form-panel'),
       decoration: BoxDecoration(
-        color: const Color(0xFFF4F8FF),
+        color: panelColor,
         borderRadius: AppRadii.card,
-        border: Border.all(color: AppBrandColors.borderSoft),
+        border: Border.all(color: colorScheme.outlineVariant),
         boxShadow: [
           BoxShadow(
-            color: AppBrandColors.primaryBlue.withValues(alpha: 0.08),
+            color: shadowColor,
             blurRadius: 18,
             offset: const Offset(0, 8),
           ),

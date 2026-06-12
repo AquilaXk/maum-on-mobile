@@ -5,6 +5,7 @@ import '../features/auth/application/auth_controller.dart';
 import '../features/auth/data/auth_repository.dart';
 import '../features/auth/domain/auth_models.dart';
 import '../features/auth/presentation/auth_screen.dart';
+import '../theme/app_theme.dart';
 
 void main() {
   runApp(buildAuthQaApp());
@@ -13,6 +14,12 @@ void main() {
 Widget buildAuthQaApp() {
   return MaterialApp(
     debugShowCheckedModeBanner: false,
+    theme: buildAppTheme(),
+    darkTheme: buildDarkAppTheme(),
+    themeMode: ThemeMode.system,
+    scrollBehavior: const MaterialScrollBehavior().copyWith(
+      overscroll: false,
+    ),
     home: AuthScreen(
       controller: AuthController(authRepository: const _AuthQaRepository()),
     ),

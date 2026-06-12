@@ -96,7 +96,7 @@ void main() {
     expect(decoration.color, AppBrandColors.backgroundBlue);
   });
 
-  testWidgets('connects the auth shell and panel with blue surfaces',
+  testWidgets('connects the auth shell and panel with app surfaces',
       (tester) async {
     tester.view.physicalSize = const Size(390, 844);
     tester.view.devicePixelRatio = 1;
@@ -115,10 +115,12 @@ void main() {
     expect(shellDecoration.gradient, isNull);
     expect(shellDecoration.color, AppBrandColors.backgroundBlue);
 
-    final panel = tester.widget(find.byKey(const ValueKey('auth-form-panel')));
+    final panelFinder = find.byKey(const ValueKey('auth-form-panel'));
+    final panel = tester.widget(panelFinder);
     expect(panel, isA<DecoratedBox>());
     final panelDecoration = (panel as DecoratedBox).decoration as BoxDecoration;
-    expect(panelDecoration.color, const Color(0xFFF4F8FF));
+    expect(
+        panelDecoration.color, Theme.of(tester.element(panelFinder)).cardColor);
     expect(
       panelDecoration.border,
       isA<Border>().having(
@@ -159,7 +161,7 @@ void main() {
     expect(overlay.value.statusBarBrightness, Brightness.light);
   });
 
-  testWidgets('keeps login panel on a light blue surface in dark system mode',
+  testWidgets('matches login panel to the app surface in dark system mode',
       (tester) async {
     final repository = _FakeAuthRepository();
     await tester.pumpWidget(
@@ -175,8 +177,11 @@ void main() {
 
     final decoration = panel.decoration as BoxDecoration;
 
-    expect(decoration.color, const Color(0xFFF4F8FF));
-    expect(decoration.color, isNot(const Color(0xFF111827)));
+    final panelContext =
+        tester.element(find.byKey(const ValueKey('auth-form-panel')));
+    final panelTheme = Theme.of(panelContext);
+    expect(decoration.color, panelTheme.cardColor);
+    expect(panelTheme.colorScheme.brightness, Brightness.dark);
   });
 
   testWidgets('keeps account deletion dialog on auth theme in dark system mode',
@@ -200,8 +205,8 @@ void main() {
     );
     final dialogTheme = Theme.of(dialogContext);
 
-    expect(dialogTheme.colorScheme.brightness, Brightness.light);
-    expect(dialogTheme.colorScheme.surface, AppBrandColors.surface);
+    expect(dialogTheme.colorScheme.brightness, Brightness.dark);
+    expect(dialogTheme.colorScheme.surface, AppBrandColors.darkSurfaceBlue);
   });
 
   testWidgets('signup validates fields before calling the repository',
