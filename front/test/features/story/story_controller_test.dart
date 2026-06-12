@@ -364,6 +364,33 @@ void main() {
       expect(selectedTarget?.targetId, 22);
     });
 
+    test('keeps server comment total after loading and refreshing comments',
+        () async {
+      final firstComment = _comment(id: 21, authorId: 7, content: '첫 댓글');
+      final repository = _FakeStoryRepository(
+        details: [_detail(id: 8, title: '댓글 글', authorId: 7)],
+        commentPages: [
+          _commentPage([firstComment], totalElements: 45),
+          _commentPage([
+            _comment(id: 22, authorId: 7, content: '등록 댓글'),
+          ], totalElements: 46),
+        ],
+      );
+      final controller = StoryController(
+        storyRepository: repository,
+        currentMemberId: 7,
+      );
+
+      await controller.openStoryById(8);
+
+      expect(controller.state.commentTotalCount, 45);
+
+      controller.updateCommentDraft('등록 댓글');
+      await controller.submitComment();
+
+      expect(controller.state.commentTotalCount, 46);
+    });
+
     test('creates replies with mention drafts while preserving other drafts',
         () async {
       final firstComment = _comment(
@@ -438,12 +465,15 @@ PageResponse<StorySummary> _storyPage(List<StorySummary> items) {
   );
 }
 
-PageResponse<StoryComment> _commentPage(List<StoryComment> items) {
+PageResponse<StoryComment> _commentPage(
+  List<StoryComment> items, {
+  int? totalElements,
+}) {
   return PageResponse(
     items: items,
     page: 0,
     size: 20,
-    totalElements: items.length,
+    totalElements: totalElements ?? items.length,
     totalPages: 1,
     last: true,
   );

@@ -439,7 +439,7 @@ class _StoryDetailView extends StatelessWidget {
         ],
         const SizedBox(height: AppSpacing.xl),
         _CommentSectionHeader(
-          commentCount: _commentThreadCount(state.comments),
+          commentCount: state.commentTotalCount,
         ),
         const SizedBox(height: AppSpacing.sm),
         _CommentComposer(state: state, controller: controller),
@@ -955,11 +955,3 @@ class _MentionText extends StatelessWidget {
 }
 
 final RegExp _mentionPattern = RegExp(r'@[0-9A-Za-z._\-가-힣]{2,30}');
-
-int _commentThreadCount(List<StoryComment> comments) {
-  var total = 0;
-  for (final comment in comments) {
-    total += 1 + _commentThreadCount(comment.replies);
-  }
-  return total;
-}
