@@ -189,16 +189,16 @@ void main() {
     expect(find.byKey(const ValueKey('route-tab-home')), findsOneWidget);
     expect(find.text('마음이님, 오늘의 마음을 이어가세요.'), findsNothing);
 
-    await _tapVisibleText(tester, '다이어리 쓰기');
+    await _tapVisibleKey(tester, const ValueKey('home-action-diary'));
     expect(find.text('나의 기록'), findsOneWidget);
     await _returnHome(tester);
 
-    await _tapVisibleText(tester, '스토리 보기');
+    await _tapVisibleKey(tester, const ValueKey('home-action-story'));
     expect(find.byKey(const ValueKey('story-create-button')), findsOneWidget);
     expect(find.text('오늘의 스토리'), findsOneWidget);
     await _returnHome(tester);
 
-    await _tapVisibleText(tester, '편지 쓰기');
+    await _tapVisibleKey(tester, const ValueKey('home-action-letter'));
     expect(find.text('편지함'), findsOneWidget);
     expect(find.byKey(const ValueKey('letter-title-field')), findsOneWidget);
     await _returnHome(tester);
@@ -295,11 +295,28 @@ void main() {
           ),
         ),
       );
-      expect(find.text('홈'), findsOneWidget);
-      expect(find.text('기록'), findsOneWidget);
-      expect(find.text('스토리'), findsOneWidget);
-      expect(find.text('편지'), findsOneWidget);
-      expect(find.text('AI 상담'), findsWidgets);
+      final bottomNavigation =
+          find.byKey(const ValueKey('app-bottom-navigation'));
+      expect(
+        find.descendant(of: bottomNavigation, matching: find.text('홈')),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(of: bottomNavigation, matching: find.text('기록')),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(of: bottomNavigation, matching: find.text('스토리')),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(of: bottomNavigation, matching: find.text('편지')),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(of: bottomNavigation, matching: find.text('AI 상담')),
+        findsOneWidget,
+      );
       expect(
         tester.getSemantics(find.bySemanticsLabel('홈 Tab 1 of 5')),
         matchesSemantics(
@@ -417,7 +434,7 @@ void main() {
     );
 
     await tester.pumpAndSettle();
-    await tester.tap(find.text('다이어리 쓰기'));
+    await tester.tap(find.byKey(const ValueKey('home-action-diary')));
     await tester.pumpAndSettle();
 
     expect(find.text('나의 기록'), findsOneWidget);
@@ -438,7 +455,7 @@ void main() {
     );
 
     await tester.pumpAndSettle();
-    await tester.tap(find.text('다이어리 쓰기'));
+    await tester.tap(find.byKey(const ValueKey('home-action-diary')));
     await tester.pumpAndSettle();
 
     expect(find.text('나의 기록'), findsOneWidget);
@@ -488,9 +505,10 @@ void main() {
     );
 
     await tester.pumpAndSettle();
-    await tester.ensureVisible(find.text('편지 쓰기'));
+    await tester
+        .ensureVisible(find.byKey(const ValueKey('home-action-letter')));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('편지 쓰기'));
+    await tester.tap(find.byKey(const ValueKey('home-action-letter')));
     await tester.pumpAndSettle();
 
     expect(find.text('편지함'), findsOneWidget);
@@ -856,9 +874,9 @@ void main() {
     );
 
     await tester.pumpAndSettle();
-    await tester.ensureVisible(find.text('스토리 보기'));
+    await tester.ensureVisible(find.byKey(const ValueKey('home-action-story')));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('스토리 보기'));
+    await tester.tap(find.byKey(const ValueKey('home-action-story')));
     await tester.pumpAndSettle();
 
     expect(find.byKey(const ValueKey('story-create-button')), findsOneWidget);

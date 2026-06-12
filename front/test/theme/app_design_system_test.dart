@@ -93,6 +93,32 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('uses clamping refresh physics to avoid stretch overscroll',
+      (tester) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: buildAppTheme(),
+        home: AppScreen(
+          title: '홈',
+          onRefresh: () async {},
+          children: const [
+            Text('새로고침 가능한 화면'),
+          ],
+        ),
+      ),
+    );
+
+    final scrollView = tester.widget<SingleChildScrollView>(
+      find.byType(SingleChildScrollView),
+    );
+
+    expect(scrollView.physics, isA<ClampingScrollPhysics>());
+    expect(
+      (scrollView.physics! as ClampingScrollPhysics).parent,
+      isA<AlwaysScrollableScrollPhysics>(),
+    );
+  });
+
   testWidgets('notice variants expose consistent state icons', (tester) async {
     await tester.pumpWidget(
       MaterialApp(

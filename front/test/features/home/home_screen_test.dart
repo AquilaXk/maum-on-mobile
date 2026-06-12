@@ -164,6 +164,105 @@ void main() {
     expect(find.text('지금 대화하기'), findsNothing);
   });
 
+  testWidgets('prioritizes the mobile action launcher above dashboard details',
+      (tester) async {
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    final controller = HomeController(
+      homeRepository: const _FakeHomeRepository(),
+    );
+    await controller.load();
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: buildAppTheme(),
+        home: HomeScreen(
+          nickname: '마음이',
+          homeController: controller,
+          onWriteDiary: () {},
+          onWriteLetter: () {},
+          onViewStory: () {},
+          onOpenConsultation: () {},
+          onOpenNotifications: () {},
+          onOpenSettings: () {},
+          onLogout: () {},
+          unreadNotificationCount: 3,
+          hasLiveNotificationConnection: true,
+        ),
+      ),
+    );
+
+    final launcher = find.byKey(const ValueKey('home-action-launcher'));
+    final stats = find.byKey(const ValueKey('home-stats-section'));
+    final secondaryTools = find.byKey(const ValueKey('home-secondary-tools'));
+
+    expect(launcher, findsOneWidget);
+    expect(stats, findsOneWidget);
+    expect(secondaryTools, findsOneWidget);
+    expect(
+        tester.getTopLeft(launcher).dy, lessThan(tester.getTopLeft(stats).dy));
+    expect(
+      find.byKey(const ValueKey('home-action-consultation-primary')),
+      findsOneWidget,
+    );
+    expect(find.text('계정 관리'), findsNothing);
+    expect(find.text('알림/신고'), findsOneWidget);
+    expect(find.text('설정'), findsOneWidget);
+    expect(find.text('로그아웃'), findsOneWidget);
+  });
+
+  testWidgets('exposes home launcher actions as button semantics',
+      (tester) async {
+    final semantics = tester.ensureSemantics();
+    try {
+      final controller = HomeController(
+        homeRepository: const _FakeHomeRepository(),
+      );
+      await controller.load();
+
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: buildAppTheme(),
+          home: HomeScreen(
+            nickname: '마음이',
+            homeController: controller,
+            onWriteDiary: () {},
+            onWriteLetter: () {},
+            onViewStory: () {},
+            onOpenConsultation: () {},
+            onOpenNotifications: () {},
+            onOpenSettings: () {},
+            onLogout: () {},
+          ),
+        ),
+      );
+
+      final consultation =
+          find.bySemanticsLabel('AI 상담, 지금 마음을 바로 정리하기');
+      final diary = find.bySemanticsLabel('기록');
+      final letter = find.bySemanticsLabel('편지');
+      final story = find.bySemanticsLabel('스토리');
+      expect(consultation, findsOneWidget);
+      expect(diary, findsOneWidget);
+      expect(letter, findsOneWidget);
+      expect(story, findsOneWidget);
+      for (final action in [consultation, diary, letter, story]) {
+        expect(
+          tester.getSemantics(action),
+          matchesSemantics(
+            isButton: true,
+            hasTapAction: true,
+          ),
+        );
+      }
+    } finally {
+      semantics.dispose();
+    }
+  });
+
   testWidgets('keeps dark home surfaces cohesive with the blue brand shell',
       (tester) async {
     tester.view.physicalSize = const Size(390, 844);
@@ -194,11 +293,13 @@ void main() {
       ),
     );
 
-    final primaryPanel = tester.widget<DecoratedBox>(
-      find.byKey(const ValueKey('home-primary-actions-panel')),
+    final consultationSurface = tester.widget<DecoratedBox>(
+      find.byKey(const ValueKey('home-action-consultation-primary')),
     );
-    final primaryPanelDecoration = primaryPanel.decoration as BoxDecoration;
-    expect(primaryPanelDecoration.color, const Color(0xFF15314D));
+    expect(
+      (consultationSurface.decoration as BoxDecoration).color,
+      const Color(0xFF244C79),
+    );
 
     final diarySurface = tester.widget<DecoratedBox>(
       find.byKey(const ValueKey('home-action-diary-surface')),
@@ -369,9 +470,8 @@ void main() {
     );
 
     expect(find.byKey(const ValueKey('home-primary-actions')), findsOneWidget);
-    expect(find.byKey(const ValueKey('home-account-tools-section')),
-        findsOneWidget);
-    expect(find.text('계정 관리'), findsOneWidget);
+    expect(find.byKey(const ValueKey('home-secondary-tools')), findsOneWidget);
+    expect(find.text('계정 관리'), findsNothing);
     expect(find.byKey(const ValueKey('home-operations-button')), findsNothing);
     expect(find.text('운영 검수'), findsNothing);
     expect(find.text('설정'), findsOneWidget);
