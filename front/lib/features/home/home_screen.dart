@@ -95,22 +95,17 @@ class _HomeScreenState extends State<HomeScreen> {
           ],
           maxWidth: AppBreakpoints.compactContentMaxWidth,
           children: [
-            _StatsSection(state: state),
-            const SizedBox(height: AppSpacing.lg),
             _ActionGrid(
               onWriteDiary: widget.onWriteDiary,
               onWriteLetter: widget.onWriteLetter,
               onViewStory: widget.onViewStory,
               onOpenConsultation: widget.onOpenConsultation,
             ),
-            const SizedBox(height: AppSpacing.lg),
-            _NotificationPriorityEntry(
+            const SizedBox(height: AppSpacing.md),
+            _SecondaryToolsSection(
               unreadCount: widget.unreadNotificationCount,
               hasLiveConnection: widget.hasLiveNotificationConnection,
               onOpenNotifications: widget.onOpenNotifications,
-            ),
-            const SizedBox(height: AppSpacing.lg),
-            _AccountToolsSection(
               onOpenSettings: widget.onOpenSettings,
               onLogout: widget.onLogout,
             ),
@@ -121,6 +116,8 @@ class _HomeScreenState extends State<HomeScreen> {
                 onContinue: _openSurface,
               ),
             ],
+            const SizedBox(height: AppSpacing.lg),
+            _StatsSection(state: state),
             const SizedBox(height: AppSpacing.xl),
             _CategoryOverview(
               stats: state.stats,
@@ -160,6 +157,7 @@ class _StatsSection extends StatelessWidget {
     final theme = Theme.of(context);
 
     return Column(
+      key: const ValueKey('home-stats-section'),
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Row(
@@ -381,16 +379,20 @@ class _HomeNotificationHeaderButton extends StatelessWidget {
   }
 }
 
-class _NotificationPriorityEntry extends StatelessWidget {
-  const _NotificationPriorityEntry({
+class _SecondaryToolsSection extends StatelessWidget {
+  const _SecondaryToolsSection({
     required this.unreadCount,
     required this.hasLiveConnection,
     required this.onOpenNotifications,
+    required this.onOpenSettings,
+    required this.onLogout,
   });
 
   final int unreadCount;
   final bool hasLiveConnection;
   final VoidCallback onOpenNotifications;
+  final VoidCallback onOpenSettings;
+  final VoidCallback onLogout;
 
   @override
   Widget build(BuildContext context) {
@@ -405,78 +407,120 @@ class _NotificationPriorityEntry extends StatelessWidget {
         : hasLiveConnection
             ? AppStatusTone.success
             : AppStatusTone.neutral;
+    final theme = Theme.of(context);
     final colorScheme = Theme.of(context).colorScheme;
 
     return Semantics(
-      label: '알림/신고, $unreadLabel, $liveLabel',
-      button: true,
-      child: Card(
-        margin: EdgeInsets.zero,
-        child: InkWell(
-          key: const ValueKey('home-action-notifications'),
+      container: true,
+      label: '홈 보조 도구',
+      child: DecoratedBox(
+        key: const ValueKey('home-secondary-tools'),
+        decoration: BoxDecoration(
+          color: colorScheme.surface.withValues(alpha: 0.74),
           borderRadius: AppRadii.card,
-          onTap: onOpenNotifications,
-          child: Padding(
-            padding: const EdgeInsets.all(AppSpacing.md),
-            child: Row(
-              children: [
-                DecoratedBox(
-                  decoration: BoxDecoration(
-                    color: colorScheme.surfaceContainerHighest,
-                    borderRadius: AppRadii.chip,
-                  ),
+          border: Border.all(color: colorScheme.outlineVariant),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(AppSpacing.sm),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  key: const ValueKey('home-action-notifications'),
+                  borderRadius: AppRadii.card,
+                  onTap: onOpenNotifications,
                   child: Padding(
-                    padding: const EdgeInsets.all(AppSpacing.xs),
-                    child: Icon(
-                      hasUnread
-                          ? Icons.notifications_active_outlined
-                          : Icons.notifications_none,
-                      size: 22,
-                      color: colorScheme.onSurfaceVariant,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: AppSpacing.xs,
+                      vertical: AppSpacing.xs,
+                    ),
+                    child: Row(
+                      children: [
+                        DecoratedBox(
+                          decoration: BoxDecoration(
+                            color: colorScheme.surfaceContainerHighest,
+                            borderRadius: AppRadii.chip,
+                          ),
+                          child: Padding(
+                            padding: const EdgeInsets.all(AppSpacing.xs),
+                            child: Icon(
+                              hasUnread
+                                  ? Icons.notifications_active_outlined
+                                  : Icons.notifications_none,
+                              size: 20,
+                              color: colorScheme.onSurfaceVariant,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: AppSpacing.sm),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                '알림/신고',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: theme.textTheme.titleSmall?.copyWith(
+                                  fontWeight: FontWeight.w800,
+                                ),
+                              ),
+                              const SizedBox(height: AppSpacing.xxs),
+                              Text(
+                                '$unreadLabel · $liveLabel',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: theme.textTheme.bodySmall?.copyWith(
+                                  color: colorScheme.onSurfaceVariant,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: AppSpacing.xs),
+                        ConstrainedBox(
+                          constraints: const BoxConstraints(maxWidth: 96),
+                          child: AppStatusPill(
+                            label: hasUnread ? '확인' : liveLabel,
+                            tone: statusTone,
+                          ),
+                        ),
+                        const SizedBox(width: AppSpacing.xs),
+                        Icon(
+                          Icons.chevron_right,
+                          size: 20,
+                          color: colorScheme.onSurfaceVariant,
+                        ),
+                      ],
                     ),
                   ),
                 ),
-                const SizedBox(width: AppSpacing.md),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        '알림/신고',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                              fontWeight: FontWeight.w800,
-                            ),
-                      ),
-                      const SizedBox(height: AppSpacing.xxs),
-                      Text(
-                        '$unreadLabel · $liveLabel',
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                              color: colorScheme.onSurfaceVariant,
-                            ),
-                      ),
-                    ],
+              ),
+              const SizedBox(height: AppSpacing.xs),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      key: const ValueKey('home-action-settings'),
+                      onPressed: onOpenSettings,
+                      icon: const Icon(Icons.settings_outlined),
+                      label: const Text('설정'),
+                    ),
                   ),
-                ),
-                const SizedBox(width: AppSpacing.xs),
-                ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 112),
-                  child: AppStatusPill(
-                    label: hasUnread ? '확인 필요' : liveLabel,
-                    tone: statusTone,
+                  const SizedBox(width: AppSpacing.xs),
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      key: const ValueKey('home-action-logout'),
+                      onPressed: onLogout,
+                      icon: const Icon(Icons.logout),
+                      label: const Text('로그아웃'),
+                    ),
                   ),
-                ),
-                const SizedBox(width: AppSpacing.xs),
-                Icon(
-                  Icons.chevron_right,
-                  size: 20,
-                  color: colorScheme.onSurfaceVariant,
-                ),
-              ],
-            ),
+                ],
+              ),
+            ],
           ),
         ),
       ),
@@ -559,139 +603,183 @@ class _ActionGrid extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final width = MediaQuery.sizeOf(context).width;
-    final cardAspectRatio = width < 390 ? 2.16 : 2.36;
-
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
 
-    return DecoratedBox(
-      key: const ValueKey('home-primary-actions-panel'),
-      decoration: BoxDecoration(
-        color: colorScheme.surface,
-        borderRadius: AppRadii.card,
-        border: Border.all(
-          color: colorScheme.primary.withValues(alpha: 0.12),
+    return Column(
+      key: const ValueKey('home-action-launcher'),
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Row(
+          children: [
+            Icon(
+              Icons.bolt_outlined,
+              size: 20,
+              color: colorScheme.primary,
+            ),
+            const SizedBox(width: AppSpacing.xs),
+            Text('바로 시작', style: theme.textTheme.titleMedium),
+          ],
         ),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(AppSpacing.md),
-        child: Column(
-          key: const ValueKey('home-primary-actions'),
+        const SizedBox(height: AppSpacing.xs),
+        Column(
+          key: const ValueKey('home-primary-actions-panel'),
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Row(
-              children: [
-                Icon(
-                  Icons.bolt_outlined,
-                  size: 20,
-                  color: colorScheme.primary,
-                ),
-                const SizedBox(width: AppSpacing.xs),
-                Text('바로 시작', style: theme.textTheme.titleMedium),
-              ],
+            _HomePrimaryActionCard(
+              actionKey: const ValueKey('home-action-consultation'),
+              primaryKey: const ValueKey('home-action-consultation-primary'),
+              title: 'AI 상담',
+              subtitle: '지금 마음을 바로 정리하기',
+              icon: Icons.chat_bubble_outline,
+              onTap: onOpenConsultation,
             ),
             const SizedBox(height: AppSpacing.xs),
-            GridView.count(
-              crossAxisCount: 2,
-              crossAxisSpacing: AppSpacing.xs,
-              mainAxisSpacing: AppSpacing.xs,
-              childAspectRatio: cardAspectRatio,
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
+            Row(
+              key: const ValueKey('home-primary-actions'),
               children: [
-                _HomeActionCard(
-                  actionKey: const ValueKey('home-action-diary'),
-                  surfaceKey: const ValueKey('home-action-diary-surface'),
-                  title: '다이어리 쓰기',
-                  icon: Icons.edit_note,
-                  tone: AppStatusTone.warning,
-                  onTap: onWriteDiary,
+                Expanded(
+                  child: _HomeActionCard(
+                    actionKey: const ValueKey('home-action-diary'),
+                    surfaceKey: const ValueKey('home-action-diary-surface'),
+                    title: '기록',
+                    icon: Icons.edit_note,
+                    tone: AppStatusTone.warning,
+                    onTap: onWriteDiary,
+                  ),
                 ),
-                _HomeActionCard(
-                  actionKey: const ValueKey('home-action-letter'),
-                  surfaceKey: const ValueKey('home-action-letter-surface'),
-                  title: '편지 쓰기',
-                  icon: Icons.mail_outline,
-                  onTap: onWriteLetter,
+                const SizedBox(width: AppSpacing.xs),
+                Expanded(
+                  child: _HomeActionCard(
+                    actionKey: const ValueKey('home-action-letter'),
+                    surfaceKey: const ValueKey('home-action-letter-surface'),
+                    title: '편지',
+                    icon: Icons.mail_outline,
+                    onTap: onWriteLetter,
+                  ),
                 ),
-                _HomeActionCard(
-                  actionKey: const ValueKey('home-action-story'),
-                  surfaceKey: const ValueKey('home-action-story-surface'),
-                  title: '스토리 보기',
-                  icon: Icons.forum_outlined,
-                  tone: AppStatusTone.success,
-                  onTap: onViewStory,
-                ),
-                _HomeActionCard(
-                  actionKey: const ValueKey('home-action-consultation'),
-                  surfaceKey:
-                      const ValueKey('home-action-consultation-surface'),
-                  title: 'AI 상담',
-                  icon: Icons.chat_bubble_outline,
-                  onTap: onOpenConsultation,
+                const SizedBox(width: AppSpacing.xs),
+                Expanded(
+                  child: _HomeActionCard(
+                    actionKey: const ValueKey('home-action-story'),
+                    surfaceKey: const ValueKey('home-action-story-surface'),
+                    title: '스토리',
+                    icon: Icons.forum_outlined,
+                    tone: AppStatusTone.success,
+                    onTap: onViewStory,
+                  ),
                 ),
               ],
             ),
           ],
         ),
-      ),
+      ],
     );
   }
 }
 
-class _AccountToolsSection extends StatelessWidget {
-  const _AccountToolsSection({
-    required this.onOpenSettings,
-    required this.onLogout,
+class _HomePrimaryActionCard extends StatelessWidget {
+  const _HomePrimaryActionCard({
+    required this.actionKey,
+    required this.primaryKey,
+    required this.title,
+    required this.subtitle,
+    required this.icon,
+    required this.onTap,
   });
 
-  final VoidCallback onOpenSettings;
-  final VoidCallback onLogout;
+  final Key actionKey;
+  final Key primaryKey;
+  final String title;
+  final String subtitle;
+  final IconData icon;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
+    final colors = _homeActionColors(
+      theme.colorScheme,
+      AppStatusTone.warning,
+    );
 
     return Semantics(
-      container: true,
-      label: '계정 관리',
-      child: Column(
-        key: const ValueKey('home-account-tools-section'),
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Text('계정 관리', style: theme.textTheme.titleMedium),
-          const SizedBox(height: AppSpacing.xs),
-          DecoratedBox(
-            decoration: BoxDecoration(
-              color: colorScheme.surface.withValues(alpha: 0.78),
-              borderRadius: AppRadii.card,
-              border: Border.all(color: colorScheme.outlineVariant),
+      button: true,
+      label: '$title, $subtitle',
+      child: ExcludeSemantics(
+        child: DecoratedBox(
+          key: primaryKey,
+          decoration: BoxDecoration(
+            color: colors.background,
+            borderRadius: AppRadii.card,
+            border: Border.all(
+              color: colors.foreground.withValues(alpha: 0.16),
             ),
-            child: Padding(
-              padding: const EdgeInsets.all(AppSpacing.sm),
-              child: Wrap(
-                spacing: AppSpacing.xs,
-                runSpacing: AppSpacing.xs,
-                children: [
-                  OutlinedButton.icon(
-                    key: const ValueKey('home-action-settings'),
-                    onPressed: onOpenSettings,
-                    icon: const Icon(Icons.settings_outlined),
-                    label: const Text('설정'),
+          ),
+          child: Material(
+            color: Colors.transparent,
+            child: InkWell(
+              key: actionKey,
+              borderRadius: AppRadii.card,
+              onTap: onTap,
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(minHeight: 76),
+                child: Padding(
+                  padding: const EdgeInsets.all(AppSpacing.md),
+                  child: Row(
+                    children: [
+                      DecoratedBox(
+                        decoration: BoxDecoration(
+                          color: colors.foreground.withValues(alpha: 0.12),
+                          borderRadius: AppRadii.chip,
+                        ),
+                        child: Padding(
+                          padding: const EdgeInsets.all(AppSpacing.sm),
+                          child: Icon(icon, color: colors.foreground, size: 24),
+                        ),
+                      ),
+                      const SizedBox(width: AppSpacing.md),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Text(
+                              title,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: theme.textTheme.titleMedium?.copyWith(
+                                color: colors.foreground,
+                                fontWeight: FontWeight.w900,
+                              ),
+                            ),
+                            const SizedBox(height: AppSpacing.xxs),
+                            Text(
+                              subtitle,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color:
+                                    colors.foreground.withValues(alpha: 0.78),
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: AppSpacing.xs),
+                      Icon(
+                        Icons.arrow_forward,
+                        color: colors.foreground,
+                        size: 20,
+                      ),
+                    ],
                   ),
-                  OutlinedButton.icon(
-                    key: const ValueKey('home-action-logout'),
-                    onPressed: onLogout,
-                    icon: const Icon(Icons.logout),
-                    label: const Text('로그아웃'),
-                  ),
-                ],
+                ),
               ),
             ),
           ),
-        ],
+        ),
       ),
     );
   }
@@ -719,49 +807,55 @@ class _HomeActionCard extends StatelessWidget {
     final theme = Theme.of(context);
     final colors = _homeActionColors(theme.colorScheme, tone);
 
-    return DecoratedBox(
-      key: surfaceKey,
-      decoration: BoxDecoration(
-        color: colors.background,
-        borderRadius: AppRadii.card,
-        border: Border.all(
-          color: colors.foreground.withValues(alpha: 0.12),
-        ),
-      ),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          key: actionKey,
-          borderRadius: AppRadii.card,
-          onTap: onTap,
-          child: Padding(
-            padding: const EdgeInsets.all(AppSpacing.sm),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                DecoratedBox(
-                  decoration: BoxDecoration(
-                    color: colors.foreground.withValues(alpha: 0.10),
-                    borderRadius: AppRadii.chip,
-                  ),
-                  child: Padding(
-                    padding: const EdgeInsets.all(AppSpacing.xs),
-                    child: Icon(icon, color: colors.foreground, size: 22),
-                  ),
-                ),
-                const SizedBox(width: AppSpacing.xs),
-                Expanded(
-                  child: Text(
-                    title,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: theme.textTheme.titleSmall?.copyWith(
-                      color: colors.foreground,
-                      fontWeight: FontWeight.w800,
+    return Semantics(
+      button: true,
+      label: title,
+      child: ExcludeSemantics(
+        child: DecoratedBox(
+          key: surfaceKey,
+          decoration: BoxDecoration(
+            color: colors.background,
+            borderRadius: AppRadii.card,
+            border: Border.all(
+              color: colors.foreground.withValues(alpha: 0.12),
+            ),
+          ),
+          child: Material(
+            color: Colors.transparent,
+            child: InkWell(
+              key: actionKey,
+              borderRadius: AppRadii.card,
+              onTap: onTap,
+              child: Padding(
+                padding: const EdgeInsets.all(AppSpacing.sm),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    DecoratedBox(
+                      decoration: BoxDecoration(
+                        color: colors.foreground.withValues(alpha: 0.10),
+                        borderRadius: AppRadii.chip,
+                      ),
+                      child: Padding(
+                        padding: const EdgeInsets.all(AppSpacing.xs),
+                        child: Icon(icon, color: colors.foreground, size: 22),
+                      ),
                     ),
-                  ),
+                    const SizedBox(width: AppSpacing.xs),
+                    Expanded(
+                      child: Text(
+                        title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.titleSmall?.copyWith(
+                          color: colors.foreground,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
-              ],
+              ),
             ),
           ),
         ),

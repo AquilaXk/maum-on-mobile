@@ -66,7 +66,11 @@ class AppScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scrollView = SingleChildScrollView(
-      physics: onRefresh == null ? null : const AlwaysScrollableScrollPhysics(),
+      physics: onRefresh == null
+          ? null
+          : const ClampingScrollPhysics(
+              parent: AlwaysScrollableScrollPhysics(),
+            ),
       padding: padding,
       child: Center(
         child: ConstrainedBox(
