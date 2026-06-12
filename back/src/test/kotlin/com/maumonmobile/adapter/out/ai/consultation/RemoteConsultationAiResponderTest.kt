@@ -351,6 +351,44 @@ class RemoteConsultationAiResponderTest {
     }
 
     @Test
+    fun promptRequiresCounselingMicroSkillsAndAnswersUserIntentFirst() {
+        val client = RecordingVertexAiGenerateContentClient(
+            responseBody = vertexResponse("""{"chunks":["질문 의도부터 붙잡아 답할게요."]}"""),
+        )
+        val responder = RemoteConsultationAiResponder(
+            properties = aiProperties(),
+            objectMapper = ObjectMapper(),
+            accessTokenProvider = { "vertex-token" },
+            generateContentClient = client,
+        )
+
+        responder.generate(
+            ConsultationAiRequest(
+                memberId = 27L,
+                message = "친구에게 어떻게 말해야 할지 모르겠어요. 제가 먼저 사과해야 할까요?",
+                recentMessages = emptyList(),
+                timeout = Duration.ofSeconds(2),
+            ),
+        )
+
+        val prompt = ObjectMapper()
+            .readTree(client.requestBody!!)["contents"][0]["parts"][0]["text"]
+            .asString()
+
+        assertThat(prompt)
+            .contains(
+                "상담 미세기술",
+                "반영",
+                "명료화",
+                "정서 확인",
+                "정상화",
+                "재구성",
+                "행동 실험",
+                "사용자가 직접 묻는 선택 질문에는 먼저 선택의 기준을 제시",
+            )
+    }
+
+    @Test
     fun promptListsRecentAssistantSuggestionsAsDoNotReuseMaterial() {
         val client = RecordingVertexAiGenerateContentClient(
             responseBody = vertexResponse("""{"chunks":["이번에는 다른 방법으로 살펴볼게요."]}"""),
