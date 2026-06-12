@@ -168,12 +168,10 @@ test("support readiness runner accepts complete runtime support evidence", async
   assert.equal(report.runtimeEvidence.status, "pass");
 });
 
-test("app and operations surfaces expose support contacts and sanitized diagnostics", () => {
+test("app surfaces expose support contacts and sanitized diagnostics", () => {
   const legal = read("front/lib/features/legal/domain/legal_disclosures.dart");
   const settingsScreen = read("front/lib/features/settings/presentation/settings_screen.dart");
   const settingsTest = read("front/test/features/settings/settings_screen_test.dart");
-  const operationsScreen = read("front/lib/features/operations/presentation/operations_screen.dart");
-  const operationsTest = read("front/test/features/operations/operations_screen_test.dart");
 
   assert.match(legal, /privacyEmail = 'privacy@maum-on\.app'/);
   assert.match(legal, /incidentNoticeUrl = 'https:\/\/maum-on\.app\/status'/);
@@ -183,10 +181,6 @@ test("app and operations surfaces expose support contacts and sanitized diagnost
   assert.match(settingsScreen, /settings-copy-diagnostics/);
   assert.match(settingsScreen, /SupportDiagnosticInfo/);
   assert.match(settingsTest, /isNot\(contains\('me@example\.com'\)\)/);
-  assert.match(operationsScreen, /심사 대응/);
-  assert.match(operationsScreen, /App Store review/);
-  assert.match(operationsScreen, /Google Play review/);
-  assert.match(operationsTest, /operations-review-support-card/);
 });
 
 test("ci runs support readiness gate only for release candidate ops flows without adding workflow inputs", () => {

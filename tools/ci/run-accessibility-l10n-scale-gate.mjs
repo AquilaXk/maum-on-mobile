@@ -69,7 +69,7 @@ function validateScreens(screens, storeListingContract, usabilityContract) {
     (set.captures ?? []).map((capture) => capture.routeKey)
   )));
   const usabilityScreens = new Set((usability.screens ?? []).map((screen) => screen.id));
-  const requiredScreens = ["home", "diary", "story", "letter", "consultation", "notifications", "settings", "operations"];
+  const requiredScreens = ["home", "diary", "story", "letter", "consultation", "notifications", "settings"];
   const screenById = new Map(screens.map((screen) => [screen.id, screen]));
   const screenFailures = [];
   const screenResults = [];

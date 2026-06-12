@@ -72,14 +72,6 @@
       "endpoints": [
         "GET /api/v1/notifications"
       ]
-    },
-    {
-      "id": "operations.actions",
-      "area": "operations",
-      "endpoints": [
-        "GET /api/v1/admin/dashboard",
-        "GET /api/v1/observability/api-metrics"
-      ]
     }
   ]
 }

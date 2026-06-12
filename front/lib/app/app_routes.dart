@@ -68,14 +68,6 @@ enum AuthenticatedRoute {
     icon: Icons.notifications_none,
     selectedIcon: Icons.notifications,
   ),
-  operations(
-    key: 'operations',
-    path: '/operations',
-    title: '운영 검수',
-    navLabel: '운영',
-    icon: Icons.admin_panel_settings_outlined,
-    selectedIcon: Icons.admin_panel_settings,
-  ),
   settings(
     key: 'settings',
     path: '/settings',

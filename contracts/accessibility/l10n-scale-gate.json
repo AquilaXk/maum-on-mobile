@@ -102,19 +102,6 @@
           "patterns": ["semanticLabel:", "계정 설정을 불러오는 중", "개인정보"]
         }
       ]
-    },
-    {
-      "id": "operations",
-      "routeKey": "operations",
-      "screenshotCandidate": true,
-      "semanticLabels": ["운영 대시보드를 불러오는 중", "운영 조치 저장"],
-      "evidenceItems": [
-        {
-          "id": "operations-semantics-scale",
-          "file": "front/lib/features/operations/presentation/operations_screen.dart",
-          "patterns": ["semanticLabel:", "운영 조치 저장", "조치 저장 확인"]
-        }
-      ]
     }
   ],
   "criteria": {
@@ -248,14 +235,6 @@
       "evidenceItems": [
         {"id": "store-settings", "file": "contracts/store-listing/store-listing.json", "patterns": ["\"routeKey\": \"settings\"", "설정"]},
         {"id": "app-settings", "file": "front/lib/app/app_routes.dart", "patterns": ["key: 'settings'", "title: '설정'"]}
-      ]
-    },
-    {
-      "id": "operations",
-      "canonical": "운영",
-      "evidenceItems": [
-        {"id": "operations-screen", "file": "front/lib/features/operations/presentation/operations_screen.dart", "patterns": ["운영", "운영 조치 저장"]},
-        {"id": "app-operations", "file": "front/lib/app/app_routes.dart", "patterns": ["key: 'operations'", "navLabel: '운영'"]}
       ]
     },
     {

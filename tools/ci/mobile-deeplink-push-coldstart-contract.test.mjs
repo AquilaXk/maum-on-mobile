@@ -44,7 +44,6 @@ test("push cold-start contract defines every required notification route", () =>
     "letter",
     "consultation",
     "notifications",
-    "operations",
   ]) {
     assert.ok(routes.has(destination), `Missing cold-start route: ${destination}`);
   }

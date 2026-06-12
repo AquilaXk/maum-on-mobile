@@ -39,7 +39,7 @@ test("accessibility l10n scale contract covers core screens, criteria, and relea
 
   assert.deepEqual(
     contract.screens.map((screen) => screen.id).sort(),
-    ["consultation", "diary", "home", "letter", "notifications", "operations", "settings", "story"],
+    ["consultation", "diary", "home", "letter", "notifications", "settings", "story"],
   );
   for (const screen of contract.screens) {
     assert.ok(screen.routeKey.length > 0, `${screen.id} must map a route key`);

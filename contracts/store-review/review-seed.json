@@ -9,9 +9,7 @@
     "secretNames": [
       "MAUMON_STORE_REVIEW_SEED_SECRET",
       "MAUMON_REVIEW_ACCOUNT_EMAIL",
-      "MAUMON_REVIEW_ACCOUNT_PASSWORD",
-      "MAUMON_REVIEW_OPERATIONS_EMAIL",
-      "MAUMON_REVIEW_OPERATIONS_PASSWORD"
+      "MAUMON_REVIEW_ACCOUNT_PASSWORD"
     ]
   },
   "reviewNotes": {
@@ -37,17 +35,6 @@
         "report.submit",
         "settings.data_export",
         "settings.member_withdrawal"
-      ]
-    },
-    {
-      "id": "operations",
-      "role": "ADMIN",
-      "emailSecretName": "MAUMON_REVIEW_OPERATIONS_EMAIL",
-      "passwordSecretName": "MAUMON_REVIEW_OPERATIONS_PASSWORD",
-      "accessPaths": [
-        "admin.members",
-        "admin.reports",
-        "admin.letters"
       ]
     }
   ],

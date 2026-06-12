@@ -357,8 +357,6 @@ void main() {
         home: HomeScreen(
           nickname: '관리자',
           homeController: controller,
-          isAdmin: true,
-          onOpenOperations: () {},
           onWriteDiary: () {},
           onWriteLetter: () {},
           onViewStory: () {},
@@ -374,12 +372,14 @@ void main() {
     expect(find.byKey(const ValueKey('home-account-tools-section')),
         findsOneWidget);
     expect(find.text('계정 관리'), findsOneWidget);
-    expect(find.text('운영 검수'), findsOneWidget);
+    expect(find.byKey(const ValueKey('home-operations-button')), findsNothing);
+    expect(find.text('운영 검수'), findsNothing);
     expect(find.text('설정'), findsOneWidget);
     expect(find.text('로그아웃'), findsOneWidget);
   });
 
-  testWidgets('shows operations entry only to admins', (tester) async {
+  testWidgets('does not expose operations entry to admin accounts',
+      (tester) async {
     final userController = HomeController(
       homeRepository: const _FakeHomeRepository(),
     );
@@ -407,15 +407,12 @@ void main() {
       homeRepository: const _FakeHomeRepository(),
     );
     await adminController.load();
-    var operationsTaps = 0;
 
     await tester.pumpWidget(
       MaterialApp(
         home: HomeScreen(
           nickname: '관리자',
           homeController: adminController,
-          isAdmin: true,
-          onOpenOperations: () => operationsTaps += 1,
           onWriteDiary: () {},
           onWriteLetter: () {},
           onViewStory: () {},
@@ -427,9 +424,8 @@ void main() {
       ),
     );
 
-    await _tapVisibleKey(tester, const ValueKey('home-operations-button'));
-
-    expect(operationsTaps, 1);
+    expect(find.byKey(const ValueKey('home-operations-button')), findsNothing);
+    expect(find.text('운영 검수'), findsNothing);
   });
 }
 

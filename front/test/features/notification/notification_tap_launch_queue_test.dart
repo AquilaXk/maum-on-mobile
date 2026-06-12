@@ -98,16 +98,17 @@ void main() {
       expect(queue.consumePendingTap(), isNull);
     });
 
-    test('queues expired-auth operations taps with a sign-in recovery message',
-        () {
+    test('queues expired-auth report-status taps to notifications', () {
       final queue = NotificationTapLaunchQueue();
+      final payload = NotificationTapPayload.fromJson({
+        'event': 'report_status',
+        'targetType': 'REPORT',
+        'targetId': '9',
+        'notificationId': '30',
+      });
 
       final resolution = queue.resolve(
-        const NotificationTapPayload(
-          destination: NotificationTapDestination.operations,
-          notificationId: 30,
-          reportId: 9,
-        ),
+        payload,
         source: NotificationTapLaunchSource.coldStart,
         authState: NotificationTapAuthState.expired,
       );
@@ -116,6 +117,10 @@ void main() {
       expect(
         resolution.errorMessage,
         '로그인이 만료되었습니다. 다시 로그인하면 알림으로 이동합니다.',
+      );
+      expect(
+        resolution.pendingTap?.payload.destination,
+        NotificationTapDestination.notifications,
       );
       expect(resolution.pendingTap?.payload.reportId, 9);
       expect(queue.consumePendingTap()?.payload.reportId, 9);

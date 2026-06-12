@@ -177,28 +177,6 @@
       "accessibilityLabelTemplate": "{readState} 알림, 신고 처리 상태, {destination}로 이동"
     },
     {
-      "type": "operations_action",
-      "destination": "operations",
-      "requiredPayload": ["notificationId", "reportId"],
-      "fallback": {
-        "destination": "notifications",
-        "message": "운영 항목을 바로 열 수 없어 알림 목록에 머뭅니다."
-      },
-      "tapBehavior": {
-        "markReadBeforeNavigate": true,
-        "dedupeByNotificationId": true
-      },
-      "emptyState": {
-        "title": "확인할 운영 항목이 없습니다.",
-        "message": "운영 화면에서 최신 목록을 확인해 주세요."
-      },
-      "errorState": {
-        "targetMissing": "운영 항목을 찾을 수 없습니다.",
-        "unauthorized": "운영 항목을 확인할 권한이 없습니다."
-      },
-      "accessibilityLabelTemplate": "{readState} 알림, 운영 항목, {destination}로 이동"
-    },
-    {
       "type": "fallback",
       "destination": "notifications",
       "requiredPayload": ["notificationId"],

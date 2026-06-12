@@ -52,15 +52,6 @@
         "destination": "notifications"
       },
       "recoveryMessage": "알림 목록에서 내용을 확인해 주세요."
-    },
-    {
-      "destination": "operations",
-      "sources": ["coldStart", "background", "foreground"],
-      "requiredPayload": ["notificationId", "reportId"],
-      "fallback": {
-        "destination": "notifications"
-      },
-      "recoveryMessage": "운영 항목을 바로 열 수 없어 알림 목록에서 다시 선택해 주세요."
     }
   ],
   "authRecovery": {

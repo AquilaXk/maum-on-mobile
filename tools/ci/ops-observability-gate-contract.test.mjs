@@ -170,23 +170,16 @@ test("ops observability runner accepts complete runtime alert evidence", async (
   assert.equal(report.runtimeEvidence.status, "pass");
 });
 
-test("backend and operations UI expose sanitized release observability signals", () => {
+test("backend exposes sanitized release observability signals", () => {
   const telemetry = read("back/src/main/kotlin/com/maumonmobile/domain/telemetry/MobileClientTelemetry.kt");
   const telemetryTest = read("back/src/test/kotlin/com/maumonmobile/application/service/MobileTelemetryServiceTest.kt");
   const metricsRegistry = read("back/src/main/kotlin/com/maumonmobile/global/observability/MobileApiMetricsRegistry.kt");
-  const operationsScreen = read("front/lib/features/operations/presentation/operations_screen.dart");
-  const operationsModels = read("front/lib/features/operations/domain/operations_models.dart");
-  const operationsTest = read("front/test/features/operations/operations_screen_test.dart");
 
   assert.match(telemetry, /CRASH_SIGNAL/);
   assert.match(telemetry, /ANR_SIGNAL/);
   assert.match(telemetryTest, /doesNotContain\("leak@example.com"\)/);
   assert.match(metricsRegistry, /recordPushDelivery/);
   assert.match(metricsRegistry, /recordAiModel/);
-  assert.match(operationsScreen, /최근 장애 원인/);
-  assert.match(operationsModels, /Crash signal/);
-  assert.match(operationsModels, /ANR signal/);
-  assert.match(operationsTest, /find\.text\('최근 장애 원인'\)/);
 });
 
 test("ci runs ops observability gate only for release candidate flows", () => {

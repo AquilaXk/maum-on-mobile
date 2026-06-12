@@ -232,7 +232,7 @@
     {
       "id": "mobile-api-contract-snapshots",
       "file": "contracts/mobile-api/response-snapshots.json",
-      "patterns": ["\"version\": 1", "\"endpoints\""]
+      "patterns": ["\"version\": 1", "\"snapshots\"", "\"path\""]
     }
   ],
   "runtimeEvidence": {
