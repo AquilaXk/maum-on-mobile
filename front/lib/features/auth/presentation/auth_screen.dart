@@ -75,7 +75,7 @@ class _AuthScreenState extends State<AuthScreen> {
         statusBarColor: Colors.transparent,
         statusBarIconBrightness: Brightness.dark,
         statusBarBrightness: Brightness.light,
-        systemNavigationBarColor: AppBrandColors.surfaceStrong,
+        systemNavigationBarColor: AppBrandColors.backgroundBlue,
         systemNavigationBarIconBrightness: Brightness.dark,
       ),
       child: Theme(
@@ -85,18 +85,14 @@ class _AuthScreenState extends State<AuthScreen> {
             key: const ValueKey('auth-blue-shell'),
             decoration: const BoxDecoration(
               color: AppBrandColors.backgroundBlue,
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [
-                  Color(0xFFE8F3FF),
-                  AppBrandColors.surfaceStrong,
-                ],
-              ),
             ),
             child: SafeArea(
               child: LayoutBuilder(
                 builder: (context, constraints) {
+                  final minContentHeight =
+                      (constraints.maxHeight - AppSpacing.xxl * 2)
+                          .clamp(0.0, double.infinity)
+                          .toDouble();
                   return SingleChildScrollView(
                     padding: const EdgeInsets.symmetric(
                       horizontal: AppSpacing.xl,
@@ -105,7 +101,7 @@ class _AuthScreenState extends State<AuthScreen> {
                     child: Center(
                       child: ConstrainedBox(
                         constraints: BoxConstraints(
-                          minHeight: constraints.maxHeight - AppSpacing.xxl * 2,
+                          minHeight: minContentHeight,
                           maxWidth: 440,
                         ),
                         child: Column(
@@ -771,51 +767,60 @@ class _AuthFormPanel extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
-    return Card(
+    return DecoratedBox(
       key: const ValueKey('auth-form-panel'),
-      margin: EdgeInsets.zero,
-      color: AppBrandColors.surfaceStrong,
-      surfaceTintColor: Colors.transparent,
-      shape: RoundedRectangleBorder(
+      decoration: BoxDecoration(
+        color: const Color(0xFFF4F8FF),
         borderRadius: AppRadii.card,
-        side: BorderSide(
-          color: AppBrandColors.primaryBlue.withValues(alpha: 0.22),
-        ),
+        border: Border.all(color: AppBrandColors.borderSoft),
+        boxShadow: [
+          BoxShadow(
+            color: AppBrandColors.primaryBlue.withValues(alpha: 0.08),
+            blurRadius: 18,
+            offset: const Offset(0, 8),
+          ),
+        ],
       ),
-      child: Padding(
-        padding: const EdgeInsets.all(AppSpacing.xl),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Row(
-              key: const ValueKey('auth-form-title-row'),
+      child: ClipRRect(
+        borderRadius: AppRadii.card,
+        child: Material(
+          color: Colors.transparent,
+          child: Padding(
+            padding: const EdgeInsets.all(AppSpacing.xl),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                DecoratedBox(
-                  key: const ValueKey('auth-form-title-icon'),
-                  decoration: BoxDecoration(
-                    color: theme.colorScheme.primaryContainer,
-                    borderRadius: AppRadii.chip,
-                  ),
-                  child: ExcludeSemantics(
-                    child: Padding(
-                      padding: const EdgeInsets.all(AppSpacing.xs),
-                      child: Icon(
-                        icon,
-                        color: theme.colorScheme.onPrimaryContainer,
-                        size: 20,
+                Row(
+                  key: const ValueKey('auth-form-title-row'),
+                  children: [
+                    DecoratedBox(
+                      key: const ValueKey('auth-form-title-icon'),
+                      decoration: BoxDecoration(
+                        color: theme.colorScheme.primaryContainer,
+                        borderRadius: AppRadii.chip,
+                      ),
+                      child: ExcludeSemantics(
+                        child: Padding(
+                          padding: const EdgeInsets.all(AppSpacing.xs),
+                          child: Icon(
+                            icon,
+                            color: theme.colorScheme.onPrimaryContainer,
+                            size: 20,
+                          ),
+                        ),
                       ),
                     ),
-                  ),
+                    const SizedBox(width: AppSpacing.sm),
+                    Expanded(
+                      child: Text(title, style: theme.textTheme.titleLarge),
+                    ),
+                  ],
                 ),
-                const SizedBox(width: AppSpacing.sm),
-                Expanded(
-                  child: Text(title, style: theme.textTheme.titleLarge),
-                ),
+                const SizedBox(height: AppSpacing.lg),
+                child,
               ],
             ),
-            const SizedBox(height: AppSpacing.lg),
-            child,
-          ],
+          ),
         ),
       ),
     );
