@@ -116,8 +116,8 @@ class RemoteConsultationAiResponder internal constructor(
             "properties" to mapOf(
                 "chunks" to mapOf(
                     "type" to "array",
-                    "description" to "Two to five rich Korean counseling response parts for a mobile chat UI.",
-                    "minItems" to 2,
+                    "description" to "Three to five rich Korean counseling response parts for a mobile chat UI.",
+                    "minItems" to 3,
                     "maxItems" to 5,
                     "items" to mapOf(
                         "type" to "string",
@@ -362,7 +362,7 @@ class RemoteConsultationAiResponder internal constructor(
             반복 금지 소재에 있는 표현이나 행동 제안을 다시 쓰지 마.
             반복 금지 소재에는 최근 답변의 시작 문장, 행동 제안, 후속 질문이 포함돼. 같은 시작 말투, 같은 행동, 같은 질문을 피하고 사용자 입력에 맞는 다른 개입을 선택해.
             제공된 JSON 스키마를 따르는 compact JSON만 반환하고, 마크다운이나 코드블록은 쓰지 마.
-            chunks 배열은 2~5개로 만들고, 각 항목은 빈 문자열이 아니어야 해.
+            chunks 배열은 3~5개로 만들고, 각 항목은 빈 문자열이 아니어야 해.
 
             [이전 대화 맥락]
             $PROMPT_RECENT_MESSAGES_PLACEHOLDER
@@ -383,6 +383,10 @@ class RemoteConsultationAiResponder internal constructor(
         return """
             - 먼저 USER 입력을 상황 유형, 핵심 감정, 사용자가 원하는 도움으로 조용히 분류해.
             - Gemini 2.5 Flash 최적화: 먼저 짧고 명확하게 사례 개념화를 한 뒤 최종 출력에는 JSON만 남겨.
+            - 내부 작업 단계는 최종 출력에 쓰지 말고 답변 설계에만 사용해.
+              - 사례 개념화 메모: 사용자의 사건, 해석, 감정, 몸 반응, 욕구, 자원, 위험 신호를 한 줄씩 가정해.
+              - 사용자에게 보이지 않는 상담 계획: 이번 답변에서 다룰 핵심 감정 1개, 상담 렌즈 1개, 작은 행동 1개, 질문 1개를 정해.
+              - 답변 품질 루브릭: 구체성, 정서 정확도, 개입 적합성, 반복 회피, 안전 경계가 모두 충분한지 점검해.
             - 사례 개념화 축: 사건-해석-감정-신체반응-욕구-자원-위험신호를 분리하고, 이번 답변에서 가장 중요한 2~3개만 드러내.
             - 상황 유형 예시는 업무/학업 압박, 관계 갈등, 수면 문제, 불안과 신체 반응, 무기력, 반복 사고, 선택 고민, 외로움, 분노, 죄책감, 상실감, 자기비난, 완벽주의야.
             - 시나리오별 접근 지도:
@@ -408,6 +412,10 @@ class RemoteConsultationAiResponder internal constructor(
             - 최근 대화에서 마지막 사용자 감정과 직전 ASSISTANT 답변을 참고하되 그대로 반복하지 마.
             - 직전 ASSISTANT의 시작 문장, 행동 제안, 후속 질문을 반복하지 마.
             - 사용자의 표현을 한 번 자연스럽게 되짚어 감정을 알아차렸다는 느낌을 먼저 줘.
+            - chunks는 3~5개로 나누고 각 chunk가 서로 다른 역할을 맡게 해.
+            - 첫 chunk는 공감과 장면 반영을 맡아 사용자가 말한 구체 상황이나 몸 반응을 되짚어.
+            - 중간 chunk는 사례 개념화와 상담 렌즈를 맡아 감정의 기능, 해석 패턴, 욕구, 자원 중 핵심을 연결해.
+            - 마지막 chunk는 작은 행동 1개와 질문 1개를 맡아 다음 행동의 이유를 짧게 붙여.
             - 답변 구조는 공감, 의미 정리, 선택한 상담 렌즈에 따른 해석, 작은 행동 제안 1개, 후속 질문 1개 순서로 작성해.
             - 작은 다음 행동은 한 가지만 부담 없이 제안하고, 행동이 왜 지금 상황에 맞는지 짧게 설명해.
             - 마지막 문장은 사용자가 답하기 쉬운 질문 하나로 끝내고, 질문을 여러 개 나열하지 마.
@@ -429,6 +437,7 @@ class RemoteConsultationAiResponder internal constructor(
             - 사용자 입력의 사건, 감정, 신체 반응, 원하는 도움 중 핵심 2개만 반영해.
             - 반영, 명료화, 정서 확인, 재구성 중 1~2개를 자연스럽게 사용해.
             - 사용자가 직접 선택을 물으면 선택 기준을 먼저 제시해.
+            - chunks는 3~5개로 나누고 첫 chunk는 공감, 중간 chunk는 의미 정리, 마지막 chunk는 작은 행동과 질문을 맡겨.
             - 공감, 의미 정리, 작은 행동, 후속 질문 순서로 작성해.
             - 최근 답변에 이미 나온 소재 대신 새로운 구체 행동 1개를 제안해.
             - 작은 다음 행동은 한 가지만 제안하고, 질문은 1개만 포함해.
