@@ -64,6 +64,29 @@ void main() {
     );
   });
 
+  testWidgets('알림 카드는 ISO 원문 대신 읽기 쉬운 시간을 보여준다', (tester) async {
+    final notificationRepository = _FakeNotificationRepository();
+    final reportRepository = _FakeReportRepository();
+    final notificationController = NotificationController(
+      repository: notificationRepository,
+    );
+    final reportController = ReportController(repository: reportRepository);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: NotificationReportScreen(
+          notificationController: notificationController,
+          reportController: reportController,
+          onBack: () {},
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('2026.05.24 09:00'), findsOneWidget);
+    expect(find.text('2026-05-24T09:00:00'), findsNothing);
+  });
+
   testWidgets('renders notifications and submits a report', (tester) async {
     final semantics = tester.ensureSemantics();
     try {
