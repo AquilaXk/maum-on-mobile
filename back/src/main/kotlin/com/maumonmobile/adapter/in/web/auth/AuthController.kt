@@ -8,6 +8,7 @@ import com.maumonmobile.application.port.`in`.LogoutCommand
 import com.maumonmobile.application.port.`in`.OidcAppCallbackCommand
 import com.maumonmobile.application.port.`in`.OidcAuthorizeCommand
 import com.maumonmobile.application.port.`in`.OidcCallbackCommand
+import com.maumonmobile.application.port.`in`.OidcProviderListResult
 import com.maumonmobile.application.port.`in`.PasswordResetConfirmCommand
 import com.maumonmobile.application.port.`in`.PasswordResetConfirmResult
 import com.maumonmobile.application.port.`in`.PasswordResetRequestCommand
@@ -135,6 +136,11 @@ class AuthController(
         )
 
         return redirect(result.authorizationUri)
+    }
+
+    @GetMapping("/oidc/providers")
+    fun oidcProviders(): ApiResponse<OidcProviderListResult> {
+        return ApiResponse.success(authUseCase.oidcProviders())
     }
 
     @PostMapping("/oidc/session/{provider}")

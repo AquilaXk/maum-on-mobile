@@ -3,7 +3,9 @@ import 'package:flutter/material.dart';
 import '../core/network/api_error.dart';
 import '../features/auth/application/auth_controller.dart';
 import '../features/auth/data/auth_repository.dart';
+import '../features/auth/deeplink/external_login.dart';
 import '../features/auth/domain/auth_models.dart';
+import '../features/auth/domain/login_provider_policy.dart';
 import '../features/auth/presentation/auth_screen.dart';
 import '../theme/app_theme.dart';
 
@@ -20,10 +22,71 @@ Widget buildAuthQaApp() {
     scrollBehavior: const MaterialScrollBehavior().copyWith(
       overscroll: false,
     ),
-    home: AuthScreen(
-      controller: AuthController(authRepository: const _AuthQaRepository()),
-    ),
+    home: const _AuthQaShell(),
   );
+}
+
+class _AuthQaShell extends StatefulWidget {
+  const _AuthQaShell();
+
+  @override
+  State<_AuthQaShell> createState() => _AuthQaShellState();
+}
+
+class _AuthQaShellState extends State<_AuthQaShell> {
+  late final AuthController _authController = AuthController(
+    authRepository: const _AuthQaRepository(),
+  );
+  late final ExternalLoginController _externalLoginController =
+      ExternalLoginController(
+    authController: _authController,
+    launcher: const _AuthQaExternalLoginLauncher(),
+    config:
+        ExternalLoginConfig(apiBaseUrl: Uri.parse('https://qa.maumon.invalid')),
+  );
+
+  @override
+  void initState() {
+    super.initState();
+    Future<void>.microtask(_authController.loadExternalLoginProviders);
+  }
+
+  @override
+  void dispose() {
+    _externalLoginController.dispose();
+    _authController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: Listenable.merge([
+        _authController,
+        _externalLoginController,
+      ]),
+      builder: (context, _) {
+        final providerIds = _authController.state.externalLoginProviderIds;
+        return AuthScreen(
+          controller: _authController,
+          externalLoginController: _externalLoginController,
+          loginProviders: providerIds == null
+              ? const []
+              : LoginProviderPolicy.providersFor(
+                  Theme.of(context).platform,
+                  enabledProviderIds: providerIds.join(','),
+                ),
+        );
+      },
+    );
+  }
+}
+
+class _AuthQaExternalLoginLauncher implements ExternalLoginLauncher {
+  const _AuthQaExternalLoginLauncher();
+
+  @override
+  Future<bool> launch(Uri uri) async => true;
 }
 
 class _AuthQaRepository implements AuthRepository {
@@ -85,6 +148,11 @@ class _AuthQaRepository implements AuthRepository {
   @override
   Future<AuthSession> exchangeOidcSession(OidcSessionRequest request) {
     return login(const LoginRequest(email: 'qa@example.com', password: 'qa'));
+  }
+
+  @override
+  Future<List<String>> fetchOidcProviderIds() async {
+    return const ['kakao'];
   }
 
   @override

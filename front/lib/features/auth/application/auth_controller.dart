@@ -18,6 +18,7 @@ class AuthState {
     this.hasRestored = false,
     this.errorMessage,
     this.infoMessage,
+    this.externalLoginProviderIds,
     this.sessionRevision = 0,
   });
 
@@ -28,6 +29,7 @@ class AuthState {
         hasRestored = false,
         errorMessage = null,
         infoMessage = null,
+        externalLoginProviderIds = null,
         sessionRevision = 0;
 
   final AuthStatus status;
@@ -36,6 +38,7 @@ class AuthState {
   final bool hasRestored;
   final String? errorMessage;
   final String? infoMessage;
+  final List<String>? externalLoginProviderIds;
   final int sessionRevision;
 
   bool get isAuthenticated => status == AuthStatus.authenticated;
@@ -52,6 +55,8 @@ class AuthState {
     bool clearErrorMessage = false,
     String? infoMessage,
     bool clearInfoMessage = false,
+    List<String>? externalLoginProviderIds,
+    bool clearExternalLoginProviderIds = false,
     int? sessionRevision,
   }) {
     return AuthState(
@@ -62,6 +67,9 @@ class AuthState {
       errorMessage:
           clearErrorMessage ? null : errorMessage ?? this.errorMessage,
       infoMessage: clearInfoMessage ? null : infoMessage ?? this.infoMessage,
+      externalLoginProviderIds: clearExternalLoginProviderIds
+          ? null
+          : externalLoginProviderIds ?? this.externalLoginProviderIds,
       sessionRevision: sessionRevision ?? this.sessionRevision,
     );
   }
@@ -78,6 +86,20 @@ class AuthController extends ChangeNotifier {
   Future<void>? _sessionInvalidationFuture;
 
   AuthState get state => _state;
+
+  Future<void> loadExternalLoginProviders() async {
+    try {
+      final providerIds = await _authRepository.fetchOidcProviderIds();
+      _setState(
+        _state.copyWith(
+          externalLoginProviderIds: _knownExternalLoginProviderIds(providerIds),
+        ),
+      );
+    } on Object {
+      // 서버 목록 조회가 실패하면 Provider 상태를 비워 호출 화면의 fallback 정책을 사용한다.
+      _setState(_state.copyWith(clearExternalLoginProviderIds: true));
+    }
+  }
 
   Future<void> restoreSession() async {
     _setState(
@@ -101,6 +123,7 @@ class AuthController extends ChangeNotifier {
           status: AuthStatus.unauthenticated,
           hasRestored: true,
           infoMessage: infoMessage,
+          externalLoginProviderIds: _state.externalLoginProviderIds,
           sessionRevision: _state.sessionRevision + 1,
         ),
       );
@@ -379,6 +402,7 @@ class AuthController extends ChangeNotifier {
         status: AuthStatus.authenticated,
         member: member,
         hasRestored: hasRestored,
+        externalLoginProviderIds: _state.externalLoginProviderIds,
         sessionRevision: _state.sessionRevision + 1,
       ),
     );
@@ -390,6 +414,7 @@ class AuthController extends ChangeNotifier {
         status: AuthStatus.unauthenticated,
         hasRestored: true,
         infoMessage: infoMessage,
+        externalLoginProviderIds: _state.externalLoginProviderIds,
         sessionRevision: _state.sessionRevision + 1,
       ),
     );
@@ -407,4 +432,25 @@ class AuthController extends ChangeNotifier {
 
     return '요청을 처리하지 못했습니다.';
   }
+
+  List<String> _knownExternalLoginProviderIds(List<String> providerIds) {
+    final normalized = <String>[];
+    final seen = <String>{};
+    for (final providerId in providerIds) {
+      final id = providerId.trim().toLowerCase();
+      if (!_knownProviderIds.contains(id) || !seen.add(id)) {
+        continue;
+      }
+      normalized.add(id);
+    }
+    return List.unmodifiable(normalized);
+  }
+
+  static const _knownProviderIds = {
+    'naver',
+    'kakao',
+    'facebook',
+    'google',
+    'apple',
+  };
 }

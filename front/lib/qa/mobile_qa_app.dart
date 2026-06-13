@@ -102,6 +102,11 @@ class _QaAuthRepository implements AuthRepository {
   Future<AuthSession> exchangeOidcSession(OidcSessionRequest request) async {
     return _qaSession();
   }
+
+  @override
+  Future<List<String>> fetchOidcProviderIds() async {
+    return const ['kakao'];
+  }
 }
 
 class _QaHomeRepository implements HomeRepository {

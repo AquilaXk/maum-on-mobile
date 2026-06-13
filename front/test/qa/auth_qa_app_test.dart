@@ -4,8 +4,7 @@ import 'package:maum_on_mobile_front/qa/auth_qa_app.dart';
 import 'package:maum_on_mobile_front/shared/ui/brand_identity.dart';
 
 void main() {
-  testWidgets('renders the auth QA app through signup verification',
-      (tester) async {
+  testWidgets('인증 QA 앱은 카카오 간편 로그인과 이메일 회원가입 흐름을 렌더링한다', (tester) async {
     await tester.pumpWidget(buildAuthQaApp());
     await tester.pumpAndSettle();
 
@@ -14,7 +13,21 @@ void main() {
     expect(find.byKey(const ValueKey('login-email-field')), findsOneWidget);
     expect(find.byKey(const ValueKey('login-submit-button')), findsOneWidget);
     expect(
-        find.byKey(const ValueKey('quick-login-provider-row')), findsNothing);
+      find.byKey(const ValueKey('quick-login-provider-row')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey('external-login-kakao-button')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey('external-login-google-button')),
+      findsNothing,
+    );
+    expect(
+      find.byKey(const ValueKey('external-login-apple-button')),
+      findsNothing,
+    );
 
     await tester.tap(find.text('새 계정 만들기'));
     await tester.pumpAndSettle();

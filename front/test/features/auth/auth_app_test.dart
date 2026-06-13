@@ -556,9 +556,11 @@ void main() {
 
         for (final route in authenticatedPrimaryRoutes) {
           final tab = find.byKey(ValueKey('route-tab-${route.key}'));
-          final icon = tester.widgetList<Icon>(
-            find.descendant(of: tab, matching: find.byType(Icon)),
-          ).single;
+          final icon = tester
+              .widgetList<Icon>(
+                find.descendant(of: tab, matching: find.byType(Icon)),
+              )
+              .single;
           expect(icon.color, const Color(0xFF777777));
           expect(
             tester.getSemantics(
@@ -1104,6 +1106,42 @@ void main() {
 
     expect(find.text('이메일 또는 비밀번호가 맞지 않아요.'), findsOneWidget);
     expect(find.text('로그인'), findsWidgets);
+  });
+
+  testWidgets('앱 로그인 화면은 서버가 공개한 간편 로그인 Provider만 노출한다', (tester) async {
+    await tester.pumpWidget(
+      MaumOnMobileApp(
+        authRepository: _FakeAuthRepository(
+          restoreError: const ApiClientException(
+            kind: ApiErrorKind.unauthorized,
+            message: '인증이 필요합니다.',
+            statusCode: 401,
+          ),
+          oidcProviderIds: const ['kakao'],
+        ),
+        homeRepository: const _FakeHomeRepository(),
+        diaryRepository: _FakeDiaryRepository(),
+        diaryImagePicker: const _FakeDiaryImagePicker(),
+        storyRepository: _FakeStoryRepository(),
+        letterRepository: _FakeLetterRepository(),
+        listenForDeepLinks: false,
+      ),
+    );
+
+    await tester.pumpAndSettle();
+
+    expect(
+      find.byKey(const ValueKey('external-login-kakao-button')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey('external-login-google-button')),
+      findsNothing,
+    );
+    expect(
+      find.byKey(const ValueKey('external-login-apple-button')),
+      findsNothing,
+    );
   });
 
   testWidgets('uses a scroll behavior without Android stretch overscroll',
@@ -1826,11 +1864,13 @@ class _FakeAuthRepository implements AuthRepository {
     this.restoredSession,
     this.restoreError,
     this.loginError,
+    this.oidcProviderIds = const [],
   });
 
   final AuthSession? restoredSession;
   final Object? restoreError;
   final Object? loginError;
+  final List<String> oidcProviderIds;
   int logoutCount = 0;
   int clearLocalSessionCount = 0;
 
@@ -1882,6 +1922,11 @@ class _FakeAuthRepository implements AuthRepository {
   @override
   Future<AuthSession> exchangeOidcSession(OidcSessionRequest request) {
     throw UnimplementedError();
+  }
+
+  @override
+  Future<List<String>> fetchOidcProviderIds() async {
+    return oidcProviderIds;
   }
 
   @override

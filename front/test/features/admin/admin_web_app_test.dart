@@ -473,6 +473,11 @@ class _FakeAdminAuthRepository implements AuthRepository {
   }
 
   @override
+  Future<List<String>> fetchOidcProviderIds() async {
+    return const [];
+  }
+
+  @override
   Future<void> saveSession(AuthSession session) {
     throw UnimplementedError();
   }

@@ -22,6 +22,8 @@ abstract interface class AuthRepository {
 
   Future<AuthSession> exchangeOidcSession(OidcSessionRequest request);
 
+  Future<List<String>> fetchOidcProviderIds();
+
   Future<void> saveSession(AuthSession session);
 
   Future<AuthMember> me();
@@ -163,6 +165,27 @@ class ApiAuthRepository implements AuthRepository {
   }
 
   @override
+  Future<List<String>> fetchOidcProviderIds() {
+    return _apiClient.get<List<String>>(
+      '/api/v1/auth/oidc/providers',
+      requiresAuth: false,
+      retryOnUnauthorized: false,
+      parser: (json) {
+        final map = json is Map ? _stringKeyedMap(json) : <String, Object?>{};
+        final rawProviders = map['providers'];
+        if (rawProviders is! List) {
+          return const [];
+        }
+        return [
+          for (final provider in rawProviders)
+            if (provider is Map)
+              (_stringKeyedMap(provider)['id']?.toString() ?? '').trim(),
+        ].where((id) => id.isNotEmpty).toList(growable: false);
+      },
+    );
+  }
+
+  @override
   Future<void> saveSession(AuthSession session) {
     return _saveSession(session);
   }
@@ -208,6 +231,10 @@ class ApiAuthRepository implements AuthRepository {
       ),
     );
   }
+}
+
+Map<String, Object?> _stringKeyedMap(Map<Object?, Object?> map) {
+  return map.map((key, value) => MapEntry(key.toString(), value));
 }
 
 class AuthSessionTokenRefresher implements AuthTokenRefresher {

@@ -300,6 +300,33 @@ void main() {
       });
     });
 
+    test('간편 로그인 Provider 목록은 인증 없이 서버에서 조회한다', () async {
+      final transport = _FakeApiTransport([
+        ApiTransportResponse.ok({
+          'success': true,
+          'data': {
+            'providers': [
+              {'id': 'kakao', 'label': '카카오'},
+              {'id': 'apple', 'label': 'Apple'},
+            ],
+          },
+        }),
+      ]);
+      final tokenStore = MemoryAuthTokenStore();
+      final repository = ApiAuthRepository(
+        apiClient: ApiClient(transport: transport, tokenStore: tokenStore),
+        tokenStore: tokenStore,
+      );
+
+      final providerIds = await repository.fetchOidcProviderIds();
+
+      expect(providerIds, ['kakao', 'apple']);
+      expect(transport.requests.single.method, ApiMethod.get);
+      expect(transport.requests.single.path, '/api/v1/auth/oidc/providers');
+      expect(transport.requests.single.requiresAuth, isFalse);
+      expect(transport.requests.single.retryOnUnauthorized, isFalse);
+    });
+
     test('requestPasswordReset sends email without authentication', () async {
       final transport = _FakeApiTransport([
         ApiTransportResponse.ok({'success': true}),

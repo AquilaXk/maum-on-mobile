@@ -69,6 +69,14 @@ class HttpAuthOidcIdentityProvider(
         )
     }
 
+    override fun isReady(provider: String): Boolean {
+        return runCatching {
+            tokenUri(provider)
+            jwksUri(provider)
+            issuer(provider)
+        }.isSuccess
+    }
+
     private fun exchangeCode(command: AuthOidcTokenCommand): TokenResponse {
         val form = LinkedMultiValueMap<String, String>()
         form.add("grant_type", "authorization_code")

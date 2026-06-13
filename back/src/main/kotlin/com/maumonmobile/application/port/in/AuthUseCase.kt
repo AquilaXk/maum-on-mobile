@@ -19,6 +19,8 @@ interface AuthUseCase {
 
     fun authorizeOidc(command: OidcAuthorizeCommand): OidcAuthorizeResult
 
+    fun oidcProviders(): OidcProviderListResult
+
     fun completeOidcAppCallback(command: OidcAppCallbackCommand): AuthSessionResult
 
     fun completeOidcCallback(command: OidcCallbackCommand): OidcCallbackResult
@@ -81,6 +83,15 @@ data class OidcAuthorizeCommand(
 
 data class OidcAuthorizeResult(
     val authorizationUri: String,
+)
+
+data class OidcProviderListResult(
+    val providers: List<OidcProviderResult>,
+)
+
+data class OidcProviderResult(
+    val id: String,
+    val label: String,
 )
 
 data class OidcCallbackCommand(
