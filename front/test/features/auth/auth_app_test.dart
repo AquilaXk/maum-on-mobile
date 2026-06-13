@@ -361,6 +361,45 @@ void main() {
     }
   });
 
+  testWidgets('하단 네비게이션은 떠 있는 둥근 바처럼 표시한다', (tester) async {
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: buildDarkAppTheme(),
+        home: AuthenticatedAppShell(
+          currentRoute: AuthenticatedRoute.home,
+          onRouteSelected: (_) {},
+          child: const SizedBox.expand(),
+        ),
+      ),
+    );
+
+    final surface = tester.widget<DecoratedBox>(
+      find.byKey(const ValueKey('app-bottom-navigation-surface')),
+    );
+    final surfaceDecoration = surface.decoration as BoxDecoration;
+    final surfaceRadius = surfaceDecoration.borderRadius as BorderRadius?;
+
+    expect(surfaceDecoration.border, isNull);
+    expect(surfaceRadius?.topLeft.x, greaterThanOrEqualTo(26));
+    expect(surfaceDecoration.boxShadow, isNotEmpty);
+    expect(
+      tester
+          .getSize(find.byKey(const ValueKey('app-bottom-navigation-surface')))
+          .width,
+      lessThan(390),
+    );
+
+    final selectedSurfaceSize = tester.getSize(
+      find.byKey(const ValueKey('route-tab-home-surface')),
+    );
+    expect(selectedSurfaceSize.width, lessThanOrEqualTo(60));
+  });
+
   testWidgets('hides home back action on primary tab landing screens',
       (tester) async {
     await tester.pumpWidget(

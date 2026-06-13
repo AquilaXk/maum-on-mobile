@@ -32,13 +32,18 @@ class MaumBottomNavigation extends StatelessWidget {
       child: DecoratedBox(
         key: const ValueKey('app-bottom-navigation-surface'),
         decoration: BoxDecoration(
-          color: colorScheme.surface.withValues(alpha: 0.98),
-          border: Border(
-            top: BorderSide(color: colorScheme.outlineVariant),
-          ),
+          color: colorScheme.surface.withValues(alpha: 0.94),
+          borderRadius: AppRadii.status,
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.22),
+              blurRadius: 18,
+              offset: const Offset(0, 8),
+            ),
+          ],
         ),
         child: Padding(
-          padding: const EdgeInsets.only(top: AppSpacing.xxs),
+          padding: const EdgeInsets.symmetric(vertical: AppSpacing.xxs),
           child: Row(
             children: [
               for (var index = 0; index < routes.length; index++)
@@ -85,8 +90,8 @@ class _MaumBottomNavigationItem extends StatelessWidget {
     final labelForeground =
         isSelected ? colorScheme.onSurface : colorScheme.onSurfaceVariant;
     final selectedSurfaceColor =
-        colorScheme.primaryContainer.withValues(alpha: 0.24);
-    const visualSurfaceWidth = 68.0;
+        colorScheme.primaryContainer.withValues(alpha: 0.22);
+    const visualSurfaceWidth = 58.0;
 
     return Semantics(
       button: true,
@@ -111,12 +116,13 @@ class _MaumBottomNavigationItem extends StatelessWidget {
                     duration: const Duration(milliseconds: 180),
                     curve: Curves.easeOut,
                     width: visualSurfaceWidth,
-                    constraints: const BoxConstraints(minHeight: 52),
+                    // 선택 상태는 작은 캡슐로만 보여 바 전체가 블록처럼 읽히지 않게 한다.
+                    constraints: const BoxConstraints(minHeight: 50),
                     decoration: BoxDecoration(
                       color: isSelected
                           ? selectedSurfaceColor
                           : Colors.transparent,
-                      borderRadius: BorderRadius.circular(20),
+                      borderRadius: AppRadii.status,
                     ),
                     child: Padding(
                       padding: const EdgeInsets.symmetric(
