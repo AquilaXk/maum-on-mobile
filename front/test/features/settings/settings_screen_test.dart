@@ -194,6 +194,24 @@ void main() {
     expect(logoutCount, 1);
   });
 
+  testWidgets('onLogout이 null일 때 로그아웃 버튼을 렌더링하지 않는다', (tester) async {
+    final repository = _FakeSettingsRepository();
+    final controller = SettingsController(repository: repository);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: SettingsScreen(
+          controller: controller,
+          onBack: () {},
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const ValueKey('settings-logout-button')), findsNothing);
+    expect(find.text('로그아웃'), findsNothing);
+  });
+
   testWidgets('설정 저장 중에는 로그아웃을 비활성화한다', (tester) async {
     var logoutCount = 0;
     final nicknameUpdateDelay = Completer<void>();

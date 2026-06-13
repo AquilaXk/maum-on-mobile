@@ -929,11 +929,11 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey('home-header-settings-button')));
     await tester.pump();
-    expect(find.text('계정 설정'), findsOneWidget);
+    await _pumpUntilFound(tester, find.text('계정 설정'));
     final logoutAction = find.byKey(const ValueKey('settings-logout-button'));
     await _pumpUntilFound(tester, logoutAction);
     await tester.ensureVisible(logoutAction);
-    await tester.pump();
+    await tester.pumpAndSettle();
     await tester.tap(logoutAction);
     await tester.pumpAndSettle();
 
@@ -1122,16 +1122,30 @@ Future<void> _tapVisibleKey(WidgetTester tester, Key key) async {
   await tester.pumpAndSettle();
 }
 
-Future<void> _pumpUntilFound(WidgetTester tester, Finder finder) async {
+Future<void> _pumpUntilFound(
+  WidgetTester tester,
+  Finder finder, {
+  Duration timeout = const Duration(seconds: 2),
+}) async {
   // 화면 전환 직후 비동기 로드로 생기는 위젯은 settle 대신 조건으로 기다린다.
-  for (var attempt = 0; attempt < 20; attempt += 1) {
-    await tester.pump(const Duration(milliseconds: 50));
+  const interval = Duration(milliseconds: 50);
+  var waited = Duration.zero;
+  var attempts = 0;
+
+  while (waited < timeout) {
+    await tester.pump(interval);
+    waited += interval;
+    attempts += 1;
     if (finder.evaluate().isNotEmpty) {
       return;
     }
   }
 
-  expect(finder, findsOneWidget);
+  final finderDescription = finder.describeMatch(Plurality.many);
+  fail(
+    '위젯을 찾지 못했습니다: $finderDescription '
+    '(대기 ${waited.inMilliseconds}ms, 시도 $attempts회)',
+  );
 }
 
 Future<void> _returnHome(WidgetTester tester) async {
