@@ -11,8 +11,7 @@ import 'package:maum_on_mobile_front/shared/ui/brand_identity.dart';
 import 'package:maum_on_mobile_front/theme/app_theme.dart';
 
 void main() {
-  testWidgets('renders stats, story feed, and category filter in a scroll view',
-      (tester) async {
+  testWidgets('홈은 스크롤 안에서 지표와 스토리 목록을 평면 UI로 렌더링한다', (tester) async {
     final controller = HomeController(
       homeRepository: const _FakeHomeRepository(),
     );
@@ -75,8 +74,7 @@ void main() {
     expect(find.byKey(const ValueKey('home-feed-story-1')), findsNothing);
   });
 
-  testWidgets('keeps mobile home summary stats in a single row',
-      (tester) async {
+  testWidgets('모바일 홈 요약 지표는 한 줄에 배치한다', (tester) async {
     tester.view.physicalSize = const Size(390, 844);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
@@ -108,6 +106,40 @@ void main() {
 
     expect(letterTop, moreOrLessEquals(diaryTop, epsilon: 1));
     expect(worryTop, moreOrLessEquals(diaryTop, epsilon: 1));
+  });
+
+  testWidgets('넓은 홈 요약 지표도 카드 없이 평면 텍스트로 표시한다', (tester) async {
+    tester.view.physicalSize = const Size(720, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    final controller = HomeController(
+      homeRepository: const _FakeHomeRepository(),
+    );
+    await controller.load();
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: buildAppTheme(),
+        home: HomeScreen(
+          nickname: '마음이',
+          homeController: controller,
+          onWriteDiary: () {},
+          onWriteLetter: () {},
+          onViewStory: () {},
+          onOpenConsultation: () {},
+          onOpenNotifications: () {},
+          onOpenSettings: () {},
+        ),
+      ),
+    );
+
+    expect(find.byType(AppMetricTile), findsNothing);
+    expect(find.byType(Card), findsNothing);
+    expect(find.text('오늘의 기록'), findsOneWidget);
+    expect(find.text('전달된 비밀 편지'), findsOneWidget);
+    expect(find.text('오늘 올라온 고민'), findsOneWidget);
   });
 
   testWidgets('홈 바로가기 액션은 사각 카드가 아닌 원형 아이콘 버튼으로 표시한다', (tester) async {
@@ -150,11 +182,6 @@ void main() {
       find.byKey(const ValueKey('home-action-diary-surface')),
       findsOneWidget,
     );
-    final diarySurface = tester.widget<DecoratedBox>(
-      find.byKey(const ValueKey('home-action-diary-surface')),
-    );
-    final diaryDecoration = diarySurface.decoration as BoxDecoration;
-    expect(diaryDecoration.color, Colors.transparent);
     expect(
       tester.getSize(find.byKey(const ValueKey('home-action-diary-surface'))),
       const Size(56, 56),
@@ -175,8 +202,7 @@ void main() {
     expect(find.text('지금 대화하기'), findsNothing);
   });
 
-  testWidgets('prioritizes the mobile action launcher above dashboard details',
-      (tester) async {
+  testWidgets('모바일 홈 바로가기는 대시보드 상세보다 먼저 배치한다', (tester) async {
     tester.view.physicalSize = const Size(390, 844);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
@@ -224,8 +250,7 @@ void main() {
     expect(find.text('로그아웃'), findsNothing);
   });
 
-  testWidgets('exposes home launcher actions as button semantics',
-      (tester) async {
+  testWidgets('홈 바로가기 액션은 접근성 버튼으로 노출한다', (tester) async {
     final semantics = tester.ensureSemantics();
     try {
       final controller = HomeController(
@@ -299,25 +324,15 @@ void main() {
       ),
     );
 
-    final consultationSurface = tester.widget<DecoratedBox>(
-      find.byKey(const ValueKey('home-action-consultation-primary')),
-    );
-    final consultationDecoration =
-        consultationSurface.decoration as BoxDecoration;
-    expect(consultationDecoration.shape, BoxShape.circle);
     expect(
-      consultationDecoration.color,
-      Colors.transparent,
+      tester.getSize(
+        find.byKey(const ValueKey('home-action-consultation-primary')),
+      ),
+      const Size(56, 56),
     );
-
-    final diarySurface = tester.widget<DecoratedBox>(
-      find.byKey(const ValueKey('home-action-diary-surface')),
-    );
-    final diaryDecoration = diarySurface.decoration as BoxDecoration;
-    expect(diaryDecoration.shape, BoxShape.circle);
     expect(
-      diaryDecoration.color,
-      Colors.transparent,
+      tester.getSize(find.byKey(const ValueKey('home-action-diary-surface'))),
+      const Size(56, 56),
     );
 
     final wordmark = tester.widget<MaumOnBrandWordmark>(
@@ -326,8 +341,7 @@ void main() {
     expect(wordmark.foregroundColor, theme.colorScheme.onSurface);
   });
 
-  testWidgets('keeps home feed empty state free of helper explanation copy',
-      (tester) async {
+  testWidgets('홈 피드 빈 상태는 과한 안내 문구를 노출하지 않는다', (tester) async {
     final controller = HomeController(
       homeRepository: const _EmptyFeedHomeRepository(),
     );
@@ -358,8 +372,7 @@ void main() {
     );
   });
 
-  testWidgets('routes draft continuation cards to their writing surfaces',
-      (tester) async {
+  testWidgets('홈 이어쓰기 행은 카드나 상태 배지 없이 작성 화면으로 이동한다', (tester) async {
     final draftRepository = StorageDraftRecoveryRepository(
       storage: MemoryDraftRecoveryStorage(),
     );
@@ -401,13 +414,16 @@ void main() {
       ),
       findsOneWidget,
     );
+    expect(find.byType(Card), findsNothing);
+    expect(find.byType(AppStatusPill), findsNothing);
+    expect(find.text('임시 저장'), findsNothing);
 
     await _tapVisibleKey(tester, const ValueKey('home-draft-diary'));
 
     expect(diaryTaps, 1);
   });
 
-  testWidgets('runs home action callbacks', (tester) async {
+  testWidgets('홈 액션 콜백을 실행한다', (tester) async {
     final controller = HomeController(
       homeRepository: const _FakeHomeRepository(),
     );
@@ -458,8 +474,7 @@ void main() {
     expect(settingsTaps, 1);
   });
 
-  testWidgets('separates account tools from the primary home action grid',
-      (tester) async {
+  testWidgets('계정 도구는 홈 주요 액션 그리드에 섞이지 않는다', (tester) async {
     final controller = HomeController(
       homeRepository: const _FakeHomeRepository(),
     );
@@ -490,8 +505,7 @@ void main() {
     expect(find.text('로그아웃'), findsNothing);
   });
 
-  testWidgets('does not expose operations entry to admin accounts',
-      (tester) async {
+  testWidgets('관리자 계정에도 운영 진입점을 노출하지 않는다', (tester) async {
     final userController = HomeController(
       homeRepository: const _FakeHomeRepository(),
     );

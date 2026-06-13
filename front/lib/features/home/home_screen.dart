@@ -222,10 +222,13 @@ class _StatsSection extends StatelessWidget {
               runSpacing: AppSpacing.xs,
               children: [
                 for (final item in items)
-                  AppMetricTile(
-                    label: item.label,
-                    value: item.value,
-                    tone: item.tone,
+                  SizedBox(
+                    width: 148,
+                    child: _CompactHomeMetricTile(
+                      label: item.label,
+                      value: item.value,
+                      tone: item.tone,
+                    ),
                   ),
               ],
             );
@@ -419,11 +422,12 @@ class _DraftContinuationSection extends StatelessWidget {
           AppListRow(
             rowKey: ValueKey('home-draft-${draft.surface.name}'),
             title: draft.title,
-            subtitle:
-                '${draft.surface.label} · ${draft.preview} · ${_formatDraftDate(draft.updatedAt)}',
-            statusLabel: draft.failed ? '전송 실패' : '임시 저장',
-            statusTone:
-                draft.failed ? AppStatusTone.warning : AppStatusTone.success,
+            subtitle: [
+              if (draft.failed) '전송 실패',
+              draft.surface.label,
+              draft.preview,
+              _formatDraftDate(draft.updatedAt),
+            ].join(' · '),
             leadingIcon: _draftIcon(draft.surface),
             trailingIcon: Icons.play_arrow,
             onTap: () => onContinue(draft.surface),
@@ -567,16 +571,10 @@ class _HomeQuickActionButton extends StatelessWidget {
                 radius: 32,
                 containedInkWell: true,
                 customBorder: const CircleBorder(),
-                child: DecoratedBox(
+                child: SizedBox.square(
                   key: surfaceKey,
-                  decoration: const BoxDecoration(
-                    color: Colors.transparent,
-                    shape: BoxShape.circle,
-                  ),
-                  child: SizedBox.square(
-                    dimension: 56,
-                    child: Icon(icon, color: colors.foreground, size: 26),
-                  ),
+                  dimension: 56,
+                  child: Icon(icon, color: colors.foreground, size: 26),
                 ),
               ),
             ),

@@ -44,9 +44,7 @@ class MaumOnBrandWordmark extends StatelessWidget {
             children: [
               CustomPaint(
                 size: Size.square(height * 0.86),
-                painter: const _MaumOnWaveIconPainter(
-                  backgroundColor: AppBrandColors.iconBlue,
-                ),
+                painter: const _MaumOnWaveIconPainter(),
               ),
               SizedBox(width: height * 0.22),
               Text('Maum On', style: textStyle),
@@ -59,45 +57,34 @@ class MaumOnBrandWordmark extends StatelessWidget {
 }
 
 class _MaumOnWaveIconPainter extends CustomPainter {
-  const _MaumOnWaveIconPainter({required this.backgroundColor});
-
-  final Color backgroundColor;
+  const _MaumOnWaveIconPainter();
 
   @override
   void paint(Canvas canvas, Size size) {
-    final rect = Offset.zero & size;
-    final radius = Radius.circular(size.width * 0.25);
-    final backgroundPaint = Paint()..color = backgroundColor;
-
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(rect, radius),
-      backgroundPaint,
-    );
-
     final stroke = Paint()
-      ..color = Colors.white
+      ..color = AppBrandColors.iconBlue
       ..style = PaintingStyle.stroke
       ..strokeCap = StrokeCap.round
       ..strokeJoin = StrokeJoin.round
-      ..strokeWidth = size.width * 0.07;
+      ..strokeWidth = size.width * 0.09;
 
     for (final y in <double>[0.38, 0.50, 0.62]) {
       final path = Path()
-        ..moveTo(size.width * 0.28, size.height * y)
+        ..moveTo(size.width * 0.16, size.height * y)
         ..cubicTo(
-          size.width * 0.36,
+          size.width * 0.28,
           size.height * (y - 0.08),
-          size.width * 0.44,
+          size.width * 0.40,
           size.height * (y - 0.08),
           size.width * 0.52,
           size.height * y,
         )
         ..cubicTo(
-          size.width * 0.60,
-          size.height * (y + 0.08),
-          size.width * 0.68,
+          size.width * 0.64,
           size.height * (y + 0.08),
           size.width * 0.76,
+          size.height * (y + 0.08),
+          size.width * 0.88,
           size.height * y,
         );
       canvas.drawPath(path, stroke);
@@ -106,6 +93,6 @@ class _MaumOnWaveIconPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant _MaumOnWaveIconPainter oldDelegate) {
-    return oldDelegate.backgroundColor != backgroundColor;
+    return false;
   }
 }
