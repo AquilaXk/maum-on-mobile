@@ -398,69 +398,136 @@ class _ConsultationStatusToolbar extends StatelessWidget {
                     ? '입력 가능'
                     : '입력 대기';
 
-    return Card(
+    return DecoratedBox(
       key: const ValueKey('consultation-status-toolbar'),
-      margin: EdgeInsets.zero,
-      color: colorScheme.primaryContainer.withValues(alpha: 0.62),
+      decoration: BoxDecoration(
+        color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.72),
+        borderRadius: AppRadii.status,
+        border: Border.all(
+          color: colorScheme.outlineVariant.withValues(alpha: 0.72),
+        ),
+      ),
       child: Padding(
-        padding: const EdgeInsets.all(AppSpacing.md),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.sm,
+          vertical: AppSpacing.xs,
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Icon(
-                  Icons.support_agent_outlined,
-                  color: colorScheme.onPrimaryContainer,
-                  size: 22,
-                ),
-                const SizedBox(width: AppSpacing.xs),
-                Expanded(
-                  child: Text(
-                    'AI 상담 상태',
-                    style: theme.textTheme.titleMedium?.copyWith(
-                      color: colorScheme.onPrimaryContainer,
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                ),
-                if (state.connectionState == ConsultationConnectionState.error)
-                  IconButton.filledTonal(
-                    key: const ValueKey('consultation-reconnect-button'),
-                    tooltip: 'AI 상담 다시 연결',
-                    onPressed: () => onReconnect(),
-                    icon: const Icon(Icons.refresh),
-                  ),
-              ],
+            Icon(
+              Icons.support_agent_outlined,
+              color: colorScheme.primary,
+              size: 18,
             ),
-            const SizedBox(height: AppSpacing.xs),
-            Wrap(
-              spacing: AppSpacing.xs,
-              runSpacing: AppSpacing.xs,
-              crossAxisAlignment: WrapCrossAlignment.center,
-              children: [
-                AppStatusPill(
-                  label: statusText,
-                  tone: _consultationStatusTone(state.connectionState),
-                ),
-                AppStatusPill(label: '대화 $conversationMessageCount개'),
-                AppStatusPill(
-                  label: inputLabel,
-                  tone: state.inputBlockedBySafety
-                      ? AppStatusTone.danger
-                      : state.connectionState ==
-                              ConsultationConnectionState.connected
-                          ? AppStatusTone.success
-                          : AppStatusTone.warning,
-                ),
-              ],
+            const SizedBox(width: AppSpacing.xs),
+            Expanded(
+              child: Wrap(
+                spacing: AppSpacing.xs,
+                runSpacing: AppSpacing.xxs,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [
+                  _CompactStatusPill(
+                    label: statusText,
+                    tone: _consultationStatusTone(state.connectionState),
+                  ),
+                  _CompactStatusPill(label: '대화 $conversationMessageCount개'),
+                  _CompactStatusPill(
+                    label: inputLabel,
+                    tone: state.inputBlockedBySafety
+                        ? AppStatusTone.danger
+                        : state.connectionState ==
+                                ConsultationConnectionState.connected
+                            ? AppStatusTone.success
+                            : AppStatusTone.warning,
+                  ),
+                ],
+              ),
             ),
+            if (state.connectionState == ConsultationConnectionState.error) ...[
+              const SizedBox(width: AppSpacing.xs),
+              SizedBox.square(
+                dimension: 48,
+                child: IconButton.filledTonal(
+                  key: const ValueKey('consultation-reconnect-button'),
+                  tooltip: 'AI 상담 다시 연결',
+                  onPressed: () => onReconnect(),
+                  icon: const Icon(Icons.refresh),
+                ),
+              ),
+            ],
           ],
         ),
       ),
     );
   }
+}
+
+class _CompactStatusPill extends StatelessWidget {
+  const _CompactStatusPill({
+    required this.label,
+    this.tone = AppStatusTone.neutral,
+  });
+
+  final String label;
+  final AppStatusTone tone;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final colors = _compactStatusColors(colorScheme, tone);
+
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: colors.background,
+        borderRadius: AppRadii.status,
+        border: Border.all(color: colors.border),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.sm,
+          vertical: AppSpacing.xxs,
+        ),
+        child: Text(
+          label,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                color: colors.foreground,
+                fontWeight: FontWeight.w800,
+              ),
+        ),
+      ),
+    );
+  }
+}
+
+({Color background, Color foreground, Color border}) _compactStatusColors(
+  ColorScheme colorScheme,
+  AppStatusTone tone,
+) {
+  return switch (tone) {
+    AppStatusTone.neutral => (
+        background: colorScheme.surfaceContainerHighest,
+        foreground: colorScheme.onSurfaceVariant,
+        border: colorScheme.outlineVariant,
+      ),
+    AppStatusTone.success => (
+        background: colorScheme.primaryContainer,
+        foreground: colorScheme.onPrimaryContainer,
+        border: colorScheme.primary.withValues(alpha: 0.28),
+      ),
+    AppStatusTone.warning => (
+        background: colorScheme.tertiaryContainer,
+        foreground: colorScheme.onTertiaryContainer,
+        border: colorScheme.tertiary.withValues(alpha: 0.28),
+      ),
+    AppStatusTone.danger => (
+        background: colorScheme.errorContainer,
+        foreground: colorScheme.onErrorContainer,
+        border: colorScheme.error.withValues(alpha: 0.28),
+      ),
+  };
 }
 
 String _consultationStatusText(
