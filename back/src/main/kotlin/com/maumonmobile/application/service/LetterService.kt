@@ -80,6 +80,8 @@ class LetterService(
 
     override fun stats(user: AuthenticatedUser): LetterStatsResult {
         val memberId = user.memberId()
+        val member = authMemberRepository.findById(memberId)
+            ?: throw ApiException(ErrorCode.UNAUTHORIZED, "다시 로그인해 주세요.")
         val receivedLetters = letterRepository.findAll()
             .filter { letter -> letter.isReceivedBy(memberId) }
             .sortedByDescending { letter -> letter.createdDate }
@@ -89,6 +91,7 @@ class LetterService(
 
         return LetterStatsResult(
             receivedCount = receivedLetters.size,
+            randomReceiveAllowed = member.randomReceiveAllowed,
             latestReceivedLetter = receivedLetters.firstOrNull()?.toSummaryResult(memberId, authMemberRepository),
             latestSentLetter = sentLetters.firstOrNull()?.toSummaryResult(memberId, authMemberRepository),
         )

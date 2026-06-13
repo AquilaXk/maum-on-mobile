@@ -452,7 +452,10 @@ class _QaLetterRepository implements LetterRepository {
 
   @override
   Future<LetterStats> fetchStats() async {
-    return const LetterStats(receivedCount: 1);
+    return const LetterStats(
+      receivedCount: 1,
+      randomReceiveAllowed: true,
+    );
   }
 
   @override

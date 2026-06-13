@@ -7,8 +7,7 @@ import 'package:maum_on_mobile_front/features/letter/domain/letter_models.dart';
 import 'package:maum_on_mobile_front/features/letter/presentation/letter_screen.dart';
 
 void main() {
-  testWidgets('shows mailbox summary actions on a phone viewport',
-      (tester) async {
+  testWidgets('편지함 상단 정보는 첫 화면 목록을 밀어내지 않는 얇은 표면이다', (tester) async {
     tester.view.physicalSize = const Size(390, 640);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
@@ -19,6 +18,7 @@ void main() {
         statsQueue: [
           LetterStats(
             receivedCount: 2,
+            randomReceiveAllowed: false,
             latestReceivedLetter: _summary(id: 8, title: '최근 받은 편지'),
             latestSentLetter: _summary(id: 2, title: '최근 보낸 편지'),
           ),
@@ -36,6 +36,12 @@ void main() {
 
     expect(
         find.byKey(const ValueKey('letter-mailbox-toolbar')), findsOneWidget);
+    expect(
+      tester.widget(find.byKey(const ValueKey('letter-mailbox-toolbar'))),
+      isA<DecoratedBox>(),
+    );
+    expect(
+        find.byKey(const ValueKey('letter-summary-actions')), findsOneWidget);
     expect(find.byKey(const ValueKey('letter-compose-button')), findsOneWidget);
     expect(
         find.byKey(const ValueKey('letter-receive-settings')), findsOneWidget);
@@ -49,6 +55,19 @@ void main() {
       findsOneWidget,
     );
     expect(find.text('받은 편지 2개'), findsOneWidget);
+    expect(find.text('랜덤 편지 차단'), findsOneWidget);
+    expect(
+      // 390x640 고정 뷰포트에서 상단 요약이 목록 영역을 과하게 밀어내지 않는 높이 기준이다.
+      tester
+          .getSize(find.byKey(const ValueKey('letter-mailbox-toolbar')))
+          .height,
+      lessThanOrEqualTo(150),
+    );
+    expect(
+      // 390x640 고정 뷰포트에서 첫 편지 카드가 첫 화면에 보여야 하는 y 위치 기준이다.
+      tester.getTopLeft(find.byKey(const ValueKey('letter-card-1'))).dy,
+      lessThan(560),
+    );
   });
 
   testWidgets('stacks letter compose actions on a narrow phone viewport',
@@ -177,6 +196,7 @@ void main() {
       statsQueue: [
         LetterStats(
           receivedCount: 1,
+          randomReceiveAllowed: true,
           latestReceivedLetter: _summary(id: 8, title: '최근 받은 편지'),
           latestSentLetter: _summary(id: 2, title: '최근 보낸 편지'),
         ),
@@ -685,6 +705,7 @@ LetterListPage _page(
 LetterStats _stats() {
   return LetterStats(
     receivedCount: 1,
+    randomReceiveAllowed: true,
     latestReceivedLetter: _summary(id: 1, title: '최근 받은 편지'),
     latestSentLetter: _summary(id: 2, title: '최근 보낸 편지'),
   );

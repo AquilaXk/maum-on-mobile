@@ -70,6 +70,7 @@ data class LetterResult(
 
 data class LetterStatsResult(
     val receivedCount: Int,
+    val randomReceiveAllowed: Boolean,
     val latestReceivedLetter: LetterSummaryResult?,
     val latestSentLetter: LetterSummaryResult?,
 )

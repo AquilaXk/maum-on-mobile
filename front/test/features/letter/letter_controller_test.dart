@@ -362,6 +362,7 @@ LetterListPage _page(List<LetterSummary> items) {
 LetterStats _stats() {
   return LetterStats(
     receivedCount: 1,
+    randomReceiveAllowed: true,
     latestReceivedLetter: _summary(id: 1, title: '최근 받은 편지'),
     latestSentLetter: _summary(id: 2, title: '최근 보낸 편지'),
   );

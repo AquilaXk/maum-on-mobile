@@ -200,6 +200,7 @@ class LetterDetail {
 class LetterStats {
   const LetterStats({
     required this.receivedCount,
+    required this.randomReceiveAllowed,
     this.latestReceivedLetter,
     this.latestSentLetter,
   });
@@ -212,6 +213,7 @@ class LetterStats {
     final map = _stringKeyedMap(json);
     return LetterStats(
       receivedCount: _readInt(map, 'receivedCount'),
+      randomReceiveAllowed: _readBool(map, 'randomReceiveAllowed'),
       latestReceivedLetter: map['latestReceivedLetter'] == null
           ? null
           : LetterSummary.fromJson(map['latestReceivedLetter']),
@@ -222,6 +224,7 @@ class LetterStats {
   }
 
   final int receivedCount;
+  final bool randomReceiveAllowed;
   final LetterSummary? latestReceivedLetter;
   final LetterSummary? latestSentLetter;
 }
@@ -255,6 +258,16 @@ int _readInt(Map<String, Object?> map, String key) {
   }
 
   return int.tryParse(value?.toString() ?? '') ?? 0;
+}
+
+bool _readBool(Map<String, Object?> map, String key) {
+  final value = map[key];
+
+  if (value is bool) {
+    return value;
+  }
+
+  return value?.toString().toLowerCase() == 'true';
 }
 
 Map<String, Object?> _stringKeyedMap(Map<Object?, Object?> map) {
