@@ -153,8 +153,8 @@ void main() {
     expect(find.byKey(const ValueKey('diary-submit-button')), findsOneWidget);
   });
 
-  testWidgets('월간 기록 달력 칸은 날짜 단위 없이 숫자만 표시한다', (tester) async {
-    tester.view.physicalSize = const Size(320, 640);
+  testWidgets('월간 기록 날짜 선택은 가벼운 표면과 큰 터치 숫자를 제공한다', (tester) async {
+    tester.view.physicalSize = const Size(390, 844);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
@@ -183,9 +183,14 @@ void main() {
     );
 
     final dayCell = find.byKey(const ValueKey('diary-day-2026-05-05'));
+    final selectedCell = find.byKey(const ValueKey('diary-day-2026-05-20'));
     final dayText = find.descendant(of: dayCell, matching: find.text('5'));
+    final selectedText =
+        find.descendant(of: selectedCell, matching: find.text('20'));
     expect(dayCell, findsOneWidget);
+    expect(selectedCell, findsOneWidget);
     expect(dayText, findsOneWidget);
+    expect(selectedText, findsOneWidget);
     expect(
       find.descendant(of: dayCell, matching: find.text('5일')),
       findsNothing,
@@ -204,11 +209,30 @@ void main() {
       findsOneWidget,
     );
     expect(
-      tester.widget<Text>(dayText).style?.fontSize,
-      greaterThanOrEqualTo(18),
+      tester.widget<Text>(selectedText).style?.fontSize,
+      greaterThanOrEqualTo(22),
+    );
+    expect(tester.getSize(selectedCell).height, greaterThanOrEqualTo(52));
+    expect(tester.getSize(selectedCell).height, lessThanOrEqualTo(76));
+    final selectedIndicator = find.descendant(
+      of: selectedCell,
+      matching: find.byType(AnimatedContainer),
+    );
+    expect(selectedIndicator, findsOneWidget);
+    expect(tester.getSize(selectedIndicator), const Size(44, 44));
+    final selectedDecoration =
+        tester.widget<AnimatedContainer>(selectedIndicator).decoration;
+    expect(selectedDecoration, isA<BoxDecoration>());
+    expect(
+      (selectedDecoration as BoxDecoration).color,
+      Theme.of(tester.element(selectedIndicator)).colorScheme.primaryContainer,
     );
     expect(
       find.descendant(of: dayCell, matching: find.byType(OutlinedButton)),
+      findsNothing,
+    );
+    expect(
+      find.ancestor(of: dayCell, matching: find.byType(Card)),
       findsNothing,
     );
     expect(
@@ -216,6 +240,17 @@ void main() {
       matchesSemantics(
         label: '2026년 5월 5일, 기록 1개',
         isButton: true,
+        hasSelectedState: true,
+        hasTapAction: true,
+      ),
+    );
+    expect(
+      tester.getSemantics(selectedCell),
+      matchesSemantics(
+        label: '2026년 5월 20일',
+        isButton: true,
+        hasSelectedState: true,
+        isSelected: true,
         hasTapAction: true,
       ),
     );
