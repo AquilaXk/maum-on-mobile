@@ -17,33 +17,25 @@ class MaumBottomNavigation extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
     final selectedRoute =
         routes.contains(currentRoute) ? currentRoute : routes.first;
 
     return SafeArea(
       top: false,
-      minimum: const EdgeInsets.fromLTRB(
-        AppSpacing.sm,
-        0,
-        AppSpacing.sm,
-        AppSpacing.xs,
-      ),
+      minimum: EdgeInsets.zero,
       child: DecoratedBox(
         key: const ValueKey('app-bottom-navigation-surface'),
-        decoration: BoxDecoration(
-          color: colorScheme.surface.withValues(alpha: 0.94),
-          borderRadius: AppRadii.status,
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.22),
-              blurRadius: 18,
-              offset: const Offset(0, 8),
-            ),
-          ],
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          border: Border(
+            top: BorderSide(color: Color(0xFFE6E6E6)),
+          ),
         ),
         child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: AppSpacing.xxs),
+          padding: const EdgeInsets.only(
+            top: AppSpacing.xs,
+            bottom: AppSpacing.xxs,
+          ),
           child: Row(
             children: [
               for (var index = 0; index < routes.length; index++)
@@ -84,14 +76,10 @@ class _MaumBottomNavigationItem extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
     final iconForeground =
-        isSelected ? colorScheme.primary : colorScheme.onSurfaceVariant;
-    final labelForeground =
-        isSelected ? colorScheme.onSurface : colorScheme.onSurfaceVariant;
-    final selectedSurfaceColor =
-        colorScheme.primaryContainer.withValues(alpha: 0.22);
-    const visualSurfaceWidth = 58.0;
+        isSelected ? const Color(0xFF111111) : const Color(0xFF777777);
+    final labelForeground = iconForeground;
+    const visualSurfaceWidth = 64.0;
 
     return Semantics(
       button: true,
@@ -103,12 +91,12 @@ class _MaumBottomNavigationItem extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xxs),
           child: Material(
             color: Colors.transparent,
-            borderRadius: BorderRadius.circular(18),
+            borderRadius: AppRadii.card,
             child: InkWell(
-              borderRadius: BorderRadius.circular(18),
+              borderRadius: AppRadii.card,
               onTap: () => onSelected(route),
               child: ConstrainedBox(
-                constraints: const BoxConstraints(minHeight: 52),
+                constraints: const BoxConstraints(minHeight: 68),
                 child: Center(
                   heightFactor: 1,
                   child: AnimatedContainer(
@@ -116,13 +104,11 @@ class _MaumBottomNavigationItem extends StatelessWidget {
                     duration: const Duration(milliseconds: 180),
                     curve: Curves.easeOut,
                     width: visualSurfaceWidth,
-                    // 선택 상태는 작은 캡슐로만 보여 바 전체가 블록처럼 읽히지 않게 한다.
-                    constraints: const BoxConstraints(minHeight: 50),
-                    decoration: BoxDecoration(
-                      color: isSelected
-                          ? selectedSurfaceColor
-                          : Colors.transparent,
-                      borderRadius: AppRadii.status,
+                    // 사진형 탭바는 배경 캡슐 없이 아이콘과 라벨 색상으로만 선택을 드러낸다.
+                    constraints: const BoxConstraints(minHeight: 62),
+                    decoration: const BoxDecoration(
+                      color: Colors.transparent,
+                      borderRadius: BorderRadius.zero,
                     ),
                     child: Padding(
                       padding: const EdgeInsets.symmetric(
@@ -132,26 +118,12 @@ class _MaumBottomNavigationItem extends StatelessWidget {
                         mainAxisSize: MainAxisSize.min,
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          AnimatedContainer(
-                            key: ValueKey('route-tab-${route.key}-indicator'),
-                            duration: const Duration(milliseconds: 180),
-                            curve: Curves.easeOut,
-                            width: 24,
-                            height: 3,
-                            decoration: BoxDecoration(
-                              color: isSelected
-                                  ? colorScheme.primary
-                                  : Colors.transparent,
-                              borderRadius: BorderRadius.circular(999),
-                            ),
-                          ),
-                          const SizedBox(height: 5),
                           Icon(
                             isSelected ? route.selectedIcon : route.icon,
-                            size: isSelected ? 23 : 22,
+                            size: isSelected ? 27 : 26,
                             color: iconForeground,
                           ),
-                          const SizedBox(height: 2),
+                          const SizedBox(height: AppSpacing.xxs),
                           Text(
                             route.navLabel,
                             maxLines: 1,

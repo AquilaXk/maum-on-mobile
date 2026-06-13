@@ -57,8 +57,8 @@ void main() {
       find.descendant(of: selectedTab, matching: find.byIcon(Icons.edit_note)),
     );
 
-    expect(selectedLabel.style?.color, theme.colorScheme.onSurface);
-    expect(selectedIcon.color, theme.colorScheme.primary);
+    expect(selectedLabel.style?.color, const Color(0xFF111111));
+    expect(selectedIcon.color, const Color(0xFF111111));
   });
 
   testWidgets('restores a session and renders the authenticated home',
@@ -269,31 +269,24 @@ void main() {
       );
       expect(
         find.byKey(const ValueKey('route-tab-home-indicator')),
-        findsOneWidget,
+        findsNothing,
       );
       expect(
         find.byKey(const ValueKey('route-tab-home-surface')),
         findsOneWidget,
       );
-      final selectedIndicatorSize = tester.getSize(
-        find.byKey(
-          const ValueKey('route-tab-home-indicator'),
-        ),
-      );
-      expect(selectedIndicatorSize.height, 3);
-      expect(selectedIndicatorSize.width, 24);
       final selectedSurface = tester.widget<AnimatedContainer>(
         find.byKey(const ValueKey('route-tab-home-surface')),
       );
       final selectedDecoration = selectedSurface.decoration as BoxDecoration?;
-      expect(selectedDecoration?.color, isNotNull);
+      expect(selectedDecoration?.color, Colors.transparent);
       final selectedSurfaceSize = tester.getSize(
         find.byKey(const ValueKey('route-tab-home-surface')),
       );
       final selectedSurfaceRadius =
           selectedDecoration!.borderRadius as BorderRadius;
       expect(selectedSurfaceSize.width, lessThanOrEqualTo(76));
-      expect(selectedSurfaceRadius.topLeft.x, greaterThanOrEqualTo(18));
+      expect(selectedSurfaceRadius.topLeft.x, 0);
       expect(
         [
           'route-tab-home',
@@ -306,8 +299,8 @@ void main() {
         }),
         everyElement(
           allOf(
-            greaterThanOrEqualTo(52),
-            lessThanOrEqualTo(60),
+            greaterThanOrEqualTo(64),
+            lessThanOrEqualTo(72),
           ),
         ),
       );
@@ -361,7 +354,7 @@ void main() {
     }
   });
 
-  testWidgets('하단 네비게이션은 떠 있는 둥근 바처럼 표시한다', (tester) async {
+  testWidgets('하단 네비게이션은 흰색 평면 탭바처럼 표시한다', (tester) async {
     tester.view.physicalSize = const Size(390, 844);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
@@ -384,20 +377,52 @@ void main() {
     final surfaceDecoration = surface.decoration as BoxDecoration;
     final surfaceRadius = surfaceDecoration.borderRadius as BorderRadius?;
 
-    expect(surfaceDecoration.border, isNull);
-    expect(surfaceRadius?.topLeft.x, greaterThanOrEqualTo(26));
-    expect(surfaceDecoration.boxShadow, isNotEmpty);
+    expect(surfaceDecoration.color, Colors.white);
+    expect(surfaceRadius, isNull);
+    expect(surfaceDecoration.boxShadow, isNull);
+    expect(surfaceDecoration.border?.top.color, const Color(0xFFE6E6E6));
     expect(
       tester
           .getSize(find.byKey(const ValueKey('app-bottom-navigation-surface')))
           .width,
-      lessThan(390),
+      390,
     );
 
-    final selectedSurfaceSize = tester.getSize(
+    final selectedSurface = tester.widget<AnimatedContainer>(
       find.byKey(const ValueKey('route-tab-home-surface')),
     );
-    expect(selectedSurfaceSize.width, lessThanOrEqualTo(60));
+    final selectedDecoration = selectedSurface.decoration as BoxDecoration?;
+    expect(selectedDecoration?.color, Colors.transparent);
+
+    final selectedIcon = tester.widget<Icon>(
+      find.descendant(
+        of: find.byKey(const ValueKey('route-tab-home')),
+        matching: find.byIcon(Icons.home),
+      ),
+    );
+    final unselectedIcon = tester.widget<Icon>(
+      find.descendant(
+        of: find.byKey(const ValueKey('route-tab-diary')),
+        matching: find.byIcon(Icons.edit_note_outlined),
+      ),
+    );
+    final selectedLabel = tester.widget<Text>(
+      find.descendant(
+        of: find.byKey(const ValueKey('route-tab-home')),
+        matching: find.text('홈'),
+      ),
+    );
+    final unselectedLabel = tester.widget<Text>(
+      find.descendant(
+        of: find.byKey(const ValueKey('route-tab-diary')),
+        matching: find.text('기록'),
+      ),
+    );
+
+    expect(selectedIcon.color, const Color(0xFF111111));
+    expect(selectedLabel.style?.color, const Color(0xFF111111));
+    expect(unselectedIcon.color, const Color(0xFF777777));
+    expect(unselectedLabel.style?.color, const Color(0xFF777777));
   });
 
   testWidgets('hides home back action on primary tab landing screens',
@@ -473,10 +498,8 @@ void main() {
       greaterThan(52),
     );
     expect(
-      tester.getSize(
-        find.byKey(const ValueKey('route-tab-consultation-indicator')),
-      ),
-      const Size(24, 3),
+      find.byKey(const ValueKey('route-tab-consultation-indicator')),
+      findsNothing,
     );
   });
 
@@ -497,8 +520,15 @@ void main() {
 
       expect(
         find.byKey(const ValueKey('route-tab-home-indicator')),
-        findsOneWidget,
+        findsNothing,
       );
+      final selectedIcon = tester.widget<Icon>(
+        find.descendant(
+          of: find.byKey(const ValueKey('route-tab-home')),
+          matching: find.byIcon(Icons.home),
+        ),
+      );
+      expect(selectedIcon.color, const Color(0xFF111111));
       expect(
         tester.getSemantics(find.bySemanticsLabel('홈 Tab 1 of 5')),
         matchesSemantics(
