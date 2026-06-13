@@ -276,6 +276,7 @@ class _MaumOnMobileAppState extends State<MaumOnMobileApp>
           controller: _settingsControllerFor(memberId),
           supportContactInfo: _supportContactInfo(),
           onBack: _returnHome,
+          onLogout: _logout,
         ),
       AuthenticatedRoute.letter => _buildLetterRoute(memberId),
       AuthenticatedRoute.story => _buildStoryRoute(memberId),
@@ -319,7 +320,6 @@ class _MaumOnMobileAppState extends State<MaumOnMobileApp>
         onOpenSettings: () => _openRoute(AuthenticatedRoute.settings),
         unreadNotificationCount: unreadCount,
         hasLiveNotificationConnection: hasLiveConnection,
-        onLogout: _logout,
       );
     }
 

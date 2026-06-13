@@ -14,7 +14,6 @@ class HomeScreen extends StatefulWidget {
     required this.onOpenConsultation,
     required this.onOpenNotifications,
     required this.onOpenSettings,
-    required this.onLogout,
     this.unreadNotificationCount = 0,
     this.hasLiveNotificationConnection = false,
     this.onRefresh,
@@ -29,7 +28,6 @@ class HomeScreen extends StatefulWidget {
   final VoidCallback onOpenConsultation;
   final VoidCallback onOpenNotifications;
   final VoidCallback onOpenSettings;
-  final VoidCallback onLogout;
   final int unreadNotificationCount;
   final bool hasLiveNotificationConnection;
   final Future<void> Function()? onRefresh;
@@ -92,6 +90,7 @@ class _HomeScreenState extends State<HomeScreen> {
               unreadCount: widget.unreadNotificationCount,
               onPressed: widget.onOpenNotifications,
             ),
+            _HomeSettingsHeaderButton(onPressed: widget.onOpenSettings),
           ],
           maxWidth: AppBreakpoints.compactContentMaxWidth,
           children: [
@@ -100,14 +99,6 @@ class _HomeScreenState extends State<HomeScreen> {
               onWriteLetter: widget.onWriteLetter,
               onViewStory: widget.onViewStory,
               onOpenConsultation: widget.onOpenConsultation,
-            ),
-            const SizedBox(height: AppSpacing.md),
-            _SecondaryToolsSection(
-              unreadCount: widget.unreadNotificationCount,
-              hasLiveConnection: widget.hasLiveNotificationConnection,
-              onOpenNotifications: widget.onOpenNotifications,
-              onOpenSettings: widget.onOpenSettings,
-              onLogout: widget.onLogout,
             ),
             if (showDraftContinuation) ...[
               const SizedBox(height: AppSpacing.lg),
@@ -379,151 +370,18 @@ class _HomeNotificationHeaderButton extends StatelessWidget {
   }
 }
 
-class _SecondaryToolsSection extends StatelessWidget {
-  const _SecondaryToolsSection({
-    required this.unreadCount,
-    required this.hasLiveConnection,
-    required this.onOpenNotifications,
-    required this.onOpenSettings,
-    required this.onLogout,
-  });
+class _HomeSettingsHeaderButton extends StatelessWidget {
+  const _HomeSettingsHeaderButton({required this.onPressed});
 
-  final int unreadCount;
-  final bool hasLiveConnection;
-  final VoidCallback onOpenNotifications;
-  final VoidCallback onOpenSettings;
-  final VoidCallback onLogout;
+  final VoidCallback onPressed;
 
   @override
   Widget build(BuildContext context) {
-    final hasUnread = unreadCount > 0;
-    final liveLabel = hasLiveConnection ? '실시간 연결됨' : '알림 센터';
-    final unreadLabel = hasUnread
-        ? '읽지 않은 알림 ${_formatBadgeCount(unreadCount)}개'
-        : '읽지 않은 알림 없음';
-
-    final statusTone = hasUnread
-        ? AppStatusTone.warning
-        : hasLiveConnection
-            ? AppStatusTone.success
-            : AppStatusTone.neutral;
-    final theme = Theme.of(context);
-    final colorScheme = Theme.of(context).colorScheme;
-
-    return Semantics(
-      container: true,
-      label: '홈 보조 도구',
-      child: DecoratedBox(
-        key: const ValueKey('home-secondary-tools'),
-        decoration: BoxDecoration(
-          color: colorScheme.surface.withValues(alpha: 0.74),
-          borderRadius: AppRadii.card,
-          border: Border.all(color: colorScheme.outlineVariant),
-        ),
-        child: Padding(
-          padding: const EdgeInsets.all(AppSpacing.sm),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Material(
-                color: Colors.transparent,
-                child: InkWell(
-                  key: const ValueKey('home-action-notifications'),
-                  borderRadius: AppRadii.card,
-                  onTap: onOpenNotifications,
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: AppSpacing.xs,
-                      vertical: AppSpacing.xs,
-                    ),
-                    child: Row(
-                      children: [
-                        DecoratedBox(
-                          decoration: BoxDecoration(
-                            color: colorScheme.surfaceContainerHighest,
-                            borderRadius: AppRadii.chip,
-                          ),
-                          child: Padding(
-                            padding: const EdgeInsets.all(AppSpacing.xs),
-                            child: Icon(
-                              hasUnread
-                                  ? Icons.notifications_active_outlined
-                                  : Icons.notifications_none,
-                              size: 20,
-                              color: colorScheme.onSurfaceVariant,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: AppSpacing.sm),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                '알림/신고',
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: theme.textTheme.titleSmall?.copyWith(
-                                  fontWeight: FontWeight.w800,
-                                ),
-                              ),
-                              const SizedBox(height: AppSpacing.xxs),
-                              Text(
-                                '$unreadLabel · $liveLabel',
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: theme.textTheme.bodySmall?.copyWith(
-                                  color: colorScheme.onSurfaceVariant,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(width: AppSpacing.xs),
-                        ConstrainedBox(
-                          constraints: const BoxConstraints(maxWidth: 96),
-                          child: AppStatusPill(
-                            label: hasUnread ? '확인' : liveLabel,
-                            tone: statusTone,
-                          ),
-                        ),
-                        const SizedBox(width: AppSpacing.xs),
-                        Icon(
-                          Icons.chevron_right,
-                          size: 20,
-                          color: colorScheme.onSurfaceVariant,
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(height: AppSpacing.xs),
-              Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      key: const ValueKey('home-action-settings'),
-                      onPressed: onOpenSettings,
-                      icon: const Icon(Icons.settings_outlined),
-                      label: const Text('설정'),
-                    ),
-                  ),
-                  const SizedBox(width: AppSpacing.xs),
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      key: const ValueKey('home-action-logout'),
-                      onPressed: onLogout,
-                      icon: const Icon(Icons.logout),
-                      label: const Text('로그아웃'),
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
-      ),
+    return IconButton(
+      key: const ValueKey('home-header-settings-button'),
+      tooltip: '설정',
+      onPressed: onPressed,
+      icon: const Icon(Icons.settings_outlined),
     );
   }
 }

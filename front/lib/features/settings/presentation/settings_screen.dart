@@ -17,6 +17,7 @@ class SettingsScreen extends StatefulWidget {
     this.supportContactInfo = LegalDisclosures.defaultSupportContact,
     this.onOpenExternalUri,
     this.onCopyDiagnostics,
+    this.onLogout,
     super.key,
   });
 
@@ -25,6 +26,7 @@ class SettingsScreen extends StatefulWidget {
   final SupportContactInfo supportContactInfo;
   final Future<bool> Function(Uri uri)? onOpenExternalUri;
   final Future<void> Function(String value)? onCopyDiagnostics;
+  final VoidCallback? onLogout;
 
   @override
   State<SettingsScreen> createState() => _SettingsScreenState();
@@ -173,6 +175,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                 randomReceiveAllowed:
                                     settings.randomReceiveAllowed,
                                 dataExport: state.dataExport,
+                                isSubmitting: state.isSubmitting,
+                                onLogout: widget.onLogout,
                               ),
                               const SizedBox(height: AppSpacing.lg),
                               const _SettingsGroupHeader(
@@ -455,6 +459,8 @@ class _AccountSummary extends StatelessWidget {
     required this.isSocialAccount,
     required this.randomReceiveAllowed,
     required this.dataExport,
+    required this.isSubmitting,
+    this.onLogout,
   });
 
   final String email;
@@ -462,6 +468,8 @@ class _AccountSummary extends StatelessWidget {
   final bool isSocialAccount;
   final bool randomReceiveAllowed;
   final MemberDataExportJob? dataExport;
+  final bool isSubmitting;
+  final VoidCallback? onLogout;
 
   @override
   Widget build(BuildContext context) {
@@ -544,6 +552,18 @@ class _AccountSummary extends StatelessWidget {
                   ),
                 ],
               ),
+              if (onLogout != null) ...[
+                const SizedBox(height: AppSpacing.sm),
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: OutlinedButton.icon(
+                    key: const ValueKey('settings-logout-button'),
+                    onPressed: isSubmitting ? null : onLogout,
+                    icon: const Icon(Icons.logout),
+                    label: const Text('로그아웃'),
+                  ),
+                ),
+              ],
             ],
           ),
         ),

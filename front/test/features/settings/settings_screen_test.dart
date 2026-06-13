@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:maum_on_mobile_front/features/settings/application/settings_controller.dart';
@@ -159,6 +161,98 @@ void main() {
     expect(repository.exportRequestCount, 1);
     expect(repository.downloadedExportIds, [1]);
     expect(find.textContaining('maum-on-data-export-1.json'), findsWidgets);
+  });
+
+  testWidgets('설정 화면 계정 영역에서 로그아웃을 실행한다', (tester) async {
+    var logoutCount = 0;
+    final repository = _FakeSettingsRepository();
+    final controller = SettingsController(repository: repository);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: SettingsScreen(
+          controller: controller,
+          onBack: () {},
+          onLogout: () => logoutCount += 1,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('로그아웃'), findsOneWidget);
+    expect(
+      find.descendant(
+        of: find.byKey(const ValueKey('settings-account-toolbar')),
+        matching: find.byKey(const ValueKey('settings-logout-button')),
+      ),
+      findsOneWidget,
+    );
+
+    await tester.tap(find.byKey(const ValueKey('settings-logout-button')));
+    await tester.pumpAndSettle();
+
+    expect(logoutCount, 1);
+  });
+
+  testWidgets('onLogout이 null일 때 로그아웃 버튼을 렌더링하지 않는다', (tester) async {
+    final repository = _FakeSettingsRepository();
+    final controller = SettingsController(repository: repository);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: SettingsScreen(
+          controller: controller,
+          onBack: () {},
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const ValueKey('settings-logout-button')), findsNothing);
+    expect(find.text('로그아웃'), findsNothing);
+  });
+
+  testWidgets('설정 저장 중에는 로그아웃을 비활성화한다', (tester) async {
+    var logoutCount = 0;
+    final nicknameUpdateDelay = Completer<void>();
+    final repository = _FakeSettingsRepository(
+      nicknameUpdateDelay: nicknameUpdateDelay,
+    );
+    final controller = SettingsController(repository: repository);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: SettingsScreen(
+          controller: controller,
+          onBack: () {},
+          onLogout: () => logoutCount += 1,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.enterText(
+      find.byKey(const ValueKey('settings-nickname-field')),
+      '저장 중 닉네임',
+    );
+    await tester.tap(find.byKey(const ValueKey('settings-save-nickname')));
+    await tester.pump();
+
+    final logoutButton = find.byKey(const ValueKey('settings-logout-button'));
+    expect(tester.widget<OutlinedButton>(logoutButton).onPressed, isNull);
+
+    await tester.tap(logoutButton);
+    await tester.pump();
+    expect(logoutCount, 0);
+
+    nicknameUpdateDelay.complete();
+    await tester.pumpAndSettle();
+
+    expect(tester.widget<OutlinedButton>(logoutButton).onPressed, isNotNull);
+    await tester.tap(logoutButton);
+    await tester.pumpAndSettle();
+
+    expect(logoutCount, 1);
   });
 
   testWidgets('confirms withdrawal and clears session', (tester) async {
@@ -427,6 +521,9 @@ void main() {
 }
 
 class _FakeSettingsRepository implements SettingsRepository {
+  _FakeSettingsRepository({this.nicknameUpdateDelay});
+
+  final Completer<void>? nicknameUpdateDelay;
   final List<String> nicknameUpdates = [];
   final List<String> emailUpdates = [];
   final List<String?> withdrawPasswords = [];
@@ -447,6 +544,7 @@ class _FakeSettingsRepository implements SettingsRepository {
   @override
   Future<MemberSettings> updateNickname(String nickname) async {
     nicknameUpdates.add(nickname);
+    await nicknameUpdateDelay?.future;
     settings = settings.copyWith(nickname: nickname);
     return settings;
   }

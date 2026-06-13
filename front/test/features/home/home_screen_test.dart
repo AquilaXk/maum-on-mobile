@@ -28,7 +28,6 @@ void main() {
           onOpenConsultation: () {},
           onOpenNotifications: () {},
           onOpenSettings: () {},
-          onLogout: () {},
         ),
       ),
     );
@@ -39,8 +38,12 @@ void main() {
     expect(find.text('오늘 올라온 고민'), findsOneWidget);
     expect(find.text('전달된 비밀 편지'), findsOneWidget);
     expect(find.text('오늘의 기록'), findsOneWidget);
-    expect(find.text('알림/신고'), findsOneWidget);
-    expect(find.text('읽지 않은 알림 없음 · 알림 센터'), findsOneWidget);
+    expect(find.byKey(const ValueKey('home-header-notification-button')),
+        findsOneWidget);
+    expect(find.byKey(const ValueKey('home-header-settings-button')),
+        findsOneWidget);
+    expect(find.text('알림/신고'), findsNothing);
+    expect(find.text('읽지 않은 알림 없음 · 알림 센터'), findsNothing);
     expect(find.byKey(const ValueKey('home-primary-panel')), findsNothing);
     expect(find.byKey(const ValueKey('home-blue-hero')), findsNothing);
     expect(find.text('지금 마음을 천천히 살펴보세요.'), findsNothing);
@@ -91,7 +94,6 @@ void main() {
           onOpenConsultation: () {},
           onOpenNotifications: () {},
           onOpenSettings: () {},
-          onLogout: () {},
         ),
       ),
     );
@@ -128,7 +130,6 @@ void main() {
           onOpenConsultation: () {},
           onOpenNotifications: () {},
           onOpenSettings: () {},
-          onLogout: () {},
         ),
       ),
     );
@@ -188,7 +189,6 @@ void main() {
           onOpenConsultation: () {},
           onOpenNotifications: () {},
           onOpenSettings: () {},
-          onLogout: () {},
           unreadNotificationCount: 3,
           hasLiveNotificationConnection: true,
         ),
@@ -197,11 +197,10 @@ void main() {
 
     final launcher = find.byKey(const ValueKey('home-action-launcher'));
     final stats = find.byKey(const ValueKey('home-stats-section'));
-    final secondaryTools = find.byKey(const ValueKey('home-secondary-tools'));
 
     expect(launcher, findsOneWidget);
     expect(stats, findsOneWidget);
-    expect(secondaryTools, findsOneWidget);
+    expect(find.byKey(const ValueKey('home-secondary-tools')), findsNothing);
     expect(
         tester.getTopLeft(launcher).dy, lessThan(tester.getTopLeft(stats).dy));
     expect(
@@ -209,9 +208,10 @@ void main() {
       findsOneWidget,
     );
     expect(find.text('계정 관리'), findsNothing);
-    expect(find.text('알림/신고'), findsOneWidget);
-    expect(find.text('설정'), findsOneWidget);
-    expect(find.text('로그아웃'), findsOneWidget);
+    expect(find.text('알림/신고'), findsNothing);
+    expect(find.byKey(const ValueKey('home-header-settings-button')),
+        findsOneWidget);
+    expect(find.text('로그아웃'), findsNothing);
   });
 
   testWidgets('exposes home launcher actions as button semantics',
@@ -235,13 +235,11 @@ void main() {
             onOpenConsultation: () {},
             onOpenNotifications: () {},
             onOpenSettings: () {},
-            onLogout: () {},
           ),
         ),
       );
 
-      final consultation =
-          find.bySemanticsLabel('AI 상담, 지금 마음을 바로 정리하기');
+      final consultation = find.bySemanticsLabel('AI 상담, 지금 마음을 바로 정리하기');
       final diary = find.bySemanticsLabel('기록');
       final letter = find.bySemanticsLabel('편지');
       final story = find.bySemanticsLabel('스토리');
@@ -288,7 +286,6 @@ void main() {
           onOpenConsultation: () {},
           onOpenNotifications: () {},
           onOpenSettings: () {},
-          onLogout: () {},
         ),
       ),
     );
@@ -333,7 +330,6 @@ void main() {
           onOpenConsultation: () {},
           onOpenNotifications: () {},
           onOpenSettings: () {},
-          onLogout: () {},
         ),
       ),
     );
@@ -379,7 +375,6 @@ void main() {
           onOpenConsultation: () {},
           onOpenNotifications: () {},
           onOpenSettings: () {},
-          onLogout: () {},
         ),
       ),
     );
@@ -423,20 +418,23 @@ void main() {
           onOpenSettings: () => settingsTaps += 1,
           unreadNotificationCount: 2,
           hasLiveNotificationConnection: true,
-          onLogout: () {},
         ),
       ),
     );
 
-    expect(find.text('읽지 않은 알림 2개 · 실시간 연결됨'), findsOneWidget);
+    expect(
+      find.byTooltip('읽지 않은 알림 2'),
+      findsOneWidget,
+    );
     expect(find.text('AI 상담'), findsOneWidget);
 
     await _tapVisibleKey(tester, const ValueKey('home-action-diary'));
     await _tapVisibleKey(tester, const ValueKey('home-action-letter'));
     await _tapVisibleKey(tester, const ValueKey('home-action-story'));
     await _tapVisibleKey(tester, const ValueKey('home-action-consultation'));
-    await _tapVisibleKey(tester, const ValueKey('home-action-notifications'));
-    await _tapVisibleKey(tester, const ValueKey('home-action-settings'));
+    await _tapVisibleKey(
+        tester, const ValueKey('home-header-notification-button'));
+    await _tapVisibleKey(tester, const ValueKey('home-header-settings-button'));
 
     expect(diaryTaps, 1);
     expect(letterTaps, 1);
@@ -464,18 +462,18 @@ void main() {
           onOpenConsultation: () {},
           onOpenNotifications: () {},
           onOpenSettings: () {},
-          onLogout: () {},
         ),
       ),
     );
 
     expect(find.byKey(const ValueKey('home-primary-actions')), findsOneWidget);
-    expect(find.byKey(const ValueKey('home-secondary-tools')), findsOneWidget);
+    expect(find.byKey(const ValueKey('home-secondary-tools')), findsNothing);
     expect(find.text('계정 관리'), findsNothing);
     expect(find.byKey(const ValueKey('home-operations-button')), findsNothing);
     expect(find.text('운영 검수'), findsNothing);
-    expect(find.text('설정'), findsOneWidget);
-    expect(find.text('로그아웃'), findsOneWidget);
+    expect(find.byKey(const ValueKey('home-header-settings-button')),
+        findsOneWidget);
+    expect(find.text('로그아웃'), findsNothing);
   });
 
   testWidgets('does not expose operations entry to admin accounts',
@@ -496,7 +494,6 @@ void main() {
           onOpenConsultation: () {},
           onOpenNotifications: () {},
           onOpenSettings: () {},
-          onLogout: () {},
         ),
       ),
     );
@@ -519,7 +516,6 @@ void main() {
           onOpenConsultation: () {},
           onOpenNotifications: () {},
           onOpenSettings: () {},
-          onLogout: () {},
         ),
       ),
     );
