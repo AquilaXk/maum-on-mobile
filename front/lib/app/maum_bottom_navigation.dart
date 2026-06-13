@@ -20,17 +20,17 @@ class MaumBottomNavigation extends StatelessWidget {
     final selectedRoute =
         routes.contains(currentRoute) ? currentRoute : routes.first;
 
-    return SafeArea(
-      top: false,
-      minimum: EdgeInsets.zero,
-      child: DecoratedBox(
-        key: const ValueKey('app-bottom-navigation-surface'),
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          border: Border(
-            top: BorderSide(color: Color(0xFFE6E6E6)),
-          ),
+    return DecoratedBox(
+      key: const ValueKey('app-bottom-navigation-surface'),
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        border: Border(
+          top: BorderSide(color: Color(0xFFE6E6E6)),
         ),
+      ),
+      child: SafeArea(
+        top: false,
+        minimum: EdgeInsets.zero,
         child: Padding(
           padding: const EdgeInsets.only(
             top: AppSpacing.xs,

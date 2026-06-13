@@ -362,6 +362,14 @@ void main() {
 
     await tester.pumpWidget(
       MaterialApp(
+        builder: (context, child) {
+          return MediaQuery(
+            data: MediaQuery.of(context).copyWith(
+              padding: const EdgeInsets.only(bottom: 34),
+            ),
+            child: child!,
+          );
+        },
         theme: buildDarkAppTheme(),
         home: AuthenticatedAppShell(
           currentRoute: AuthenticatedRoute.home,
@@ -382,10 +390,25 @@ void main() {
     expect(surfaceDecoration.boxShadow, isNull);
     expect(surfaceDecoration.border?.top.color, const Color(0xFFE6E6E6));
     expect(
+      find.descendant(
+        of: find.byKey(const ValueKey('app-bottom-navigation-surface')),
+        matching: find.byType(SafeArea),
+      ),
+      findsOneWidget,
+    );
+    expect(
       tester
           .getSize(find.byKey(const ValueKey('app-bottom-navigation-surface')))
           .width,
       390,
+    );
+    expect(
+      tester
+          .getSize(find.byKey(const ValueKey('app-bottom-navigation-surface')))
+          .height,
+      greaterThan(
+        tester.getSize(find.byKey(const ValueKey('route-tab-home'))).height,
+      ),
     );
 
     final selectedSurface = tester.widget<AnimatedContainer>(
