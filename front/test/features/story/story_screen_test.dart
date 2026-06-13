@@ -8,8 +8,7 @@ import 'package:maum_on_mobile_front/features/story/presentation/story_screen.da
 import 'package:maum_on_mobile_front/shared/ui/app_design_system.dart';
 
 void main() {
-  testWidgets('keeps story discovery controls compact on a phone viewport',
-      (tester) async {
+  testWidgets('스토리 검색 도구는 첫 화면 콘텐츠를 가리지 않는 얇은 표면이다', (tester) async {
     tester.view.physicalSize = const Size(390, 640);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
@@ -32,20 +31,29 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byKey(const ValueKey('story-discovery-strip')), findsOneWidget);
+    expect(find.byKey(const ValueKey('story-search-toolbar')), findsOneWidget);
     expect(find.byKey(const ValueKey('story-search-field')), findsOneWidget);
     expect(
         find.byKey(const ValueKey('story-category-question')), findsOneWidget);
     expect(find.text('1개의 스토리'), findsOneWidget);
 
-    final searchButton = tester.widget<FilledButton>(
-      find.byKey(const ValueKey('story-search-button')),
+    final discoverySurface =
+        tester.widget(find.byKey(const ValueKey('story-discovery-strip')));
+    expect(discoverySurface, isNot(isA<Card>()));
+    expect(
+      tester
+          .getSize(find.byKey(const ValueKey('story-discovery-strip')))
+          .height,
+      lessThanOrEqualTo(170),
     );
-    final searchButtonColor =
-        searchButton.style?.backgroundColor?.resolve(<WidgetState>{});
-    final colorScheme = Theme.of(
-      tester.element(find.byKey(const ValueKey('story-search-button'))),
-    ).colorScheme;
-    expect(searchButtonColor, colorScheme.primary);
+    expect(
+      tester.getTopLeft(find.byKey(const ValueKey('story-card-1'))).dy,
+      lessThan(520),
+    );
+    expect(
+      tester.widget(find.byKey(const ValueKey('story-search-button'))),
+      isA<IconButton>(),
+    );
   });
 
   testWidgets('stacks story editor actions on a narrow phone viewport',
