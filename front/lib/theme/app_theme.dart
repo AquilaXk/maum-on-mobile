@@ -3,42 +3,28 @@ import 'package:flutter/material.dart';
 import '../shared/ui/brand_identity.dart';
 
 ThemeData buildAppTheme() {
-  return _buildTheme(Brightness.light);
+  return _buildTheme();
 }
 
-ThemeData buildDarkAppTheme() {
-  return _buildTheme(Brightness.dark);
-}
-
-ThemeData _buildTheme(Brightness brightness) {
-  final isDark = brightness == Brightness.dark;
+ThemeData _buildTheme() {
   final baseColorScheme = ColorScheme.fromSeed(
     seedColor: AppBrandColors.primaryBlue,
-    brightness: brightness,
+    brightness: Brightness.light,
   );
   final colorScheme = baseColorScheme.copyWith(
     primary: AppBrandColors.primaryBlue,
     onPrimary: Colors.white,
     secondary: AppBrandColors.iconBlue,
     onSecondary: Colors.white,
-    primaryContainer:
-        isDark ? const Color(0xFF244C79) : const Color(0xFFDCEBFF),
-    onPrimaryContainer:
-        isDark ? const Color(0xFFDCEBFF) : const Color(0xFF1F3150),
-    secondaryContainer:
-        isDark ? const Color(0xFF164557) : const Color(0xFFEAF6FF),
-    onSecondaryContainer:
-        isDark ? const Color(0xFFEAF6FF) : const Color(0xFF1F3150),
-    surface: isDark ? AppBrandColors.darkSurfaceBlue : AppBrandColors.surface,
-    onSurface: isDark ? const Color(0xFFE8EEF8) : AppBrandColors.foreground,
-    surfaceContainerHighest: isDark
-        ? AppBrandColors.darkSurfaceStrongBlue
-        : AppBrandColors.surfaceStrong,
-    onSurfaceVariant: isDark
-        ? AppBrandColors.darkMutedForeground
-        : AppBrandColors.mutedForeground,
-    outlineVariant:
-        isDark ? AppBrandColors.darkBorderBlue : AppBrandColors.borderSoft,
+    primaryContainer: const Color(0xFFDCEBFF),
+    onPrimaryContainer: const Color(0xFF1F3150),
+    secondaryContainer: const Color(0xFFEAF6FF),
+    onSecondaryContainer: const Color(0xFF1F3150),
+    surface: AppBrandColors.surface,
+    onSurface: AppBrandColors.foreground,
+    surfaceContainerHighest: AppBrandColors.surfaceStrong,
+    onSurfaceVariant: AppBrandColors.mutedForeground,
+    outlineVariant: AppBrandColors.borderSoft,
   );
   final textTheme = const TextTheme(
     displaySmall: TextStyle(
@@ -85,21 +71,15 @@ ThemeData _buildTheme(Brightness brightness) {
   return ThemeData(
     useMaterial3: true,
     colorScheme: colorScheme,
-    scaffoldBackgroundColor: isDark
-        ? AppBrandColors.darkBackgroundBlue
-        : AppBrandColors.backgroundBlue,
+    scaffoldBackgroundColor: AppBrandColors.backgroundBlue,
     textTheme: textTheme,
     dividerColor: colorScheme.outlineVariant,
     cardTheme: CardThemeData(
       elevation: 0,
-      color: isDark ? AppBrandColors.darkSurfaceBlue : AppBrandColors.surface,
+      color: AppBrandColors.surface,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(8),
-        side: BorderSide(
-          color: isDark
-              ? AppBrandColors.darkBorderBlue
-              : AppBrandColors.borderSoft,
-        ),
+        side: const BorderSide(color: AppBrandColors.borderSoft),
       ),
     ),
     chipTheme: ChipThemeData(
@@ -117,7 +97,7 @@ ThemeData _buildTheme(Brightness brightness) {
     ),
     inputDecorationTheme: InputDecorationTheme(
       filled: true,
-      fillColor: isDark ? const Color(0xFF12304B) : AppBrandColors.surface,
+      fillColor: AppBrandColors.surface,
       border: inputBorder,
       enabledBorder: inputBorder.copyWith(
         borderSide: BorderSide(color: colorScheme.outlineVariant),

@@ -19,15 +19,15 @@ void main() {
     );
   });
 
-  test('uses a branded dark surface stack instead of the default navy shell',
-      () {
-    final theme = buildDarkAppTheme();
+  test('앱 테마는 하늘색 라이트 토큰만 제공한다', () {
+    final theme = buildAppTheme();
 
-    expect(theme.scaffoldBackgroundColor, const Color(0xFF102A43));
-    expect(theme.colorScheme.surface, const Color(0xFF15314D));
-    expect(theme.colorScheme.surfaceContainerHighest, const Color(0xFF1D4265));
-    expect(theme.cardTheme.color, const Color(0xFF15314D));
-    expect(theme.colorScheme.outlineVariant, const Color(0xFF37658C));
+    expect(theme.colorScheme.brightness, Brightness.light);
+    expect(theme.scaffoldBackgroundColor, const Color(0xFFEDF5FF));
+    expect(theme.colorScheme.surface, Colors.white);
+    expect(theme.colorScheme.surfaceContainerHighest, const Color(0xFFFBFDFF));
+    expect(theme.cardTheme.color, Colors.white);
+    expect(theme.colorScheme.outlineVariant, const Color(0xFFDBE7FB));
   });
 
   testWidgets('keeps the mobile design shell stable with larger text',

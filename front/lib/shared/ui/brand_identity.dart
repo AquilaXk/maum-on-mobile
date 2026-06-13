@@ -11,11 +11,6 @@ abstract final class AppBrandColors {
   static const Color surface = Color(0xFFFFFFFF);
   static const Color surfaceStrong = Color(0xFFFBFDFF);
   static const Color borderSoft = Color(0xFFDBE7FB);
-  static const Color darkBackgroundBlue = Color(0xFF102A43);
-  static const Color darkSurfaceBlue = Color(0xFF15314D);
-  static const Color darkSurfaceStrongBlue = Color(0xFF1D4265);
-  static const Color darkBorderBlue = Color(0xFF37658C);
-  static const Color darkMutedForeground = Color(0xFFBFD3E8);
 }
 
 class MaumOnBrandWordmark extends StatelessWidget {

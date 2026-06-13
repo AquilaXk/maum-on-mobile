@@ -199,8 +199,7 @@ class _MaumOnMobileAppState extends State<MaumOnMobileApp>
       title: 'Maum On',
       debugShowCheckedModeBanner: false,
       theme: buildAppTheme(),
-      darkTheme: buildDarkAppTheme(),
-      themeMode: ThemeMode.system,
+      themeMode: ThemeMode.light,
       scrollBehavior: const MaterialScrollBehavior().copyWith(
         overscroll: false,
       ),

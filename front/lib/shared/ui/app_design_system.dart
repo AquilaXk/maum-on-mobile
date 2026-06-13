@@ -846,37 +846,27 @@ class AppListRow extends StatelessWidget {
       label: semanticLabel,
       child: ExcludeSemantics(
         excluding: semanticLabel != null,
-        child: Card(
-          margin: EdgeInsets.zero,
-          color: selected ? colorScheme.primaryContainer : null,
+        child: Material(
+          color: Colors.transparent,
           child: InkWell(
-            borderRadius: AppRadii.card,
             onTap: onTap,
             child: ConstrainedBox(
               constraints: const BoxConstraints(minHeight: 64),
               child: Padding(
-                padding: const EdgeInsets.all(AppSpacing.md),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: AppSpacing.xxs,
+                  vertical: AppSpacing.sm,
+                ),
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
                     if (leadingIcon != null) ...[
-                      DecoratedBox(
-                        decoration: BoxDecoration(
-                          color: selected
-                              ? colorScheme.primary.withValues(alpha: 0.16)
-                              : colorScheme.surfaceContainerHighest,
-                          borderRadius: AppRadii.chip,
-                        ),
-                        child: Padding(
-                          padding: const EdgeInsets.all(AppSpacing.xs),
-                          child: Icon(
-                            leadingIcon,
-                            size: 22,
-                            color: selected
-                                ? colorScheme.onPrimaryContainer
-                                : colorScheme.onSurfaceVariant,
-                          ),
-                        ),
+                      Icon(
+                        leadingIcon,
+                        size: 24,
+                        color: selected
+                            ? colorScheme.primary
+                            : colorScheme.onSurfaceVariant,
                       ),
                       const SizedBox(width: AppSpacing.md),
                     ],

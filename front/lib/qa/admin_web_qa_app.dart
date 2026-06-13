@@ -14,7 +14,6 @@ Widget buildAdminWebQaApp() {
     title: 'Maum On Admin QA',
     debugShowCheckedModeBanner: false,
     theme: buildAppTheme(),
-    darkTheme: buildDarkAppTheme(),
     themeMode: ThemeMode.light,
     home: const AdminWebApp(repository: _QaAdminRepository()),
   );

@@ -61,17 +61,13 @@ class _AuthScreenState extends State<AuthScreen> {
   @override
   Widget build(BuildContext context) {
     final rootTheme = Theme.of(context);
-    final useDarkTheme = rootTheme.colorScheme.brightness == Brightness.dark;
-    final theme = (useDarkTheme ? buildDarkAppTheme() : buildAppTheme())
-        .copyWith(platform: rootTheme.platform);
+    final theme = buildAppTheme().copyWith(platform: rootTheme.platform);
     final overlayStyle = SystemUiOverlayStyle(
       statusBarColor: Colors.transparent,
-      statusBarIconBrightness:
-          useDarkTheme ? Brightness.light : Brightness.dark,
-      statusBarBrightness: useDarkTheme ? Brightness.dark : Brightness.light,
+      statusBarIconBrightness: Brightness.dark,
+      statusBarBrightness: Brightness.light,
       systemNavigationBarColor: theme.scaffoldBackgroundColor,
-      systemNavigationBarIconBrightness:
-          useDarkTheme ? Brightness.light : Brightness.dark,
+      systemNavigationBarIconBrightness: Brightness.dark,
     );
     final state = widget.controller.state;
     final externalLoginState = widget.externalLoginController?.state;
@@ -773,9 +769,7 @@ class _AuthFormPanel extends StatelessWidget {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     final panelColor = theme.cardColor;
-    final shadowColor = colorScheme.brightness == Brightness.dark
-        ? Colors.black.withValues(alpha: 0.24)
-        : AppBrandColors.primaryBlue.withValues(alpha: 0.08);
+    final shadowColor = AppBrandColors.primaryBlue.withValues(alpha: 0.08);
 
     return DecoratedBox(
       key: const ValueKey('auth-form-panel'),

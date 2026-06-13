@@ -26,7 +26,6 @@ class MaumOnAdminWebApp extends StatelessWidget {
       title: 'Maum On Admin',
       debugShowCheckedModeBanner: false,
       theme: buildAppTheme(),
-      darkTheme: buildDarkAppTheme(),
       themeMode: ThemeMode.light,
       home: AdminWebAuthShell(
         authRepository: dependencies.authRepository,

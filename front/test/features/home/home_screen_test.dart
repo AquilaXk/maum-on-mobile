@@ -6,6 +6,7 @@ import 'package:maum_on_mobile_front/features/home/application/home_controller.d
 import 'package:maum_on_mobile_front/features/home/data/home_repository.dart';
 import 'package:maum_on_mobile_front/features/home/domain/home_models.dart';
 import 'package:maum_on_mobile_front/features/home/home_screen.dart';
+import 'package:maum_on_mobile_front/shared/ui/app_design_system.dart';
 import 'package:maum_on_mobile_front/shared/ui/brand_identity.dart';
 import 'package:maum_on_mobile_front/theme/app_theme.dart';
 
@@ -58,6 +59,9 @@ void main() {
     expect(find.text('최근 인기'), findsOneWidget);
     expect(find.text('오늘 너무 지쳐요'), findsWidgets);
     expect(find.byKey(const ValueKey('home-feed-story-1')), findsOneWidget);
+    expect(find.byType(Card), findsNothing);
+    expect(find.byType(ChoiceChip), findsNothing);
+    expect(find.byType(AppStatusPill), findsNothing);
     expect(find.text('ANDROID'), findsNothing);
     expect(find.text('IOS'), findsNothing);
 
@@ -106,8 +110,7 @@ void main() {
     expect(worryTop, moreOrLessEquals(diaryTop, epsilon: 1));
   });
 
-  testWidgets('uses primary action surfaces without the hero card on mobile',
-      (tester) async {
+  testWidgets('홈 바로가기 액션은 사각 카드가 아닌 원형 아이콘 버튼으로 표시한다', (tester) async {
     tester.view.physicalSize = const Size(390, 844);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
@@ -142,18 +145,25 @@ void main() {
       find.byKey(const ValueKey('home-primary-actions-panel')),
       findsOneWidget,
     );
+    expect(find.byKey(const ValueKey('home-primary-actions')), findsOneWidget);
     expect(
       find.byKey(const ValueKey('home-action-diary-surface')),
       findsOneWidget,
     );
+    final diarySurface = tester.widget<DecoratedBox>(
+      find.byKey(const ValueKey('home-action-diary-surface')),
+    );
+    final diaryDecoration = diarySurface.decoration as BoxDecoration;
+    expect(diaryDecoration.color, Colors.transparent);
     expect(
-      (tester
-              .widget<DecoratedBox>(
-                find.byKey(const ValueKey('home-action-diary-surface')),
-              )
-              .decoration as BoxDecoration)
-          .color,
-      const Color(0xFFE8F1FF),
+      tester.getSize(find.byKey(const ValueKey('home-action-diary-surface'))),
+      const Size(56, 56),
+    );
+    expect(
+      tester.getSize(
+        find.byKey(const ValueKey('home-action-consultation-primary')),
+      ),
+      const Size(56, 56),
     );
     expect(
       find.byKey(const ValueKey('home-action-story-surface')),
@@ -239,7 +249,7 @@ void main() {
         ),
       );
 
-      final consultation = find.bySemanticsLabel('AI 상담, 지금 마음을 바로 정리하기');
+      final consultation = find.bySemanticsLabel('AI 상담');
       final diary = find.bySemanticsLabel('기록');
       final letter = find.bySemanticsLabel('편지');
       final story = find.bySemanticsLabel('스토리');
@@ -261,8 +271,7 @@ void main() {
     }
   });
 
-  testWidgets('keeps dark home surfaces cohesive with the blue brand shell',
-      (tester) async {
+  testWidgets('홈은 하늘색 라이트 표면을 유지한다', (tester) async {
     tester.view.physicalSize = const Size(390, 844);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
@@ -273,7 +282,7 @@ void main() {
     );
     await controller.load();
 
-    final theme = buildDarkAppTheme();
+    final theme = buildAppTheme();
     await tester.pumpWidget(
       MaterialApp(
         theme: theme,
@@ -293,17 +302,22 @@ void main() {
     final consultationSurface = tester.widget<DecoratedBox>(
       find.byKey(const ValueKey('home-action-consultation-primary')),
     );
+    final consultationDecoration =
+        consultationSurface.decoration as BoxDecoration;
+    expect(consultationDecoration.shape, BoxShape.circle);
     expect(
-      (consultationSurface.decoration as BoxDecoration).color,
-      const Color(0xFF244C79),
+      consultationDecoration.color,
+      Colors.transparent,
     );
 
     final diarySurface = tester.widget<DecoratedBox>(
       find.byKey(const ValueKey('home-action-diary-surface')),
     );
+    final diaryDecoration = diarySurface.decoration as BoxDecoration;
+    expect(diaryDecoration.shape, BoxShape.circle);
     expect(
-      (diarySurface.decoration as BoxDecoration).color,
-      const Color(0xFF244C79),
+      diaryDecoration.color,
+      Colors.transparent,
     );
 
     final wordmark = tester.widget<MaumOnBrandWordmark>(
