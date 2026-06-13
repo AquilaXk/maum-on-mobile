@@ -535,42 +535,51 @@ void main() {
     );
   });
 
-  testWidgets('marks home selected when the current route is not a primary tab',
-      (tester) async {
+  testWidgets('보조 화면에서는 하단 primary 탭을 선택 상태로 표시하지 않는다', (tester) async {
     final semanticsHandle = tester.ensureSemantics();
 
     try {
-      await tester.pumpWidget(
-        MaterialApp(
-          home: AuthenticatedAppShell(
-            currentRoute: AuthenticatedRoute.settings,
-            onRouteSelected: (_) {},
-            child: const SizedBox.shrink(),
+      for (final secondaryRoute in [
+        AuthenticatedRoute.settings,
+        AuthenticatedRoute.notifications,
+      ]) {
+        await tester.pumpWidget(
+          MaterialApp(
+            home: AuthenticatedAppShell(
+              currentRoute: secondaryRoute,
+              onRouteSelected: (_) {},
+              child: const SizedBox.shrink(),
+            ),
           ),
-        ),
-      );
+        );
+        await tester.pumpAndSettle();
 
-      expect(
-        find.byKey(const ValueKey('route-tab-home-indicator')),
-        findsNothing,
-      );
-      final selectedIcon = tester.widget<Icon>(
-        find.descendant(
-          of: find.byKey(const ValueKey('route-tab-home')),
-          matching: find.byIcon(Icons.home),
-        ),
-      );
-      expect(selectedIcon.color, const Color(0xFF111111));
-      expect(
-        tester.getSemantics(find.bySemanticsLabel('홈 Tab 1 of 5')),
-        matchesSemantics(
-          label: '홈 Tab 1 of 5',
-          isButton: true,
-          hasSelectedState: true,
-          isSelected: true,
-          hasTapAction: true,
-        ),
-      );
+        for (final route in authenticatedPrimaryRoutes) {
+          final tab = find.byKey(ValueKey('route-tab-${route.key}'));
+          final icon = tester.widgetList<Icon>(
+            find.descendant(of: tab, matching: find.byType(Icon)),
+          ).single;
+          expect(icon.color, const Color(0xFF777777));
+          expect(
+            tester.getSemantics(
+              find.bySemanticsLabel(
+                '${route.navLabel} Tab '
+                '${authenticatedPrimaryRoutes.indexOf(route) + 1} '
+                'of ${authenticatedPrimaryRoutes.length}',
+              ),
+            ),
+            matchesSemantics(
+              label: '${route.navLabel} Tab '
+                  '${authenticatedPrimaryRoutes.indexOf(route) + 1} '
+                  'of ${authenticatedPrimaryRoutes.length}',
+              isButton: true,
+              hasSelectedState: true,
+              isSelected: false,
+              hasTapAction: true,
+            ),
+          );
+        }
+      }
     } finally {
       semanticsHandle.dispose();
     }
