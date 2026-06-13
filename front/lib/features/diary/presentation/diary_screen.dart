@@ -248,12 +248,9 @@ class _DiaryScreenState extends State<DiaryScreen> {
               onWritePressed: _scrollToDiaryForm,
             ),
             const SizedBox(height: AppSpacing.lg),
-            AppSectionCard(
-              title: '월간 기록',
-              child: _CalendarSection(
-                state: state,
-                onSelectDate: widget.controller.selectDate,
-              ),
+            _CalendarSurface(
+              state: state,
+              onSelectDate: widget.controller.selectDate,
             ),
             const SizedBox(height: AppSpacing.lg),
             _SelectedEntriesSection(
@@ -368,6 +365,51 @@ class _DiaryQuickCapturePanel extends StatelessWidget {
   }
 }
 
+class _CalendarSurface extends StatelessWidget {
+  const _CalendarSurface({
+    required this.state,
+    required this.onSelectDate,
+  });
+
+  final DiaryState state;
+  final ValueChanged<DateTime> onSelectDate;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    return Semantics(
+      container: true,
+      label: '월간 기록 달력',
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xxs),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              children: [
+                Icon(
+                  Icons.calendar_month_outlined,
+                  size: 24,
+                  color: colorScheme.primary,
+                ),
+                const SizedBox(width: AppSpacing.xs),
+                Text('월간 기록', style: theme.textTheme.titleLarge),
+              ],
+            ),
+            const SizedBox(height: AppSpacing.sm),
+            _CalendarSection(
+              state: state,
+              onSelectDate: onSelectDate,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _CalendarSection extends StatelessWidget {
   const _CalendarSection({
     required this.state,
@@ -390,24 +432,28 @@ class _CalendarSection extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        const Row(
+        Row(
           mainAxisAlignment: MainAxisAlignment.spaceAround,
           children: [
-            Text('일'),
-            Text('월'),
-            Text('화'),
-            Text('수'),
-            Text('목'),
-            Text('금'),
-            Text('토'),
+            for (final weekday in const ['일', '월', '화', '수', '목', '금', '토'])
+              Expanded(
+                child: Center(
+                  child: Text(
+                    weekday,
+                    style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        ),
+                  ),
+                ),
+              ),
           ],
         ),
         const SizedBox(height: AppSpacing.xs),
         GridView.count(
           crossAxisCount: 7,
-          childAspectRatio: 0.74,
-          crossAxisSpacing: 4,
-          mainAxisSpacing: 4,
+          childAspectRatio: 0.69,
+          crossAxisSpacing: 2,
+          mainAxisSpacing: 2,
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
           children: [
@@ -452,6 +498,7 @@ class _CalendarDayButton extends StatelessWidget {
     return Semantics(
       key: ValueKey('diary-day-$dateKey'),
       button: true,
+      selected: isSelected,
       label: semanticLabel,
       onTap: onTap,
       child: ExcludeSemantics(
@@ -461,50 +508,57 @@ class _CalendarDayButton extends StatelessWidget {
           child: InkWell(
             borderRadius: AppRadii.status,
             onTap: onTap,
-            child: Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  AnimatedContainer(
-                    duration: const Duration(milliseconds: 160),
-                    curve: Curves.easeOutCubic,
-                    width: 36,
-                    height: 36,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: isSelected
-                          ? colorScheme.primaryContainer
-                          : Colors.transparent,
-                    ),
-                    alignment: Alignment.center,
-                    child: FittedBox(
-                      fit: BoxFit.scaleDown,
-                      // 달력 칸은 반복되는 단위 텍스트를 덜어 화면 밀도를 낮춘다.
-                      child: Text(
-                        '${day.day}',
-                        maxLines: 1,
-                        softWrap: false,
-                        style: theme.textTheme.titleMedium?.copyWith(
-                          fontSize: 20,
-                          height: 1,
-                          fontWeight: FontWeight.w800,
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final indicatorSize =
+                    constraints.maxWidth < 44 ? constraints.maxWidth : 44.0;
+
+                return Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      AnimatedContainer(
+                        duration: const Duration(milliseconds: 160),
+                        curve: Curves.easeOutCubic,
+                        width: indicatorSize,
+                        height: indicatorSize,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
                           color: isSelected
-                              ? colorScheme.onPrimaryContainer
-                              : colorScheme.onSurface,
+                              ? colorScheme.primaryContainer
+                              : Colors.transparent,
+                        ),
+                        alignment: Alignment.center,
+                        child: FittedBox(
+                          fit: BoxFit.scaleDown,
+                          // 달력 칸은 반복되는 단위 텍스트를 덜어 화면 밀도를 낮춘다.
+                          child: Text(
+                            '${day.day}',
+                            maxLines: 1,
+                            softWrap: false,
+                            style: theme.textTheme.titleMedium?.copyWith(
+                              fontSize: 22,
+                              height: 1,
+                              fontWeight: FontWeight.w800,
+                              color: isSelected
+                                  ? colorScheme.onPrimaryContainer
+                                  : colorScheme.onSurface,
+                            ),
+                          ),
                         ),
                       ),
-                    ),
+                      if (count > 0) ...[
+                        const SizedBox(height: 3),
+                        _CalendarEntryMarker(
+                          key: ValueKey('diary-day-$dateKey-entry-marker'),
+                          isSelected: isSelected,
+                        ),
+                      ],
+                    ],
                   ),
-                  if (count > 0) ...[
-                    const SizedBox(height: 3),
-                    _CalendarEntryMarker(
-                      key: ValueKey('diary-day-$dateKey-entry-marker'),
-                      isSelected: isSelected,
-                    ),
-                  ],
-                ],
-              ),
+                );
+              },
             ),
           ),
         ),
