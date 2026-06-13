@@ -406,8 +406,8 @@ class _CalendarSection extends StatelessWidget {
         GridView.count(
           crossAxisCount: 7,
           childAspectRatio: 0.74,
-          crossAxisSpacing: 6,
-          mainAxisSpacing: 6,
+          crossAxisSpacing: 4,
+          mainAxisSpacing: 4,
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
           children: [
@@ -455,42 +455,56 @@ class _CalendarDayButton extends StatelessWidget {
       label: semanticLabel,
       onTap: onTap,
       child: ExcludeSemantics(
-        child: OutlinedButton(
-          style: OutlinedButton.styleFrom(
-            padding: EdgeInsets.zero,
-            backgroundColor: isSelected ? colorScheme.primaryContainer : null,
-            minimumSize: Size.zero,
-            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-          ),
-          onPressed: onTap,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 2),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                FittedBox(
-                  fit: BoxFit.scaleDown,
-                  child: Text(
-                    '${day.day}일',
-                    maxLines: 1,
-                    softWrap: false,
-                    style: theme.textTheme.labelMedium?.copyWith(
-                      fontWeight: FontWeight.w800,
+        // InkWell은 그리드 칸 전체를 터치 영역으로 쓰고, 화면에는 큰 숫자만 가볍게 남긴다.
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            borderRadius: AppRadii.status,
+            onTap: onTap,
+            child: Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  AnimatedContainer(
+                    duration: const Duration(milliseconds: 160),
+                    curve: Curves.easeOutCubic,
+                    width: 36,
+                    height: 36,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
                       color: isSelected
-                          ? colorScheme.onPrimaryContainer
-                          : colorScheme.onSurface,
+                          ? colorScheme.primaryContainer
+                          : Colors.transparent,
+                    ),
+                    alignment: Alignment.center,
+                    child: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      // 달력 칸은 반복되는 단위 텍스트를 덜어 화면 밀도를 낮춘다.
+                      child: Text(
+                        '${day.day}',
+                        maxLines: 1,
+                        softWrap: false,
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          fontSize: 20,
+                          height: 1,
+                          fontWeight: FontWeight.w800,
+                          color: isSelected
+                              ? colorScheme.onPrimaryContainer
+                              : colorScheme.onSurface,
+                        ),
+                      ),
                     ),
                   ),
-                ),
-                if (count > 0) ...[
-                  const SizedBox(height: 3),
-                  _CalendarEntryMarker(
-                    key: ValueKey('diary-day-$dateKey-entry-marker'),
-                    isSelected: isSelected,
-                  ),
+                  if (count > 0) ...[
+                    const SizedBox(height: 3),
+                    _CalendarEntryMarker(
+                      key: ValueKey('diary-day-$dateKey-entry-marker'),
+                      isSelected: isSelected,
+                    ),
+                  ],
                 ],
-              ],
+              ),
             ),
           ),
         ),
