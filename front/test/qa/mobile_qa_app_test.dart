@@ -3,8 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:maum_on_mobile_front/qa/mobile_qa_app.dart';
 
 void main() {
-  testWidgets('renders the authenticated QA app without network',
-      (tester) async {
+  testWidgets('인증된 QA 앱을 네트워크 없이 렌더링한다', (tester) async {
     await tester.pumpWidget(buildMobileQaApp());
     await tester.pumpAndSettle();
 
@@ -68,10 +67,11 @@ void main() {
 
     await tester.tap(find.byKey(mobileQaRouteKey('home')));
     await tester.pumpAndSettle();
-    await tester
-        .ensureVisible(find.byKey(const ValueKey('home-action-settings')));
+    await tester.ensureVisible(
+      find.byKey(const ValueKey('home-header-settings-button')),
+    );
     await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const ValueKey('home-action-settings')));
+    await tester.tap(find.byKey(const ValueKey('home-header-settings-button')));
     await tester.pumpAndSettle();
     expect(find.text('계정 설정'), findsOneWidget);
     expect(find.textContaining('관리자'), findsNothing);
