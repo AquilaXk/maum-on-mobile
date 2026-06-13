@@ -222,10 +222,13 @@ class _StatsSection extends StatelessWidget {
               runSpacing: AppSpacing.xs,
               children: [
                 for (final item in items)
-                  AppMetricTile(
-                    label: item.label,
-                    value: item.value,
-                    tone: item.tone,
+                  SizedBox(
+                    width: 148,
+                    child: _CompactHomeMetricTile(
+                      label: item.label,
+                      value: item.value,
+                      tone: item.tone,
+                    ),
                   ),
               ],
             );
@@ -274,44 +277,35 @@ class _CompactHomeMetricTile extends StatelessWidget {
 
     return Semantics(
       label: '$label $value',
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          color: colors.background,
-          borderRadius: AppRadii.card,
-          border: Border.all(
-            color: colors.foreground.withValues(alpha: 0.16),
-          ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.xxs,
+          vertical: AppSpacing.xs,
         ),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(
-            horizontal: AppSpacing.xs,
-            vertical: AppSpacing.sm,
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                label,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: theme.textTheme.labelSmall?.copyWith(
-                  color: colors.foreground.withValues(alpha: 0.78),
-                  fontWeight: FontWeight.w800,
-                ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              label,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: theme.textTheme.labelSmall?.copyWith(
+                color: colors.foreground.withValues(alpha: 0.72),
+                fontWeight: FontWeight.w800,
               ),
-              const SizedBox(height: AppSpacing.xxs),
-              Text(
-                value,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: theme.textTheme.titleLarge?.copyWith(
-                  color: colors.foreground,
-                  fontWeight: FontWeight.w900,
-                ),
+            ),
+            const SizedBox(height: AppSpacing.xxs),
+            Text(
+              value,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: theme.textTheme.titleLarge?.copyWith(
+                color: colors.foreground,
+                fontWeight: FontWeight.w900,
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
@@ -428,11 +422,12 @@ class _DraftContinuationSection extends StatelessWidget {
           AppListRow(
             rowKey: ValueKey('home-draft-${draft.surface.name}'),
             title: draft.title,
-            subtitle:
-                '${draft.surface.label} · ${draft.preview} · ${_formatDraftDate(draft.updatedAt)}',
-            statusLabel: draft.failed ? '전송 실패' : '임시 저장',
-            statusTone:
-                draft.failed ? AppStatusTone.warning : AppStatusTone.success,
+            subtitle: [
+              if (draft.failed) '전송 실패',
+              draft.surface.label,
+              draft.preview,
+              _formatDraftDate(draft.updatedAt),
+            ].join(' · '),
             leadingIcon: _draftIcon(draft.surface),
             trailingIcon: Icons.play_arrow,
             onTap: () => onContinue(draft.surface),
@@ -484,20 +479,23 @@ class _ActionGrid extends StatelessWidget {
           key: const ValueKey('home-primary-actions-panel'),
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            _HomePrimaryActionCard(
-              actionKey: const ValueKey('home-action-consultation'),
-              primaryKey: const ValueKey('home-action-consultation-primary'),
-              title: 'AI 상담',
-              subtitle: '지금 마음을 바로 정리하기',
-              icon: Icons.chat_bubble_outline,
-              onTap: onOpenConsultation,
-            ),
-            const SizedBox(height: AppSpacing.xs),
             Row(
               key: const ValueKey('home-primary-actions'),
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Expanded(
-                  child: _HomeActionCard(
+                  child: _HomeQuickActionButton(
+                    actionKey: const ValueKey('home-action-consultation'),
+                    surfaceKey:
+                        const ValueKey('home-action-consultation-primary'),
+                    title: 'AI 상담',
+                    icon: Icons.chat_bubble_outline,
+                    tone: AppStatusTone.warning,
+                    onTap: onOpenConsultation,
+                  ),
+                ),
+                Expanded(
+                  child: _HomeQuickActionButton(
                     actionKey: const ValueKey('home-action-diary'),
                     surfaceKey: const ValueKey('home-action-diary-surface'),
                     title: '기록',
@@ -506,9 +504,8 @@ class _ActionGrid extends StatelessWidget {
                     onTap: onWriteDiary,
                   ),
                 ),
-                const SizedBox(width: AppSpacing.xs),
                 Expanded(
-                  child: _HomeActionCard(
+                  child: _HomeQuickActionButton(
                     actionKey: const ValueKey('home-action-letter'),
                     surfaceKey: const ValueKey('home-action-letter-surface'),
                     title: '편지',
@@ -516,9 +513,8 @@ class _ActionGrid extends StatelessWidget {
                     onTap: onWriteLetter,
                   ),
                 ),
-                const SizedBox(width: AppSpacing.xs),
                 Expanded(
-                  child: _HomeActionCard(
+                  child: _HomeQuickActionButton(
                     actionKey: const ValueKey('home-action-story'),
                     surfaceKey: const ValueKey('home-action-story-surface'),
                     title: '스토리',
@@ -536,116 +532,8 @@ class _ActionGrid extends StatelessWidget {
   }
 }
 
-class _HomePrimaryActionCard extends StatelessWidget {
-  const _HomePrimaryActionCard({
-    required this.actionKey,
-    required this.primaryKey,
-    required this.title,
-    required this.subtitle,
-    required this.icon,
-    required this.onTap,
-  });
-
-  final Key actionKey;
-  final Key primaryKey;
-  final String title;
-  final String subtitle;
-  final IconData icon;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colors = _homeActionColors(
-      theme.colorScheme,
-      AppStatusTone.warning,
-    );
-
-    return Semantics(
-      button: true,
-      label: '$title, $subtitle',
-      onTap: onTap,
-      child: ExcludeSemantics(
-        child: DecoratedBox(
-          key: primaryKey,
-          decoration: BoxDecoration(
-            color: colors.background,
-            borderRadius: AppRadii.card,
-            border: Border.all(
-              color: colors.foreground.withValues(alpha: 0.16),
-            ),
-          ),
-          child: Material(
-            color: Colors.transparent,
-            child: InkWell(
-              key: actionKey,
-              borderRadius: AppRadii.card,
-              onTap: onTap,
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(minHeight: 76),
-                child: Padding(
-                  padding: const EdgeInsets.all(AppSpacing.md),
-                  child: Row(
-                    children: [
-                      DecoratedBox(
-                        decoration: BoxDecoration(
-                          color: colors.foreground.withValues(alpha: 0.12),
-                          borderRadius: AppRadii.chip,
-                        ),
-                        child: Padding(
-                          padding: const EdgeInsets.all(AppSpacing.sm),
-                          child: Icon(icon, color: colors.foreground, size: 24),
-                        ),
-                      ),
-                      const SizedBox(width: AppSpacing.md),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Text(
-                              title,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: theme.textTheme.titleMedium?.copyWith(
-                                color: colors.foreground,
-                                fontWeight: FontWeight.w900,
-                              ),
-                            ),
-                            const SizedBox(height: AppSpacing.xxs),
-                            Text(
-                              subtitle,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: theme.textTheme.bodySmall?.copyWith(
-                                color:
-                                    colors.foreground.withValues(alpha: 0.78),
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(width: AppSpacing.xs),
-                      Icon(
-                        Icons.arrow_forward,
-                        color: colors.foreground,
-                        size: 20,
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _HomeActionCard extends StatelessWidget {
-  const _HomeActionCard({
+class _HomeQuickActionButton extends StatelessWidget {
+  const _HomeQuickActionButton({
     required this.actionKey,
     required this.surfaceKey,
     required this.title,
@@ -671,53 +559,40 @@ class _HomeActionCard extends StatelessWidget {
       label: title,
       onTap: onTap,
       child: ExcludeSemantics(
-        child: DecoratedBox(
-          key: surfaceKey,
-          decoration: BoxDecoration(
-            color: colors.background,
-            borderRadius: AppRadii.card,
-            border: Border.all(
-              color: colors.foreground.withValues(alpha: 0.12),
-            ),
-          ),
-          child: Material(
-            color: Colors.transparent,
-            child: InkWell(
-              key: actionKey,
-              borderRadius: AppRadii.card,
-              onTap: onTap,
-              child: Padding(
-                padding: const EdgeInsets.all(AppSpacing.sm),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  children: [
-                    DecoratedBox(
-                      decoration: BoxDecoration(
-                        color: colors.foreground.withValues(alpha: 0.10),
-                        borderRadius: AppRadii.chip,
-                      ),
-                      child: Padding(
-                        padding: const EdgeInsets.all(AppSpacing.xs),
-                        child: Icon(icon, color: colors.foreground, size: 22),
-                      ),
-                    ),
-                    const SizedBox(width: AppSpacing.xs),
-                    Expanded(
-                      child: Text(
-                        title,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: theme.textTheme.titleSmall?.copyWith(
-                          color: colors.foreground,
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                    ),
-                  ],
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Material(
+              color: Colors.transparent,
+              shape: const CircleBorder(),
+              child: InkResponse(
+                key: actionKey,
+                onTap: onTap,
+                radius: 32,
+                containedInkWell: true,
+                customBorder: const CircleBorder(),
+                child: SizedBox.square(
+                  key: surfaceKey,
+                  dimension: 56,
+                  child: Icon(icon, color: colors.foreground, size: 26),
                 ),
               ),
             ),
-          ),
+            const SizedBox(height: AppSpacing.xxs),
+            Text(
+              title,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: theme.textTheme.labelLarge?.copyWith(
+                    color: colors.foreground,
+                    fontWeight: FontWeight.w800,
+                  ) ??
+                  TextStyle(
+                    color: colors.foreground,
+                    fontWeight: FontWeight.w800,
+                  ),
+            ),
+          ],
         ),
       ),
     );
@@ -740,11 +615,11 @@ class _CategoryFilter extends StatelessWidget {
       runSpacing: AppSpacing.xs,
       children: [
         for (final category in HomeStoryCategory.values)
-          ChoiceChip(
+          _HomeTextTab(
             key: ValueKey('home-category-${category.name}'),
-            label: Text(category.label),
+            label: category.label,
             selected: category == selectedCategory,
-            onSelected: (_) => onSelected(category),
+            onTap: () => onSelected(category),
           ),
       ],
     );
@@ -777,15 +652,82 @@ class _CategoryOverview extends StatelessWidget {
           runSpacing: AppSpacing.xs,
           children: [
             for (final summary in summaries)
-              ChoiceChip(
+              _HomeTextTab(
                 key: ValueKey('home-category-summary-${summary.category.name}'),
-                label: Text('${summary.label} ${summary.count}'),
+                label: '${summary.label} ${summary.count}',
                 selected: selectedCategory == summary.category,
-                onSelected: (_) => onSelected(summary.category),
+                onTap: () => onSelected(summary.category),
               ),
           ],
         ),
       ],
+    );
+  }
+}
+
+class _HomeTextTab extends StatelessWidget {
+  const _HomeTextTab({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+    super.key,
+  });
+
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final foreground =
+        selected ? colorScheme.primary : colorScheme.onSurfaceVariant;
+
+    return Semantics(
+      button: true,
+      selected: selected,
+      child: ExcludeSemantics(
+        child: InkWell(
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(
+              horizontal: AppSpacing.xs,
+              vertical: AppSpacing.xs,
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  label,
+                  style: theme.textTheme.titleSmall?.copyWith(
+                        color: foreground,
+                        fontWeight:
+                            selected ? FontWeight.w900 : FontWeight.w800,
+                      ) ??
+                      TextStyle(
+                        color: foreground,
+                        fontWeight:
+                            selected ? FontWeight.w900 : FontWeight.w800,
+                      ),
+                ),
+                const SizedBox(height: 2),
+                SizedBox(
+                  width: 18,
+                  height: 2,
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      color:
+                          selected ? colorScheme.primary : Colors.transparent,
+                      borderRadius: AppRadii.status,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
     );
   }
 }
@@ -813,8 +755,6 @@ class _PopularStorySection extends StatelessWidget {
             title: story.title,
             subtitle:
                 '${story.label} · ${story.nickname} · 조회 ${story.viewCount}',
-            statusLabel: story.label,
-            statusTone: AppStatusTone.success,
             leadingIcon: Icons.trending_up,
             trailingIcon: null,
             semanticLabel:
@@ -877,11 +817,13 @@ class _StoryCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
-    return Card(
+    return KeyedSubtree(
       key: ValueKey('home-feed-story-${story.id}'),
-      margin: EdgeInsets.zero,
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.xxs,
+          vertical: AppSpacing.sm,
+        ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -906,6 +848,11 @@ class _StoryCard extends StatelessWidget {
             Text(
               '${story.authorNickname} · 조회 ${story.viewCount}',
               style: theme.textTheme.bodySmall,
+            ),
+            const SizedBox(height: AppSpacing.sm),
+            Divider(
+              height: 1,
+              color: theme.colorScheme.outlineVariant.withValues(alpha: 0.72),
             ),
           ],
         ),
@@ -942,28 +889,22 @@ _HomeActionColors _homeActionColors(
   ColorScheme colorScheme,
   AppStatusTone tone,
 ) {
-  final isDark = colorScheme.brightness == Brightness.dark;
-
   return switch (tone) {
-    AppStatusTone.success => _HomeActionColors(
-        background: isDark ? const Color(0xFF1A4A5A) : const Color(0xFFEAF6FF),
-        foreground: isDark ? const Color(0xFFEAF6FF) : const Color(0xFF1F4D72),
+    AppStatusTone.success => const _HomeActionColors(
+        background: Color(0xFFEAF6FF),
+        foreground: Color(0xFF1F4D72),
       ),
-    AppStatusTone.warning => _HomeActionColors(
-        background: isDark ? const Color(0xFF244C79) : const Color(0xFFE8F1FF),
-        foreground: isDark ? const Color(0xFFDCEBFF) : const Color(0xFF244C8A),
+    AppStatusTone.warning => const _HomeActionColors(
+        background: Color(0xFFE8F1FF),
+        foreground: Color(0xFF244C8A),
       ),
     AppStatusTone.danger => _HomeActionColors(
         background: colorScheme.errorContainer,
         foreground: colorScheme.onErrorContainer,
       ),
     AppStatusTone.neutral => _HomeActionColors(
-        background: isDark
-            ? colorScheme.surfaceContainerHighest
-            : colorScheme.primaryContainer,
-        foreground: isDark
-            ? colorScheme.onSurfaceVariant
-            : colorScheme.onPrimaryContainer,
+        background: colorScheme.primaryContainer,
+        foreground: colorScheme.onPrimaryContainer,
       ),
   };
 }

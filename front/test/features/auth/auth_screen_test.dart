@@ -161,13 +161,12 @@ void main() {
     expect(overlay.value.statusBarBrightness, Brightness.light);
   });
 
-  testWidgets('matches login panel to the app surface in dark system mode',
-      (tester) async {
+  testWidgets('로그인 패널은 하늘색 라이트 표면을 유지한다', (tester) async {
     final repository = _FakeAuthRepository();
     await tester.pumpWidget(
       _AuthScreenHarness(
         repository: repository,
-        theme: buildDarkAppTheme(),
+        theme: buildAppTheme(),
       ),
     );
 
@@ -181,16 +180,16 @@ void main() {
         tester.element(find.byKey(const ValueKey('auth-form-panel')));
     final panelTheme = Theme.of(panelContext);
     expect(decoration.color, panelTheme.cardColor);
-    expect(panelTheme.colorScheme.brightness, Brightness.dark);
+    expect(panelTheme.colorScheme.brightness, Brightness.light);
+    expect(panelTheme.scaffoldBackgroundColor, AppBrandColors.backgroundBlue);
   });
 
-  testWidgets('keeps account deletion dialog on auth theme in dark system mode',
-      (tester) async {
+  testWidgets('계정 삭제 다이얼로그는 라이트 표면을 유지한다', (tester) async {
     final repository = _FakeAuthRepository();
     await tester.pumpWidget(
       _AuthScreenHarness(
         repository: repository,
-        theme: buildDarkAppTheme(),
+        theme: buildAppTheme(),
       ),
     );
 
@@ -205,8 +204,8 @@ void main() {
     );
     final dialogTheme = Theme.of(dialogContext);
 
-    expect(dialogTheme.colorScheme.brightness, Brightness.dark);
-    expect(dialogTheme.colorScheme.surface, AppBrandColors.darkSurfaceBlue);
+    expect(dialogTheme.colorScheme.brightness, Brightness.light);
+    expect(dialogTheme.colorScheme.surface, AppBrandColors.surface);
   });
 
   testWidgets('signup validates fields before calling the repository',

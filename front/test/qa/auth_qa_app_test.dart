@@ -53,8 +53,7 @@ void main() {
     expect(find.byKey(const ValueKey('signup-submit-button')), findsOneWidget);
   });
 
-  testWidgets('uses the shared dark app theme in dark system mode',
-      (tester) async {
+  testWidgets('시스템 다크 모드에서도 하늘색 라이트 인증 테마를 유지한다', (tester) async {
     tester.binding.platformDispatcher.platformBrightnessTestValue =
         Brightness.dark;
     addTearDown(
@@ -72,7 +71,7 @@ void main() {
       tester.element(find.byKey(const ValueKey('auth-form-panel'))),
     );
 
-    expect(shellDecoration.color, AppBrandColors.darkBackgroundBlue);
-    expect(panelTheme.colorScheme.brightness, Brightness.dark);
+    expect(shellDecoration.color, AppBrandColors.backgroundBlue);
+    expect(panelTheme.colorScheme.brightness, Brightness.light);
   });
 }

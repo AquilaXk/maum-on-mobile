@@ -32,9 +32,8 @@ import 'package:maum_on_mobile_front/features/story/domain/story_models.dart';
 import 'package:maum_on_mobile_front/theme/app_theme.dart';
 
 void main() {
-  testWidgets('uses high contrast selected tab foreground in dark mode',
-      (tester) async {
-    final theme = buildDarkAppTheme();
+  testWidgets('선택된 하단 탭은 단일 라이트 테마에서도 고대비로 표시한다', (tester) async {
+    final theme = buildAppTheme();
 
     await tester.pumpWidget(
       MaterialApp(
@@ -379,7 +378,7 @@ void main() {
             child: child!,
           );
         },
-        theme: buildDarkAppTheme(),
+        theme: buildAppTheme(),
         home: AuthenticatedAppShell(
           currentRoute: AuthenticatedRoute.home,
           onRouteSelected: (_) {},

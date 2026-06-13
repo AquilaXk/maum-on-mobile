@@ -17,10 +17,10 @@ void main() {
           themeMode: ThemeMode.light,
         ),
         _QualityVariant(
-          name: 'dark-mode',
+          name: 'fixed-light-theme',
           size: Size(390, 844),
           textScale: 1,
-          themeMode: ThemeMode.dark,
+          themeMode: ThemeMode.light,
         ),
         _QualityVariant(
           name: 'rotated-landscape',
@@ -60,7 +60,6 @@ Future<void> _pumpQualitySurface(
   await tester.pumpWidget(
     MaterialApp(
       theme: buildAppTheme(),
-      darkTheme: buildDarkAppTheme(),
       themeMode: variant.themeMode,
       builder: (context, child) {
         return MediaQuery(
