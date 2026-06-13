@@ -450,6 +450,20 @@ class AuthControllerTest @Autowired constructor(
         assertThat(query["code_challenge_method"]).isEqualTo("S256")
     }
 
+    @DisplayName("OIDC Provider 목록은 운영 연동이 준비된 Provider만 반환한다")
+    @Test
+    fun oidcProvidersExposeOnlyReadyProviders() {
+        mockMvc.get("/api/v1/auth/oidc/providers")
+            .andExpect {
+                status { isOk() }
+                jsonPath("$.success") { value(true) }
+                jsonPath("$.data.providers.length()") { value(3) }
+                jsonPath("$.data.providers[0].id") { value("kakao") }
+                jsonPath("$.data.providers[1].id") { value("google") }
+                jsonPath("$.data.providers[2].id") { value("apple") }
+            }
+    }
+
     @DisplayName("Apple OIDC authorize는 Apple endpoint, client id, scope를 사용한다")
     @Test
     fun oidcAuthorizeUsesAppleEndpointAndClientIdForAppleProvider() {

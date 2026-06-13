@@ -19,6 +19,8 @@ data class AuthOidcIdentity(
 
 interface AuthOidcIdentityProvider {
     fun verify(command: AuthOidcTokenCommand): AuthOidcIdentity
+
+    fun isReady(provider: String): Boolean = true
 }
 
 class AuthOidcVerificationException(

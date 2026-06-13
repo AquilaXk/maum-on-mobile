@@ -12,6 +12,7 @@ import '../core/network/secure_auth_token_store.dart';
 import '../features/auth/application/auth_controller.dart';
 import '../features/auth/data/auth_repository.dart';
 import '../features/auth/deeplink/external_login.dart';
+import '../features/auth/domain/login_provider_policy.dart';
 import '../features/auth/presentation/auth_screen.dart';
 import '../features/consultation/application/consultation_controller.dart';
 import '../features/consultation/data/consultation_repository.dart';
@@ -162,6 +163,7 @@ class _MaumOnMobileAppState extends State<MaumOnMobileApp>
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     Future<void>.microtask(_authController.restoreSession);
+    Future<void>.microtask(_authController.loadExternalLoginProviders);
     if (widget.listenForDeepLinks) {
       Future<void>.microtask(_bindDeepLinks);
     }
@@ -232,6 +234,7 @@ class _MaumOnMobileAppState extends State<MaumOnMobileApp>
               return AuthScreen(
                 controller: _authController,
                 externalLoginController: _externalLoginController,
+                loginProviders: _loginProvidersFor(state),
               );
             }
 
@@ -285,6 +288,17 @@ class _MaumOnMobileAppState extends State<MaumOnMobileApp>
           nickname: nickname,
         ),
     };
+  }
+
+  List<LoginProvider>? _loginProvidersFor(AuthState state) {
+    final providerIds = state.externalLoginProviderIds;
+    if (providerIds == null) {
+      return null;
+    }
+    return LoginProviderPolicy.providersFor(
+      defaultTargetPlatform,
+      enabledProviderIds: providerIds.join(','),
+    );
   }
 
   Widget _buildHomeRoute({

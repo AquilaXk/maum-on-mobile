@@ -10,6 +10,8 @@ import com.maumonmobile.application.port.`in`.OidcAuthorizeCommand
 import com.maumonmobile.application.port.`in`.OidcAuthorizeResult
 import com.maumonmobile.application.port.`in`.OidcCallbackCommand
 import com.maumonmobile.application.port.`in`.OidcCallbackResult
+import com.maumonmobile.application.port.`in`.OidcProviderListResult
+import com.maumonmobile.application.port.`in`.OidcProviderResult
 import com.maumonmobile.application.port.`in`.PasswordResetConfirmCommand
 import com.maumonmobile.application.port.`in`.PasswordResetConfirmResult
 import com.maumonmobile.application.port.`in`.PasswordResetRequestCommand
@@ -368,6 +370,20 @@ class AuthService(
         )
     }
 
+    override fun oidcProviders(): OidcProviderListResult {
+        val providers = OIDC_PROVIDER_PRESENTATIONS
+            .filter { provider -> provider.id in enabledOidcProviderSet }
+            .filter { provider -> oidcProviderIsReady(provider.id) }
+            .map { provider ->
+                OidcProviderResult(
+                    id = provider.id,
+                    label = provider.label,
+                )
+            }
+
+        return OidcProviderListResult(providers = providers)
+    }
+
     override fun completeOidcAppCallback(command: OidcAppCallbackCommand): AuthSessionResult {
         val provider = command.provider.normalizedProvider()
         val savedState = consumableOidcState(
@@ -604,6 +620,15 @@ class AuthService(
         }
     }
 
+    // authorizationEndpoint와 oidcClientIdFor로 필수 설정을 예외 기반으로 확인한 뒤 adapter readiness를 따른다.
+    private fun oidcProviderIsReady(provider: String): Boolean {
+        return runCatching {
+            authorizationEndpoint(provider)
+            oidcClientIdFor(provider)
+            authOidcIdentityProvider.isReady(provider)
+        }.getOrDefault(false)
+    }
+
     private fun providerAuthorizationUri(provider: String): String? {
         return when (provider) {
             NAVER_PROVIDER -> naverAuthorizationUri
@@ -782,10 +807,22 @@ class AuthService(
         private const val GOOGLE_PROVIDER = "google"
         private const val APPLE_PROVIDER = "apple"
         private const val PLACEHOLDER_PROVIDER_HOST = "login.maumon.local"
+        private val OIDC_PROVIDER_PRESENTATIONS = listOf(
+            OidcProviderPresentation(NAVER_PROVIDER, "네이버"),
+            OidcProviderPresentation(KAKAO_PROVIDER, "카카오"),
+            OidcProviderPresentation(FACEBOOK_PROVIDER, "Facebook"),
+            OidcProviderPresentation(GOOGLE_PROVIDER, "Google"),
+            OidcProviderPresentation(APPLE_PROVIDER, "Apple"),
+        )
         private val SIGNUP_CODE_PATTERN = Regex("^\\d{6}$")
         private val secureRandom = SecureRandom()
         private val log = LoggerFactory.getLogger(AuthService::class.java)
     }
+
+    private data class OidcProviderPresentation(
+        val id: String,
+        val label: String,
+    )
 }
 
 private fun AuthMember.toResult(): AuthMemberResult {

@@ -93,6 +93,18 @@ void main() {
       expect(controller.state.errorMessage, isNull);
     });
 
+    test('간편 로그인 Provider는 서버가 공개한 연동 목록만 보관한다', () async {
+      final controller = AuthController(
+        authRepository: _FakeAuthRepository(
+          oidcProviderIds: const ['kakao', 'unknown', 'apple'],
+        ),
+      );
+
+      await controller.loadExternalLoginProviders();
+
+      expect(controller.state.externalLoginProviderIds, ['kakao', 'apple']);
+    });
+
     test('logout clears authenticated state immediately', () async {
       final repository = _FakeAuthRepository(loginSession: _session());
       final controller = AuthController(authRepository: repository);
@@ -224,12 +236,14 @@ class _FakeAuthRepository implements AuthRepository {
     this.restoredSession,
     this.loginError,
     this.restoreError,
+    this.oidcProviderIds = const [],
   });
 
   final AuthSession? loginSession;
   final AuthSession? restoredSession;
   final Object? loginError;
   final Object? restoreError;
+  final List<String> oidcProviderIds;
   bool logoutCalled = false;
   int clearLocalSessionCount = 0;
   final List<SignupRequest> signupRequests = [];
@@ -299,6 +313,11 @@ class _FakeAuthRepository implements AuthRepository {
   @override
   Future<AuthSession> exchangeOidcSession(OidcSessionRequest request) {
     throw UnimplementedError();
+  }
+
+  @override
+  Future<List<String>> fetchOidcProviderIds() async {
+    return oidcProviderIds;
   }
 
   @override
