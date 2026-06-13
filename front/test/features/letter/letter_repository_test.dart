@@ -14,6 +14,7 @@ void main() {
           'resultCode': '200',
           'data': {
             'receivedCount': 2,
+            'randomReceiveAllowed': false,
             'latestReceivedLetter': {
               'id': 1,
               'title': '도착한 편지',
@@ -66,6 +67,7 @@ void main() {
       final detail = await repository.fetchLetter(3);
 
       expect(stats.receivedCount, 2);
+      expect(stats.randomReceiveAllowed, isFalse);
       expect(stats.latestSentLetter?.replied, isTrue);
       expect(list.items.single.status, LetterStatus.sent);
       expect(detail.status, LetterStatus.accepted);

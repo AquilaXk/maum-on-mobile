@@ -18,6 +18,7 @@ import com.maumonmobile.global.web.ApiException
 import com.maumonmobile.global.web.ErrorCode
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.catchThrowable
+import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Test
 import java.time.Duration
 import java.time.Instant
@@ -71,6 +72,21 @@ class LetterServiceTest {
 
         assertThat(fixture.letterRepository.findAll()).isEmpty()
         assertThat(fixture.notifications.records).isEmpty()
+    }
+
+    @Test
+    @DisplayName("편지 통계는 사용자의 랜덤 수신 설정을 함께 반환한다")
+    fun statsExposeRandomReceiveAllowed() {
+        val fixture = letterFixture()
+        val member = fixture.saveMember(
+            email = "stats-member@example.com",
+            nickname = "통계회원",
+            randomReceiveAllowed = false,
+        )
+
+        val stats = fixture.service.stats(member.toUser())
+
+        assertThat(stats.randomReceiveAllowed).isFalse()
     }
 
     @Test

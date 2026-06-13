@@ -18,6 +18,7 @@ void main() {
         statsQueue: [
           LetterStats(
             receivedCount: 2,
+            randomReceiveAllowed: false,
             latestReceivedLetter: _summary(id: 8, title: '최근 받은 편지'),
             latestSentLetter: _summary(id: 2, title: '최근 보낸 편지'),
           ),
@@ -54,6 +55,7 @@ void main() {
       findsOneWidget,
     );
     expect(find.text('받은 편지 2개'), findsOneWidget);
+    expect(find.text('랜덤 편지 차단'), findsOneWidget);
     expect(
       tester
           .getSize(find.byKey(const ValueKey('letter-mailbox-toolbar')))
@@ -192,6 +194,7 @@ void main() {
       statsQueue: [
         LetterStats(
           receivedCount: 1,
+          randomReceiveAllowed: true,
           latestReceivedLetter: _summary(id: 8, title: '최근 받은 편지'),
           latestSentLetter: _summary(id: 2, title: '최근 보낸 편지'),
         ),
@@ -700,6 +703,7 @@ LetterListPage _page(
 LetterStats _stats() {
   return LetterStats(
     receivedCount: 1,
+    randomReceiveAllowed: true,
     latestReceivedLetter: _summary(id: 1, title: '최근 받은 편지'),
     latestSentLetter: _summary(id: 2, title: '최근 보낸 편지'),
   );

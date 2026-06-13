@@ -89,6 +89,9 @@ class LetterService(
 
         return LetterStatsResult(
             receivedCount = receivedLetters.size,
+            randomReceiveAllowed = authMemberRepository.findById(memberId)
+                ?.randomReceiveAllowed
+                ?: false,
             latestReceivedLetter = receivedLetters.firstOrNull()?.toSummaryResult(memberId, authMemberRepository),
             latestSentLetter = sentLetters.firstOrNull()?.toSummaryResult(memberId, authMemberRepository),
         )

@@ -249,6 +249,12 @@ class _StatsSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final receivedCount = stats?.receivedCount ?? 0;
+    final randomReceiveAllowed = stats?.randomReceiveAllowed;
+    final randomReceiveLabel = switch (randomReceiveAllowed) {
+      true => '랜덤 편지 수신',
+      false => '랜덤 편지 차단',
+      null => '랜덤 편지 확인 중',
+    };
     final colorScheme = Theme.of(context).colorScheme;
     final theme = Theme.of(context);
 
@@ -329,7 +335,12 @@ class _StatsSection extends StatelessWidget {
                   label: '받은 편지 $receivedCount개',
                   tone: AppStatusTone.success,
                 ),
-                const AppStatusPill(label: '랜덤 편지 수신'),
+                AppStatusPill(
+                  label: randomReceiveLabel,
+                  tone: randomReceiveAllowed == true
+                      ? AppStatusTone.success
+                      : AppStatusTone.neutral,
+                ),
               ],
             ),
           ],

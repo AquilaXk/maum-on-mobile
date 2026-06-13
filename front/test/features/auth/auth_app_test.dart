@@ -164,7 +164,12 @@ void main() {
           ],
         ),
         letterRepository: _FakeLetterRepository(
-          statsQueue: const [LetterStats(receivedCount: 1)],
+          statsQueue: const [
+            LetterStats(
+              receivedCount: 1,
+              randomReceiveAllowed: true,
+            ),
+          ],
           receivedPages: const [
             LetterListPage(
               items: [
@@ -631,7 +636,10 @@ void main() {
         storyRepository: _FakeStoryRepository(),
         letterRepository: _FakeLetterRepository(
           statsQueue: [
-            const LetterStats(receivedCount: 1),
+            const LetterStats(
+              receivedCount: 1,
+              randomReceiveAllowed: true,
+            ),
           ],
           receivedPages: [
             const LetterListPage(
@@ -1660,7 +1668,10 @@ class _FakeStoryRepository implements StoryRepository {
 class _FakeLetterRepository implements LetterRepository {
   _FakeLetterRepository({
     List<LetterStats> statsQueue = const [
-      LetterStats(receivedCount: 0),
+      LetterStats(
+        receivedCount: 0,
+        randomReceiveAllowed: true,
+      ),
     ],
     List<LetterListPage> receivedPages = const [
       LetterListPage(
@@ -1753,7 +1764,10 @@ class _FakeLetterRepository implements LetterRepository {
   @override
   Future<LetterStats> fetchStats() async {
     return _statsQueue.isEmpty
-        ? const LetterStats(receivedCount: 0)
+        ? const LetterStats(
+            receivedCount: 0,
+            randomReceiveAllowed: true,
+          )
         : _statsQueue.removeAt(0);
   }
 
