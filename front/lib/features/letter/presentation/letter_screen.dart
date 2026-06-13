@@ -367,7 +367,7 @@ class _LetterCard extends StatelessWidget {
       key: ValueKey('letter-card-${letter.id}'),
       leadingIcon: Icons.mail_outline,
       title: letter.title.isEmpty ? '제목 없는 편지' : letter.title,
-      subtitle: letter.createdDate,
+      subtitle: _formatLetterTimestamp(letter.createdDate),
       badges: [_StatusPill(status: letter.status)],
       content: letter.content.isEmpty
           ? null
@@ -426,7 +426,7 @@ class _LetterDetailView extends StatelessWidget {
           key: const ValueKey('letter-detail-card'),
           leadingIcon: Icons.mail_outline,
           title: letter.title,
-          subtitle: letter.createdDate,
+          subtitle: _formatLetterTimestamp(letter.createdDate),
           badges: [_StatusPill(status: letter.status)],
           content: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -790,4 +790,21 @@ extension _LetterStatusPresentation on LetterStatus {
       LetterStatus.replied => AppStatusTone.success,
     };
   }
+}
+
+String _formatLetterTimestamp(String value) {
+  final parsed = DateTime.tryParse(value);
+  if (parsed == null) {
+    return value;
+  }
+
+  final local = parsed.toLocal();
+  String twoDigits(int number) => number.toString().padLeft(2, '0');
+
+  // 편지 목록은 감정적인 맥락을 훑는 화면이라 ISO 구분자는 덜어낸다.
+  return '${local.year}.'
+      '${twoDigits(local.month)}.'
+      '${twoDigits(local.day)} '
+      '${twoDigits(local.hour)}:'
+      '${twoDigits(local.minute)}';
 }
