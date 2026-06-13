@@ -242,7 +242,7 @@ void main() {
           controller.state.messages.last.role, ConsultationMessageRole.system);
       expect(controller.state.messages.last.content, contains('119'));
 
-      repository.recentMessagesAfterDelete = [
+      repository.latestRecentMessages = [
         ConsultationMessage(
           id: 'remote-safe',
           role: ConsultationMessageRole.assistant,
@@ -600,7 +600,46 @@ void main() {
       );
     });
 
-    test('ignores late response chunks after response timeout', () async {
+    test('응답 지연 후 재연결하면 서버 상담 답변을 다시 불러온다', () async {
+      final repository = _FakeConsultationRepository();
+      final controller = ConsultationController(
+        repository: repository,
+        responseTimeout: Duration.zero,
+        reconnectBackoffDelays: const [Duration.zero],
+      );
+
+      await controller.connect();
+      repository.emit(const ConsultationStreamEvent.connect('connected'));
+      controller.updateDraft('서버 답변이 늦게 저장될 수 있어요');
+      await controller.submitMessage();
+      repository.latestRecentMessages = [
+        ConsultationMessage(
+          id: 'remote-user-late',
+          role: ConsultationMessageRole.user,
+          content: '서버 답변이 늦게 저장될 수 있어요',
+          createdAt: DateTime.parse('2026-05-25T00:00:00Z'),
+        ),
+        ConsultationMessage(
+          id: 'remote-assistant-late',
+          role: ConsultationMessageRole.assistant,
+          content: '늦게 저장된 답변을 다시 보여드릴게요.',
+          createdAt: DateTime.parse('2026-05-25T00:00:01Z'),
+        ),
+      ];
+
+      await Future<void>.delayed(Duration.zero);
+      await Future<void>.delayed(Duration.zero);
+
+      expect(repository.connectCount, 2);
+      expect(repository.loadRecentCount, 2);
+      expect(controller.state.messages.last.id, 'remote-assistant-late');
+      expect(controller.state.messages.last.content, '늦게 저장된 답변을 다시 보여드릴게요.');
+      expect(controller.state.isStreaming, isFalse);
+      expect(controller.state.connectionState,
+          ConsultationConnectionState.connecting);
+    });
+
+    test('응답 타임아웃 뒤 늦은 스트림 조각은 새 답변으로 붙이지 않는다', () async {
       final repository = _FakeConsultationRepository();
       final controller = ConsultationController(
         repository: repository,
@@ -628,7 +667,7 @@ void main() {
       );
       expect(repository.cancelCount, 1);
       expect(repository.connectCount, 2);
-      expect(repository.loadRecentCount, 1);
+      expect(repository.loadRecentCount, 2);
       expect(controller.state.isStreaming, isFalse);
       expect(controller.state.canSubmit, isTrue);
     });
@@ -715,7 +754,7 @@ class _FakeConsultationRepository implements ConsultationRepository {
   int cancelCount = 0;
   int loadRecentCount = 0;
   int deleteSensitiveCount = 0;
-  List<ConsultationMessage>? recentMessagesAfterDelete;
+  List<ConsultationMessage>? latestRecentMessages;
   final List<StreamController<ConsultationStreamEvent>> streamControllers = [];
   StreamController<ConsultationStreamEvent>? _controller;
 
@@ -748,7 +787,7 @@ class _FakeConsultationRepository implements ConsultationRepository {
   @override
   Future<List<ConsultationMessage>> loadRecentMessages() async {
     loadRecentCount += 1;
-    return recentMessagesAfterDelete ?? recentMessages;
+    return latestRecentMessages ?? recentMessages;
   }
 
   @override

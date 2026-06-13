@@ -358,11 +358,11 @@ class ConsultationController extends ChangeNotifier {
   }) async {
     try {
       final result = await _repository.sendMessage(content).timeout(
-            _sendTimeout,
-            onTimeout: () {
-              throw TimeoutException('consultation send timed out');
-            },
-          );
+        _sendTimeout,
+        onTimeout: () {
+          throw TimeoutException('consultation send timed out');
+        },
+      );
       final safety = result.safety;
       if (safety != null && safety.blocksConversation) {
         await _draftRepository?.delete(_draftKey);
@@ -996,7 +996,8 @@ class ConsultationController extends ChangeNotifier {
     _scheduleReconnect(
       message,
       appendNotice: false,
-      reloadRecentMessages: false,
+      // 서버 답변이 늦게 저장된 경우 재연결 시 최근 기록으로 화면을 복구한다.
+      reloadRecentMessages: true,
     );
   }
 
@@ -1018,8 +1019,7 @@ String _mergeAssistantChunkContent(String current, String chunk) {
 }
 
 bool _hasBoundarySpacing(String current, String chunk) {
-  return current[current.length - 1].trim().isEmpty ||
-      chunk[0].trim().isEmpty;
+  return current[current.length - 1].trim().isEmpty || chunk[0].trim().isEmpty;
 }
 
 bool _endsWithSentencePunctuation(String value) {
