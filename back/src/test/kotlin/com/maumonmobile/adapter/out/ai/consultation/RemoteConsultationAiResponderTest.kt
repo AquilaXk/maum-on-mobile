@@ -8,6 +8,7 @@ import com.maumonmobile.domain.consultation.ConsultationMessage
 import com.maumonmobile.domain.consultation.ConsultationMessageSender
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
+import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Test
 import tools.jackson.databind.ObjectMapper
 import java.net.URI
@@ -16,6 +17,7 @@ import java.time.Duration
 class RemoteConsultationAiResponderTest {
 
     @Test
+    @DisplayName("Gemini 2.5 Flash 요청은 최소 세 개 상담 단락 스키마를 사용한다")
     fun sendsVertexGenerateContentRequestToGeminiFlashModel() {
         val client = RecordingVertexAiGenerateContentClient(
             responseBody = vertexResponse("""{"chunks":[" $VALID_REPLY ","$VALID_REPLY_ALT"]}"""),
@@ -60,8 +62,8 @@ class RemoteConsultationAiResponderTest {
         val responseSchema = requestJson["generationConfig"]["responseSchema"]
         val chunksSchema = responseSchema["properties"]["chunks"]
         assertThat(responseSchema.toString())
-            .contains("\"chunks\"", "\"array\"", "\"string\"", "Two to five")
-        assertThat(chunksSchema["minItems"].asInt()).isEqualTo(2)
+            .contains("\"chunks\"", "\"array\"", "\"string\"", "Three to five")
+        assertThat(chunksSchema["minItems"].asInt()).isEqualTo(3)
         assertThat(chunksSchema["maxItems"].asInt()).isEqualTo(5)
         assertThat(chunksSchema["items"]["description"].asString())
             .contains("24자 이상", "420자 이하")
@@ -106,7 +108,7 @@ class RemoteConsultationAiResponderTest {
             .contains(
                 "마음 온",
                 "다정하고 따뜻한 공감 상담사",
-                "chunks 배열은 2~5개",
+                "chunks 배열은 3~5개",
                 "마크다운",
                 "의학적 진단을 대신하지",
                 "요즘 마음이 지쳤어요.",
@@ -580,6 +582,54 @@ class RemoteConsultationAiResponderTest {
                 "USER 입력의 구체 장면이나 신체 반응을 최소 1개 반영했는가",
                 "최근 답변 반복 금지 소재와 겹치면 다시 작성",
                 "고정 위로 문장으로 시작하지 않았는가",
+            )
+    }
+
+    @Test
+    @DisplayName("상담 프롬프트는 내부 작업 단계와 품질 루브릭으로 깊이 있는 답변을 요구한다")
+    fun promptRequiresInternalPlanningRubricAndThreePartAnswerShape() {
+        val client = RecordingVertexAiGenerateContentClient(
+            responseBody = vertexResponse("""{"chunks":["$VALID_REPLY"]}"""),
+        )
+        val responder = RemoteConsultationAiResponder(
+            properties = aiProperties(),
+            objectMapper = ObjectMapper(),
+            accessTokenProvider = { "vertex-token" },
+            generateContentClient = client,
+        )
+
+        responder.generate(
+            ConsultationAiRequest(
+                memberId = 32L,
+                message = "연인과 다투고 나서 내가 전부 망친 것 같아서 잠도 안 오고 계속 사과해야 하나 고민돼요.",
+                recentMessages = listOf(
+                    ConsultationMessage(
+                        id = 100L,
+                        memberId = 32L,
+                        sender = ConsultationMessageSender.ASSISTANT,
+                        content = "오늘은 생각을 잠시 멈추고 따뜻한 물을 마셔보세요.",
+                        createdAt = "2026-05-25T00:00:00Z",
+                    ),
+                ),
+                timeout = Duration.ofSeconds(2),
+            ),
+        )
+
+        val prompt = ObjectMapper()
+            .readTree(client.requestBody!!)["contents"][0]["parts"][0]["text"]
+            .asString()
+
+        assertThat(prompt)
+            .contains(
+                "내부 작업 단계",
+                "사례 개념화 메모",
+                "사용자에게 보이지 않는 상담 계획",
+                "답변 품질 루브릭",
+                "구체성, 정서 정확도, 개입 적합성, 반복 회피, 안전 경계",
+                "chunks는 3~5개",
+                "첫 chunk는 공감과 장면 반영",
+                "중간 chunk는 사례 개념화와 상담 렌즈",
+                "마지막 chunk는 작은 행동 1개와 질문 1개",
             )
     }
 
