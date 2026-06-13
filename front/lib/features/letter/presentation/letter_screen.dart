@@ -313,14 +313,16 @@ class _StatsSection extends StatelessWidget {
                       ),
                   ],
                 ),
-                TextButton.icon(
-                  key: const ValueKey('letter-receive-settings'),
-                  onPressed: onOpenRandomReceiveSettings,
-                  icon: const Icon(Icons.tune, size: 18),
-                  label: const Text('수신 설정'),
-                  style: TextButton.styleFrom(
-                    visualDensity: VisualDensity.compact,
-                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                Tooltip(
+                  message: '랜덤 편지 수신 설정 열기',
+                  child: TextButton.icon(
+                    key: const ValueKey('letter-receive-settings'),
+                    onPressed: onOpenRandomReceiveSettings,
+                    icon: const Icon(Icons.tune, size: 18),
+                    label: const Text('수신 설정'),
+                    style: TextButton.styleFrom(
+                      visualDensity: VisualDensity.compact,
+                    ),
                   ),
                 ),
               ],

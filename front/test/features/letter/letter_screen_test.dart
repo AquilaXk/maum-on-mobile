@@ -57,12 +57,14 @@ void main() {
     expect(find.text('받은 편지 2개'), findsOneWidget);
     expect(find.text('랜덤 편지 차단'), findsOneWidget);
     expect(
+      // 390x640 고정 뷰포트에서 상단 요약이 목록 영역을 과하게 밀어내지 않는 높이 기준이다.
       tester
           .getSize(find.byKey(const ValueKey('letter-mailbox-toolbar')))
           .height,
       lessThanOrEqualTo(150),
     );
     expect(
+      // 390x640 고정 뷰포트에서 첫 편지 카드가 첫 화면에 보여야 하는 y 위치 기준이다.
       tester.getTopLeft(find.byKey(const ValueKey('letter-card-1'))).dy,
       lessThan(560),
     );
