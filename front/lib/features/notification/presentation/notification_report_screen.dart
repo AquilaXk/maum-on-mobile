@@ -618,7 +618,7 @@ class _NotificationTile extends StatelessWidget {
                       if (notification.createdAt.isNotEmpty) ...[
                         const SizedBox(height: AppSpacing.xxs),
                         Text(
-                          notification.createdAt,
+                          _formatNotificationTimestamp(notification.createdAt),
                           style: Theme.of(context).textTheme.bodySmall,
                         ),
                       ],
@@ -709,6 +709,22 @@ AppStatusTone _notificationDestinationTone(NotificationItem notification) {
     NotificationTapDestination.notifications => AppStatusTone.neutral,
     _ => AppStatusTone.success,
   };
+}
+
+String _formatNotificationTimestamp(String value) {
+  final parsed = DateTime.tryParse(value.trim());
+  if (parsed == null) {
+    return value;
+  }
+
+  final local = parsed.toLocal();
+  final year = local.year.toString().padLeft(4, '0');
+  final month = local.month.toString().padLeft(2, '0');
+  final day = local.day.toString().padLeft(2, '0');
+  final hour = local.hour.toString().padLeft(2, '0');
+  final minute = local.minute.toString().padLeft(2, '0');
+  // 알림 목록은 짧게 훑어보는 화면이라 초 단위와 ISO 구분자는 덜어낸다.
+  return '$year.$month.$day $hour:$minute';
 }
 
 class _ReportForm extends StatelessWidget {
