@@ -148,6 +148,32 @@ void main() {
     expect(find.byKey(const ValueKey('letter-reject-button')), findsOneWidget);
   });
 
+  testWidgets('편지 목록과 상세는 ISO 원문 대신 읽기 쉬운 시간을 보여준다', (tester) async {
+    final repository = _FakeLetterRepository(
+      statsQueue: [_stats()],
+      receivedPages: [
+        _page([_summary(id: 1, title: '도착한 편지')]),
+      ],
+      details: [_detail(id: 1, status: LetterStatus.sent)],
+    );
+    final controller = LetterController(letterRepository: repository);
+
+    await tester.pumpWidget(
+      MaterialApp(home: LetterScreen(controller: controller, onBack: () {})),
+    );
+    await tester.pumpAndSettle();
+
+    expect(_visibleText(tester), contains('2026.05.24 08:00'));
+    expect(_visibleText(tester), isNot(contains('2026-05-24T08:00:00')));
+
+    await tester.ensureVisible(find.byKey(const ValueKey('letter-card-1')));
+    await tester.tap(find.byKey(const ValueKey('letter-card-1')));
+    await tester.pumpAndSettle();
+
+    expect(_visibleText(tester), contains('2026.05.24 08:00'));
+    expect(_visibleText(tester), isNot(contains('2026-05-24T08:00:00')));
+  });
+
   testWidgets('renders mailbox state controls and opens receive settings',
       (tester) async {
     var settingsOpenCount = 0;
@@ -684,6 +710,14 @@ void main() {
     expect(find.text('답장'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
+}
+
+String _visibleText(WidgetTester tester) {
+  return tester
+      .widgetList<Text>(find.byType(Text))
+      .map((text) => text.data ?? '')
+      .join('\n')
+      .replaceAll('\u{200B}', '');
 }
 
 LetterListPage _page(
