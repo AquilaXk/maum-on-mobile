@@ -349,6 +349,33 @@ void main() {
     expect(repository.connectCount, 2);
   });
 
+  testWidgets('상담 재연결 버튼은 모바일 터치 영역을 유지한다', (tester) async {
+    final repository = _FakeConsultationRepository();
+    final controller = ConsultationController(
+      repository: repository,
+      reconnectBackoffDelays: const [],
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: ConsultationScreen(
+          controller: controller,
+          onBack: () {},
+        ),
+      ),
+    );
+    await tester.pump();
+    repository.emitError(Exception('closed'));
+    await tester.pump();
+
+    final reconnectButtonSize = tester.getSize(
+      find.byKey(const ValueKey('consultation-reconnect-button')),
+    );
+
+    expect(reconnectButtonSize.width, greaterThanOrEqualTo(48));
+    expect(reconnectButtonSize.height, greaterThanOrEqualTo(48));
+  });
+
   testWidgets('shows retry and delete actions for a failed send',
       (tester) async {
     final repository = _FakeConsultationRepository()

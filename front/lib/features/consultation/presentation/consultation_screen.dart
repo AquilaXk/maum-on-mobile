@@ -447,7 +447,7 @@ class _ConsultationStatusToolbar extends StatelessWidget {
             if (state.connectionState == ConsultationConnectionState.error) ...[
               const SizedBox(width: AppSpacing.xs),
               SizedBox.square(
-                dimension: 40,
+                dimension: 48,
                 child: IconButton.filledTonal(
                   key: const ValueKey('consultation-reconnect-button'),
                   tooltip: 'AI 상담 다시 연결',
