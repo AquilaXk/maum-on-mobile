@@ -161,6 +161,37 @@ void main() {
     expect(find.textContaining('maum-on-data-export-1.json'), findsWidgets);
   });
 
+  testWidgets('설정 화면 계정 영역에서 로그아웃을 실행한다', (tester) async {
+    var logoutCount = 0;
+    final repository = _FakeSettingsRepository();
+    final controller = SettingsController(repository: repository);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: SettingsScreen(
+          controller: controller,
+          onBack: () {},
+          onLogout: () => logoutCount += 1,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('로그아웃'), findsOneWidget);
+    expect(
+      find.descendant(
+        of: find.byKey(const ValueKey('settings-account-toolbar')),
+        matching: find.byKey(const ValueKey('settings-logout-button')),
+      ),
+      findsOneWidget,
+    );
+
+    await tester.tap(find.byKey(const ValueKey('settings-logout-button')));
+    await tester.pumpAndSettle();
+
+    expect(logoutCount, 1);
+  });
+
   testWidgets('confirms withdrawal and clears session', (tester) async {
     var cleaned = false;
     final repository = _FakeSettingsRepository();

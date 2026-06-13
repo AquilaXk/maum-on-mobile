@@ -79,7 +79,9 @@ void main() {
 
     expect(find.byKey(const ValueKey('route-tab-home')), findsOneWidget);
     expect(find.text('마음이님, 오늘의 마음을 이어가세요.'), findsNothing);
-    expect(find.text('로그아웃'), findsOneWidget);
+    expect(find.byKey(const ValueKey('home-header-settings-button')),
+        findsOneWidget);
+    expect(find.text('로그아웃'), findsNothing);
   });
 
   testWidgets('syncs the home notification badge and read state',
@@ -102,9 +104,10 @@ void main() {
 
     await tester.pumpAndSettle();
 
-    expect(find.textContaining('읽지 않은 알림 1개'), findsOneWidget);
+    expect(find.byTooltip('읽지 않은 알림 1'), findsOneWidget);
 
-    await _tapVisibleText(tester, '알림/신고');
+    await _tapVisibleKey(
+        tester, const ValueKey('home-header-notification-button'));
     await tester.pumpAndSettle();
     await tester
         .ensureVisible(find.byKey(const ValueKey('notification-card-1')));
@@ -118,7 +121,7 @@ void main() {
     await _returnHome(tester);
 
     expect(notificationRepository.ticketRequestCount, 1);
-    expect(find.textContaining('읽지 않은 알림 없음'), findsOneWidget);
+    expect(find.byTooltip('알림/신고'), findsOneWidget);
   });
 
   testWidgets('runs the authenticated mobile smoke flow without network',
@@ -218,7 +221,8 @@ void main() {
     expect(find.text('AI 상담 연결됨'), findsOneWidget);
     await _returnHome(tester);
 
-    await _tapVisibleText(tester, '알림/신고');
+    await _tapVisibleKey(
+        tester, const ValueKey('home-header-notification-button'));
     await tester.pump();
     notificationRepository.emit(
       const NotificationStreamEvent.connect('connected'),
@@ -228,7 +232,7 @@ void main() {
     expect(find.text('연결됨'), findsOneWidget);
     await _returnHome(tester);
 
-    await _tapVisibleText(tester, '설정');
+    await _tapVisibleKey(tester, const ValueKey('home-header-settings-button'));
     expect(find.text('계정 설정'), findsOneWidget);
     expect(
       find.descendant(
@@ -719,9 +723,12 @@ void main() {
     );
 
     await tester.pumpAndSettle();
-    await tester.ensureVisible(find.text('알림/신고'));
+    await tester.ensureVisible(
+      find.byKey(const ValueKey('home-header-notification-button')),
+    );
     await tester.pumpAndSettle();
-    await tester.tap(find.text('알림/신고'));
+    await tester
+        .tap(find.byKey(const ValueKey('home-header-notification-button')));
     await tester.pump();
     notificationRepository.emit(
       const NotificationStreamEvent.connect('연결되었습니다!'),
@@ -900,6 +907,7 @@ void main() {
           ),
         ),
         reportRepository: _FakeReportRepository(),
+        settingsRepository: _FakeSettingsRepository(),
         diaryRepository: _FakeDiaryRepository(),
         diaryImagePicker: const _FakeDiaryImagePicker(),
         storyRepository: _FakeStoryRepository(),
@@ -909,16 +917,23 @@ void main() {
     );
 
     await tester.pumpAndSettle();
-    await tester.ensureVisible(find.text('알림/신고'));
-    await tester.tap(find.text('알림/신고'));
+    await tester.ensureVisible(
+      find.byKey(const ValueKey('home-header-notification-button')),
+    );
+    await tester
+        .tap(find.byKey(const ValueKey('home-header-notification-button')));
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey('notification-push-button')));
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey('route-tab-home')));
     await tester.pumpAndSettle();
-    final logoutAction = find.byKey(const ValueKey('home-action-logout'));
+    await tester.tap(find.byKey(const ValueKey('home-header-settings-button')));
+    await tester.pump();
+    expect(find.text('계정 설정'), findsOneWidget);
+    final logoutAction = find.byKey(const ValueKey('settings-logout-button'));
+    await _pumpUntilFound(tester, logoutAction);
     await tester.ensureVisible(logoutAction);
-    await tester.pumpAndSettle();
+    await tester.pump();
     await tester.tap(logoutAction);
     await tester.pumpAndSettle();
 
@@ -945,8 +960,10 @@ void main() {
     );
 
     await tester.pumpAndSettle();
-    await tester.ensureVisible(find.text('설정'));
-    await tester.tap(find.text('설정'));
+    await tester.ensureVisible(
+      find.byKey(const ValueKey('home-header-settings-button')),
+    );
+    await tester.tap(find.byKey(const ValueKey('home-header-settings-button')));
     await tester.pumpAndSettle();
 
     expect(find.text('계정 설정'), findsOneWidget);
@@ -1097,20 +1114,24 @@ void main() {
   });
 }
 
-Future<void> _tapVisibleText(WidgetTester tester, String text) async {
-  final finder = find.text(text);
-  await tester.ensureVisible(finder);
-  await tester.pumpAndSettle();
-  await tester.tap(finder);
-  await tester.pumpAndSettle();
-}
-
 Future<void> _tapVisibleKey(WidgetTester tester, Key key) async {
   final finder = find.byKey(key);
   await tester.ensureVisible(finder);
   await tester.pumpAndSettle();
   await tester.tap(finder);
   await tester.pumpAndSettle();
+}
+
+Future<void> _pumpUntilFound(WidgetTester tester, Finder finder) async {
+  // 화면 전환 직후 비동기 로드로 생기는 위젯은 settle 대신 조건으로 기다린다.
+  for (var attempt = 0; attempt < 20; attempt += 1) {
+    await tester.pump(const Duration(milliseconds: 50));
+    if (finder.evaluate().isNotEmpty) {
+      return;
+    }
+  }
+
+  expect(finder, findsOneWidget);
 }
 
 Future<void> _returnHome(WidgetTester tester) async {
