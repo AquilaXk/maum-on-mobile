@@ -56,6 +56,35 @@ void main() {
     );
   });
 
+  testWidgets('상담 상태 영역은 첫 화면 대화를 밀어내지 않는 얇은 스트립이다', (tester) async {
+    tester.view.physicalSize = const Size(390, 640);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    final repository = _FakeConsultationRepository();
+    final controller = ConsultationController(repository: repository);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: ConsultationScreen(
+          controller: controller,
+          onBack: () {},
+        ),
+      ),
+    );
+    await tester.pump();
+    repository.emit(const ConsultationStreamEvent.connect('connected'));
+    await tester.pump();
+
+    expect(find.text('AI 상담 상태'), findsNothing);
+
+    final toolbarSize = tester.getSize(
+      find.byKey(const ValueKey('consultation-status-toolbar')),
+    );
+    expect(toolbarSize.height, lessThanOrEqualTo(72));
+  });
+
   testWidgets('renders chat stream and sends a message', (tester) async {
     final repository = _FakeConsultationRepository();
     final controller = ConsultationController(repository: repository);
