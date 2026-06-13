@@ -214,62 +214,83 @@ class _StoryDiscoveryStrip extends StatelessWidget {
   Widget build(BuildContext context) {
     final storyCountLabel = '${state.stories.length}개의 스토리';
     final colorScheme = Theme.of(context).colorScheme;
+    final theme = Theme.of(context);
 
-    return Card(
+    return DecoratedBox(
       key: const ValueKey('story-discovery-strip'),
-      margin: EdgeInsets.zero,
+      decoration: BoxDecoration(
+        color: colorScheme.surface.withValues(alpha: 0.52),
+        borderRadius: AppRadii.card,
+        border: Border.all(
+          color: colorScheme.outlineVariant.withValues(alpha: 0.72),
+        ),
+      ),
       child: Padding(
         padding: const EdgeInsets.all(AppSpacing.md),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            AppInlineSectionHeader(
-              icon: Icons.travel_explore_outlined,
-              title: '이야기 찾기',
-              trailing: AppStatusPill(
-                label: storyCountLabel,
-                tone: state.stories.isEmpty
-                    ? AppStatusTone.neutral
-                    : AppStatusTone.success,
-              ),
-            ),
-            const SizedBox(height: AppSpacing.sm),
-            TextField(
-              key: const ValueKey('story-search-field'),
-              decoration: const InputDecoration(
-                labelText: '제목 검색',
-                prefixIcon: Icon(Icons.search),
-                border: OutlineInputBorder(),
-              ),
-              onChanged: controller.updateSearchQuery,
-              onSubmitted: (_) {
-                if (!state.isListLoading) {
-                  controller.loadStories();
-                }
-              },
-            ),
-            const SizedBox(height: AppSpacing.sm),
-            Wrap(
-              spacing: AppSpacing.xs,
-              runSpacing: AppSpacing.xs,
-              crossAxisAlignment: WrapCrossAlignment.center,
+            Row(
               children: [
-                FilledButton.icon(
+                Icon(
+                  Icons.travel_explore_outlined,
+                  size: 20,
+                  color: colorScheme.primary,
+                ),
+                const SizedBox(width: AppSpacing.xs),
+                Expanded(
+                  child: Text(
+                    '이야기 찾기',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
+                AppStatusPill(
+                  label: storyCountLabel,
+                  tone: state.stories.isEmpty
+                      ? AppStatusTone.neutral
+                      : AppStatusTone.success,
+                ),
+              ],
+            ),
+            const SizedBox(height: AppSpacing.xs),
+            Row(
+              key: const ValueKey('story-search-toolbar'),
+              children: [
+                Expanded(
+                  child: TextField(
+                    key: const ValueKey('story-search-field'),
+                    decoration: const InputDecoration(
+                      hintText: '제목 검색',
+                      prefixIcon: Icon(Icons.search),
+                      isDense: true,
+                      border: OutlineInputBorder(),
+                    ),
+                    onChanged: controller.updateSearchQuery,
+                    onSubmitted: (_) {
+                      if (!state.isListLoading) {
+                        controller.loadStories();
+                      }
+                    },
+                  ),
+                ),
+                const SizedBox(width: AppSpacing.xs),
+                IconButton.filledTonal(
                   key: const ValueKey('story-search-button'),
                   onPressed:
                       state.isListLoading ? null : controller.loadStories,
-                  style: FilledButton.styleFrom(
-                    backgroundColor: colorScheme.primary,
-                    foregroundColor: colorScheme.onPrimary,
-                  ),
+                  tooltip: '검색',
                   icon: const Icon(Icons.manage_search),
-                  label: const Text('검색'),
-                ),
-                _StoryCategoryFilter(
-                  selectedCategory: state.selectedCategory,
-                  onSelected: controller.selectCategory,
                 ),
               ],
+            ),
+            const SizedBox(height: AppSpacing.xs),
+            _StoryCategoryFilter(
+              selectedCategory: state.selectedCategory,
+              onSelected: controller.selectCategory,
             ),
           ],
         ),
@@ -289,6 +310,8 @@ class _StoryCategoryFilter extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
     return Wrap(
       spacing: AppSpacing.xs,
       runSpacing: AppSpacing.xs,
@@ -298,6 +321,10 @@ class _StoryCategoryFilter extends StatelessWidget {
             key: ValueKey('story-category-${category.name}'),
             label: Text(category.label),
             selected: selectedCategory == category,
+            visualDensity: VisualDensity.compact,
+            labelStyle: theme.textTheme.labelLarge?.copyWith(
+              fontWeight: selectedCategory == category ? FontWeight.w800 : null,
+            ),
             onSelected: (_) => onSelected(category),
           ),
       ],
