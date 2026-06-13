@@ -75,14 +75,52 @@ class AuthService(
     private val signupEmailVerificationMaxFailedAttempts: Int,
     @param:Value("\${app.auth.signup-email.hash-secret}")
     private val signupEmailVerificationHashSecret: String,
-    @param:Value("\${app.auth.oidc.provider-authorization-base-url:https://login.maumon.local}")
+    @param:Value("\${app.auth.oidc.provider-authorization-base-url:}")
     private val providerAuthorizationBaseUrl: String,
-    @param:Value("\${app.auth.oidc.client-id:maum-on-mobile}")
+    @param:Value("\${app.auth.oidc.client-id:}")
     private val oidcClientId: String,
+    @param:Value("\${app.auth.oidc.enabled-providers:}")
+    private val oidcEnabledProviders: String,
+    @param:Value("\${app.auth.oidc.naver.authorization-uri:}")
+    private val naverAuthorizationUri: String,
+    @param:Value("\${app.auth.oidc.naver.client-id:}")
+    private val naverClientId: String,
+    @param:Value("\${app.auth.oidc.naver.client-secret:}")
+    private val naverClientSecret: String,
+    @param:Value("\${app.auth.oidc.naver.scope:}")
+    private val naverScope: String,
+    @param:Value("\${app.auth.oidc.kakao.authorization-uri:}")
+    private val kakaoAuthorizationUri: String,
+    @param:Value("\${app.auth.oidc.kakao.client-id:}")
+    private val kakaoClientId: String,
+    @param:Value("\${app.auth.oidc.kakao.client-secret:}")
+    private val kakaoClientSecret: String,
+    @param:Value("\${app.auth.oidc.kakao.scope:}")
+    private val kakaoScope: String,
+    @param:Value("\${app.auth.oidc.facebook.authorization-uri:}")
+    private val facebookAuthorizationUri: String,
+    @param:Value("\${app.auth.oidc.facebook.client-id:}")
+    private val facebookClientId: String,
+    @param:Value("\${app.auth.oidc.facebook.client-secret:}")
+    private val facebookClientSecret: String,
+    @param:Value("\${app.auth.oidc.facebook.scope:}")
+    private val facebookScope: String,
+    @param:Value("\${app.auth.oidc.google.authorization-uri:}")
+    private val googleAuthorizationUri: String,
+    @param:Value("\${app.auth.oidc.google.client-id:}")
+    private val googleClientId: String,
+    @param:Value("\${app.auth.oidc.google.client-secret:}")
+    private val googleClientSecret: String,
+    @param:Value("\${app.auth.oidc.google.scope:}")
+    private val googleScope: String,
     @param:Value("\${app.auth.oidc.apple.authorization-uri:https://appleid.apple.com/auth/authorize}")
     private val appleAuthorizationUri: String,
     @param:Value("\${app.auth.oidc.apple.client-id:}")
     private val appleClientId: String,
+    @param:Value("\${app.auth.oidc.apple.client-secret:}")
+    private val appleClientSecret: String,
+    @param:Value("\${app.auth.oidc.apple.scope:}")
+    private val appleScope: String,
     @param:Value("\${app.auth.oidc.state-ttl:PT10M}")
     private val oidcStateTtl: Duration,
     @param:Value("\${app.auth.oidc.default-app-redirect-uri:maumon://auth/callback}")
@@ -94,6 +132,12 @@ class AuthService(
     @param:Value("\${app.auth.password-reset.max-failed-attempts:5}")
     private val passwordResetMaxFailedAttempts: Int,
 ) : AuthUseCase {
+    // 운영에서 명시적으로 켠 Provider만 authorize/session 흐름을 열어 둔다.
+    private val enabledOidcProviderSet: Set<String> = oidcEnabledProviders
+        .split(",")
+        .map { it.trim().lowercase(Locale.ROOT) }
+        .filter { it.matches(PROVIDER_ID_PATTERN) }
+        .toSet()
 
     @Transactional
     override fun requestSignupEmailVerification(
@@ -283,6 +327,9 @@ class AuthService(
     override fun authorizeOidc(command: OidcAuthorizeCommand): OidcAuthorizeResult {
         val provider = command.provider.normalizedProvider()
         val redirectUri = command.redirectUri.validatedMobileRedirectUri()
+        val authorizationEndpoint = authorizationEndpoint(provider)
+        val clientId = oidcClientIdFor(provider)
+        val scope = oidcScopeFor(provider)
         val now = Instant.now()
         val codeVerifier = randomToken()
         val savedState = authOidcStateRepository.save(
@@ -299,17 +346,24 @@ class AuthService(
             ),
         )
 
+        val authorizationUriBuilder = UriComponentsBuilder
+            .fromUriString(authorizationEndpoint)
+            .queryParam("response_type", "code")
+            .queryParam("client_id", clientId)
+            .queryParam("redirect_uri", savedState.redirectUri)
+            .queryParam("state", savedState.state)
+            .queryParam("nonce", savedState.nonce)
+            .queryParam("code_challenge", codeChallenge(codeVerifier))
+            .queryParam("code_challenge_method", "S256")
+
+        if (scope != null) {
+            authorizationUriBuilder.queryParam("scope", scope)
+        }
+
         return OidcAuthorizeResult(
-            authorizationUri = UriComponentsBuilder
-                .fromUriString(authorizationEndpoint(provider))
-                .queryParam("response_type", "code")
-                .queryParam("client_id", oidcClientIdFor(provider))
-                .queryParam("redirect_uri", savedState.redirectUri)
-                .queryParam("state", savedState.state)
-                .queryParam("nonce", savedState.nonce)
-                .queryParam("code_challenge", codeChallenge(codeVerifier))
-                .queryParam("code_challenge_method", "S256")
+            authorizationUri = authorizationUriBuilder
                 .build()
+                .encode()
                 .toUriString(),
         )
     }
@@ -483,6 +537,7 @@ class AuthService(
                     redirectUri = savedState.redirectUri,
                     clientId = oidcClientIdFor(provider),
                     expectedNonce = savedState.nonce,
+                    clientSecret = oidcClientSecretFor(provider),
                 ),
             )
         } catch (_: AuthOidcVerificationException) {
@@ -496,7 +551,7 @@ class AuthService(
 
     private fun String.normalizedProvider(): String {
         val normalized = trim().lowercase(Locale.ROOT)
-        if (!normalized.matches(Regex("[a-z0-9_-]{2,40}"))) {
+        if (!normalized.matches(PROVIDER_ID_PATTERN) || normalized !in enabledOidcProviderSet) {
             throw ApiException(ErrorCode.INVALID_REQUEST, "지원하지 않는 외부 로그인 제공자입니다.")
         }
 
@@ -505,10 +560,16 @@ class AuthService(
 
     private fun authorizationEndpoint(provider: String): String {
         if (provider == APPLE_PROVIDER) {
-            return appleAuthorizationUri.trim()
+            return requiredOidcUri(appleAuthorizationUri, "Apple authorization URI")
         }
 
-        return UriComponentsBuilder.fromUriString(providerAuthorizationBaseUrl.trimEnd('/'))
+        providerAuthorizationUri(provider)?.let { configuredUri ->
+            return requiredOidcUri(configuredUri, "Provider authorization URI")
+        }
+
+        val baseUrl = requiredOidcUri(providerAuthorizationBaseUrl, "Provider authorization base URL")
+            .trimEnd('/')
+        return UriComponentsBuilder.fromUriString(baseUrl)
             .pathSegment(provider, "authorize")
             .toUriString()
     }
@@ -518,12 +579,81 @@ class AuthService(
             return appleClientId
                 .trim()
                 .takeIf(String::isNotEmpty)
-                ?: throw IllegalStateException(
-                    "app.auth.oidc.apple.client-id is required for Apple OIDC login.",
-                )
+                ?: throw ApiException(ErrorCode.INVALID_REQUEST, "Apple client id 설정을 확인해 주세요.")
         }
 
-        return oidcClientId
+        return (providerClientId(provider) ?: oidcClientId)
+            .trim()
+            .takeIf(String::isNotEmpty)
+            ?: throw ApiException(ErrorCode.INVALID_REQUEST, "Provider client id 설정을 확인해 주세요.")
+    }
+
+    private fun oidcClientSecretFor(provider: String): String? {
+        return if (provider == APPLE_PROVIDER) {
+            appleClientSecret.trim().takeIf(String::isNotEmpty)
+        } else {
+            providerClientSecret(provider)
+        }
+    }
+
+    private fun oidcScopeFor(provider: String): String? {
+        return if (provider == APPLE_PROVIDER) {
+            appleScope.trim().takeIf(String::isNotEmpty)
+        } else {
+            providerScope(provider)
+        }
+    }
+
+    private fun providerAuthorizationUri(provider: String): String? {
+        return when (provider) {
+            NAVER_PROVIDER -> naverAuthorizationUri
+            KAKAO_PROVIDER -> kakaoAuthorizationUri
+            FACEBOOK_PROVIDER -> facebookAuthorizationUri
+            GOOGLE_PROVIDER -> googleAuthorizationUri
+            else -> ""
+        }.trim().takeIf(String::isNotEmpty)
+    }
+
+    private fun providerClientId(provider: String): String? {
+        return when (provider) {
+            NAVER_PROVIDER -> naverClientId
+            KAKAO_PROVIDER -> kakaoClientId
+            FACEBOOK_PROVIDER -> facebookClientId
+            GOOGLE_PROVIDER -> googleClientId
+            else -> ""
+        }.trim().takeIf(String::isNotEmpty)
+    }
+
+    private fun providerClientSecret(provider: String): String? {
+        return when (provider) {
+            NAVER_PROVIDER -> naverClientSecret
+            KAKAO_PROVIDER -> kakaoClientSecret
+            FACEBOOK_PROVIDER -> facebookClientSecret
+            GOOGLE_PROVIDER -> googleClientSecret
+            else -> ""
+        }.trim().takeIf(String::isNotEmpty)
+    }
+
+    private fun providerScope(provider: String): String? {
+        return when (provider) {
+            NAVER_PROVIDER -> naverScope
+            KAKAO_PROVIDER -> kakaoScope
+            FACEBOOK_PROVIDER -> facebookScope
+            GOOGLE_PROVIDER -> googleScope
+            else -> ""
+        }.trim().takeIf(String::isNotEmpty)
+    }
+
+    private fun requiredOidcUri(value: String, label: String): String {
+        // placeholder나 http URL이 외부 로그인 redirect/token 검증으로 흘러가지 않게 진입 시점에서 막는다.
+        val trimmed = value.trim().takeIf(String::isNotEmpty)
+            ?: throw ApiException(ErrorCode.INVALID_REQUEST, "$label 설정을 확인해 주세요.")
+        val uri = runCatching { java.net.URI(trimmed) }.getOrNull()
+            ?: throw ApiException(ErrorCode.INVALID_REQUEST, "$label 설정을 확인해 주세요.")
+        if (uri.scheme != "https" || uri.host.isNullOrBlank() || uri.host == PLACEHOLDER_PROVIDER_HOST) {
+            throw ApiException(ErrorCode.INVALID_REQUEST, "$label 설정을 확인해 주세요.")
+        }
+        return trimmed
     }
 
     private fun String.validatedMobileRedirectUri(): String {
@@ -645,7 +775,13 @@ class AuthService(
     }
 
     private companion object {
+        private val PROVIDER_ID_PATTERN = Regex("[a-z0-9_-]{2,40}")
+        private const val NAVER_PROVIDER = "naver"
+        private const val KAKAO_PROVIDER = "kakao"
+        private const val FACEBOOK_PROVIDER = "facebook"
+        private const val GOOGLE_PROVIDER = "google"
         private const val APPLE_PROVIDER = "apple"
+        private const val PLACEHOLDER_PROVIDER_HOST = "login.maumon.local"
         private val SIGNUP_CODE_PATTERN = Regex("^\\d{6}$")
         private val secureRandom = SecureRandom()
         private val log = LoggerFactory.getLogger(AuthService::class.java)

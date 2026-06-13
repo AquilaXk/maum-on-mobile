@@ -13,6 +13,7 @@ import org.assertj.core.api.Assertions.assertThat
 import org.hamcrest.Matchers.blankOrNullString
 import org.hamcrest.Matchers.greaterThan
 import org.hamcrest.Matchers.not
+import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
@@ -30,7 +31,18 @@ import java.net.URI
 
 @SpringBootTest(
     properties = [
+        "app.auth.oidc.enabled-providers=kakao,google,apple",
+        "app.auth.oidc.kakao.authorization-uri=https://kauth.kakao.com/oauth/authorize",
+        "app.auth.oidc.kakao.client-id=maum-on-kakao-test",
+        "app.auth.oidc.kakao.client-secret=maum-on-kakao-secret",
+        "app.auth.oidc.kakao.scope=openid profile_nickname account_email",
+        "app.auth.oidc.google.authorization-uri=https://accounts.google.com/o/oauth2/v2/auth",
+        "app.auth.oidc.google.client-id=maum-on-google-test",
+        "app.auth.oidc.google.client-secret=maum-on-google-secret",
+        "app.auth.oidc.google.scope=openid email profile",
         "app.auth.oidc.apple.client-id=maum-on-ios",
+        "app.auth.oidc.apple.client-secret=maum-on-apple-secret",
+        "app.auth.oidc.apple.scope=name email",
     ],
 )
 @AutoConfigureMockMvc
@@ -412,6 +424,7 @@ class AuthControllerTest @Autowired constructor(
         assertThat(passwordResetMailSender.sent).hasSize(3)
     }
 
+    @DisplayName("Kakao OIDC authorize는 운영 Provider URI와 scope로 redirect한다")
     @Test
     fun oidcAuthorizeStoresStateAndRedirectsToProvider() {
         val result = mockMvc.get("/api/v1/auth/oidc/authorize/kakao") {
@@ -425,17 +438,19 @@ class AuthControllerTest @Autowired constructor(
         val location = URI(result.response.getHeader("Location")!!)
         val query = location.queryParameters()
 
-        assertThat(location.host).isEqualTo("login.maumon.local")
-        assertThat(location.path).isEqualTo("/kakao/authorize")
+        assertThat(location.host).isEqualTo("kauth.kakao.com")
+        assertThat(location.path).isEqualTo("/oauth/authorize")
         assertThat(query["response_type"]).isEqualTo("code")
-        assertThat(query["client_id"]).isEqualTo("maum-on-mobile")
+        assertThat(query["client_id"]).isEqualTo("maum-on-kakao-test")
         assertThat(query["redirect_uri"]).isEqualTo("maumon://auth/callback?provider=kakao")
+        assertThat(query["scope"]).isEqualTo("openid profile_nickname account_email")
         assertThat(query["state"]).hasSizeGreaterThanOrEqualTo(24)
         assertThat(query["nonce"]).hasSizeGreaterThanOrEqualTo(24)
         assertThat(query["code_challenge"]).hasSizeGreaterThanOrEqualTo(24)
         assertThat(query["code_challenge_method"]).isEqualTo("S256")
     }
 
+    @DisplayName("Apple OIDC authorize는 Apple endpoint, client id, scope를 사용한다")
     @Test
     fun oidcAuthorizeUsesAppleEndpointAndClientIdForAppleProvider() {
         val result = mockMvc.get("/api/v1/auth/oidc/authorize/apple") {
@@ -454,12 +469,14 @@ class AuthControllerTest @Autowired constructor(
         assertThat(query["response_type"]).isEqualTo("code")
         assertThat(query["client_id"]).isEqualTo("maum-on-ios")
         assertThat(query["redirect_uri"]).isEqualTo("maumon://auth/callback?provider=apple")
+        assertThat(query["scope"]).isEqualTo("name email")
         assertThat(query["state"]).hasSizeGreaterThanOrEqualTo(24)
         assertThat(query["nonce"]).hasSizeGreaterThanOrEqualTo(24)
         assertThat(query["code_challenge"]).hasSizeGreaterThanOrEqualTo(24)
         assertThat(query["code_challenge_method"]).isEqualTo("S256")
     }
 
+    @DisplayName("OIDC authorize는 등록되지 않은 모바일 redirect URI를 거절한다")
     @Test
     fun oidcAuthorizeRejectsInvalidMobileRedirectUri() {
         mockMvc.get("/api/v1/auth/oidc/authorize/kakao") {
@@ -471,6 +488,19 @@ class AuthControllerTest @Autowired constructor(
             }
     }
 
+    @DisplayName("OIDC authorize는 운영 설정에 없는 Provider를 거절한다")
+    @Test
+    fun oidcAuthorizeRejectsProviderThatIsNotConfigured() {
+        mockMvc.get("/api/v1/auth/oidc/authorize/naver") {
+            param("redirect_uri", "maumon://auth/callback?provider=naver")
+        }
+            .andExpect {
+                status { isBadRequest() }
+                jsonPath("$.error.code") { value("INVALID_REQUEST") }
+            }
+    }
+
+    @DisplayName("OIDC 앱 callback은 Provider code와 client secret으로 세션을 교환한다")
     @Test
     fun oidcAppCallbackExchangesCodeForJsonSessionAndRejectsStateReuse() {
         val authorizeLocation = mockMvc.get("/api/v1/auth/oidc/authorize/kakao") {
@@ -515,6 +545,7 @@ class AuthControllerTest @Autowired constructor(
             }
     }
 
+    @DisplayName("OIDC 앱 callback은 Provider 검증 실패를 UNAUTHORIZED로 반환한다")
     @Test
     fun oidcAppCallbackRejectsCodesThatProviderCannotVerify() {
         val authorizeLocation = mockMvc.get("/api/v1/auth/oidc/authorize/kakao") {
@@ -536,6 +567,7 @@ class AuthControllerTest @Autowired constructor(
             }
     }
 
+    @DisplayName("OIDC 서버 callback은 모바일 세션 토큰을 deeplink로 노출하지 않는다")
     @Test
     fun oidcServerCallbackDoesNotExposeMobileSessionTokensInDeeplink() {
         val authorizeLocation = mockMvc.get("/api/v1/auth/oidc/authorize/kakao") {
@@ -562,6 +594,7 @@ class AuthControllerTest @Autowired constructor(
         assertThat(callbackQuery["refresh_token"]).isNull()
     }
 
+    @DisplayName("OIDC callback은 Provider 오류를 앱 deeplink 오류로 반환한다")
     @Test
     fun oidcCallbackReturnsProviderErrorsToAppDeeplink() {
         val authorizeLocation = mockMvc.get("/api/v1/auth/oidc/authorize/google") {
@@ -601,6 +634,12 @@ class AuthControllerTest @Autowired constructor(
                 assertThat(command.codeVerifier).isNotBlank()
                 assertThat(command.redirectUri)
                     .isEqualTo("maumon://auth/callback?provider=${command.provider}")
+                if (command.provider == "kakao") {
+                    assertThat(command.clientSecret).isEqualTo("maum-on-kakao-secret")
+                }
+                if (command.provider == "google") {
+                    assertThat(command.clientSecret).isEqualTo("maum-on-google-secret")
+                }
                 return AuthOidcIdentity(
                     issuer = "https://login.maumon.local/${command.provider}",
                     subject = "verified-${command.code}",

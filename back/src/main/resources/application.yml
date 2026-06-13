@@ -39,6 +39,54 @@ app:
         enabled: ${CUSTOM__MEMBER__SIGNUP__MAIL_ENABLED:${SIGNUP_EMAIL_MAIL_ENABLED:false}}
         from: ${CUSTOM__MEMBER__SIGNUP__MAIL_FROM:${SIGNUP_EMAIL_MAIL_FROM:}}
         subject: ${CUSTOM__MEMBER__SIGNUP__MAIL_SUBJECT:${SIGNUP_EMAIL_MAIL_SUBJECT:[Maum On] 회원가입 이메일 인증}}
+    oidc:
+      enabled-providers: ${APP_AUTH_OIDC_ENABLED_PROVIDERS:}
+      client-id: ${APP_AUTH_OIDC_CLIENT_ID:}
+      provider-authorization-base-url: ${APP_AUTH_OIDC_PROVIDER_AUTHORIZATION_BASE_URL:}
+      provider-token-base-url: ${APP_AUTH_OIDC_PROVIDER_TOKEN_BASE_URL:}
+      provider-jwks-base-url: ${APP_AUTH_OIDC_PROVIDER_JWKS_BASE_URL:}
+      provider-issuer-base-url: ${APP_AUTH_OIDC_PROVIDER_ISSUER_BASE_URL:}
+      default-app-redirect-uri: ${APP_AUTH_OIDC_DEFAULT_APP_REDIRECT_URI:maumon://auth/callback}
+      naver:
+        authorization-uri: ${APP_AUTH_OIDC_NAVER_AUTHORIZATION_URI:}
+        client-id: ${APP_AUTH_OIDC_NAVER_CLIENT_ID:}
+        client-secret: ${APP_AUTH_OIDC_NAVER_CLIENT_SECRET:}
+        scope: ${APP_AUTH_OIDC_NAVER_SCOPE:}
+        token-uri: ${APP_AUTH_OIDC_NAVER_TOKEN_URI:}
+        jwks-uri: ${APP_AUTH_OIDC_NAVER_JWKS_URI:}
+        issuer: ${APP_AUTH_OIDC_NAVER_ISSUER:}
+      kakao:
+        authorization-uri: ${APP_AUTH_OIDC_KAKAO_AUTHORIZATION_URI:}
+        client-id: ${APP_AUTH_OIDC_KAKAO_CLIENT_ID:}
+        client-secret: ${APP_AUTH_OIDC_KAKAO_CLIENT_SECRET:}
+        scope: ${APP_AUTH_OIDC_KAKAO_SCOPE:openid}
+        token-uri: ${APP_AUTH_OIDC_KAKAO_TOKEN_URI:}
+        jwks-uri: ${APP_AUTH_OIDC_KAKAO_JWKS_URI:}
+        issuer: ${APP_AUTH_OIDC_KAKAO_ISSUER:}
+      facebook:
+        authorization-uri: ${APP_AUTH_OIDC_FACEBOOK_AUTHORIZATION_URI:}
+        client-id: ${APP_AUTH_OIDC_FACEBOOK_CLIENT_ID:}
+        client-secret: ${APP_AUTH_OIDC_FACEBOOK_CLIENT_SECRET:}
+        scope: ${APP_AUTH_OIDC_FACEBOOK_SCOPE:openid email public_profile}
+        token-uri: ${APP_AUTH_OIDC_FACEBOOK_TOKEN_URI:}
+        jwks-uri: ${APP_AUTH_OIDC_FACEBOOK_JWKS_URI:}
+        issuer: ${APP_AUTH_OIDC_FACEBOOK_ISSUER:}
+      google:
+        authorization-uri: ${APP_AUTH_OIDC_GOOGLE_AUTHORIZATION_URI:}
+        client-id: ${APP_AUTH_OIDC_GOOGLE_CLIENT_ID:}
+        client-secret: ${APP_AUTH_OIDC_GOOGLE_CLIENT_SECRET:}
+        scope: ${APP_AUTH_OIDC_GOOGLE_SCOPE:openid email profile}
+        token-uri: ${APP_AUTH_OIDC_GOOGLE_TOKEN_URI:}
+        jwks-uri: ${APP_AUTH_OIDC_GOOGLE_JWKS_URI:}
+        issuer: ${APP_AUTH_OIDC_GOOGLE_ISSUER:}
+      apple:
+        authorization-uri: ${APP_AUTH_OIDC_APPLE_AUTHORIZATION_URI:https://appleid.apple.com/auth/authorize}
+        client-id: ${APP_AUTH_OIDC_APPLE_CLIENT_ID:}
+        client-secret: ${APP_AUTH_OIDC_APPLE_CLIENT_SECRET:}
+        scope: ${APP_AUTH_OIDC_APPLE_SCOPE:name email}
+        token-uri: ${APP_AUTH_OIDC_APPLE_TOKEN_URI:https://appleid.apple.com/auth/token}
+        jwks-uri: ${APP_AUTH_OIDC_APPLE_JWKS_URI:https://appleid.apple.com/auth/keys}
+        issuer: ${APP_AUTH_OIDC_APPLE_ISSUER:https://appleid.apple.com}
   security:
     jwt:
       issuer: maum-on-mobile

@@ -15,7 +15,10 @@ import com.maumonmobile.application.port.out.SignupEmailVerificationMailSender
 import com.maumonmobile.application.port.out.SseSessionRevocationPort
 import com.maumonmobile.global.security.JwtProperties
 import com.maumonmobile.global.security.JwtTokenProvider
+import com.maumonmobile.global.web.ApiException
+import com.maumonmobile.global.web.ErrorCode
 import org.assertj.core.api.Assertions.assertThat
+import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
 import org.springframework.security.crypto.password.PasswordEncoder
@@ -23,11 +26,12 @@ import java.time.Duration
 
 class AuthServiceAppleConfigurationTest {
 
+    @DisplayName("Apple client id가 없으면 500 대신 INVALID_REQUEST로 거절한다")
     @Test
-    fun authorizeAppleRequiresAppleClientId() {
+    fun authorizeAppleRequiresAppleClientIdWithoutServerError() {
         val service = authService(appleClientId = "")
 
-        val exception = assertThrows<IllegalStateException> {
+        val exception = assertThrows<ApiException> {
             service.authorizeOidc(
                 OidcAuthorizeCommand(
                     provider = "apple",
@@ -36,10 +40,37 @@ class AuthServiceAppleConfigurationTest {
             )
         }
 
-        assertThat(exception.message).contains("app.auth.oidc.apple.client-id")
+        assertThat(exception.errorCode).isEqualTo(ErrorCode.INVALID_REQUEST)
+        assertThat(exception.message).contains("Apple")
     }
 
-    private fun authService(appleClientId: String): AuthService {
+    @DisplayName("일반 Provider authorize는 실제 authorization base URL 설정이 필요하다")
+    @Test
+    fun authorizeProviderRequiresConfiguredAuthorizationBaseUrl() {
+        val service = authService(
+            appleClientId = "maum-on-ios",
+            enabledProviders = "kakao",
+            providerAuthorizationBaseUrl = "",
+        )
+
+        val exception = assertThrows<ApiException> {
+            service.authorizeOidc(
+                OidcAuthorizeCommand(
+                    provider = "kakao",
+                    redirectUri = "maumon://auth/callback?provider=kakao",
+                ),
+            )
+        }
+
+        assertThat(exception.errorCode).isEqualTo(ErrorCode.INVALID_REQUEST)
+        assertThat(exception.message).contains("Provider")
+    }
+
+    private fun authService(
+        appleClientId: String,
+        enabledProviders: String = "apple",
+        providerAuthorizationBaseUrl: String = "https://login.maumon.test",
+    ): AuthService {
         return AuthService(
             authMemberRepository = InMemoryAuthMemberRepository(),
             authOidcStateRepository = InMemoryAuthOidcStateRepository(),
@@ -61,10 +92,29 @@ class AuthServiceAppleConfigurationTest {
             signupEmailVerificationMaxActiveRequests = 3,
             signupEmailVerificationMaxFailedAttempts = 5,
             signupEmailVerificationHashSecret = "test-signup-email-verification-hash-secret",
-            providerAuthorizationBaseUrl = "https://login.maumon.local",
-            oidcClientId = "maum-on-mobile",
+            providerAuthorizationBaseUrl = providerAuthorizationBaseUrl,
+            oidcClientId = "maum-on-mobile-test",
+            oidcEnabledProviders = enabledProviders,
+            naverAuthorizationUri = "",
+            naverClientId = "",
+            naverClientSecret = "",
+            naverScope = "",
+            kakaoAuthorizationUri = "",
+            kakaoClientId = "",
+            kakaoClientSecret = "",
+            kakaoScope = "",
+            facebookAuthorizationUri = "",
+            facebookClientId = "",
+            facebookClientSecret = "",
+            facebookScope = "",
+            googleAuthorizationUri = "",
+            googleClientId = "",
+            googleClientSecret = "",
+            googleScope = "",
             appleAuthorizationUri = "https://appleid.apple.com/auth/authorize",
             appleClientId = appleClientId,
+            appleClientSecret = "",
+            appleScope = "name email",
             oidcStateTtl = Duration.ofMinutes(10),
             defaultAppRedirectUri = "maumon://auth/callback",
             passwordResetTtl = Duration.ofMinutes(15),
