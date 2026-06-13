@@ -161,9 +161,6 @@ class _MailboxView extends StatelessWidget {
           onOpenLatestSent: state.stats?.latestSentLetter == null
               ? null
               : () => controller.openLetter(state.stats!.latestSentLetter!),
-        ),
-        const SizedBox(height: AppSpacing.md),
-        _ReceiveSettingsCard(
           onOpenRandomReceiveSettings: onOpenRandomReceiveSettings,
         ),
         const SizedBox(height: AppSpacing.md),
@@ -241,26 +238,88 @@ class _StatsSection extends StatelessWidget {
     required this.stats,
     this.onOpenLatestReceived,
     this.onOpenLatestSent,
+    this.onOpenRandomReceiveSettings,
   });
 
   final LetterStats? stats;
   final VoidCallback? onOpenLatestReceived;
   final VoidCallback? onOpenLatestSent;
+  final VoidCallback? onOpenRandomReceiveSettings;
 
   @override
   Widget build(BuildContext context) {
-    final latestReceived = stats?.latestReceivedLetter?.title ?? '-';
-    final latestSent = stats?.latestSentLetter?.title ?? '-';
     final receivedCount = stats?.receivedCount ?? 0;
+    final colorScheme = Theme.of(context).colorScheme;
+    final theme = Theme.of(context);
 
-    return AppSectionCard(
+    return DecoratedBox(
       key: const ValueKey('letter-mailbox-toolbar'),
-      title: '받은 편지',
+      decoration: BoxDecoration(
+        color: colorScheme.surface.withValues(alpha: 0.52),
+        borderRadius: AppRadii.card,
+        border: Border.all(
+          color: colorScheme.outlineVariant.withValues(alpha: 0.72),
+        ),
+      ),
       child: Padding(
-        padding: EdgeInsets.zero,
+        padding: const EdgeInsets.all(AppSpacing.sm),
         child: Column(
+          mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            Row(
+              children: [
+                Icon(
+                  Icons.mark_email_read_outlined,
+                  size: 20,
+                  color: colorScheme.primary,
+                ),
+                const SizedBox(width: AppSpacing.xs),
+                Expanded(
+                  child: Text(
+                    '받은 편지',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
+                Row(
+                  key: const ValueKey('letter-summary-actions'),
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (stats?.latestReceivedLetter != null)
+                      IconButton(
+                        key: const ValueKey('letter-latest-received-button'),
+                        onPressed: onOpenLatestReceived,
+                        tooltip:
+                            '최근 받은 편지 ${stats!.latestReceivedLetter!.title} 열기',
+                        icon: const Icon(Icons.inbox_outlined),
+                      ),
+                    if (stats?.latestSentLetter != null)
+                      IconButton(
+                        key: const ValueKey('letter-latest-sent-button'),
+                        onPressed: onOpenLatestSent,
+                        tooltip:
+                            '최근 보낸 편지 ${stats!.latestSentLetter!.title} 열기',
+                        icon: const Icon(Icons.send_outlined),
+                      ),
+                  ],
+                ),
+                TextButton.icon(
+                  key: const ValueKey('letter-receive-settings'),
+                  onPressed: onOpenRandomReceiveSettings,
+                  icon: const Icon(Icons.tune, size: 18),
+                  label: const Text('수신 설정'),
+                  style: TextButton.styleFrom(
+                    visualDensity: VisualDensity.compact,
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: AppSpacing.xs),
             Wrap(
               spacing: AppSpacing.xs,
               runSpacing: AppSpacing.xs,
@@ -270,35 +329,9 @@ class _StatsSection extends StatelessWidget {
                   label: '받은 편지 $receivedCount개',
                   tone: AppStatusTone.success,
                 ),
-                AppStatusPill(label: '최근 받은 편지 $latestReceived'),
-                AppStatusPill(
-                  label: '최근 보낸 편지 $latestSent',
-                  tone: AppStatusTone.warning,
-                ),
+                const AppStatusPill(label: '랜덤 편지 수신'),
               ],
             ),
-            if (stats?.latestReceivedLetter != null ||
-                stats?.latestSentLetter != null) ...[
-              const SizedBox(height: AppSpacing.md),
-              AppResponsiveActionWrap(
-                children: [
-                  if (stats?.latestReceivedLetter != null)
-                    OutlinedButton.icon(
-                      key: const ValueKey('letter-latest-received-button'),
-                      onPressed: onOpenLatestReceived,
-                      icon: const Icon(Icons.inbox_outlined),
-                      label: const Text('최근 받은 편지 열기'),
-                    ),
-                  if (stats?.latestSentLetter != null)
-                    OutlinedButton.icon(
-                      key: const ValueKey('letter-latest-sent-button'),
-                      onPressed: onOpenLatestSent,
-                      icon: const Icon(Icons.send_outlined),
-                      label: const Text('최근 보낸 편지 열기'),
-                    ),
-                ],
-              ),
-            ],
           ],
         ),
       ),
@@ -722,28 +755,6 @@ class _LetterNotice extends StatelessWidget {
           tone: isSendSuccess ? AppNoticeTone.success : AppNoticeTone.neutral,
         ),
       ],
-    );
-  }
-}
-
-class _ReceiveSettingsCard extends StatelessWidget {
-  const _ReceiveSettingsCard({this.onOpenRandomReceiveSettings});
-
-  final VoidCallback? onOpenRandomReceiveSettings;
-
-  @override
-  Widget build(BuildContext context) {
-    return AppSectionCard(
-      title: '랜덤 편지 수신',
-      child: Align(
-        alignment: Alignment.centerLeft,
-        child: OutlinedButton.icon(
-          key: const ValueKey('letter-receive-settings'),
-          onPressed: onOpenRandomReceiveSettings,
-          icon: const Icon(Icons.tune),
-          label: const Text('수신 설정'),
-        ),
-      ),
     );
   }
 }

@@ -7,8 +7,7 @@ import 'package:maum_on_mobile_front/features/letter/domain/letter_models.dart';
 import 'package:maum_on_mobile_front/features/letter/presentation/letter_screen.dart';
 
 void main() {
-  testWidgets('shows mailbox summary actions on a phone viewport',
-      (tester) async {
+  testWidgets('편지함 상단 정보는 첫 화면 목록을 밀어내지 않는 얇은 표면이다', (tester) async {
     tester.view.physicalSize = const Size(390, 640);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
@@ -36,6 +35,12 @@ void main() {
 
     expect(
         find.byKey(const ValueKey('letter-mailbox-toolbar')), findsOneWidget);
+    expect(
+      tester.widget(find.byKey(const ValueKey('letter-mailbox-toolbar'))),
+      isA<DecoratedBox>(),
+    );
+    expect(
+        find.byKey(const ValueKey('letter-summary-actions')), findsOneWidget);
     expect(find.byKey(const ValueKey('letter-compose-button')), findsOneWidget);
     expect(
         find.byKey(const ValueKey('letter-receive-settings')), findsOneWidget);
@@ -49,6 +54,16 @@ void main() {
       findsOneWidget,
     );
     expect(find.text('받은 편지 2개'), findsOneWidget);
+    expect(
+      tester
+          .getSize(find.byKey(const ValueKey('letter-mailbox-toolbar')))
+          .height,
+      lessThanOrEqualTo(150),
+    );
+    expect(
+      tester.getTopLeft(find.byKey(const ValueKey('letter-card-1'))).dy,
+      lessThan(560),
+    );
   });
 
   testWidgets('stacks letter compose actions on a narrow phone viewport',
