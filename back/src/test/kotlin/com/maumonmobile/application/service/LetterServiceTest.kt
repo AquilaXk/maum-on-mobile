@@ -90,6 +90,20 @@ class LetterServiceTest {
     }
 
     @Test
+    @DisplayName("편지 통계는 로그인 회원을 찾을 수 없으면 인증 오류를 반환한다")
+    fun statsRejectsMissingMember() {
+        val fixture = letterFixture()
+
+        val exception = catchThrowable {
+            fixture.service.stats(AuthenticatedUser("999", "missing@example.com"))
+        }
+
+        assertThat(exception).isInstanceOf(ApiException::class.java)
+        val apiException = exception as ApiException
+        assertThat(apiException.errorCode).isEqualTo(ErrorCode.UNAUTHORIZED)
+    }
+
+    @Test
     fun acceptsWritingAndReplyAreIdempotentWithoutDuplicateNotifications() {
         val fixture = letterFixture()
         val sender = fixture.saveMember(email = "flow-sender@example.com", nickname = "보낸이")
