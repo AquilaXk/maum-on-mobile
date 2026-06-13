@@ -175,6 +175,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                 randomReceiveAllowed:
                                     settings.randomReceiveAllowed,
                                 dataExport: state.dataExport,
+                                isSubmitting: state.isSubmitting,
                                 onLogout: widget.onLogout,
                               ),
                               const SizedBox(height: AppSpacing.lg),
@@ -458,6 +459,7 @@ class _AccountSummary extends StatelessWidget {
     required this.isSocialAccount,
     required this.randomReceiveAllowed,
     required this.dataExport,
+    required this.isSubmitting,
     this.onLogout,
   });
 
@@ -466,6 +468,7 @@ class _AccountSummary extends StatelessWidget {
   final bool isSocialAccount;
   final bool randomReceiveAllowed;
   final MemberDataExportJob? dataExport;
+  final bool isSubmitting;
   final VoidCallback? onLogout;
 
   @override
@@ -555,7 +558,7 @@ class _AccountSummary extends StatelessWidget {
                   alignment: Alignment.centerRight,
                   child: OutlinedButton.icon(
                     key: const ValueKey('settings-logout-button'),
-                    onPressed: onLogout,
+                    onPressed: isSubmitting ? null : onLogout,
                     icon: const Icon(Icons.logout),
                     label: const Text('로그아웃'),
                   ),

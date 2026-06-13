@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:maum_on_mobile_front/features/settings/application/settings_controller.dart';
@@ -187,6 +189,49 @@ void main() {
     );
 
     await tester.tap(find.byKey(const ValueKey('settings-logout-button')));
+    await tester.pumpAndSettle();
+
+    expect(logoutCount, 1);
+  });
+
+  testWidgets('설정 저장 중에는 로그아웃을 비활성화한다', (tester) async {
+    var logoutCount = 0;
+    final nicknameUpdateDelay = Completer<void>();
+    final repository = _FakeSettingsRepository(
+      nicknameUpdateDelay: nicknameUpdateDelay,
+    );
+    final controller = SettingsController(repository: repository);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: SettingsScreen(
+          controller: controller,
+          onBack: () {},
+          onLogout: () => logoutCount += 1,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.enterText(
+      find.byKey(const ValueKey('settings-nickname-field')),
+      '저장 중 닉네임',
+    );
+    await tester.tap(find.byKey(const ValueKey('settings-save-nickname')));
+    await tester.pump();
+
+    final logoutButton = find.byKey(const ValueKey('settings-logout-button'));
+    expect(tester.widget<OutlinedButton>(logoutButton).onPressed, isNull);
+
+    await tester.tap(logoutButton);
+    await tester.pump();
+    expect(logoutCount, 0);
+
+    nicknameUpdateDelay.complete();
+    await tester.pumpAndSettle();
+
+    expect(tester.widget<OutlinedButton>(logoutButton).onPressed, isNotNull);
+    await tester.tap(logoutButton);
     await tester.pumpAndSettle();
 
     expect(logoutCount, 1);
@@ -458,6 +503,9 @@ void main() {
 }
 
 class _FakeSettingsRepository implements SettingsRepository {
+  _FakeSettingsRepository({this.nicknameUpdateDelay});
+
+  final Completer<void>? nicknameUpdateDelay;
   final List<String> nicknameUpdates = [];
   final List<String> emailUpdates = [];
   final List<String?> withdrawPasswords = [];
@@ -478,6 +526,7 @@ class _FakeSettingsRepository implements SettingsRepository {
   @override
   Future<MemberSettings> updateNickname(String nickname) async {
     nicknameUpdates.add(nickname);
+    await nicknameUpdateDelay?.future;
     settings = settings.copyWith(nickname: nickname);
     return settings;
   }
