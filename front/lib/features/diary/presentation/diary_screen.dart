@@ -326,40 +326,50 @@ class _DiaryQuickCapturePanel extends StatelessWidget {
     final colorScheme = theme.colorScheme;
     final selectedCount = state.selectedDateEntries.length;
 
-    return Card(
-      margin: EdgeInsets.zero,
-      color: colorScheme.primaryContainer.withValues(alpha: 0.68),
-      child: Padding(
-        padding: const EdgeInsets.all(AppSpacing.md),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Wrap(
-              spacing: AppSpacing.xs,
-              runSpacing: AppSpacing.xs,
-              crossAxisAlignment: WrapCrossAlignment.center,
-              children: [
-                AppStatusPill(label: selectedDateLabel),
-                AppStatusPill(label: '선택한 날 $selectedCount개'),
-                AppStatusPill(
-                  label: state.isEditing ? '수정 중' : state.category.label,
-                  tone: AppStatusTone.success,
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xxs),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Wrap(
+            spacing: AppSpacing.xs,
+            runSpacing: AppSpacing.xs,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              Text(
+                selectedDateLabel,
+                style: theme.textTheme.titleMedium?.copyWith(
+                  color: colorScheme.onSurface,
                 ),
-              ],
-            ),
-            const SizedBox(height: AppSpacing.sm),
-            AppResponsiveActionWrap(
-              children: [
-                FilledButton.icon(
-                  key: const ValueKey('diary-quick-write-button'),
-                  onPressed: onWritePressed,
-                  icon: const Icon(Icons.edit_outlined),
-                  label: const Text('오늘 기록 쓰기'),
+              ),
+              Text(
+                '선택한 날 $selectedCount개',
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: colorScheme.onSurfaceVariant,
+                  fontWeight: FontWeight.w700,
                 ),
-              ],
-            ),
-          ],
-        ),
+              ),
+              Text(
+                state.isEditing ? '수정 중' : state.category.label,
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: colorScheme.primary,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          AppResponsiveActionWrap(
+            children: [
+              FilledButton.icon(
+                key: const ValueKey('diary-quick-write-button'),
+                onPressed: onWritePressed,
+                icon: const Icon(Icons.edit_outlined),
+                label: const Text('오늘 기록 쓰기'),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }

@@ -44,6 +44,13 @@ void main() {
         findsOneWidget);
     expect(
         find.byKey(const ValueKey('diary-quick-write-button')), findsOneWidget);
+    expect(
+      find.ancestor(
+        of: find.byKey(const ValueKey('diary-quick-capture-panel')),
+        matching: find.byType(Card),
+      ),
+      findsNothing,
+    );
     expect(find.text('오늘 기록 쓰기'), findsOneWidget);
     expect(find.text('선택한 날 1개'), findsOneWidget);
     expect(find.text('다른 사용자의 공개 기록을 읽으며 흐름을 이어갑니다.'), findsNothing);
