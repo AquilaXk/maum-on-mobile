@@ -273,6 +273,9 @@ class DiaryDraft {
     this.imageUrl,
     this.image,
     this.contentBlocks = const [],
+    this.moodScore,
+    this.emotionTags,
+    this.triggerTags,
   });
 
   final String title;
@@ -282,6 +285,9 @@ class DiaryDraft {
   final String? imageUrl;
   final DiaryImageAttachment? image;
   final List<DiaryContentBlock> contentBlocks;
+  final int? moodScore;
+  final String? emotionTags;
+  final String? triggerTags;
 }
 
 class DiaryEntry {
@@ -296,6 +302,9 @@ class DiaryEntry {
     required this.createDate,
     required this.modifyDate,
     this.contentBlocks = const [],
+    this.moodScore,
+    this.emotionTags,
+    this.triggerTags,
   });
 
   factory DiaryEntry.fromJson(Object? json) {
@@ -320,6 +329,9 @@ class DiaryEntry {
       contentBlocks: contentBlocks.isEmpty
           ? legacyDiaryContentBlocks(content: content, imageUrl: imageUrl)
           : contentBlocks,
+      moodScore: _readNullableInt(map['moodScore']),
+      emotionTags: _readNullableString(map['emotionTags']),
+      triggerTags: _readNullableString(map['triggerTags']),
     );
   }
 
@@ -333,6 +345,9 @@ class DiaryEntry {
   final String createDate;
   final String modifyDate;
   final List<DiaryContentBlock> contentBlocks;
+  final int? moodScore;
+  final String? emotionTags;
+  final String? triggerTags;
 
   String get dateKey => dateKeyFromDateTime(createDate);
 
@@ -355,6 +370,12 @@ class DiaryEntry {
     String? createDate,
     String? modifyDate,
     List<DiaryContentBlock>? contentBlocks,
+    int? moodScore,
+    bool clearMoodScore = false,
+    String? emotionTags,
+    bool clearEmotionTags = false,
+    String? triggerTags,
+    bool clearTriggerTags = false,
   }) {
     return DiaryEntry(
       id: id,
@@ -367,6 +388,9 @@ class DiaryEntry {
       createDate: createDate ?? this.createDate,
       modifyDate: modifyDate ?? this.modifyDate,
       contentBlocks: contentBlocks ?? this.contentBlocks,
+      moodScore: clearMoodScore ? null : moodScore ?? this.moodScore,
+      emotionTags: clearEmotionTags ? null : emotionTags ?? this.emotionTags,
+      triggerTags: clearTriggerTags ? null : triggerTags ?? this.triggerTags,
     );
   }
 }

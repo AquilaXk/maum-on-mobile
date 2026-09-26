@@ -120,6 +120,17 @@ class DiaryState {
     return counts;
   }
 
+  Map<String, int> get moodScoreByDate {
+    final scores = <String, int>{};
+    for (final entry in entries) {
+      if (entry.moodScore != null && !scores.containsKey(entry.dateKey)) {
+        scores[entry.dateKey] = entry.moodScore!;
+      }
+    }
+    return scores;
+  }
+
+
   DiaryState copyWith({
     DateTime? visibleMonth,
     DateTime? selectedDate,
