@@ -273,6 +273,9 @@ class DiaryDraft {
     this.imageUrl,
     this.image,
     this.contentBlocks = const [],
+    this.moodScore,
+    this.emotionTags,
+    this.triggerTags,
   });
 
   final String title;
@@ -282,6 +285,9 @@ class DiaryDraft {
   final String? imageUrl;
   final DiaryImageAttachment? image;
   final List<DiaryContentBlock> contentBlocks;
+  final int? moodScore;
+  final String? emotionTags;
+  final String? triggerTags;
 }
 
 class DiaryEntry {
@@ -296,6 +302,9 @@ class DiaryEntry {
     required this.createDate,
     required this.modifyDate,
     this.contentBlocks = const [],
+    this.moodScore,
+    this.emotionTags,
+    this.triggerTags,
   });
 
   factory DiaryEntry.fromJson(Object? json) {
@@ -320,6 +329,9 @@ class DiaryEntry {
       contentBlocks: contentBlocks.isEmpty
           ? legacyDiaryContentBlocks(content: content, imageUrl: imageUrl)
           : contentBlocks,
+      moodScore: _readNullableInt(map['moodScore']),
+      emotionTags: _readNullableString(map['emotionTags']),
+      triggerTags: _readNullableString(map['triggerTags']),
     );
   }
 
@@ -333,6 +345,9 @@ class DiaryEntry {
   final String createDate;
   final String modifyDate;
   final List<DiaryContentBlock> contentBlocks;
+  final int? moodScore;
+  final String? emotionTags;
+  final String? triggerTags;
 
   String get dateKey => dateKeyFromDateTime(createDate);
 
@@ -355,6 +370,12 @@ class DiaryEntry {
     String? createDate,
     String? modifyDate,
     List<DiaryContentBlock>? contentBlocks,
+    int? moodScore,
+    bool clearMoodScore = false,
+    String? emotionTags,
+    bool clearEmotionTags = false,
+    String? triggerTags,
+    bool clearTriggerTags = false,
   }) {
     return DiaryEntry(
       id: id,
@@ -367,6 +388,9 @@ class DiaryEntry {
       createDate: createDate ?? this.createDate,
       modifyDate: modifyDate ?? this.modifyDate,
       contentBlocks: contentBlocks ?? this.contentBlocks,
+      moodScore: clearMoodScore ? null : moodScore ?? this.moodScore,
+      emotionTags: clearEmotionTags ? null : emotionTags ?? this.emotionTags,
+      triggerTags: clearTriggerTags ? null : triggerTags ?? this.triggerTags,
     );
   }
 }
@@ -430,11 +454,113 @@ List<DiaryContentBlock> legacyDiaryContentBlocks({
   required String content,
   String? imageUrl,
 }) {
-  return [
-    DiaryContentBlock.text(id: 'text-0', text: content),
-    if (imageUrl != null)
-      DiaryContentBlock.image(id: 'image-0', imageUrl: imageUrl),
-  ];
+  return parseHtmlToDiaryContentBlocks(content: content, imageUrl: imageUrl);
+}
+
+List<DiaryContentBlock> parseHtmlToDiaryContentBlocks({
+  required String content,
+  String? imageUrl,
+}) {
+  final trimmed = content.trim();
+  if (trimmed.isEmpty) {
+    return [
+      DiaryContentBlock.text(id: 'text-0', text: ''),
+      if (imageUrl != null)
+        DiaryContentBlock.image(id: 'image-0', imageUrl: imageUrl),
+    ];
+  }
+
+  final hasHtml = RegExp(r'<[^>]+>').hasMatch(trimmed);
+  if (!hasHtml) {
+    return [
+      DiaryContentBlock.text(id: 'text-0', text: content),
+      if (imageUrl != null)
+        DiaryContentBlock.image(id: 'image-0', imageUrl: imageUrl),
+    ];
+  }
+
+  final blocks = <DiaryContentBlock>[];
+  var blockIndex = 0;
+  final seenImageUrls = <String>{};
+
+  final imgRegex = RegExp(
+    r'''<img[^>]*src=["']([^"']+)["'][^>]*>''',
+    caseSensitive: false,
+  );
+  var lastIndex = 0;
+
+  for (final match in imgRegex.allMatches(trimmed)) {
+    final textBefore = trimmed.substring(lastIndex, match.start);
+    final cleanText = _stripHtmlTags(textBefore);
+    if (cleanText.isNotEmpty) {
+      blocks.add(DiaryContentBlock.text(
+        id: 'text-${blockIndex++}',
+        text: cleanText,
+      ));
+    }
+
+    final imgSrc = match.group(1);
+    final imgTag = match.group(0) ?? '';
+    if (imgSrc != null && imgSrc.isNotEmpty) {
+      seenImageUrls.add(imgSrc);
+      final dataFilenameMatch = RegExp(
+        r'''data-filename=["']([^"']+)["']''',
+        caseSensitive: false,
+      ).firstMatch(imgTag);
+      final altMatch = RegExp(
+        r'''alt=["']([^"']+)["']''',
+        caseSensitive: false,
+      ).firstMatch(imgTag);
+      final filename = dataFilenameMatch?.group(1) ?? altMatch?.group(1);
+      final sizeMatch = RegExp(
+        r'''data-size=["']([^"']+)["']''',
+        caseSensitive: false,
+      ).firstMatch(imgTag);
+
+      blocks.add(DiaryContentBlock.image(
+        id: 'image-${blockIndex++}',
+        imageUrl: imgSrc,
+        filename: filename,
+        byteSize: int.tryParse(sizeMatch?.group(1) ?? ''),
+      ));
+    }
+
+    lastIndex = match.end;
+  }
+
+  if (lastIndex < trimmed.length) {
+    final textAfter = trimmed.substring(lastIndex);
+    final cleanText = _stripHtmlTags(textAfter);
+    if (cleanText.isNotEmpty) {
+      blocks.add(DiaryContentBlock.text(
+        id: 'text-${blockIndex++}',
+        text: cleanText,
+      ));
+    }
+  }
+
+  if (imageUrl != null && !seenImageUrls.contains(imageUrl)) {
+    blocks.add(DiaryContentBlock.image(
+      id: 'image-${blockIndex++}',
+      imageUrl: imageUrl,
+    ));
+  }
+
+  return ensureDiaryTextBlock(blocks);
+}
+
+String _stripHtmlTags(String html) {
+  return html
+      .replaceAll(RegExp(r'<br\s*/?>', caseSensitive: false), '\n')
+      .replaceAll(RegExp(r'</p>', caseSensitive: false), '\n')
+      .replaceAll(RegExp(r'<[^>]+>'), '')
+      .replaceAll('&nbsp;', ' ')
+      .replaceAll('&amp;', '&')
+      .replaceAll('&lt;', '<')
+      .replaceAll('&gt;', '>')
+      .replaceAll('&quot;', '"')
+      .replaceAll('&#039;', "'")
+      .trim();
 }
 
 String encodeDiaryContentBlocks(List<DiaryContentBlock> blocks) {

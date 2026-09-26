@@ -288,6 +288,17 @@ void main() {
       );
       final selectedDecoration = selectedSurface.decoration as BoxDecoration?;
       expect(selectedDecoration?.color, Colors.transparent);
+      final selectedInkWell = tester.widget<InkWell>(
+        find.descendant(
+          of: find.byKey(const ValueKey('route-tab-home')),
+          matching: find.byType(InkWell),
+        ),
+      );
+      expect(selectedInkWell.splashFactory, NoSplash.splashFactory);
+      expect(
+        selectedInkWell.overlayColor?.resolve({WidgetState.pressed}),
+        Colors.transparent,
+      );
       final selectedSurfaceSize = tester.getSize(
         find.byKey(const ValueKey('route-tab-home-surface')),
       );

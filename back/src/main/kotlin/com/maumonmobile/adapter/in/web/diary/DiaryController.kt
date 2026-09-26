@@ -117,6 +117,9 @@ data class DiarySaveRequest(
     @param:JsonProperty("isPrivate")
     @get:JsonProperty("isPrivate")
     val isPrivate: Boolean = false,
+    val moodScore: Int? = null,
+    val emotionTags: String? = null,
+    val triggerTags: String? = null,
     val contentBlocks: List<DiaryContentBlockSaveRequest>? = null,
 )
 
@@ -140,6 +143,9 @@ private fun DiarySaveRequest.toCommand(image: MultipartFile?): DiarySaveCommand 
         imageUrl = imageUrl,
         isPrivate = isPrivate,
         imageFilename = image?.originalFilename,
+        moodScore = moodScore,
+        emotionTags = emotionTags,
+        triggerTags = triggerTags,
         contentBlocks = contentBlocks.orEmpty().map { block ->
             DiaryContentBlockCommand(
                 id = block.id,

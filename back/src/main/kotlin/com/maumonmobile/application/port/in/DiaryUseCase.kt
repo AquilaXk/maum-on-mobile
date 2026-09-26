@@ -25,6 +25,9 @@ data class DiarySaveCommand(
     val isPrivate: Boolean,
     val imageFilename: String?,
     val contentBlocks: List<DiaryContentBlockCommand> = emptyList(),
+    val moodScore: Int? = null,
+    val emotionTags: String? = null,
+    val triggerTags: String? = null,
 )
 
 data class DiaryContentBlockCommand(
@@ -50,6 +53,9 @@ data class DiaryResult(
     val createDate: String,
     val modifyDate: String,
     val contentBlocks: List<DiaryContentBlockResult>,
+    val moodScore: Int? = null,
+    val emotionTags: String? = null,
+    val triggerTags: String? = null,
 )
 
 data class DiaryContentBlockResult(

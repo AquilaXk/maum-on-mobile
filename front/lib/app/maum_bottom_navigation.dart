@@ -18,8 +18,7 @@ class MaumBottomNavigation extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     // 알림/설정 같은 보조 화면에서는 primary 탭을 임의로 선택하지 않는다.
-    final selectedRoute =
-        routes.contains(currentRoute) ? currentRoute : null;
+    final selectedRoute = routes.contains(currentRoute) ? currentRoute : null;
 
     return DecoratedBox(
       key: const ValueKey('app-bottom-navigation-surface'),
@@ -95,6 +94,10 @@ class _MaumBottomNavigationItem extends StatelessWidget {
             borderRadius: AppRadii.card,
             child: InkWell(
               borderRadius: AppRadii.card,
+              canRequestFocus: false,
+              enableFeedback: false,
+              splashFactory: NoSplash.splashFactory,
+              overlayColor: WidgetStateProperty.all(Colors.transparent),
               onTap: () => onSelected(route),
               child: ConstrainedBox(
                 constraints: const BoxConstraints(minHeight: 68),

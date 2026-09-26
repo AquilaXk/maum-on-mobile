@@ -326,40 +326,50 @@ class _DiaryQuickCapturePanel extends StatelessWidget {
     final colorScheme = theme.colorScheme;
     final selectedCount = state.selectedDateEntries.length;
 
-    return Card(
-      margin: EdgeInsets.zero,
-      color: colorScheme.primaryContainer.withValues(alpha: 0.68),
-      child: Padding(
-        padding: const EdgeInsets.all(AppSpacing.md),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Wrap(
-              spacing: AppSpacing.xs,
-              runSpacing: AppSpacing.xs,
-              crossAxisAlignment: WrapCrossAlignment.center,
-              children: [
-                AppStatusPill(label: selectedDateLabel),
-                AppStatusPill(label: '선택한 날 $selectedCount개'),
-                AppStatusPill(
-                  label: state.isEditing ? '수정 중' : state.category.label,
-                  tone: AppStatusTone.success,
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xxs),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Wrap(
+            spacing: AppSpacing.xs,
+            runSpacing: AppSpacing.xs,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              Text(
+                selectedDateLabel,
+                style: theme.textTheme.titleMedium?.copyWith(
+                  color: colorScheme.onSurface,
                 ),
-              ],
-            ),
-            const SizedBox(height: AppSpacing.sm),
-            AppResponsiveActionWrap(
-              children: [
-                FilledButton.icon(
-                  key: const ValueKey('diary-quick-write-button'),
-                  onPressed: onWritePressed,
-                  icon: const Icon(Icons.edit_outlined),
-                  label: const Text('오늘 기록 쓰기'),
+              ),
+              Text(
+                '선택한 날 $selectedCount개',
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: colorScheme.onSurfaceVariant,
+                  fontWeight: FontWeight.w700,
                 ),
-              ],
-            ),
-          ],
-        ),
+              ),
+              Text(
+                state.isEditing ? '수정 중' : state.category.label,
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: colorScheme.primary,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          AppResponsiveActionWrap(
+            children: [
+              FilledButton.icon(
+                key: const ValueKey('diary-quick-write-button'),
+                onPressed: onWritePressed,
+                icon: const Icon(Icons.edit_outlined),
+                label: const Text('오늘 기록 쓰기'),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }
@@ -464,6 +474,7 @@ class _CalendarSection extends StatelessWidget {
                 day: day,
                 isSelected: dateKeyFromDate(day) == state.selectedDateKey,
                 count: counts[dateKeyFromDate(day)] ?? 0,
+                moodScore: state.moodScoreByDate[dateKeyFromDate(day)],
                 onTap: () => onSelectDate(day),
               ),
           ],
@@ -479,12 +490,14 @@ class _CalendarDayButton extends StatelessWidget {
     required this.isSelected,
     required this.count,
     required this.onTap,
+    this.moodScore,
   });
 
   final DateTime day;
   final bool isSelected;
   final int count;
   final VoidCallback onTap;
+  final int? moodScore;
 
   @override
   Widget build(BuildContext context) {
@@ -553,6 +566,7 @@ class _CalendarDayButton extends StatelessWidget {
                         _CalendarEntryMarker(
                           key: ValueKey('diary-day-$dateKey-entry-marker'),
                           isSelected: isSelected,
+                          moodScore: moodScore,
                         ),
                       ],
                     ],
@@ -567,26 +581,52 @@ class _CalendarDayButton extends StatelessWidget {
   }
 }
 
+Color _moodMarkerColor(int moodScore) {
+  switch (moodScore) {
+    case 1:
+      return const Color(0xFFEF4444);
+    case 2:
+      return const Color(0xFFF97316);
+    case 3:
+      return const Color(0xFFEAB308);
+    case 4:
+      return const Color(0xFF0284C7);
+    case 5:
+      return const Color(0xFF5C6BC0);
+    default:
+      return const Color(0xFF5C6BC0);
+  }
+}
+
 class _CalendarEntryMarker extends StatelessWidget {
   const _CalendarEntryMarker({
     required this.isSelected,
+    this.moodScore,
     super.key,
   });
 
   final bool isSelected;
+  final int? moodScore;
 
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
+    final markerColor = moodScore != null
+        ? _moodMarkerColor(moodScore!)
+        : (isSelected
+            ? colorScheme.onPrimaryContainer
+            : colorScheme.primary.withValues(alpha: 0.72));
 
     return DecoratedBox(
       decoration: BoxDecoration(
-        color: isSelected
-            ? colorScheme.onPrimaryContainer
-            : colorScheme.primary.withValues(alpha: 0.72),
-        borderRadius: AppRadii.status,
+        color: markerColor,
+        shape: moodScore != null ? BoxShape.circle : BoxShape.rectangle,
+        borderRadius: moodScore != null ? null : AppRadii.status,
       ),
-      child: const SizedBox(width: 18, height: 5),
+      child: SizedBox(
+        width: moodScore != null ? 7 : 18,
+        height: moodScore != null ? 7 : 5,
+      ),
     );
   }
 }

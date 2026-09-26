@@ -297,6 +297,8 @@ class ConsultationControllerTest @Autowired constructor(
                 jsonPath("$.data.safety.message") { value(org.hamcrest.Matchers.containsString("혼자 있지")) }
                 jsonPath("$.data.safety.message") { value(org.hamcrest.Matchers.containsString("119")) }
                 jsonPath("$.data.safety.message") { value(org.hamcrest.Matchers.containsString("112")) }
+                jsonPath("$.data.safety.message") { value(org.hamcrest.Matchers.containsString("109")) }
+                jsonPath("$.data.safety.message") { value(org.hamcrest.Matchers.containsString("1577-0199")) }
             }
 
         mockMvc.get("/api/v1/consultations/recent") {

@@ -524,7 +524,15 @@ void main() {
     );
     expect(find.text('즉시 도움 요청'), findsOneWidget);
     expect(
+      find.byKey(const ValueKey('consultation-emergency-109-button')),
+      findsOneWidget,
+    );
+    expect(
       find.byKey(const ValueKey('consultation-emergency-119-button')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey('consultation-emergency-1577-0199-button')),
       findsOneWidget,
     );
     expect(

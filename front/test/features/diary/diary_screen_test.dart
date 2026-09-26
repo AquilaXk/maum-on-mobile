@@ -44,6 +44,13 @@ void main() {
         findsOneWidget);
     expect(
         find.byKey(const ValueKey('diary-quick-write-button')), findsOneWidget);
+    expect(
+      find.ancestor(
+        of: find.byKey(const ValueKey('diary-quick-capture-panel')),
+        matching: find.byType(Card),
+      ),
+      findsNothing,
+    );
     expect(find.text('오늘 기록 쓰기'), findsOneWidget);
     expect(find.text('선택한 날 1개'), findsOneWidget);
     expect(find.text('다른 사용자의 공개 기록을 읽으며 흐름을 이어갑니다.'), findsNothing);
@@ -254,6 +261,50 @@ void main() {
         hasTapAction: true,
       ),
     );
+  });
+
+  testWidgets('달력 항목 마커는 moodScore에 따라 고유한 감정 컬러 도트를 표시한다', (tester) async {
+    final controller = DiaryController(
+      diaryRepository: _FakeDiaryRepository(
+        pages: [
+          _page([
+            _entry(id: 1, title: '슬픔', createDate: '2026-05-01T09:00:00', moodScore: 1),
+            _entry(id: 5, title: '최고', createDate: '2026-05-05T09:00:00', moodScore: 5),
+          ]),
+        ],
+      ),
+      imageRepository: _FakeDiaryImageRepository(),
+      now: DateTime(2026, 5, 20),
+    );
+
+    await controller.load();
+    await tester.pumpWidget(
+      MaterialApp(
+        home: DiaryScreen(
+          controller: controller,
+          imagePicker: _FakeDiaryImagePicker(),
+          onBack: () {},
+        ),
+      ),
+    );
+
+    final marker1 = tester.widget<DecoratedBox>(
+      find.descendant(
+        of: find.byKey(const ValueKey('diary-day-2026-05-01-entry-marker')),
+        matching: find.byType(DecoratedBox),
+      ),
+    );
+    expect((marker1.decoration as BoxDecoration).color, const Color(0xFFEF4444));
+    expect((marker1.decoration as BoxDecoration).shape, BoxShape.circle);
+
+    final marker5 = tester.widget<DecoratedBox>(
+      find.descendant(
+        of: find.byKey(const ValueKey('diary-day-2026-05-05-entry-marker')),
+        matching: find.byType(DecoratedBox),
+      ),
+    );
+    expect((marker5.decoration as BoxDecoration).color, const Color(0xFF5C6BC0));
+    expect((marker5.decoration as BoxDecoration).shape, BoxShape.circle);
   });
 
   testWidgets('picks a gallery image and submits a diary', (tester) async {
@@ -661,6 +712,7 @@ DiaryEntry _entry({
   required String title,
   required String createDate,
   bool isPrivate = true,
+  int? moodScore,
 }) {
   return DiaryEntry(
     id: id,
@@ -672,6 +724,7 @@ DiaryEntry _entry({
     isPrivate: isPrivate,
     createDate: createDate,
     modifyDate: createDate,
+    moodScore: moodScore,
   );
 }
 

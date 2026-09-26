@@ -107,6 +107,9 @@ class ApiDiaryRepository implements DiaryRepository {
             'contentBlocks': draft.contentBlocks
                 .map((block) => block.toJson())
                 .toList(growable: false),
+            'moodScore': draft.moodScore,
+            'emotionTags': draft.emotionTags,
+            'triggerTags': draft.triggerTags,
           }),
           contentType: 'application/json',
         ),
