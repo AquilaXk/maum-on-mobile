@@ -1,6 +1,6 @@
 # 📱 마음온 모바일 (Maum On Mobile)
 
-> **"언제 어디서나, 당신의 손끝에서 시작되는 따뜻한 위로와 마음 치유"**  
+> **"언제 어디서나, 당신의 손끝에서 시작되는 따뜻한 위로와 마음 치유"**
 > 마음온 모바일은 일상적인 감정 기록(캘린더 일기), 따뜻한 공감 커뮤니티(스토리), 익명 마음 편지 교환, 24시간 실시간 AI 심리상담 및 위기상담 핫라인 연계를 제공하는 **Android 및 iOS 크로스플랫폼 멘탈케어 모바일 애플리케이션 및 전용 백엔드 서비스**입니다.
 
 <p align="center">
@@ -86,7 +86,7 @@ flowchart TD
         Services["application.service\n(Domain Services & Idempotency)"]
         DomainModels["domain\n(Entities & Business Rules)"]
         OutAdapters["adapter.out\n(Persistence / AI / Push / SSE)"]
-        
+
         WebAdapters --> UseCases
         UseCases --> Services
         Services --> DomainModels
