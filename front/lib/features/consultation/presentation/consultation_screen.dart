@@ -264,11 +264,25 @@ class _SafetyNotice extends StatelessWidget {
           AppResponsiveActionWrap(
             children: [
               _EmergencyActionButton(
+                key: const ValueKey('consultation-emergency-109-button'),
+                icon: Icons.phone_in_talk_outlined,
+                label: '109',
+                semanticLabel: '109 24시간 자살예방 상담전화',
+                onPressed: () => _showEmergencyContact(context, '109'),
+              ),
+              _EmergencyActionButton(
                 key: const ValueKey('consultation-emergency-119-button'),
                 icon: Icons.local_hospital_outlined,
                 label: '119',
                 semanticLabel: '119 긴급 구조 요청',
                 onPressed: () => _showEmergencyContact(context, '119'),
+              ),
+              _EmergencyActionButton(
+                key: const ValueKey('consultation-emergency-1577-0199-button'),
+                icon: Icons.support_outlined,
+                label: '1577-0199',
+                semanticLabel: '1577-0199 정신건강 위기상담전화',
+                onPressed: () => _showEmergencyContact(context, '1577-0199'),
               ),
               _EmergencyActionButton(
                 key: const ValueKey('consultation-emergency-112-button'),
@@ -335,10 +349,16 @@ class _EmergencyActionButton extends StatelessWidget {
     return Semantics(
       button: true,
       label: semanticLabel,
-      child: FilledButton.tonalIcon(
-        onPressed: onPressed,
-        icon: Icon(icon),
-        label: Text(label),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(minHeight: 48, minWidth: 48),
+        child: FilledButton.tonalIcon(
+          style: FilledButton.styleFrom(
+            minimumSize: const Size(48, 48),
+          ),
+          onPressed: onPressed,
+          icon: Icon(icon),
+          label: Text(label),
+        ),
       ),
     );
   }
