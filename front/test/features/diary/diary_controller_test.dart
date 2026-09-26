@@ -635,6 +635,66 @@ void main() {
           controller.state.imageBlocks.single.errorMessage, contains('다시 선택'));
     });
 
+    test('propagates moodScore and tags on create and preserves them on edit', () async {
+      final repository = _FakeDiaryRepository(
+        pages: [
+          _page([]),
+          _page([
+            _entry(
+              id: 20,
+              title: '기분 일기',
+              createDate: '2026-05-20T12:00:00',
+              moodScore: 4,
+              emotionTags: '평온,감사',
+              triggerTags: '산책',
+            ),
+          ]),
+          _page([]),
+        ],
+        createdId: 20,
+      );
+      final controller = DiaryController(
+        diaryRepository: repository,
+        imageRepository: _FakeDiaryImageRepository(),
+        now: DateTime(2026, 5, 20),
+      );
+
+      await controller.load();
+      controller.updateTitle('새로운 기분 일기');
+      controller.updateContent('오늘 마음이 편안했다.');
+      controller.updateMoodScore(4);
+      controller.updateEmotionTags('평온,감사');
+      controller.updateTriggerTags('산책');
+      await controller.submit();
+
+      final createdDraft = repository.createdDrafts.single;
+      expect(createdDraft.moodScore, 4);
+      expect(createdDraft.emotionTags, '평온,감사');
+      expect(createdDraft.triggerTags, '산책');
+
+      // Now test editing: startEditing should preserve mood and tags
+      final entryToEdit = _entry(
+        id: 20,
+        title: '수정할 일기',
+        createDate: '2026-05-20T12:00:00',
+        moodScore: 5,
+        emotionTags: '기쁨',
+        triggerTags: '휴식',
+      );
+      controller.startEditing(entryToEdit);
+      expect(controller.state.moodScore, 5);
+      expect(controller.state.emotionTags, '기쁨');
+      expect(controller.state.triggerTags, '휴식');
+
+      controller.updateContent('수정된 내용입니다.');
+      await controller.submit();
+
+      final updatedDraft = repository.updatedDrafts.single.draft;
+      expect(updatedDraft.moodScore, 5);
+      expect(updatedDraft.emotionTags, '기쁨');
+      expect(updatedDraft.triggerTags, '휴식');
+    });
+
     test('invokes unauthorized callback on expired auth', () async {
       var unauthorizedCount = 0;
       final controller = DiaryController(
@@ -707,6 +767,9 @@ DiaryEntry _entry({
   required String title,
   required String createDate,
   bool isPrivate = true,
+  int? moodScore,
+  String? emotionTags,
+  String? triggerTags,
 }) {
   return DiaryEntry(
     id: id,
@@ -718,6 +781,9 @@ DiaryEntry _entry({
     isPrivate: isPrivate,
     createDate: createDate,
     modifyDate: createDate,
+    moodScore: moodScore,
+    emotionTags: emotionTags,
+    triggerTags: triggerTags,
   );
 }
 

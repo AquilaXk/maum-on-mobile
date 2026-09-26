@@ -36,6 +36,9 @@ class DiaryState {
     this.contentBlocks = const [
       DiaryContentBlock(id: 'text-0', type: DiaryContentBlockType.text),
     ],
+    this.moodScore,
+    this.emotionTags,
+    this.triggerTags,
     this.errorMessage,
     this.publicErrorMessage,
     this.noticeMessage,
@@ -63,6 +66,9 @@ class DiaryState {
   final String? imageUrl;
   final DiaryImageAttachment? selectedImage;
   final List<DiaryContentBlock> contentBlocks;
+  final int? moodScore;
+  final String? emotionTags;
+  final String? triggerTags;
   final String? errorMessage;
   final String? publicErrorMessage;
   final String? noticeMessage;
@@ -157,6 +163,12 @@ class DiaryState {
     DiaryImageAttachment? selectedImage,
     bool clearSelectedImage = false,
     List<DiaryContentBlock>? contentBlocks,
+    int? moodScore,
+    bool clearMoodScore = false,
+    String? emotionTags,
+    bool clearEmotionTags = false,
+    String? triggerTags,
+    bool clearTriggerTags = false,
     String? errorMessage,
     bool clearErrorMessage = false,
     String? publicErrorMessage,
@@ -192,6 +204,9 @@ class DiaryState {
       selectedImage:
           clearSelectedImage ? null : selectedImage ?? this.selectedImage,
       contentBlocks: contentBlocks ?? this.contentBlocks,
+      moodScore: clearMoodScore ? null : moodScore ?? this.moodScore,
+      emotionTags: clearEmotionTags ? null : emotionTags ?? this.emotionTags,
+      triggerTags: clearTriggerTags ? null : triggerTags ?? this.triggerTags,
       errorMessage:
           clearErrorMessage ? null : errorMessage ?? this.errorMessage,
       publicErrorMessage: clearPublicErrorMessage
@@ -269,6 +284,13 @@ class DiaryController extends ChangeNotifier {
         isPrivate: entry.fields['isPrivate'] != 'false',
         imageUrl: primaryDiaryImageUrlFromBlocks(contentBlocks),
         contentBlocks: contentBlocks,
+        moodScore: int.tryParse(entry.fields['moodScore'] ?? ''),
+        emotionTags: entry.fields['emotionTags']?.isEmpty == true
+            ? null
+            : entry.fields['emotionTags'],
+        triggerTags: entry.fields['triggerTags']?.isEmpty == true
+            ? null
+            : entry.fields['triggerTags'],
         noticeMessage: '임시 저장된 기록을 복원했습니다.',
         clearErrorMessage: true,
       ),
@@ -386,6 +408,36 @@ class DiaryController extends ChangeNotifier {
 
   void updatePrivacy(bool isPrivate) {
     _setState(_state.copyWith(isPrivate: isPrivate));
+    _saveDraft();
+  }
+
+  void updateMoodScore(int? moodScore) {
+    _setState(
+      _state.copyWith(
+        moodScore: moodScore,
+        clearMoodScore: moodScore == null,
+      ),
+    );
+    _saveDraft();
+  }
+
+  void updateEmotionTags(String? emotionTags) {
+    _setState(
+      _state.copyWith(
+        emotionTags: emotionTags,
+        clearEmotionTags: emotionTags == null,
+      ),
+    );
+    _saveDraft();
+  }
+
+  void updateTriggerTags(String? triggerTags) {
+    _setState(
+      _state.copyWith(
+        triggerTags: triggerTags,
+        clearTriggerTags: triggerTags == null,
+      ),
+    );
     _saveDraft();
   }
 
@@ -590,6 +642,9 @@ class DiaryController extends ChangeNotifier {
         isPrivate: entry.isPrivate,
         imageUrl: primaryDiaryImageUrlFromBlocks(contentBlocks),
         contentBlocks: contentBlocks,
+        moodScore: entry.moodScore,
+        emotionTags: entry.emotionTags,
+        triggerTags: entry.triggerTags,
         clearSelectedImage: true,
         noticeMessage: '수정 모드로 전환되었습니다.',
         clearErrorMessage: true,
@@ -669,6 +724,9 @@ class DiaryController extends ChangeNotifier {
         isPrivate: _state.isPrivate,
         imageUrl: uploadedImageUrl,
         contentBlocks: uploadedBlocks,
+        moodScore: _state.moodScore,
+        emotionTags: _state.emotionTags,
+        triggerTags: _state.triggerTags,
       );
 
       if (editingId == null) {
@@ -965,6 +1023,9 @@ class DiaryController extends ChangeNotifier {
       contentBlocks: const [
         DiaryContentBlock(id: 'text-0', type: DiaryContentBlockType.text),
       ],
+      clearMoodScore: true,
+      clearEmotionTags: true,
+      clearTriggerTags: true,
       isUploadingImage: false,
       clearImageUploadProgress: true,
     );
@@ -1003,6 +1064,9 @@ class DiaryController extends ChangeNotifier {
       'imageByteLength': selectedImage?.bytes.length.toString() ?? '',
       'imageSource': selectedImage?.source.name ?? '',
       'imageContentType': selectedImage?.contentType ?? '',
+      'moodScore': _state.moodScore?.toString() ?? '',
+      'emotionTags': _state.emotionTags ?? '',
+      'triggerTags': _state.triggerTags ?? '',
     };
   }
 
