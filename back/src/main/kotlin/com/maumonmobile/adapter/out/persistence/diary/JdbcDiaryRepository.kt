@@ -38,7 +38,10 @@ class JdbcDiaryRepository(
                     image_url,
                     is_private,
                     create_date,
-                    modify_date
+                    modify_date,
+                    mood_score,
+                    emotion_tags,
+                    trigger_tags
                 ) values (
                     :memberId,
                     :nickname,
@@ -48,7 +51,10 @@ class JdbcDiaryRepository(
                     :imageUrl,
                     :isPrivate,
                     :createDate,
-                    :modifyDate
+                    :modifyDate,
+                    :moodScore,
+                    :emotionTags,
+                    :triggerTags
                 )
             """.trimIndent(),
             params()
@@ -60,7 +66,10 @@ class JdbcDiaryRepository(
                 .withValue("imageUrl", draft.imageUrlFor(id = null))
                 .withValue("isPrivate", draft.isPrivate)
                 .withValue("createDate", now)
-                .withValue("modifyDate", now),
+                .withValue("modifyDate", now)
+                .withValue("moodScore", draft.moodScore)
+                .withValue("emotionTags", draft.emotionTags)
+                .withValue("triggerTags", draft.triggerTags),
         )
 
         val imageUrl = draft.imageUrlFor(id)
@@ -85,7 +94,10 @@ class JdbcDiaryRepository(
                        category_name = :categoryName,
                        image_url = :imageUrl,
                        is_private = :isPrivate,
-                       modify_date = :modifyDate
+                       modify_date = :modifyDate,
+                       mood_score = :moodScore,
+                       emotion_tags = :emotionTags,
+                       trigger_tags = :triggerTags
                  where id = :id
             """.trimIndent(),
             params()
@@ -95,7 +107,10 @@ class JdbcDiaryRepository(
                 .withValue("categoryName", draft.categoryName)
                 .withValue("imageUrl", draft.imageUrlFor(diary.id))
                 .withValue("isPrivate", draft.isPrivate)
-                .withValue("modifyDate", Instant.now().toString()),
+                .withValue("modifyDate", Instant.now().toString())
+                .withValue("moodScore", draft.moodScore)
+                .withValue("emotionTags", draft.emotionTags)
+                .withValue("triggerTags", draft.triggerTags),
         )
         replaceContentBlocks(diary.id, draft.contentBlocks.blocksForPersistence(draft.imageUrlFor(diary.id)))
         return findById(diary.id) ?: error("수정된 기록을 확인하지 못했습니다.")
@@ -289,6 +304,9 @@ class JdbcDiaryRepository(
                 isPrivate = rs.getBoolean("is_private"),
                 createDate = rs.getString("create_date"),
                 modifyDate = rs.getString("modify_date"),
+                moodScore = rs.getIntOrNull("mood_score"),
+                emotionTags = rs.getString("emotion_tags"),
+                triggerTags = rs.getString("trigger_tags"),
             )
         }
 
@@ -319,6 +337,11 @@ class JdbcDiaryRepository(
 
         private fun ResultSet.getLongOrNull(columnName: String): Long? {
             val value = getLong(columnName)
+            return if (wasNull()) null else value
+        }
+
+        private fun ResultSet.getIntOrNull(columnName: String): Int? {
+            val value = getInt(columnName)
             return if (wasNull()) null else value
         }
     }

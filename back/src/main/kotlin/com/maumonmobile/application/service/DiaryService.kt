@@ -158,6 +158,9 @@ private fun DiarySaveCommand.toDraft(): DiaryDraft {
         isPrivate = isPrivate,
         imageFilename = imageFilename?.trim()?.takeIf(String::isNotEmpty),
         contentBlocks = normalizedBlocks,
+        moodScore = moodScore,
+        emotionTags = emotionTags?.trim()?.takeIf(String::isNotEmpty),
+        triggerTags = triggerTags?.trim()?.takeIf(String::isNotEmpty),
     )
 }
 
@@ -176,6 +179,9 @@ private fun Diary.toResult(): DiaryResult {
         createDate = createDate,
         modifyDate = modifyDate,
         contentBlocks = readableContentBlocks().map { block -> block.toResult() },
+        moodScore = moodScore,
+        emotionTags = emotionTags,
+        triggerTags = triggerTags,
     )
 }
 

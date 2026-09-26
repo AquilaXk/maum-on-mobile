@@ -12,6 +12,9 @@ data class Diary(
     val createDate: String,
     val modifyDate: String,
     val contentBlocks: List<DiaryContentBlock> = emptyList(),
+    val moodScore: Int? = null,
+    val emotionTags: String? = null,
+    val triggerTags: String? = null,
 )
 
 data class DiaryDraft(
@@ -22,6 +25,9 @@ data class DiaryDraft(
     val isPrivate: Boolean,
     val imageFilename: String?,
     val contentBlocks: List<DiaryContentBlockDraft> = emptyList(),
+    val moodScore: Int? = null,
+    val emotionTags: String? = null,
+    val triggerTags: String? = null,
 )
 
 data class DiaryContentBlock(

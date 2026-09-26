@@ -35,6 +35,9 @@ class InMemoryDiaryRepository : DiaryRepository {
             createDate = now,
             modifyDate = now,
             contentBlocks = draft.contentBlocks.blocksForPersistence(imageUrl),
+            moodScore = draft.moodScore,
+            emotionTags = draft.emotionTags,
+            triggerTags = draft.triggerTags,
         )
 
         diariesById[id] = diary
@@ -52,6 +55,9 @@ class InMemoryDiaryRepository : DiaryRepository {
             isPrivate = draft.isPrivate,
             modifyDate = Instant.now().toString(),
             contentBlocks = draft.contentBlocks.blocksForPersistence(imageUrl),
+            moodScore = draft.moodScore,
+            emotionTags = draft.emotionTags,
+            triggerTags = draft.triggerTags,
         )
 
         diariesById[updatedDiary.id] = updatedDiary
