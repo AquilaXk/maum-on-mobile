@@ -7,6 +7,8 @@ import com.maumonmobile.global.security.AuthenticatedUser
 import com.maumonmobile.global.web.ApiException
 import com.maumonmobile.global.web.ApiResponse
 import com.maumonmobile.global.web.ErrorCode
+import jakarta.validation.Valid
+import jakarta.validation.constraints.Size
 import org.springframework.security.core.Authentication
 import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.RequestBody
@@ -22,7 +24,7 @@ class ContentModerationController(
     @PostMapping("/text")
     fun reviewText(
         authentication: Authentication,
-        @RequestBody request: ContentModerationRequest,
+        @Valid @RequestBody request: ContentModerationRequest,
     ): ApiResponse<ContentModerationResult> {
         return ApiResponse.success(
             contentModerationUseCase.review(
@@ -35,6 +37,7 @@ class ContentModerationController(
 
 data class ContentModerationRequest(
     val targetType: String? = null,
+    @field:Size(max = 20_000)
     val text: String? = null,
 )
 
