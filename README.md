@@ -10,7 +10,7 @@
   <img src="https://img.shields.io/badge/iOS-Native-000000?style=for-the-badge&logo=apple&logoColor=white" alt="iOS" />
   <img src="https://img.shields.io/badge/Kotlin-2.2.21-7F52FF?style=for-the-badge&logo=kotlin&logoColor=white" alt="Kotlin" />
   <img src="https://img.shields.io/badge/Spring%20Boot-4.0.3-6DB33F?style=for-the-badge&logo=springboot&logoColor=white" alt="Spring Boot" />
-  <img src="https://img.shields.io/badge/Flyway-V21-CC0200?style=for-the-badge&logo=flyway&logoColor=white" alt="Flyway" />
+  <img src="https://img.shields.io/badge/Flyway-V22-CC0200?style=for-the-badge&logo=flyway&logoColor=white" alt="Flyway" />
   <img src="https://img.shields.io/badge/OCI-Ampere%20A1%20CD-F80000?style=for-the-badge&logo=oracle&logoColor=white" alt="OCI CD" />
 </p>
 
@@ -95,7 +95,7 @@ flowchart TD
 
     subgraph Storage ["Database & Storage"]
         H2[(Local H2 Dev DB)]
-        PG[(PostgreSQL 16 Prod\nFlyway V1~V21)]
+        PG[(PostgreSQL 16 Prod\nFlyway V1~V22)]
         FCM["FCM / APNs Push"]
         Vertex["Vertex AI / Rule-Based Model"]
     end
@@ -131,7 +131,7 @@ maum-on-mobile/
 │   │   ├── application/       # 유스케이스, 포트, 비즈니스 서비스, 멱등성 보장
 │   │   ├── adapter/           # REST 컨트롤러, SSE 레지스트리, JDBC/인메모리 레포지토리
 │   │   └── global/            # JWT 보안 필터, 공통 응답, 레이트 리미터, 예외 처리
-│   ├── src/main/resources/    # application-{dev, prod, test}.yaml, Flyway V1~V21 마이그레이션
+│   ├── src/main/resources/    # application-{dev, prod, test}.yaml, Flyway V1~V22 마이그레이션
 │   └── build.gradle.kts       # Kotlin DSL 빌드 설정
 ├── contracts/                 # API JSON Schema 계약 및 릴리스 기준 정의
 ├── tools/                     # 저장소 전용 래퍼 도구 (flutterw)
@@ -218,7 +218,7 @@ cd front && ../tools/flutterw build web --target lib/admin_main.dart --dart-defi
 - **Language**: **Kotlin 2.2.21** (JVM 21) — *백엔드는 100% Kotlin으로만 작성되며 Java 코드 작성이 엄격히 제한됩니다.*
 - **Framework**: Spring Boot 4.0.3, Spring Security, Spring JDBC
 - **Database**: H2 (개발용), PostgreSQL 16 (운영용)
-- **Migration**: Flyway 11 (`V1__bootstrap.sql` ~ `V21__diary_mood_and_tags.sql`)
+- **Migration**: Flyway 11 (`V1__bootstrap.sql` ~ `V22__query_efficiency_indexes.sql`)
 - **Architecture**: Hexagonal Architecture (`domain` -> `application` -> `adapter` -> `global`)
 
 ### 로컬 개발 서버 구동 (H2 Dev Profile)
@@ -233,7 +233,7 @@ cd front && ../tools/flutterw build web --target lib/admin_main.dart --dart-defi
 
 ### 테스트 및 커버리지 검증
 ```bash
-# 전체 테스트 실행 (47개 테스트 클래스 및 Jacoco 커버리지 리포트 생성)
+# 전체 테스트 실행 (49개 테스트 클래스 및 Jacoco 커버리지 리포트 생성)
 ./back/gradlew -p back test
 
 # 특정 컨트롤러 또는 도메인 테스트 실행
