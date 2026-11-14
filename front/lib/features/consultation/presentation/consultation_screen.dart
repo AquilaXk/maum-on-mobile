@@ -1,20 +1,30 @@
+// Streaming chat bubble isolation and near-bottom scroll pinning adapted from:
+// - flyerhq/flutter_chat_ui (Apache-2.0)
+// - flutter/ai (BSD-3-Clause)
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../../shared/ui/app_design_system.dart';
 import '../application/consultation_controller.dart';
 import '../domain/consultation_models.dart';
 
+typedef ConsultationEmergencyDialer = Future<void> Function(String number);
+
 class ConsultationScreen extends StatefulWidget {
   const ConsultationScreen({
     required this.controller,
     this.onBack,
+    this.emergencyDialer,
     super.key,
   });
 
   final ConsultationController controller;
   final VoidCallback? onBack;
+  final ConsultationEmergencyDialer? emergencyDialer;
 
   @override
   State<ConsultationScreen> createState() => _ConsultationScreenState();
@@ -22,15 +32,23 @@ class ConsultationScreen extends StatefulWidget {
 
 class _ConsultationScreenState extends State<ConsultationScreen>
     with WidgetsBindingObserver {
+  static final RegExp _nonDigitPattern = RegExp(r'[^0-9]');
+  static const double _nearBottomThreshold = 64;
+
   final ScrollController _scrollController = ScrollController();
+  final ValueNotifier<bool> _showJumpToBottomNotifier =
+      ValueNotifier<bool>(false);
   late final TextEditingController _textController;
+  bool _isNearBottom = true;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    _scrollController.addListener(_handleScrollChanged);
     _textController =
         TextEditingController(text: widget.controller.state.draft);
+    _attachController(widget.controller);
     unawaited(widget.controller.connect());
   }
 
@@ -38,6 +56,8 @@ class _ConsultationScreenState extends State<ConsultationScreen>
   void didUpdateWidget(covariant ConsultationScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.controller != widget.controller) {
+      _detachController(oldWidget.controller);
+      _attachController(widget.controller);
       _syncText();
       unawaited(widget.controller.connect());
     }
@@ -51,10 +71,41 @@ class _ConsultationScreenState extends State<ConsultationScreen>
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    _detachController(widget.controller);
+    _scrollController.removeListener(_handleScrollChanged);
     widget.controller.close();
+    _showJumpToBottomNotifier.dispose();
     _scrollController.dispose();
     _textController.dispose();
     super.dispose();
+  }
+
+  void _attachController(ConsultationController controller) {
+    controller.streamingContentNotifier.addListener(_handleStreamingChunkUpdate);
+  }
+
+  void _detachController(ConsultationController controller) {
+    controller.streamingContentNotifier
+        .removeListener(_handleStreamingChunkUpdate);
+  }
+
+  void _handleScrollChanged() {
+    if (!_scrollController.hasClients) {
+      return;
+    }
+    final position = _scrollController.position;
+    final nearBottom = position.extentAfter <= _nearBottomThreshold;
+    _isNearBottom = nearBottom;
+    final showJump = !nearBottom && position.maxScrollExtent > 0;
+    if (_showJumpToBottomNotifier.value != showJump) {
+      _showJumpToBottomNotifier.value = showJump;
+    }
+  }
+
+  void _handleStreamingChunkUpdate() {
+    if (_isNearBottom) {
+      _scheduleScrollToBottom();
+    }
   }
 
   void _syncText() {
@@ -70,13 +121,63 @@ class _ConsultationScreenState extends State<ConsultationScreen>
   }
 
   void _scheduleScrollToBottom() {
+    if (!_isNearBottom) {
+      return;
+    }
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!_scrollController.hasClients) {
+      if (!_scrollController.hasClients || !_isNearBottom) {
         return;
       }
 
       _scrollController.jumpTo(_scrollController.position.maxScrollExtent);
     });
+  }
+
+  void _jumpToBottom() {
+    _isNearBottom = true;
+    _showJumpToBottomNotifier.value = false;
+    if (!_scrollController.hasClients) {
+      return;
+    }
+    _scrollController.jumpTo(_scrollController.position.maxScrollExtent);
+  }
+
+  void _handleEmergencyContact(BuildContext context, String number) {
+    ScaffoldMessenger.of(context)
+      ..clearSnackBars()
+      ..showSnackBar(
+        SnackBar(content: Text('기기 전화 앱에서 $number에 연락해 주세요.')),
+      );
+    unawaited(_launchEmergencyDialer(number));
+  }
+
+  Future<void> _launchEmergencyDialer(String number) async {
+    final customDialer = widget.emergencyDialer;
+    if (customDialer != null) {
+      try {
+        await customDialer(number);
+      } on Object {
+        // Keep immediate contact notice visible when platform dialer is unavailable.
+      }
+      return;
+    }
+
+    final digitsOnly = number.replaceAll(_nonDigitPattern, '');
+    if (digitsOnly.isEmpty) {
+      return;
+    }
+    try {
+      await launchUrl(
+        Uri(scheme: 'tel', path: digitsOnly),
+        mode: LaunchMode.externalApplication,
+      );
+    } on MissingPluginException {
+      // Headless tests and platforms without url_launcher plugin keep snackbar feedback.
+    } on PlatformException {
+      // Emulators without telephony fall back gracefully to snackbar feedback.
+    } on Object {
+      // Preserve fail-safe emergency guidance when OS dialer cannot open.
+    }
   }
 
   @override
@@ -106,6 +207,7 @@ class _ConsultationScreenState extends State<ConsultationScreen>
                     safety: state.safetyNotice!,
                     onDeleteSensitive:
                         widget.controller.deleteSensitiveMessages,
+                    onEmergencyContact: _handleEmergencyContact,
                   ),
                 if (state.safetyNotice == null && state.failedMessage != null)
                   _FailedMessageNotice(
@@ -127,9 +229,44 @@ class _ConsultationScreenState extends State<ConsultationScreen>
                 ),
                 Expanded(
                   key: const ValueKey('consultation-chat-section'),
-                  child: _ConversationList(
-                    controller: _scrollController,
-                    messages: state.messages,
+                  child: Stack(
+                    children: [
+                      _ConversationList(
+                        controller: _scrollController,
+                        messages: state.messages,
+                        streamingMessageId:
+                            widget.controller.activeStreamingMessageId,
+                        streamingContentListenable:
+                            widget.controller.streamingContentNotifier,
+                      ),
+                      Positioned(
+                        right: AppSpacing.md,
+                        bottom: AppSpacing.sm,
+                        child: ValueListenableBuilder<bool>(
+                          valueListenable: _showJumpToBottomNotifier,
+                          builder: (context, showJump, _) {
+                            if (!showJump) {
+                              return const SizedBox.shrink();
+                            }
+                            return Semantics(
+                              button: true,
+                              label: '최신 답변 보기',
+                              child: FilledButton.tonalIcon(
+                                key: const ValueKey(
+                                  'consultation-jump-to-bottom-button',
+                                ),
+                                onPressed: _jumpToBottom,
+                                icon: const Icon(
+                                  Icons.arrow_downward_rounded,
+                                  size: 18,
+                                ),
+                                label: const Text('최신 답변 보기'),
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+                    ],
                   ),
                 ),
                 _Composer(
@@ -237,10 +374,12 @@ class _SafetyNotice extends StatelessWidget {
   const _SafetyNotice({
     required this.safety,
     required this.onDeleteSensitive,
+    required this.onEmergencyContact,
   });
 
   final ConsultationSafetyResult safety;
   final Future<void> Function() onDeleteSensitive;
+  final void Function(BuildContext context, String number) onEmergencyContact;
 
   @override
   Widget build(BuildContext context) {
@@ -268,35 +407,35 @@ class _SafetyNotice extends StatelessWidget {
                 icon: Icons.phone_in_talk_outlined,
                 label: '109',
                 semanticLabel: '109 24시간 자살예방 상담전화',
-                onPressed: () => _showEmergencyContact(context, '109'),
+                onPressed: () => onEmergencyContact(context, '109'),
               ),
               _EmergencyActionButton(
                 key: const ValueKey('consultation-emergency-119-button'),
                 icon: Icons.local_hospital_outlined,
                 label: '119',
                 semanticLabel: '119 긴급 구조 요청',
-                onPressed: () => _showEmergencyContact(context, '119'),
+                onPressed: () => onEmergencyContact(context, '119'),
               ),
               _EmergencyActionButton(
                 key: const ValueKey('consultation-emergency-1577-0199-button'),
                 icon: Icons.support_outlined,
                 label: '1577-0199',
                 semanticLabel: '1577-0199 정신건강 위기상담전화',
-                onPressed: () => _showEmergencyContact(context, '1577-0199'),
+                onPressed: () => onEmergencyContact(context, '1577-0199'),
               ),
               _EmergencyActionButton(
                 key: const ValueKey('consultation-emergency-112-button'),
                 icon: Icons.local_police_outlined,
                 label: '112',
                 semanticLabel: '112 경찰 긴급 신고',
-                onPressed: () => _showEmergencyContact(context, '112'),
+                onPressed: () => onEmergencyContact(context, '112'),
               ),
               _EmergencyActionButton(
                 key: const ValueKey('consultation-emergency-1388-button'),
                 icon: Icons.support_agent_outlined,
                 label: '1388',
                 semanticLabel: '1388 청소년 상담 연결',
-                onPressed: () => _showEmergencyContact(context, '1388'),
+                onPressed: () => onEmergencyContact(context, '1388'),
               ),
             ],
           ),
@@ -319,14 +458,6 @@ class _SafetyNotice extends StatelessWidget {
         ],
       ),
     );
-  }
-
-  void _showEmergencyContact(BuildContext context, String number) {
-    ScaffoldMessenger.of(context)
-      ..clearSnackBars()
-      ..showSnackBar(
-        SnackBar(content: Text('기기 전화 앱에서 $number에 연락해 주세요.')),
-      );
   }
 }
 
@@ -589,10 +720,14 @@ class _ConversationList extends StatelessWidget {
   const _ConversationList({
     required this.controller,
     required this.messages,
+    required this.streamingMessageId,
+    required this.streamingContentListenable,
   });
 
   final ScrollController controller;
   final List<ConsultationMessage> messages;
+  final String? streamingMessageId;
+  final ValueListenable<String?> streamingContentListenable;
 
   @override
   Widget build(BuildContext context) {
@@ -612,7 +747,24 @@ class _ConversationList extends StatelessWidget {
           return const _ConsultationEmptyState();
         }
 
-        return _MessageBubble(message: visibleMessages[index]);
+        final message = visibleMessages[index];
+        if (streamingMessageId != null && message.id == streamingMessageId) {
+          return RepaintBoundary(
+            child: ValueListenableBuilder<String?>(
+              valueListenable: streamingContentListenable,
+              builder: (context, streamedContent, _) {
+                final activeMessage = streamedContent == null
+                    ? message
+                    : message.copyWith(content: streamedContent);
+                return _MessageBubble(message: activeMessage);
+              },
+            ),
+          );
+        }
+
+        return RepaintBoundary(
+          child: _MessageBubble(message: message),
+        );
       },
     );
   }

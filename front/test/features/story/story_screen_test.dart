@@ -617,6 +617,92 @@ void main() {
     expect(find.byKey(const ValueKey('story-comment-field')), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets(
+      'header back and PopScope return to list with scroll reset and search field persists query',
+      (tester) async {
+    tester.view.physicalSize = const Size(390, 640);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    final stories = [
+      for (var id = 1; id <= 12; id += 1)
+        _summary(id: id, title: '오늘의 이야기 $id'),
+    ];
+    final controller = StoryController(
+      storyRepository: _FakeStoryRepository(
+        storyPages: [
+          _storyPage(stories),
+          _storyPage(stories),
+        ],
+        details: [
+          _detail(id: 1, title: '오늘의 이야기 1', content: '상세 내용'),
+        ],
+        commentPages: [_commentPage(const [])],
+      ),
+      currentMemberId: 7,
+    );
+    var rootBackCount = 0;
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Navigator(
+          onGenerateRoute: (_) => MaterialPageRoute<void>(
+            builder: (_) => StoryScreen(
+              controller: controller,
+              onBack: () => rootBackCount += 1,
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.enterText(
+      find.byKey(const ValueKey('story-search-field')),
+      '위로',
+    );
+    await tester.tap(find.byKey(const ValueKey('story-category-daily')));
+    await tester.pumpAndSettle();
+    final searchField = tester.widget<TextField>(
+      find.byKey(const ValueKey('story-search-field')),
+    );
+    expect(searchField.controller?.text, '위로');
+
+    await tester.drag(find.byType(Scrollable).first, const Offset(0, -320));
+    await tester.pumpAndSettle();
+    final scrollableState = tester.state<ScrollableState>(
+      find.byType(Scrollable).first,
+    );
+    expect(scrollableState.position.pixels, greaterThan(0));
+
+    await tester.ensureVisible(find.byKey(const ValueKey('story-card-5')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('story-card-5')));
+    await tester.pumpAndSettle();
+    expect(controller.state.mode, StoryViewMode.detail);
+
+    await tester.tap(find.byTooltip('홈으로'));
+    await tester.pumpAndSettle();
+
+    expect(controller.state.mode, StoryViewMode.list);
+    expect(rootBackCount, 0);
+    expect(scrollableState.position.pixels, 0);
+
+    await tester.tap(find.byKey(const ValueKey('story-create-button')));
+    await tester.pumpAndSettle();
+    expect(controller.state.mode, StoryViewMode.editor);
+
+    await Navigator.of(
+      tester.element(find.byType(StoryScreen)),
+    ).maybePop();
+    await tester.pumpAndSettle();
+
+    expect(controller.state.mode, StoryViewMode.list);
+    expect(rootBackCount, 0);
+    expect(scrollableState.position.pixels, 0);
+  });
 }
 
 PageResponse<StorySummary> _storyPage(

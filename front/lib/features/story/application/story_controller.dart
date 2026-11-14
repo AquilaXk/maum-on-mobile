@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 
 import '../../../core/network/api_error.dart';
+import '../../../shared/algorithm/bitap_hangul_search.dart';
 import '../../draft_recovery/data/draft_recovery_repository.dart';
 import '../../draft_recovery/domain/draft_recovery_models.dart';
 import '../../moderation/data/content_moderation_repository.dart';
@@ -306,6 +307,50 @@ class StoryController extends ChangeNotifier {
 
   void updateSearchQuery(String query) {
     _setState(_state.copyWith(searchQuery: query, clearErrorMessage: true));
+  }
+
+  List<StorySummary> get filteredLoadedStories =>
+      filterLoadedStories(_state.searchQuery);
+
+  List<StorySummary> filterLoadedStories(String query) {
+    final trimmed = query.trim();
+    if (trimmed.isEmpty) {
+      return _state.stories;
+    }
+
+    final matcher = BitapHangulMatcher(trimmed);
+    final matches = <({StorySummary story, int distance})>[];
+    for (final story in _state.stories) {
+      final combinedBloom = computeTextBloom31(story.title) |
+          computeTextBloom31(story.summary) |
+          computeTextBloom31(story.authorNickname);
+      if (!matcher.mayMatchBloom(combinedBloom)) {
+        continue;
+      }
+
+      var bestDistance = matcher.matchDistance(story.title);
+      if (bestDistance != 0) {
+        final summaryDistance = matcher.matchDistance(story.summary);
+        if (summaryDistance >= 0 &&
+            (bestDistance < 0 || summaryDistance < bestDistance)) {
+          bestDistance = summaryDistance;
+        }
+      }
+      if (bestDistance != 0) {
+        final authorDistance = matcher.matchDistance(story.authorNickname);
+        if (authorDistance >= 0 &&
+            (bestDistance < 0 || authorDistance < bestDistance)) {
+          bestDistance = authorDistance;
+        }
+      }
+
+      if (bestDistance >= 0) {
+        matches.add((story: story, distance: bestDistance));
+      }
+    }
+
+    matches.sort((a, b) => a.distance.compareTo(b.distance));
+    return [for (final item in matches) item.story];
   }
 
   Future<void> selectCategory(StoryCategory category) async {

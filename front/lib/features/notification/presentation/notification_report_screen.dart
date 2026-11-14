@@ -133,6 +133,24 @@ class _NotificationReportScreenState extends State<NotificationReportScreen>
       builder: (context, _) {
         _syncReportFields();
 
+        final notificationState = widget.notificationController.state;
+        var unreadCount = 0;
+        var directCount = 0;
+        final unreadNotifications = <NotificationItem>[];
+        final readNotifications = <NotificationItem>[];
+        for (final notification in notificationState.notifications) {
+          if (notification.destination !=
+              NotificationTapDestination.notifications) {
+            directCount += 1;
+          }
+          if (notification.isRead) {
+            readNotifications.add(notification);
+          } else {
+            unreadCount += 1;
+            unreadNotifications.add(notification);
+          }
+        }
+
         return DefaultTabController(
           length: 2,
           child: Scaffold(
@@ -140,24 +158,13 @@ class _NotificationReportScreenState extends State<NotificationReportScreen>
               child: Column(
                 children: [
                   _Header(
-                    connectionState:
-                        widget.notificationController.state.connectionState,
-                    pushNotificationState: widget
-                        .notificationController.state.pushNotificationState,
-                    canOpenPushSettings:
-                        widget.notificationController.state.canOpenPushSettings,
-                    unreadCount:
-                        widget.notificationController.state.unreadCount,
-                    directCount:
-                        widget.notificationController.state.notifications
-                            .where(
-                              (notification) =>
-                                  notification.destination !=
-                                  NotificationTapDestination.notifications,
-                            )
-                            .length,
-                    lastReceivedAt:
-                        widget.notificationController.state.lastReceivedAt,
+                    connectionState: notificationState.connectionState,
+                    pushNotificationState:
+                        notificationState.pushNotificationState,
+                    canOpenPushSettings: notificationState.canOpenPushSettings,
+                    unreadCount: unreadCount,
+                    directCount: directCount,
+                    lastReceivedAt: notificationState.lastReceivedAt,
                     onBack: widget.onBack,
                     onReconnect: widget.notificationController.reconnect,
                     onRequestPush:
@@ -176,7 +183,9 @@ class _NotificationReportScreenState extends State<NotificationReportScreen>
                     child: TabBarView(
                       children: [
                         _NotificationCenter(
-                          state: widget.notificationController.state,
+                          state: notificationState,
+                          unreadNotifications: unreadNotifications,
+                          readNotifications: readNotifications,
                           onRefresh: widget.notificationController.load,
                           onOpenNotification: _openNotification,
                         ),
@@ -257,13 +266,7 @@ class _Header extends StatelessWidget {
         ? onOpenPushSettings
         : onRequestPush;
     final permissionState = switch (pushNotificationState) {
-      PushNotificationState.idle => AppStateView.permission(
-          title: '푸시 알림 권한을 확인해 주세요.',
-          message: '새 알림을 바로 받으려면 권한 요청을 진행합니다.',
-          actionLabel: '권한 요청',
-          onAction: () => unawaited(onRequestPush()),
-          semanticLabel: '푸시 알림 권한 요청 가능',
-        ),
+      PushNotificationState.idle => null,
       PushNotificationState.requesting => const AppStateView.loading(
           title: '푸시 알림 권한을 확인하는 중입니다.',
           semanticLabel: '푸시 알림 권한 확인 중',
@@ -442,21 +445,20 @@ class _NotificationStatusToolbar extends StatelessWidget {
 class _NotificationCenter extends StatelessWidget {
   const _NotificationCenter({
     required this.state,
+    required this.unreadNotifications,
+    required this.readNotifications,
     required this.onRefresh,
     required this.onOpenNotification,
   });
 
   final NotificationState state;
+  final List<NotificationItem> unreadNotifications;
+  final List<NotificationItem> readNotifications;
   final Future<void> Function({bool silent}) onRefresh;
   final Future<void> Function(NotificationItem notification) onOpenNotification;
 
   @override
   Widget build(BuildContext context) {
-    final unreadNotifications =
-        state.notifications.where((notification) => !notification.isRead);
-    final readNotifications =
-        state.notifications.where((notification) => notification.isRead);
-
     if (state.isLoading && !state.hasLoaded) {
       return const Center(
         child: Padding(
@@ -618,7 +620,7 @@ class _NotificationTile extends StatelessWidget {
                       if (notification.createdAt.isNotEmpty) ...[
                         const SizedBox(height: AppSpacing.xxs),
                         Text(
-                          _formatNotificationTimestamp(notification.createdAt),
+                          _formatNotificationTimestamp(notification),
                           style: Theme.of(context).textTheme.bodySmall,
                         ),
                       ],
@@ -711,13 +713,12 @@ AppStatusTone _notificationDestinationTone(NotificationItem notification) {
   };
 }
 
-String _formatNotificationTimestamp(String value) {
-  final parsed = DateTime.tryParse(value.trim());
-  if (parsed == null) {
-    return value;
+String _formatNotificationTimestamp(NotificationItem notification) {
+  final local = notification.parsedCreatedAt;
+  if (local == null) {
+    return notification.createdAt;
   }
 
-  final local = parsed.toLocal();
   final year = local.year.toString().padLeft(4, '0');
   final month = local.month.toString().padLeft(2, '0');
   final day = local.day.toString().padLeft(2, '0');

@@ -451,6 +451,68 @@ void main() {
       expect(unauthorizedCount, 1);
       expect(controller.state.errorMessage, '다시 로그인해 주세요.');
     });
+
+    test('filters loaded stories via Hangul Choseong and 1-edit Bitap search',
+        () async {
+      final controller = StoryController(
+        storyRepository: _FakeStoryRepository(
+          storyPages: [
+            _storyPage([
+              const StorySummary(
+                id: 1,
+                title: '오늘 밤 마음 응원',
+                summary: '따뜻한 밤 이야기',
+                authorNickname: '별빛',
+                category: StoryCategory.worry,
+                resolutionStatus: StoryResolutionStatus.ongoing,
+                viewCount: 1,
+                createDate: '2026-05-24T08:00:00',
+                modifyDate: '2026-05-24T08:00:00',
+              ),
+              const StorySummary(
+                id: 2,
+                title: '산책과 하루 기록',
+                summary: '맑은 공기 메모',
+                authorNickname: '하늘',
+                category: StoryCategory.daily,
+                resolutionStatus: StoryResolutionStatus.ongoing,
+                viewCount: 1,
+                createDate: '2026-05-24T08:00:00',
+                modifyDate: '2026-05-24T08:00:00',
+              ),
+              const StorySummary(
+                id: 3,
+                title: '도서관 공부 메모',
+                summary: '시험 기간 계획',
+                authorNickname: '공부러',
+                category: StoryCategory.question,
+                resolutionStatus: StoryResolutionStatus.ongoing,
+                viewCount: 1,
+                createDate: '2026-05-24T08:00:00',
+                modifyDate: '2026-05-24T08:00:00',
+              ),
+            ]),
+          ],
+        ),
+        currentMemberId: 7,
+      );
+
+      await controller.loadStories();
+
+      expect(
+        controller.filterLoadedStories('ㅇㅇ').map((s) => s.id),
+        [1],
+      );
+      expect(
+        controller.filterLoadedStories('ㅎㄹ ㄱㄹ').map((s) => s.id),
+        [2],
+      );
+      expect(
+        controller.filterLoadedStories('마움 응원').map((s) => s.id),
+        [1],
+      );
+      expect(controller.filterLoadedStories('없는키워드'), isEmpty);
+    });
   });
 }
 

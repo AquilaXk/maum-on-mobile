@@ -104,7 +104,7 @@ class MaumOnMobileApp extends StatefulWidget {
 class _MaumOnMobileAppState extends State<MaumOnMobileApp>
     with WidgetsBindingObserver {
   late final ApiConfig _apiConfig = ApiConfig.fromEnvironment();
-  late final SecureAuthTokenStore _tokenStore = const SecureAuthTokenStore();
+  late final SecureAuthTokenStore _tokenStore = SecureAuthTokenStore();
   late final AuthTokenRefreshCoordinator _tokenRefreshCoordinator =
       AuthTokenRefreshCoordinator();
   late final DioApiTransport _apiTransport = DioApiTransport.fromConfig(
@@ -129,8 +129,10 @@ class _MaumOnMobileAppState extends State<MaumOnMobileApp>
   int? _homeMemberId;
   ConsultationController? _consultationController;
   int? _consultationMemberId;
+  HttpConsultationStreamClient? _defaultConsultationStreamClient;
   NotificationController? _notificationController;
   int? _notificationMemberId;
+  DioNotificationStreamClient? _defaultNotificationStreamClient;
   ReportController? _reportController;
   int? _reportMemberId;
   SettingsController? _settingsController;
@@ -191,6 +193,7 @@ class _MaumOnMobileAppState extends State<MaumOnMobileApp>
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     _notificationController?.handleLifecycleState(state);
+    _consultationController?.handleLifecycleState(state);
   }
 
   @override
@@ -268,6 +271,7 @@ class _MaumOnMobileAppState extends State<MaumOnMobileApp>
           controller: _diaryControllerFor(memberId),
           imagePicker:
               widget.diaryImagePicker ?? const PlatformDiaryImagePicker(),
+          imageBaseUrl: _apiConfig.baseUrl,
           onBack: null,
         ),
       AuthenticatedRoute.consultation => ConsultationScreen(
@@ -397,14 +401,24 @@ class _MaumOnMobileAppState extends State<MaumOnMobileApp>
     final notificationController = _notificationControllerFor(memberId);
     final pendingNotice = _pendingNotificationNotice;
     if (pendingNotice != null) {
-      notificationController.showNotice(pendingNotice);
       _pendingNotificationNotice = null;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted || _notificationController != notificationController) {
+          return;
+        }
+        notificationController.showNotice(pendingNotice);
+      });
     }
     final reportController = _reportControllerFor(memberId);
     final pendingTarget = _pendingReportTarget;
     if (pendingTarget != null) {
-      reportController.selectTarget(pendingTarget);
       _pendingReportTarget = null;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted || _reportController != reportController) {
+          return;
+        }
+        reportController.selectTarget(pendingTarget);
+      });
     }
 
     return NotificationReportScreen(
@@ -622,6 +636,8 @@ class _MaumOnMobileAppState extends State<MaumOnMobileApp>
     _consultationController?.dispose();
     _consultationController = null;
     _consultationMemberId = null;
+    _defaultConsultationStreamClient?.close();
+    _defaultConsultationStreamClient = null;
   }
 
   NotificationController _notificationControllerFor(int memberId) {
@@ -654,20 +670,33 @@ class _MaumOnMobileAppState extends State<MaumOnMobileApp>
     _notificationController = null;
     _notificationMemberId = null;
     _notificationBootstrapRequested = false;
+    _defaultNotificationStreamClient?.close();
+    _defaultNotificationStreamClient = null;
   }
 
   Future<void> _unregisterCurrentPushToken() async {
+    DioNotificationStreamClient? tempStreamClient;
     try {
       final token =
           (await _pushNotificationClient.getPermissionStatus()).token?.trim();
       if (token == null || token.isEmpty) {
         return;
       }
-      await (widget.notificationRepository ??
-              _buildDefaultNotificationRepository())
-          .unregisterDeviceToken(token);
+      final NotificationRepository repository;
+      if (widget.notificationRepository != null) {
+        repository = widget.notificationRepository!;
+      } else {
+        tempStreamClient = DioNotificationStreamClient(apiConfig: _apiConfig);
+        repository = ApiNotificationRepository(
+          apiClient: _sessionApiClient(tokenRefresher: _tokenRefresher()),
+          streamClient: tempStreamClient,
+        );
+      }
+      await repository.unregisterDeviceToken(token);
     } on Object {
       // 세션 폐기 중 푸시 해제 실패는 서버 측 토큰 폐기 또는 다음 로그인 동기화로 보정한다.
+    } finally {
+      tempStreamClient?.close();
     }
   }
 
@@ -807,7 +836,7 @@ class _MaumOnMobileAppState extends State<MaumOnMobileApp>
 
   HomeRepository _buildDefaultHomeRepository() {
     return ApiHomeRepository(
-      apiClient: _sessionApiClient(),
+      apiClient: _sessionApiClient(tokenRefresher: _tokenRefresher()),
     );
   }
 
@@ -830,21 +859,27 @@ class _MaumOnMobileAppState extends State<MaumOnMobileApp>
   }
 
   ConsultationRepository _buildDefaultConsultationRepository() {
+    _defaultConsultationStreamClient?.close();
+    final streamClient = HttpConsultationStreamClient(
+      apiConfig: _apiConfig,
+      tokenStore: _tokenStore,
+      tokenRefresher: _tokenRefresher(),
+      tokenRefreshCoordinator: _tokenRefreshCoordinator,
+    );
+    _defaultConsultationStreamClient = streamClient;
     return ApiConsultationRepository(
       apiClient: _sessionApiClient(tokenRefresher: _tokenRefresher()),
-      streamClient: HttpConsultationStreamClient(
-        apiConfig: _apiConfig,
-        tokenStore: _tokenStore,
-        tokenRefresher: _tokenRefresher(),
-        tokenRefreshCoordinator: _tokenRefreshCoordinator,
-      ),
+      streamClient: streamClient,
     );
   }
 
   NotificationRepository _buildDefaultNotificationRepository() {
+    _defaultNotificationStreamClient?.close();
+    final streamClient = DioNotificationStreamClient(apiConfig: _apiConfig);
+    _defaultNotificationStreamClient = streamClient;
     return ApiNotificationRepository(
       apiClient: _sessionApiClient(tokenRefresher: _tokenRefresher()),
-      streamClient: DioNotificationStreamClient(apiConfig: _apiConfig),
+      streamClient: streamClient,
     );
   }
 

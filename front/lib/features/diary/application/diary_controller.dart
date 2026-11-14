@@ -10,9 +10,156 @@ import '../../moderation/domain/content_moderation_models.dart';
 import '../data/diary_image_repository.dart';
 import '../data/diary_repository.dart';
 import '../domain/diary_models.dart';
+import '../domain/mood_year_bitmap.dart';
+
+class _DiaryEntryIndex {
+  const _DiaryEntryIndex({
+    required this.entriesByDateKey,
+    required this.entriesByPackedDate,
+    required this.entryCountByDate,
+    required this.moodScoreByDate,
+    required this.bitmapsByYear,
+  });
+
+  static const _DiaryEntryIndex empty = _DiaryEntryIndex(
+    entriesByDateKey: <String, List<DiaryEntry>>{},
+    entriesByPackedDate: <int, List<DiaryEntry>>{},
+    entryCountByDate: <String, int>{},
+    moodScoreByDate: <String, int>{},
+    bitmapsByYear: <int, MoodYearBitmap>{},
+  );
+
+  factory _DiaryEntryIndex.build(List<DiaryEntry> entries) {
+    if (entries.isEmpty) {
+      return empty;
+    }
+
+    final byDateKey = <String, List<DiaryEntry>>{};
+    final byPacked = <int, List<DiaryEntry>>{};
+    final counts = <String, int>{};
+    final moods = <String, int>{};
+    final bitmaps = <int, MoodYearBitmap>{};
+
+    for (final entry in entries) {
+      final dateKey = entry.dateKey;
+      if (dateKey.isNotEmpty) {
+        (byDateKey[dateKey] ??= <DiaryEntry>[]).add(entry);
+        counts[dateKey] = (counts[dateKey] ?? 0) + 1;
+        if (entry.moodScore != null && !moods.containsKey(dateKey)) {
+          moods[dateKey] = entry.moodScore!;
+        }
+      }
+
+      final packed = entry.packedDateKey;
+      if (packed != null) {
+        (byPacked[packed] ??= <DiaryEntry>[]).add(entry);
+        final parsed = entry.parsedCreateDate;
+        if (parsed != null) {
+          final bitmap = bitmaps.putIfAbsent(
+            parsed.year,
+            () => MoodYearBitmap(parsed.year),
+          );
+          bitmap.recordDay(parsed, moodScore: entry.moodScore);
+        } else {
+          final year = packed >> 9;
+          final month = (packed >> 5) & 0xF;
+          final day = packed & 0x1F;
+          final bitmap = bitmaps.putIfAbsent(
+            year,
+            () => MoodYearBitmap(year),
+          );
+          bitmap.recordDayIndex(
+            dayOfYearIndex(year, month, day),
+            moodScore: entry.moodScore,
+          );
+        }
+      }
+    }
+
+    return _DiaryEntryIndex(
+      entriesByDateKey: byDateKey.map(
+        (key, value) => MapEntry(key, List<DiaryEntry>.unmodifiable(value)),
+      ),
+      entriesByPackedDate: byPacked.map(
+        (key, value) => MapEntry(key, List<DiaryEntry>.unmodifiable(value)),
+      ),
+      entryCountByDate: Map<String, int>.unmodifiable(counts),
+      moodScoreByDate: Map<String, int>.unmodifiable(moods),
+      bitmapsByYear: Map<int, MoodYearBitmap>.unmodifiable(bitmaps),
+    );
+  }
+
+  final Map<String, List<DiaryEntry>> entriesByDateKey;
+  final Map<int, List<DiaryEntry>> entriesByPackedDate;
+  final Map<String, int> entryCountByDate;
+  final Map<String, int> moodScoreByDate;
+  final Map<int, MoodYearBitmap> bitmapsByYear;
+}
 
 class DiaryState {
-  const DiaryState({
+  DiaryState({
+    required DateTime visibleMonth,
+    required DateTime selectedDate,
+    List<DiaryEntry> entries = const [],
+    List<DiaryEntry> publicEntries = const [],
+    bool isLoading = false,
+    bool isPublicLoading = false,
+    bool isPublicLoadingMore = false,
+    int publicPage = 0,
+    bool isLastPublicPage = true,
+    bool isSubmitting = false,
+    bool isUploadingImage = false,
+    double? imageUploadProgress,
+    bool hasLoaded = false,
+    int? editingDiaryId,
+    String title = '',
+    String content = '',
+    DiaryCategory category = DiaryCategory.daily,
+    bool isPrivate = true,
+    String? imageUrl,
+    DiaryImageAttachment? selectedImage,
+    List<DiaryContentBlock> contentBlocks = const [
+      DiaryContentBlock(id: 'text-0', type: DiaryContentBlockType.text),
+    ],
+    int? moodScore,
+    String? emotionTags,
+    String? triggerTags,
+    String? errorMessage,
+    String? publicErrorMessage,
+    String? noticeMessage,
+    ContentModerationFeedback? moderationFeedback,
+  }) : this._(
+          visibleMonth: visibleMonth,
+          selectedDate: selectedDate,
+          entries: entries,
+          publicEntries: publicEntries,
+          isLoading: isLoading,
+          isPublicLoading: isPublicLoading,
+          isPublicLoadingMore: isPublicLoadingMore,
+          publicPage: publicPage,
+          isLastPublicPage: isLastPublicPage,
+          isSubmitting: isSubmitting,
+          isUploadingImage: isUploadingImage,
+          imageUploadProgress: imageUploadProgress,
+          hasLoaded: hasLoaded,
+          editingDiaryId: editingDiaryId,
+          title: title,
+          content: content,
+          category: category,
+          isPrivate: isPrivate,
+          imageUrl: imageUrl,
+          selectedImage: selectedImage,
+          contentBlocks: contentBlocks,
+          moodScore: moodScore,
+          emotionTags: emotionTags,
+          triggerTags: triggerTags,
+          errorMessage: errorMessage,
+          publicErrorMessage: publicErrorMessage,
+          noticeMessage: noticeMessage,
+          moderationFeedback: moderationFeedback,
+        );
+
+  DiaryState._({
     required this.visibleMonth,
     required this.selectedDate,
     this.entries = const [],
@@ -43,7 +190,8 @@ class DiaryState {
     this.publicErrorMessage,
     this.noticeMessage,
     this.moderationFeedback,
-  });
+    _DiaryEntryIndex? entryIndex,
+  }) : _entryIndex = entryIndex ?? _DiaryEntryIndex.build(entries);
 
   final DateTime visibleMonth;
   final DateTime selectedDate;
@@ -73,6 +221,7 @@ class DiaryState {
   final String? publicErrorMessage;
   final String? noticeMessage;
   final ContentModerationFeedback? moderationFeedback;
+  final _DiaryEntryIndex _entryIndex;
 
   bool get isPublicEmpty =>
       hasLoaded &&
@@ -113,28 +262,19 @@ class DiaryState {
       !isUploadingImage;
 
   List<DiaryEntry> get selectedDateEntries {
-    return entries
-        .where((entry) => entry.dateKey == selectedDateKey)
-        .toList(growable: false);
+    final packed = packDateTimeKey(selectedDate);
+    return _entryIndex.entriesByPackedDate[packed] ??
+        _entryIndex.entriesByDateKey[selectedDateKey] ??
+        const <DiaryEntry>[];
   }
 
-  Map<String, int> get entryCountByDate {
-    final counts = <String, int>{};
-    for (final entry in entries) {
-      counts[entry.dateKey] = (counts[entry.dateKey] ?? 0) + 1;
-    }
-    return counts;
-  }
+  Map<String, int> get entryCountByDate => _entryIndex.entryCountByDate;
 
-  Map<String, int> get moodScoreByDate {
-    final scores = <String, int>{};
-    for (final entry in entries) {
-      if (entry.moodScore != null && !scores.containsKey(entry.dateKey)) {
-        scores[entry.dateKey] = entry.moodScore!;
-      }
-    }
-    return scores;
-  }
+  Map<String, int> get moodScoreByDate => _entryIndex.moodScoreByDate;
+
+  Map<int, MoodYearBitmap> get bitmapsByYear => _entryIndex.bitmapsByYear;
+
+  MoodYearBitmap? bitmapForYear(int year) => _entryIndex.bitmapsByYear[year];
 
 
   DiaryState copyWith({
@@ -178,7 +318,7 @@ class DiaryState {
     ContentModerationFeedback? moderationFeedback,
     bool clearModerationFeedback = false,
   }) {
-    return DiaryState(
+    return DiaryState._(
       visibleMonth: visibleMonth ?? this.visibleMonth,
       selectedDate: selectedDate ?? this.selectedDate,
       entries: entries ?? this.entries,
@@ -217,6 +357,10 @@ class DiaryState {
       moderationFeedback: clearModerationFeedback
           ? null
           : moderationFeedback ?? this.moderationFeedback,
+      entryIndex:
+          (entries == null || identical(entries, this.entries))
+              ? _entryIndex
+              : null,
     );
   }
 }
@@ -230,12 +374,14 @@ class DiaryController extends ChangeNotifier {
     DraftRecoveryRepository? draftRepository,
     DateTime? now,
     VoidCallback? onUnauthorized,
+    Duration draftSaveDebounce = const Duration(milliseconds: 300),
   })  : _diaryRepository = diaryRepository,
         _imageRepository = imageRepository,
         _moderationRepository = moderationRepository,
         _currentMemberId = currentMemberId,
         _draftRepository = draftRepository,
         _onUnauthorized = onUnauthorized,
+        _draftSaveDebounce = draftSaveDebounce,
         _state = DiaryState(
           visibleMonth: firstDayOfMonth(now ?? DateTime.now()),
           selectedDate: now ?? DateTime.now(),
@@ -247,11 +393,14 @@ class DiaryController extends ChangeNotifier {
   final int _currentMemberId;
   final DraftRecoveryRepository? _draftRepository;
   final VoidCallback? _onUnauthorized;
+  final Duration _draftSaveDebounce;
 
   DiaryState _state;
   bool _isDisposed = false;
   int _nextBlockOrdinal = 1;
   final Set<String> _temporaryUploadedImageUrls = {};
+  Timer? _draftSaveTimer;
+  bool _hasPendingDraftSave = false;
 
   DiaryState get state => _state;
 
@@ -409,6 +558,16 @@ class DiaryController extends ChangeNotifier {
   void updatePrivacy(bool isPrivate) {
     _setState(_state.copyWith(isPrivate: isPrivate));
     _saveDraft();
+  }
+
+  void setMoodScore(int? moodScore) => updateMoodScore(moodScore);
+
+  void toggleEmotionTag(String tag) {
+    updateEmotionTags(_toggleCsvTag(_state.emotionTags, tag));
+  }
+
+  void toggleTriggerTag(String tag) {
+    updateTriggerTags(_toggleCsvTag(_state.triggerTags, tag));
   }
 
   void updateMoodScore(int? moodScore) {
@@ -656,6 +815,7 @@ class DiaryController extends ChangeNotifier {
   }
 
   void resetForm() {
+    _cancelPendingDraftSave();
     final temporaryUrls = _takeTemporaryUploadedImageUrlsIfCurrent();
     _nextBlockOrdinal = 1;
     _setState(
@@ -670,6 +830,9 @@ class DiaryController extends ChangeNotifier {
         contentBlocks: const [
           DiaryContentBlock(id: 'text-0', type: DiaryContentBlockType.text),
         ],
+        clearMoodScore: true,
+        clearEmotionTags: true,
+        clearTriggerTags: true,
         clearErrorMessage: true,
         clearNoticeMessage: true,
       ),
@@ -735,6 +898,7 @@ class DiaryController extends ChangeNotifier {
         await _diaryRepository.updateDiary(editingId, draft);
       }
 
+      _cancelPendingDraftSave();
       await _draftRepository?.delete(_draftKey);
       _resetFormSilently();
       await _loadMonth(_state.visibleMonth, showLoading: false);
@@ -954,8 +1118,10 @@ class DiaryController extends ChangeNotifier {
       );
     }
 
-    await _loadMyDiaries(month);
-    await _loadPublicDiaries();
+    await Future.wait([
+      _loadMyDiaries(month),
+      _loadPublicDiaries(),
+    ]);
 
     _setState(
       _state.copyWith(
@@ -1032,6 +1198,22 @@ class DiaryController extends ChangeNotifier {
   }
 
   void _saveDraft() {
+    if (_draftRepository == null || _isDisposed) {
+      return;
+    }
+    _draftSaveTimer?.cancel();
+    if (_draftSaveDebounce <= Duration.zero) {
+      _hasPendingDraftSave = false;
+      _persistActiveDraft();
+      return;
+    }
+    _hasPendingDraftSave = true;
+    _draftSaveTimer = Timer(_draftSaveDebounce, _persistActiveDraft);
+  }
+
+  void _persistActiveDraft() {
+    _draftSaveTimer = null;
+    _hasPendingDraftSave = false;
     final repository = _draftRepository;
     if (repository == null) {
       return;
@@ -1039,7 +1221,14 @@ class DiaryController extends ChangeNotifier {
     unawaited(repository.saveEditing(_draftKey, fields: _draftFields()));
   }
 
+  void _cancelPendingDraftSave() {
+    _draftSaveTimer?.cancel();
+    _draftSaveTimer = null;
+    _hasPendingDraftSave = false;
+  }
+
   Future<void> _markDraftFailed(Object error) async {
+    _cancelPendingDraftSave();
     final repository = _draftRepository;
     if (repository == null) {
       return;
@@ -1196,9 +1385,42 @@ class DiaryController extends ChangeNotifier {
 
   @override
   void dispose() {
+    if (_hasPendingDraftSave) {
+      _draftSaveTimer?.cancel();
+      _persistActiveDraft();
+    } else {
+      _draftSaveTimer?.cancel();
+    }
     _isDisposed = true;
     super.dispose();
   }
+}
+
+String? _toggleCsvTag(String? currentCsv, String tag) {
+  final normalizedTag = tag.trim();
+  if (normalizedTag.isEmpty) {
+    return currentCsv;
+  }
+
+  final tags = <String>[];
+  var removed = false;
+  if (currentCsv != null && currentCsv.isNotEmpty) {
+    for (final rawPart in currentCsv.split(',')) {
+      final part = rawPart.trim();
+      if (part.isEmpty) {
+        continue;
+      }
+      if (part == normalizedTag) {
+        removed = true;
+      } else if (!tags.contains(part)) {
+        tags.add(part);
+      }
+    }
+  }
+  if (!removed) {
+    tags.add(normalizedTag);
+  }
+  return tags.isEmpty ? null : tags.join(',');
 }
 
 List<DiaryContentBlock> _updatePrimaryTextBlock(

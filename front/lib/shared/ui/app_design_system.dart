@@ -42,6 +42,7 @@ class AppScreen extends StatelessWidget {
     this.subtitle,
     this.onBack,
     this.onRefresh,
+    this.scrollController,
     this.actions = const [],
     this.maxWidth = AppBreakpoints.contentMaxWidth,
     this.padding = const EdgeInsets.fromLTRB(
@@ -58,6 +59,7 @@ class AppScreen extends StatelessWidget {
   final String? subtitle;
   final VoidCallback? onBack;
   final RefreshCallback? onRefresh;
+  final ScrollController? scrollController;
   final List<Widget> actions;
   final List<Widget> children;
   final double maxWidth;
@@ -66,6 +68,8 @@ class AppScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scrollView = SingleChildScrollView(
+      key: scrollController != null ? GlobalObjectKey(scrollController!) : null,
+      controller: scrollController,
       physics: onRefresh == null
           ? null
           : const ClampingScrollPhysics(
@@ -697,8 +701,18 @@ class AppContentCard extends StatelessWidget {
     final effectiveTrailingIcon =
         trailingIcon ?? (onTap == null ? null : Icons.chevron_right);
 
-    final cardBody = Padding(
-      padding: const EdgeInsets.all(AppSpacing.md),
+    final hasActions = actions.isNotEmpty;
+    final summaryPadding = hasActions
+        ? const EdgeInsets.fromLTRB(
+            AppSpacing.md,
+            AppSpacing.md,
+            AppSpacing.md,
+            AppSpacing.sm,
+          )
+        : const EdgeInsets.all(AppSpacing.md);
+
+    final summaryBody = Padding(
+      padding: summaryPadding,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -775,32 +789,52 @@ class AppContentCard extends StatelessWidget {
               child: content!,
             ),
           ],
-          if (actions.isNotEmpty) ...[
-            const SizedBox(height: AppSpacing.md),
-            _AppContentActions(key: actionsKey, children: actions),
-          ],
         ],
       ),
     );
 
-    final card = Card(
-      margin: EdgeInsets.zero,
-      child: onTap == null
-          ? cardBody
-          : InkWell(
-              borderRadius: AppRadii.card,
-              onTap: onTap,
-              child: cardBody,
-            ),
-    );
+    final interactiveSummary = onTap == null
+        ? summaryBody
+        : InkWell(
+            borderRadius: hasActions
+                ? const BorderRadius.vertical(
+                    top: Radius.circular(AppRadii.sm),
+                  )
+                : AppRadii.card,
+            excludeFromSemantics: semanticLabel != null,
+            onTap: onTap,
+            child: summaryBody,
+          );
 
-    return Semantics(
-      container: true,
-      button: onTap != null,
-      label: semanticLabel,
-      child: ExcludeSemantics(
-        excluding: semanticLabel != null,
-        child: card,
+    final wrappedSummary = semanticLabel == null
+        ? interactiveSummary
+        : Semantics(
+            container: true,
+            button: onTap != null,
+            onTap: onTap,
+            label: semanticLabel,
+            child: ExcludeSemantics(
+              child: interactiveSummary,
+            ),
+          );
+
+    return Card(
+      margin: EdgeInsets.zero,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          wrappedSummary,
+          if (hasActions)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(
+                AppSpacing.md,
+                AppSpacing.sm,
+                AppSpacing.md,
+                AppSpacing.md,
+              ),
+              child: _AppContentActions(key: actionsKey, children: actions),
+            ),
+        ],
       ),
     );
   }
@@ -1098,9 +1132,29 @@ class AppStatusPill extends StatelessWidget {
 }
 
 String _softBreak(String value) {
-  return value.replaceAllMapped(RegExp(r'([@._/\-])'), (match) {
-    return '${match.group(0) ?? ''}\u{200B}';
-  });
+  final length = value.length;
+  var segmentStart = 0;
+  StringBuffer? buffer;
+
+  for (var i = 0; i < length; i += 1) {
+    final cu = value.codeUnitAt(i);
+    if (cu != 64 && cu != 95 && !(cu >= 45 && cu <= 47)) {
+      continue;
+    }
+
+    buffer ??= StringBuffer();
+    buffer.write(value.substring(segmentStart, i + 1));
+    buffer.write('\u200B');
+    segmentStart = i + 1;
+  }
+
+  if (buffer == null) {
+    return value;
+  }
+  if (segmentStart < length) {
+    buffer.write(value.substring(segmentStart));
+  }
+  return buffer.toString();
 }
 
 _ToneColors _noticeColors(ColorScheme colorScheme, AppNoticeTone tone) {

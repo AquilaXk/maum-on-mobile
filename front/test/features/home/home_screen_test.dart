@@ -551,6 +551,55 @@ void main() {
     expect(find.byKey(const ValueKey('home-operations-button')), findsNothing);
     expect(find.text('운영 검수'), findsNothing);
   });
+
+  testWidgets('다크 모드 대비, 스토리 항목 탭 및 textScale 2.0 레이아웃을 유지한다',
+      (tester) async {
+    tester.view.physicalSize = const Size(390, 640);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    var storyOpenCount = 0;
+    final controller = HomeController(
+      homeRepository: const _FakeHomeRepository(),
+    );
+    await controller.load();
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: buildDarkAppTheme(),
+        home: MediaQuery(
+          data: const MediaQueryData(textScaler: TextScaler.linear(2.0)),
+          child: HomeScreen(
+            nickname: '마음이',
+            homeController: controller,
+            onWriteDiary: () {},
+            onWriteLetter: () {},
+            onViewStory: () => storyOpenCount += 1,
+            onOpenConsultation: () {},
+            onOpenNotifications: () {},
+            onOpenSettings: () {},
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final diaryIcon = tester.widget<Icon>(
+      find.descendant(
+        of: find.byKey(const ValueKey('home-action-diary-surface')),
+        matching: find.byType(Icon),
+      ),
+    );
+    expect(diaryIcon.color, const Color(0xFFBFDBFE));
+
+    await _tapVisibleKey(tester, const ValueKey('home-popular-story-1'));
+    expect(storyOpenCount, 1);
+
+    await _tapVisibleKey(tester, const ValueKey('home-feed-story-2'));
+    expect(storyOpenCount, 2);
+    expect(tester.takeException(), isNull);
+  });
 }
 
 Future<void> _tapVisibleKey(WidgetTester tester, Key key) async {

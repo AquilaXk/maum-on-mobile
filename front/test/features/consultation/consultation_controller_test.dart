@@ -736,6 +736,62 @@ void main() {
           controller.state.connectionState, ConsultationConnectionState.idle);
       expect(controller.state.isStreaming, isFalse);
     });
+
+    test('does not insert spaces into split decimal numbers or ellipses',
+        () async {
+      final repository = _FakeConsultationRepository();
+      final controller = ConsultationController(repository: repository);
+
+      await controller.connect();
+      repository.emit(const ConsultationStreamEvent.connect('connected'));
+      controller.updateDraft('숫자와 말줄임표를 확인해 주세요');
+      await controller.submitMessage();
+      repository
+        ..emit(const ConsultationStreamEvent.chat('1.'))
+        ..emit(const ConsultationStreamEvent.chat('2'))
+        ..emit(const ConsultationStreamEvent.chat(' 단계.'))
+        ..emit(const ConsultationStreamEvent.chat('..'))
+        ..emit(const ConsultationStreamEvent.done());
+
+      expect(controller.state.messages.last.content, '1.2 단계...');
+    });
+
+    test('isolates per-token streaming updates from whole-controller rebuilds',
+        () async {
+      final repository = _FakeConsultationRepository();
+      final controller = ConsultationController(repository: repository);
+      var controllerNotifyCount = 0;
+      controller.addListener(() {
+        controllerNotifyCount += 1;
+      });
+
+      await controller.connect();
+      repository.emit(const ConsultationStreamEvent.connect('connected'));
+      controller.updateDraft('스트리밍 격리');
+      await controller.submitMessage();
+
+      controllerNotifyCount = 0;
+      final streamedSnapshots = <String?>[];
+      controller.streamingContentNotifier.addListener(() {
+        streamedSnapshots.add(controller.streamingContentNotifier.value);
+      });
+
+      repository
+        ..emit(const ConsultationStreamEvent.chat('한 '))
+        ..emit(const ConsultationStreamEvent.chat('조각씩 '))
+        ..emit(const ConsultationStreamEvent.chat('전달돼요.'));
+
+      expect(controllerNotifyCount, 0);
+      expect(
+        streamedSnapshots,
+        ['한 ', '한 조각씩 ', '한 조각씩 전달돼요.'],
+      );
+
+      repository.emit(const ConsultationStreamEvent.done());
+      expect(controllerNotifyCount, 1);
+      expect(controller.streamingContentNotifier.value, isNull);
+      expect(controller.state.messages.last.content, '한 조각씩 전달돼요.');
+    });
   });
 }
 

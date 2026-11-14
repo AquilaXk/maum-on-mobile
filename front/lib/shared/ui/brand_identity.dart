@@ -38,17 +38,21 @@ class MaumOnBrandWordmark extends StatelessWidget {
       child: ExcludeSemantics(
         child: SizedBox(
           height: height,
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              CustomPaint(
-                size: Size.square(height * 0.86),
-                painter: const _MaumOnWaveIconPainter(),
-              ),
-              SizedBox(width: height * 0.22),
-              Text('Maum On', style: textStyle),
-            ],
+          child: FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                CustomPaint(
+                  size: Size.square(height * 0.86),
+                  painter: const _MaumOnWaveIconPainter(),
+                ),
+                SizedBox(width: height * 0.22),
+                Text('Maum On', style: textStyle),
+              ],
+            ),
           ),
         ),
       ),

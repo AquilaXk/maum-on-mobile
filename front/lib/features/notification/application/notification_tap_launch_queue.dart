@@ -1,3 +1,4 @@
+import '../../../shared/algorithm/bounded_key_ring_set.dart';
 import '../domain/notification_models.dart';
 
 enum NotificationTapLaunchSource {
@@ -43,7 +44,8 @@ class NotificationTapLaunchResolution {
 }
 
 class NotificationTapLaunchQueue {
-  final Set<String> _seenTapKeys = <String>{};
+  final BoundedKeyRingSet<String> _seenTapKeys =
+      BoundedKeyRingSet<String>(capacity: 512);
   NotificationTapLaunch? _pendingTap;
 
   NotificationTapLaunch? get pendingTap => _pendingTap;

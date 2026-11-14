@@ -643,10 +643,12 @@ class _AuthScreenState extends State<AuthScreen> {
     return _commitFieldErrors(errors);
   }
 
+  static final RegExp _emailPattern = RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$');
+  static final RegExp _verificationCodePattern = RegExp(r'^\d{6}$');
+
   void _validateEmail(Map<String, String> errors, String email) {
     final trimmed = email.trim();
-    final emailPattern = RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$');
-    if (!emailPattern.hasMatch(trimmed)) {
+    if (!_emailPattern.hasMatch(trimmed)) {
       errors['email'] = '올바른 이메일 주소를 입력해 주세요.';
     }
   }
@@ -664,8 +666,7 @@ class _AuthScreenState extends State<AuthScreen> {
   }
 
   void _validateEmailVerificationCode(Map<String, String> errors) {
-    final codePattern = RegExp(r'^\d{6}$');
-    if (!codePattern
+    if (!_verificationCodePattern
         .hasMatch(_signupEmailVerificationCodeController.text.trim())) {
       errors['emailVerificationCode'] = '인증번호 6자리를 입력해 주세요.';
     }

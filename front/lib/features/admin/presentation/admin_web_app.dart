@@ -67,31 +67,32 @@ class AdminWebDependencies {
 
 AdminWebDependencies buildAdminWebDependencies({
   required ApiConfig apiConfig,
-  AuthTokenStore tokenStore = const SecureAuthTokenStore(),
+  AuthTokenStore? tokenStore,
   ApiTransport? rawTransport,
   ApiTransport? sessionTransport,
 }) {
+  final resolvedTokenStore = tokenStore ?? SecureAuthTokenStore();
   final rawApiClient = ApiClient(
     transport: rawTransport ?? DioApiTransport.fromConfig(apiConfig),
-    tokenStore: tokenStore,
+    tokenStore: resolvedTokenStore,
   );
   final rawAuthRepository = ApiAuthRepository(
     apiClient: rawApiClient,
-    tokenStore: tokenStore,
+    tokenStore: resolvedTokenStore,
   );
   final tokenRefresher = AuthSessionTokenRefresher(
     authRepository: rawAuthRepository,
   );
   final sessionApiClient = ApiClient(
     transport: sessionTransport ?? DioApiTransport.fromConfig(apiConfig),
-    tokenStore: tokenStore,
+    tokenStore: resolvedTokenStore,
     tokenRefresher: tokenRefresher,
   );
 
   return AdminWebDependencies(
     authRepository: ApiAuthRepository(
       apiClient: sessionApiClient,
-      tokenStore: tokenStore,
+      tokenStore: resolvedTokenStore,
     ),
     adminRepository: ApiAdminRepository(apiClient: sessionApiClient),
   );

@@ -670,6 +670,92 @@ void main() {
     expect(repository.deletedIds, [1]);
     expect(find.text('기록이 삭제되었습니다.'), findsOneWidget);
   });
+
+  testWidgets(
+      'selects moodScore and emotion/trigger tags in diary form and renders saved imageUrl',
+      (tester) async {
+    final repository = _FakeDiaryRepository(
+      pages: [
+        _page([
+          _entry(
+            id: 77,
+            title: '사진이 있는 기록',
+            createDate: '2026-05-20T09:00:00',
+            imageUrl: '/images/uploads/saved.png',
+            moodScore: 4,
+          ),
+        ]),
+        _page([]),
+      ],
+      createdId: 78,
+    );
+    final controller = DiaryController(
+      diaryRepository: repository,
+      imageRepository: _FakeDiaryImageRepository(),
+      now: DateTime(2026, 5, 20),
+    );
+    await controller.load();
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: DiaryScreen(
+          controller: controller,
+          imagePicker: _FakeDiaryImagePicker(),
+          imageBaseUrl: Uri.parse('https://example.invalid'),
+          onBack: () {},
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const ValueKey('diary-mood-heatmap-strip')), findsOneWidget);
+    expect(find.text('최근 12주 감정 흐름'), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('diary-entry-image-77-0')),
+      findsOneWidget,
+    );
+
+    await tester.enterText(
+      find.byKey(const ValueKey('diary-title-field')),
+      '감정 기록 테스트',
+    );
+    await tester.enterText(
+      find.byKey(const ValueKey('diary-content-field')),
+      '오늘 기분과 태그를 고릅니다.',
+    );
+
+    final mood4 = find.byKey(const ValueKey('diary-mood-score-4'));
+    await tester.ensureVisible(mood4);
+    await tester.pumpAndSettle();
+    await tester.tap(mood4);
+    await tester.pump();
+
+    final emotionChip = find.byKey(const ValueKey('diary-emotion-tag-평온'));
+    await tester.ensureVisible(emotionChip);
+    await tester.pumpAndSettle();
+    await tester.tap(emotionChip);
+    await tester.pump();
+
+    final triggerChip = find.byKey(const ValueKey('diary-trigger-tag-산책'));
+    await tester.ensureVisible(triggerChip);
+    await tester.pumpAndSettle();
+    await tester.tap(triggerChip);
+    await tester.pump();
+
+    final submitButton = find.byKey(const ValueKey('diary-submit-button'));
+    await tester.ensureVisible(submitButton);
+    await tester.pumpAndSettle();
+    await tester.tap(submitButton);
+    await tester.pumpAndSettle();
+
+    expect(repository.createdDrafts.single.moodScore, 4);
+    expect(repository.createdDrafts.single.emotionTags, '평온');
+    expect(repository.createdDrafts.single.triggerTags, '산책');
+    // After submit, form mood and tags are reset cleanly.
+    expect(controller.state.moodScore, isNull);
+    expect(controller.state.emotionTags, isNull);
+    expect(controller.state.triggerTags, isNull);
+  });
 }
 
 class _FakeDiaryImageRepository implements DiaryImageRepository {
@@ -713,6 +799,7 @@ DiaryEntry _entry({
   required String createDate,
   bool isPrivate = true,
   int? moodScore,
+  String? imageUrl,
 }) {
   return DiaryEntry(
     id: id,
@@ -720,7 +807,7 @@ DiaryEntry _entry({
     content: '본문입니다.',
     category: DiaryCategory.daily,
     nickname: '마음이',
-    imageUrl: null,
+    imageUrl: imageUrl,
     isPrivate: isPrivate,
     createDate: createDate,
     modifyDate: createDate,

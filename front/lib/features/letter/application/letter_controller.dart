@@ -269,8 +269,11 @@ class LetterController extends ChangeNotifier {
     );
 
     try {
-      final stats = await _letterRepository.fetchStats();
-      final page = await _fetchPage(tab, page: 0);
+      final statsFuture = _letterRepository.fetchStats();
+      final pageFuture = _fetchPage(tab, page: 0);
+      await Future.wait<void>([statsFuture, pageFuture]);
+      final stats = await statsFuture;
+      final page = await pageFuture;
       if (requestId != _loadRequestId) {
         return;
       }

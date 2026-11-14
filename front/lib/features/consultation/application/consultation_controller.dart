@@ -1,8 +1,10 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 
 import '../../../core/network/api_error.dart';
+import '../../../shared/algorithm/bounded_key_ring_set.dart';
 import '../../draft_recovery/data/draft_recovery_repository.dart';
 import '../../draft_recovery/domain/draft_recovery_models.dart';
 import '../data/consultation_repository.dart';
@@ -140,10 +142,19 @@ class ConsultationController extends ChangeNotifier {
   String? _activeAssistantMessageId;
   String? _activeStreamRequestId;
   bool _ignoreStreamEventsUntilDone = false;
-  final Set<String> _processedStreamChunkKeys = <String>{};
-  final Set<String> _completedStreamRequestIds = <String>{};
+  final BoundedKeyRingSet<String> _processedStreamChunkKeys =
+      BoundedKeyRingSet<String>(capacity: 2048);
+  final BoundedKeyRingSet<String> _completedStreamRequestIds =
+      BoundedKeyRingSet<String>(capacity: 512);
+  final ValueNotifier<String?> _streamingContentNotifier =
+      ValueNotifier<String?>(null);
 
   ConsultationState get state => _state;
+
+  ValueListenable<String?> get streamingContentNotifier =>
+      _streamingContentNotifier;
+
+  String? get activeStreamingMessageId => _activeAssistantMessageId;
 
   DraftKey get _draftKey => DraftKey(
         memberId: _currentMemberId,
@@ -368,6 +379,7 @@ class ConsultationController extends ChangeNotifier {
         await _draftRepository?.delete(_draftKey);
         _replaceActiveAssistantWithSystem(safety.message);
         _activeAssistantMessageId = null;
+        _streamingContentNotifier.value = null;
         _setState(
           _state.copyWith(
             isSending: false,
@@ -400,6 +412,7 @@ class ConsultationController extends ChangeNotifier {
       await _markDraftFailed(content, error);
       _replaceActiveAssistantWithSystem('전송 실패: $errorMessage');
       _activeAssistantMessageId = null;
+      _streamingContentNotifier.value = null;
       _ignoreStreamEventsUntilDone = true;
       _cancelResponseTimeout();
       _setState(
@@ -637,6 +650,13 @@ class ConsultationController extends ChangeNotifier {
           message.role == ConsultationMessageRole.assistant &&
           message.content.isEmpty;
     });
+    final buffered = _streamingContentNotifier.value;
+    if (buffered != null && buffered.isNotEmpty) {
+      _setState(
+        _state.copyWith(messages: _messagesWithSyncedStreamingContent()),
+      );
+      return;
+    }
     if (!hasPendingAssistant) {
       return;
     }
@@ -663,8 +683,9 @@ class ConsultationController extends ChangeNotifier {
 
     final messageId = _activeAssistantMessageId;
     if (messageId == null) {
-      final message = _createMessage(ConsultationMessageRole.assistant, chunk);
+      final message = _createMessage(ConsultationMessageRole.assistant, '');
       _activeAssistantMessageId = message.id;
+      _streamingContentNotifier.value = chunk;
       _setState(
         _state.copyWith(
           messages: [..._state.messages, message],
@@ -677,25 +698,22 @@ class ConsultationController extends ChangeNotifier {
       return;
     }
 
-    _setState(
-      _state.copyWith(
-        messages: [
-          for (final message in _state.messages)
-            if (message.id == messageId)
-              message.copyWith(
-                content: _mergeAssistantChunkContent(
-                  message.content,
-                  chunk,
-                ),
-              )
-            else
-              message,
-        ],
-        connectionState: ConsultationConnectionState.connected,
-        isStreaming: true,
-        clearErrorMessage: true,
-      ),
+    final nextContent = _mergeAssistantChunkContent(
+      _activeStreamingText(),
+      chunk,
     );
+    _streamingContentNotifier.value = nextContent;
+    if (!_state.isStreaming ||
+        _state.connectionState != ConsultationConnectionState.connected ||
+        _state.errorMessage != null) {
+      _setState(
+        _state.copyWith(
+          connectionState: ConsultationConnectionState.connected,
+          isStreaming: true,
+          clearErrorMessage: true,
+        ),
+      );
+    }
     _restartResponseTimeout();
   }
 
@@ -712,6 +730,7 @@ class ConsultationController extends ChangeNotifier {
   }
 
   void _replaceActiveAssistantWithSystem(String content) {
+    _streamingContentNotifier.value = null;
     final messageId = _activeAssistantMessageId;
     if (messageId == null) {
       _appendSystemMessage(content);
@@ -736,6 +755,7 @@ class ConsultationController extends ChangeNotifier {
 
   void _finishStreaming([ConsultationStreamEvent? event]) {
     _cancelResponseTimeout();
+    final syncedMessages = _messagesWithSyncedStreamingContent();
     final requestId = event?.requestId ?? _activeStreamRequestId;
     if (requestId != null) {
       _completedStreamRequestIds.add(requestId);
@@ -744,7 +764,13 @@ class ConsultationController extends ChangeNotifier {
     _activeStreamRequestId = null;
     _ignoreStreamEventsUntilDone = false;
     _processedStreamChunkKeys.clear();
-    _setState(_state.copyWith(isStreaming: false));
+    _streamingContentNotifier.value = null;
+    _setState(
+      _state.copyWith(
+        messages: syncedMessages,
+        isStreaming: false,
+      ),
+    );
   }
 
   Future<void> _loadRecentMessages({bool force = false}) async {
@@ -805,13 +831,16 @@ class ConsultationController extends ChangeNotifier {
     _streamSubscription = null;
     _cancelPendingReconnect();
     _cancelResponseTimeout();
+    final syncedMessages = _messagesWithSyncedStreamingContent();
     await currentSubscription?.cancel();
     _activeAssistantMessageId = null;
     _activeStreamRequestId = null;
     _ignoreStreamEventsUntilDone = false;
     _processedStreamChunkKeys.clear();
+    _streamingContentNotifier.value = null;
     _setState(
       _state.copyWith(
+        messages: syncedMessages,
         connectionState: connectionState,
         isSending: false,
         isStreaming: false,
@@ -828,6 +857,7 @@ class ConsultationController extends ChangeNotifier {
     _streamSubscription = null;
     _cancelPendingReconnect();
     _cancelResponseTimeout();
+    final syncedMessages = _messagesWithSyncedStreamingContent();
     if (currentSubscription != null) {
       unawaited(currentSubscription.cancel());
     }
@@ -835,8 +865,10 @@ class ConsultationController extends ChangeNotifier {
     _activeStreamRequestId = null;
     _ignoreStreamEventsUntilDone = false;
     _processedStreamChunkKeys.clear();
+    _streamingContentNotifier.value = null;
     _setState(
       _state.copyWith(
+        messages: syncedMessages,
         connectionState: connectionState,
         isSending: false,
         isStreaming: false,
@@ -887,6 +919,43 @@ class ConsultationController extends ChangeNotifier {
     _activeStreamRequestId = null;
     _ignoreStreamEventsUntilDone = false;
     _processedStreamChunkKeys.clear();
+    _streamingContentNotifier.value = '';
+  }
+
+  String _activeStreamingText() {
+    final buffered = _streamingContentNotifier.value;
+    if (buffered != null) {
+      return buffered;
+    }
+    final messageId = _activeAssistantMessageId;
+    if (messageId == null) {
+      return '';
+    }
+    for (var i = _state.messages.length - 1; i >= 0; i -= 1) {
+      final message = _state.messages[i];
+      if (message.id == messageId) {
+        return message.content;
+      }
+    }
+    return '';
+  }
+
+  List<ConsultationMessage> _messagesWithSyncedStreamingContent() {
+    final messageId = _activeAssistantMessageId;
+    final streamedContent = _streamingContentNotifier.value;
+    if (messageId == null ||
+        streamedContent == null ||
+        streamedContent.isEmpty) {
+      return _state.messages;
+    }
+
+    return [
+      for (final message in _state.messages)
+        if (message.id == messageId && message.content != streamedContent)
+          message.copyWith(content: streamedContent)
+        else
+          message,
+    ];
   }
 
   bool _markStreamChunkForAppend(ConsultationStreamEvent event) {
@@ -940,6 +1009,7 @@ class ConsultationController extends ChangeNotifier {
     _cancelPendingReconnect();
     _cancelResponseTimeout();
     _streamSubscription?.cancel();
+    _streamingContentNotifier.dispose();
     super.dispose();
   }
 
@@ -986,6 +1056,7 @@ class ConsultationController extends ChangeNotifier {
     _activeStreamRequestId = null;
     _ignoreStreamEventsUntilDone = false;
     _processedStreamChunkKeys.clear();
+    _streamingContentNotifier.value = null;
     _setState(
       _state.copyWith(
         isSending: false,
@@ -1012,7 +1083,9 @@ String _mergeAssistantChunkContent(String current, String chunk) {
     return '$current$chunk';
   }
   if (_hasBoundarySpacing(current, chunk) ||
-      !_endsWithSentencePunctuation(current)) {
+      !_endsWithSentencePunctuation(current) ||
+      _startsWithContinuationOrPunctuation(chunk) ||
+      _isDecimalNumberBoundary(current, chunk)) {
     return '$current$chunk';
   }
   return '$current $chunk';
@@ -1020,6 +1093,48 @@ String _mergeAssistantChunkContent(String current, String chunk) {
 
 bool _hasBoundarySpacing(String current, String chunk) {
   return current[current.length - 1].trim().isEmpty || chunk[0].trim().isEmpty;
+}
+
+bool _startsWithContinuationOrPunctuation(String chunk) {
+  final first = chunk.codeUnitAt(0);
+  // '.', '!', '?', ',', ';', ':', ')', ']', '}', '"', '\'', '…', '。', '！', '？', '』', '」', '”', '’'
+  switch (first) {
+    case 0x2E:
+    case 0x21:
+    case 0x3F:
+    case 0x2C:
+    case 0x3B:
+    case 0x3A:
+    case 0x29:
+    case 0x5D:
+    case 0x7D:
+    case 0x22:
+    case 0x27:
+    case 0x2026:
+    case 0x3002:
+    case 0xFF01:
+    case 0xFF1F:
+    case 0x300F:
+    case 0x300D:
+    case 0x201D:
+    case 0x2019:
+      return true;
+    default:
+      return false;
+  }
+}
+
+bool _isDecimalNumberBoundary(String current, String chunk) {
+  if (current.length < 2) {
+    return false;
+  }
+  final last = current.codeUnitAt(current.length - 1);
+  if (last != 0x2E) {
+    return false;
+  }
+  final prev = current.codeUnitAt(current.length - 2);
+  final next = chunk.codeUnitAt(0);
+  return prev >= 0x30 && prev <= 0x39 && next >= 0x30 && next <= 0x39;
 }
 
 bool _endsWithSentencePunctuation(String value) {

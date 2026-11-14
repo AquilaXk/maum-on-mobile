@@ -20,69 +20,74 @@ class ContentModerationFeedbackPanel extends StatelessWidget {
     final theme = Theme.of(context);
     final colors = theme.colorScheme;
 
-    return Semantics(
-      container: true,
-      liveRegion: true,
-      label: '콘텐츠 검수 차단 안내: ${feedback.title}. ${feedback.message}',
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          color: colors.errorContainer,
-          borderRadius: AppRadii.card,
-          border: Border.all(color: colors.error.withValues(alpha: 0.4)),
-        ),
-        child: Padding(
-          padding: const EdgeInsets.all(AppSpacing.md),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: colors.errorContainer,
+        borderRadius: AppRadii.card,
+        border: Border.all(color: colors.error.withValues(alpha: 0.4)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(AppSpacing.md),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Semantics(
+              container: true,
+              liveRegion: true,
+              label: '콘텐츠 검수 차단 안내: ${feedback.title}. ${feedback.message}',
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Icon(Icons.policy_outlined, color: colors.onErrorContainer),
-                  const SizedBox(width: AppSpacing.xs),
-                  Expanded(
-                    child: Text(
-                      feedback.title,
-                      style: theme.textTheme.titleSmall?.copyWith(
-                        color: colors.onErrorContainer,
-                        fontWeight: FontWeight.w800,
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Icon(Icons.policy_outlined, color: colors.onErrorContainer),
+                      const SizedBox(width: AppSpacing.xs),
+                      Expanded(
+                        child: Text(
+                          feedback.title,
+                          style: theme.textTheme.titleSmall?.copyWith(
+                            color: colors.onErrorContainer,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
                       ),
+                    ],
+                  ),
+                  const SizedBox(height: AppSpacing.xs),
+                  Text(
+                    feedback.message,
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: colors.onErrorContainer,
+                      fontWeight: FontWeight.w600,
                     ),
                   ),
+                  const SizedBox(height: AppSpacing.sm),
+                  for (final item in feedback.guidanceItems) ...[
+                    _GuidanceBullet(text: item),
+                    const SizedBox(height: AppSpacing.xxs),
+                  ],
                 ],
               ),
-              const SizedBox(height: AppSpacing.xs),
-              Text(
-                feedback.message,
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  color: colors.onErrorContainer,
-                  fontWeight: FontWeight.w600,
+            ),
+            const SizedBox(height: AppSpacing.sm),
+            Wrap(
+              spacing: AppSpacing.xs,
+              runSpacing: AppSpacing.xs,
+              alignment: WrapAlignment.end,
+              children: [
+                OutlinedButton(
+                  onPressed: onDismiss,
+                  child: Text(feedback.dismissActionLabel),
                 ),
-              ),
-              const SizedBox(height: AppSpacing.sm),
-              for (final item in feedback.guidanceItems) ...[
-                _GuidanceBullet(text: item),
-                const SizedBox(height: AppSpacing.xxs),
+                FilledButton.icon(
+                  onPressed: onRetry,
+                  icon: const Icon(Icons.refresh_outlined),
+                  label: Text(feedback.primaryActionLabel),
+                ),
               ],
-              const SizedBox(height: AppSpacing.sm),
-              Wrap(
-                spacing: AppSpacing.xs,
-                runSpacing: AppSpacing.xs,
-                alignment: WrapAlignment.end,
-                children: [
-                  OutlinedButton(
-                    onPressed: onDismiss,
-                    child: Text(feedback.dismissActionLabel),
-                  ),
-                  FilledButton.icon(
-                    onPressed: onRetry,
-                    icon: const Icon(Icons.refresh_outlined),
-                    label: Text(feedback.primaryActionLabel),
-                  ),
-                ],
-              ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );

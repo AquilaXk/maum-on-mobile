@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../shared/ui/app_design_system.dart';
 import 'app_routes.dart';
@@ -17,15 +18,22 @@ class MaumBottomNavigation extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final colorScheme = theme.colorScheme;
     // 알림/설정 같은 보조 화면에서는 primary 탭을 임의로 선택하지 않는다.
     final selectedRoute = routes.contains(currentRoute) ? currentRoute : null;
 
     return DecoratedBox(
       key: const ValueKey('app-bottom-navigation-surface'),
-      decoration: const BoxDecoration(
-        color: Colors.white,
+      decoration: BoxDecoration(
+        color: isDark ? colorScheme.surface : Colors.white,
         border: Border(
-          top: BorderSide(color: Color(0xFFE6E6E6)),
+          top: BorderSide(
+            color: isDark
+                ? colorScheme.outlineVariant
+                : const Color(0xFFE6E6E6),
+          ),
         ),
       ),
       child: SafeArea(
@@ -76,16 +84,23 @@ class _MaumBottomNavigationItem extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final iconForeground =
-        isSelected ? const Color(0xFF111111) : const Color(0xFF777777);
+    final isDark = theme.brightness == Brightness.dark;
+    final colorScheme = theme.colorScheme;
+    final iconForeground = isDark
+        ? (isSelected ? colorScheme.primary : colorScheme.onSurfaceVariant)
+        : (isSelected ? const Color(0xFF111111) : const Color(0xFF777777));
     final labelForeground = iconForeground;
     const visualSurfaceWidth = 64.0;
+    void handleTap() {
+      HapticFeedback.selectionClick();
+      onSelected(route);
+    }
 
     return Semantics(
       button: true,
       selected: isSelected,
       label: '${route.navLabel} Tab ${index + 1} of $totalCount',
-      onTap: () => onSelected(route),
+      onTap: handleTap,
       child: ExcludeSemantics(
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xxs),
@@ -98,7 +113,7 @@ class _MaumBottomNavigationItem extends StatelessWidget {
               enableFeedback: false,
               splashFactory: NoSplash.splashFactory,
               overlayColor: WidgetStateProperty.all(Colors.transparent),
-              onTap: () => onSelected(route),
+              onTap: handleTap,
               child: ConstrainedBox(
                 constraints: const BoxConstraints(minHeight: 68),
                 child: Center(

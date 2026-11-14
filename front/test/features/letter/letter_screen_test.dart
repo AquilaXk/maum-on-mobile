@@ -710,6 +710,78 @@ void main() {
     expect(find.text('답장'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets('header back and PopScope return to mailbox and reset scroll',
+      (tester) async {
+    tester.view.physicalSize = const Size(390, 640);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    final letters = [
+      for (var id = 1; id <= 12; id += 1)
+        _summary(id: id, title: '받은 편지 $id'),
+    ];
+    final controller = LetterController(
+      letterRepository: _FakeLetterRepository(
+        statsQueue: [_stats()],
+        receivedPages: [_page(letters)],
+        details: [
+          _detail(id: 1, status: LetterStatus.writing, content: '편지 본문'),
+        ],
+      ),
+    );
+    var rootBackCount = 0;
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Navigator(
+          onGenerateRoute: (_) => MaterialPageRoute<void>(
+            builder: (_) => LetterScreen(
+              controller: controller,
+              onBack: () => rootBackCount += 1,
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.drag(find.byType(Scrollable).first, const Offset(0, -320));
+    await tester.pumpAndSettle();
+    final scrollableState = tester.state<ScrollableState>(
+      find.byType(Scrollable).first,
+    );
+    expect(scrollableState.position.pixels, greaterThan(0));
+
+    await tester.ensureVisible(find.byKey(const ValueKey('letter-card-5')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('letter-card-5')));
+    await tester.pumpAndSettle();
+    expect(controller.state.mode, LetterViewMode.detail);
+
+    // Header back returns from detail to mailbox instead of exiting route.
+    await tester.tap(find.byTooltip('홈으로'));
+    await tester.pumpAndSettle();
+
+    expect(controller.state.mode, LetterViewMode.mailbox);
+    expect(rootBackCount, 0);
+    expect(scrollableState.position.pixels, 0);
+
+    await tester.tap(find.byKey(const ValueKey('letter-compose-button')));
+    await tester.pumpAndSettle();
+    expect(controller.state.mode, LetterViewMode.compose);
+
+    // System PopScope back returns from compose to mailbox as well.
+    await Navigator.of(
+      tester.element(find.byType(LetterScreen)),
+    ).maybePop();
+    await tester.pumpAndSettle();
+
+    expect(controller.state.mode, LetterViewMode.mailbox);
+    expect(rootBackCount, 0);
+    expect(scrollableState.position.pixels, 0);
+  });
 }
 
 String _visibleText(WidgetTester tester) {

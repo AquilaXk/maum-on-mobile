@@ -1,24 +1,27 @@
 import 'dart:async';
-import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../../shared/ui/app_design_system.dart';
 import '../../moderation/presentation/content_moderation_feedback_panel.dart';
 import '../application/diary_controller.dart';
 import '../domain/diary_models.dart';
 import 'diary_image_picker.dart';
+import 'mood_heatmap_strip.dart';
 
 class DiaryScreen extends StatefulWidget {
   const DiaryScreen({
     required this.controller,
     required this.imagePicker,
+    this.imageBaseUrl,
     this.onBack,
     super.key,
   });
 
   final DiaryController controller;
   final DiaryImagePicker imagePicker;
+  final Uri? imageBaseUrl;
   final VoidCallback? onBack;
 
   @override
@@ -252,16 +255,25 @@ class _DiaryScreenState extends State<DiaryScreen> {
               state: state,
               onSelectDate: widget.controller.selectDate,
             ),
+            const SizedBox(height: AppSpacing.md),
+            MoodHeatmapStrip(
+              bitmapsByYear: state.bitmapsByYear,
+              anchorDate: state.selectedDate,
+              selectedDate: state.selectedDate,
+              onSelectDate: widget.controller.selectDate,
+            ),
             const SizedBox(height: AppSpacing.lg),
             _SelectedEntriesSection(
               entries: state.selectedDateEntries,
               selectedDateLabel: _formatDateLabel(state.selectedDate),
+              imageBaseUrl: widget.imageBaseUrl,
               onEdit: widget.controller.startEditing,
               onDelete: _confirmDelete,
             ),
             const SizedBox(height: AppSpacing.lg),
             _PublicEntriesSection(
               state: state,
+              imageBaseUrl: widget.imageBaseUrl,
               onLoadMore: widget.controller.loadMorePublicEntries,
             ),
             const SizedBox(height: AppSpacing.xl),
@@ -272,12 +284,16 @@ class _DiaryScreenState extends State<DiaryScreen> {
                 titleController: _titleController,
                 contentController: _contentController,
                 textBlockControllerFor: _textControllerForBlock,
+                imageBaseUrl: widget.imageBaseUrl,
                 onTitleChanged: widget.controller.updateTitle,
                 onContentChanged: widget.controller.updateContent,
                 onTextBlockChanged: widget.controller.updateTextBlock,
                 onAddTextBlockAfter: widget.controller.addTextBlockAfter,
                 onMoveBlock: widget.controller.moveContentBlock,
                 onCategoryChanged: widget.controller.updateCategory,
+                onMoodScoreChanged: widget.controller.setMoodScore,
+                onEmotionTagToggled: widget.controller.toggleEmotionTag,
+                onTriggerTagToggled: widget.controller.toggleTriggerTag,
                 onPrivacyChanged: widget.controller.updatePrivacy,
                 onPickImage: _pickImage,
                 onReplaceImage: (blockId, source) =>
@@ -637,12 +653,14 @@ class _SelectedEntriesSection extends StatelessWidget {
     required this.selectedDateLabel,
     required this.onEdit,
     required this.onDelete,
+    this.imageBaseUrl,
   });
 
   final List<DiaryEntry> entries;
   final String selectedDateLabel;
   final ValueChanged<DiaryEntry> onEdit;
   final ValueChanged<DiaryEntry> onDelete;
+  final Uri? imageBaseUrl;
 
   @override
   Widget build(BuildContext context) {
@@ -676,7 +694,10 @@ class _SelectedEntriesSection extends StatelessWidget {
                   ),
                   AppStatusPill(label: entry.isPrivate ? '나만 보기' : '공개'),
                 ],
-                content: _DiaryEntryContentPreview(entry: entry),
+                content: _DiaryEntryContentPreview(
+                  entry: entry,
+                  imageBaseUrl: imageBaseUrl,
+                ),
                 actions: [
                   TextButton.icon(
                     onPressed: () => onEdit(entry),
@@ -702,10 +723,12 @@ class _PublicEntriesSection extends StatelessWidget {
   const _PublicEntriesSection({
     required this.state,
     required this.onLoadMore,
+    this.imageBaseUrl,
   });
 
   final DiaryState state;
   final Future<void> Function() onLoadMore;
+  final Uri? imageBaseUrl;
 
   @override
   Widget build(BuildContext context) {
@@ -750,7 +773,10 @@ class _PublicEntriesSection extends StatelessWidget {
                     tone: AppStatusTone.success,
                   ),
                 ],
-                content: _DiaryEntryContentPreview(entry: entry),
+                content: _DiaryEntryContentPreview(
+                  entry: entry,
+                  imageBaseUrl: imageBaseUrl,
+                ),
               ),
               const SizedBox(height: AppSpacing.xs),
             ],
@@ -780,23 +806,77 @@ class _PublicEntriesSection extends StatelessWidget {
 }
 
 class _DiaryEntryContentPreview extends StatelessWidget {
-  const _DiaryEntryContentPreview({required this.entry});
+  const _DiaryEntryContentPreview({
+    required this.entry,
+    this.imageBaseUrl,
+  });
 
   final DiaryEntry entry;
+  final Uri? imageBaseUrl;
 
   @override
   Widget build(BuildContext context) {
     final blocks = entry.readableContentBlocks;
     final text = plainDiaryContentFromBlocks(blocks);
-    final imageCount = blocks.where((block) => block.isImage).length;
+    final imageUrls = <String>[];
+    var imageCount = 0;
+    for (final block in blocks) {
+      if (!block.isImage) {
+        continue;
+      }
+      imageCount += 1;
+      final url = block.imageUrl?.trim();
+      if (url != null && url.isNotEmpty && !imageUrls.contains(url)) {
+        imageUrls.add(url);
+      }
+    }
+    final legacyUrl = entry.imageUrl?.trim();
+    if (legacyUrl != null &&
+        legacyUrl.isNotEmpty &&
+        !imageUrls.contains(legacyUrl)) {
+      imageUrls.add(legacyUrl);
+      if (imageCount == 0) {
+        imageCount = 1;
+      }
+    }
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         if (text.isNotEmpty)
           Text(text, maxLines: 3, overflow: TextOverflow.ellipsis),
-        if (imageCount > 0) ...[
+        if (imageUrls.isNotEmpty) ...[
           if (text.isNotEmpty) const SizedBox(height: AppSpacing.xs),
+          for (var i = 0; i < imageUrls.length && i < 3; i += 1) ...[
+            if (i > 0) const SizedBox(height: AppSpacing.xs),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(8),
+              child: Image.network(
+                resolveDiaryImageUrl(imageUrls[i], baseUrl: imageBaseUrl),
+                key: ValueKey('diary-entry-image-${entry.id}-$i'),
+                height: 120,
+                width: double.infinity,
+                fit: BoxFit.cover,
+                gaplessPlayback: true,
+                errorBuilder: (context, error, stackTrace) {
+                  return Container(
+                    height: 64,
+                    width: double.infinity,
+                    alignment: Alignment.center,
+                    color:
+                        Theme.of(context).colorScheme.surfaceContainerHighest,
+                    child: Icon(
+                      Icons.image_outlined,
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+                  );
+                },
+              ),
+            ),
+          ],
+        ],
+        if (imageCount > 0) ...[
+          const SizedBox(height: AppSpacing.xs),
           Wrap(
             spacing: AppSpacing.xs,
             runSpacing: AppSpacing.xs,
@@ -822,6 +902,9 @@ class _DiaryForm extends StatelessWidget {
     required this.onAddTextBlockAfter,
     required this.onMoveBlock,
     required this.onCategoryChanged,
+    required this.onMoodScoreChanged,
+    required this.onEmotionTagToggled,
+    required this.onTriggerTagToggled,
     required this.onPrivacyChanged,
     required this.onPickImage,
     required this.onReplaceImage,
@@ -832,6 +915,7 @@ class _DiaryForm extends StatelessWidget {
     required this.onRetryImageBlock,
     required this.onReset,
     required this.onSubmit,
+    this.imageBaseUrl,
   });
 
   final DiaryState state;
@@ -845,6 +929,9 @@ class _DiaryForm extends StatelessWidget {
   final ValueChanged<String> onAddTextBlockAfter;
   final void Function(String blockId, int delta) onMoveBlock;
   final ValueChanged<DiaryCategory> onCategoryChanged;
+  final ValueChanged<int?> onMoodScoreChanged;
+  final ValueChanged<String> onEmotionTagToggled;
+  final ValueChanged<String> onTriggerTagToggled;
   final ValueChanged<bool> onPrivacyChanged;
   final void Function(DiaryImageSource source) onPickImage;
   final void Function(String blockId, DiaryImageSource source) onReplaceImage;
@@ -855,9 +942,21 @@ class _DiaryForm extends StatelessWidget {
   final ValueChanged<String> onRetryImageBlock;
   final VoidCallback onReset;
   final Future<void> Function() onSubmit;
+  final Uri? imageBaseUrl;
 
   @override
   Widget build(BuildContext context) {
+    final selectedEmotionTags = _parseCsvTagSet(state.emotionTags);
+    final selectedTriggerTags = _parseCsvTagSet(state.triggerTags);
+    final emotionOptions = _mergedTagOptions(
+      _emotionTagPresets,
+      selectedEmotionTags,
+    );
+    final triggerOptions = _mergedTagOptions(
+      _triggerTagPresets,
+      selectedTriggerTags,
+    );
+
     return AppSectionCard(
       title: state.isEditing ? '기록 수정하기' : '오늘의 기록',
       child: Column(
@@ -890,6 +989,7 @@ class _DiaryForm extends StatelessWidget {
             blocks: state.contentBlocks,
             primaryTextController: contentController,
             textBlockControllerFor: textBlockControllerFor,
+            imageBaseUrl: imageBaseUrl,
             isUploadingImage: state.isUploadingImage,
             uploadProgress: state.imageUploadProgress,
             canOpenImageSettings: canOpenImageSettings,
@@ -903,6 +1003,84 @@ class _DiaryForm extends StatelessWidget {
             onClearImage: onClearImage,
             onRemoveImageBlock: onRemoveImageBlock,
             onRetryImageBlock: onRetryImageBlock,
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          Text(
+            '오늘 기분 점수',
+            style: Theme.of(context).textTheme.labelLarge,
+          ),
+          const SizedBox(height: AppSpacing.xs),
+          Wrap(
+            spacing: AppSpacing.xs,
+            runSpacing: AppSpacing.xs,
+            children: [
+              for (final option in _moodScoreOptions)
+                ChoiceChip(
+                  key: ValueKey('diary-mood-score-${option.score}'),
+                  label: Text(option.label),
+                  selected: state.moodScore == option.score,
+                  selectedColor:
+                      _moodMarkerColor(option.score).withValues(alpha: 0.22),
+                  onSelected: state.isSubmitting
+                      ? null
+                      : (_) {
+                          HapticFeedback.selectionClick();
+                          onMoodScoreChanged(
+                            state.moodScore == option.score
+                                ? null
+                                : option.score,
+                          );
+                        },
+                ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          Text(
+            '감정 태그',
+            style: Theme.of(context).textTheme.labelLarge,
+          ),
+          const SizedBox(height: AppSpacing.xs),
+          Wrap(
+            spacing: AppSpacing.xs,
+            runSpacing: AppSpacing.xs,
+            children: [
+              for (final tag in emotionOptions)
+                FilterChip(
+                  key: ValueKey('diary-emotion-tag-$tag'),
+                  label: Text(tag),
+                  selected: selectedEmotionTags.contains(tag),
+                  onSelected: state.isSubmitting
+                      ? null
+                      : (_) {
+                          HapticFeedback.selectionClick();
+                          onEmotionTagToggled(tag);
+                        },
+                ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          Text(
+            '원인 태그',
+            style: Theme.of(context).textTheme.labelLarge,
+          ),
+          const SizedBox(height: AppSpacing.xs),
+          Wrap(
+            spacing: AppSpacing.xs,
+            runSpacing: AppSpacing.xs,
+            children: [
+              for (final tag in triggerOptions)
+                FilterChip(
+                  key: ValueKey('diary-trigger-tag-$tag'),
+                  label: Text(tag),
+                  selected: selectedTriggerTags.contains(tag),
+                  onSelected: state.isSubmitting
+                      ? null
+                      : (_) {
+                          HapticFeedback.selectionClick();
+                          onTriggerTagToggled(tag);
+                        },
+                ),
+            ],
           ),
           const SizedBox(height: AppSpacing.sm),
           DropdownButtonFormField<DiaryCategory>(
@@ -967,6 +1145,7 @@ class _ContentBlocksEditor extends StatelessWidget {
     required this.onClearImage,
     required this.onRemoveImageBlock,
     required this.onRetryImageBlock,
+    this.imageBaseUrl,
   });
 
   final List<DiaryContentBlock> blocks;
@@ -986,6 +1165,7 @@ class _ContentBlocksEditor extends StatelessWidget {
   final VoidCallback onClearImage;
   final ValueChanged<String> onRemoveImageBlock;
   final ValueChanged<String> onRetryImageBlock;
+  final Uri? imageBaseUrl;
 
   @override
   Widget build(BuildContext context) {
@@ -1017,6 +1197,7 @@ class _ContentBlocksEditor extends StatelessWidget {
             _ImageBlockPanel(
               key: ValueKey('diary-image-block-widget-${blocks[index].id}'),
               block: blocks[index],
+              imageBaseUrl: imageBaseUrl,
               isUploadingImage: isUploadingImage,
               uploadProgress: uploadProgress,
               canMoveUp: index > 0,
@@ -1150,6 +1331,7 @@ class _ImageBlockPanel extends StatelessWidget {
     required this.onAddTextBlockAfter,
     required this.onRetryImageBlock,
     required this.onRemoveImageBlock,
+    this.imageBaseUrl,
     super.key,
   });
 
@@ -1164,6 +1346,7 @@ class _ImageBlockPanel extends StatelessWidget {
   final VoidCallback onAddTextBlockAfter;
   final VoidCallback onRetryImageBlock;
   final VoidCallback onRemoveImageBlock;
+  final Uri? imageBaseUrl;
 
   @override
   Widget build(BuildContext context) {
@@ -1206,17 +1389,33 @@ class _ImageBlockPanel extends StatelessWidget {
               ClipRRect(
                 borderRadius: BorderRadius.circular(8),
                 child: Image.memory(
-                  Uint8List.fromList(image.bytes),
+                  image.bytes is Uint8List
+                      ? image.bytes as Uint8List
+                      : Uint8List.fromList(image.bytes),
                   key: ValueKey('diary-image-preview-${block.id}'),
                   height: 140,
                   fit: BoxFit.cover,
+                  gaplessPlayback: true,
                   errorBuilder: (context, error, stackTrace) {
                     return _ImageFallbackLabel(filename: image.filename);
                   },
                 ),
               )
             else if (block.imageUrl != null)
-              const AppNotice(message: '기존 이미지가 유지됩니다.')
+              ClipRRect(
+                borderRadius: BorderRadius.circular(8),
+                child: Image.network(
+                  resolveDiaryImageUrl(block.imageUrl!, baseUrl: imageBaseUrl),
+                  key: ValueKey('diary-image-url-preview-${block.id}'),
+                  height: 140,
+                  width: double.infinity,
+                  fit: BoxFit.cover,
+                  gaplessPlayback: true,
+                  errorBuilder: (context, error, stackTrace) {
+                    return const AppNotice(message: '기존 이미지가 유지됩니다.');
+                  },
+                ),
+              )
             else
               _ImageFallbackLabel(filename: block.displayFilename),
             if (block.errorMessage != null) ...[
@@ -1336,6 +1535,76 @@ class _ImageFallbackLabel extends StatelessWidget {
       child: Text(filename, overflow: TextOverflow.ellipsis),
     );
   }
+}
+
+const List<({int score, String label})> _moodScoreOptions = [
+  (score: 1, label: '매우 힘듦'),
+  (score: 2, label: '힘듦'),
+  (score: 3, label: '보통'),
+  (score: 4, label: '좋음'),
+  (score: 5, label: '매우 좋음'),
+];
+
+const List<String> _emotionTagPresets = [
+  '기쁨',
+  '평온',
+  '감사',
+  '불안',
+  '슬픔',
+  '화남',
+  '피곤',
+];
+
+const List<String> _triggerTagPresets = [
+  '일·업무',
+  '관계',
+  '가족',
+  '건강',
+  '수면',
+  '산책',
+  '휴식',
+];
+
+Set<String> _parseCsvTagSet(String? csv) {
+  if (csv == null || csv.trim().isEmpty) {
+    return const <String>{};
+  }
+  final tags = <String>{};
+  for (final raw in csv.split(',')) {
+    final trimmed = raw.trim();
+    if (trimmed.isNotEmpty) {
+      tags.add(trimmed);
+    }
+  }
+  return tags;
+}
+
+List<String> _mergedTagOptions(List<String> presets, Set<String> active) {
+  if (active.isEmpty) {
+    return presets;
+  }
+  final merged = <String>[...presets];
+  for (final tag in active) {
+    if (!merged.contains(tag)) {
+      merged.add(tag);
+    }
+  }
+  return merged;
+}
+
+String resolveDiaryImageUrl(String rawUrl, {Uri? baseUrl}) {
+  final trimmed = rawUrl.trim();
+  if (trimmed.isEmpty) {
+    return trimmed;
+  }
+  final parsed = Uri.tryParse(trimmed);
+  if (parsed != null && (parsed.scheme == 'http' || parsed.scheme == 'https')) {
+    return parsed.toString();
+  }
+  if (baseUrl != null && baseUrl.hasScheme) {
+    return baseUrl.resolve(trimmed).toString();
+  }
+  return trimmed;
 }
 
 String _formatMonthLabel(DateTime date) {
