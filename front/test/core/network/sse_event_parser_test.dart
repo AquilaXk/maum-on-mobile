@@ -96,5 +96,61 @@ void main() {
       expect(events[3].type, ConsultationStreamEventType.streamError);
       expect(events[3].data, '재연결 중입니다.');
     });
+
+    test('parses split CRLF and multibyte UTF-8 characters across chunk slices',
+        () async {
+      final events = await const SseEventParser()
+          .parse(
+            Stream<List<int>>.fromIterable([
+              utf8.encode('event: chat\r'),
+              utf8.encode('\ndata: 안녕'),
+              utf8.encode('하세요\r\n\r\n'),
+            ]),
+          )
+          .toList();
+
+      expect(events, hasLength(1));
+      expect(events.single.event, 'chat');
+      expect(events.single.data, '안녕하세요');
+    });
+
+    test('fails closed with FormatException when unterminated line exceeds cap',
+        () async {
+      const parser = SseEventParser(maxBufferBytes: 64);
+      final oversized = Stream<List<int>>.value(
+        List<int>.filled(65, 0x61), // 65 bytes of 'a' without newline
+      );
+
+      await expectLater(
+        parser.parse(oversized).toList(),
+        throwsFormatException,
+      );
+    });
+
+    test('fails closed when cumulative event lines exceed maxBufferBytes',
+        () async {
+      const parser = SseEventParser(maxBufferBytes: 64);
+      final multiLineNoBoundary = Stream<List<int>>.fromIterable([
+        utf8.encode('data: ${'a' * 30}\n'),
+        utf8.encode('data: ${'b' * 40}\n'),
+      ]);
+
+      await expectLater(
+        parser.parse(multiLineNoBoundary).toList(),
+        throwsFormatException,
+      );
+    });
+
+    test('strips trailing CR at EOF when stream ends without final newline',
+        () async {
+      const parser = SseEventParser();
+      final crWithoutLf = Stream<List<int>>.fromIterable([
+        utf8.encode('data: hello\r'),
+      ]);
+
+      final events = await parser.parse(crWithoutLf).toList();
+      expect(events, hasLength(1));
+      expect(events.single.data, 'hello');
+    });
   });
 }

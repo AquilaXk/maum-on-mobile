@@ -68,5 +68,85 @@ void main() {
       expect(await repository.read(commentKey), isNull);
       expect(await repository.listFailed(memberId: 7), isEmpty);
     });
+
+    test('uses per-member key index before reading failed drafts cleanly',
+        () async {
+      final storage = _CountingDraftRecoveryStorage();
+      final repository = StorageDraftRecoveryRepository(storage: storage);
+      const memberOneKey = DraftKey(
+        memberId: 11,
+        surface: DraftSurface.letter,
+      );
+      const memberTwoKey = DraftKey(
+        memberId: 22,
+        surface: DraftSurface.story,
+      );
+
+      await repository.markFailed(
+        memberOneKey,
+        fields: {'title': '실패 편지', 'content': '본문'},
+        failureMessage: '일시 오류',
+      );
+      await repository.saveEditing(
+        memberTwoKey,
+        fields: {'title': '다른 계정', 'content': '작성 중'},
+      );
+      storage.readAllCount = 0;
+
+      final failed = await repository.listFailed(memberId: 11);
+      expect(failed.single.key.storageKey, memberOneKey.storageKey);
+      expect(storage.readAllCount, 0);
+
+      await repository.clearMember(11);
+      expect(storage.readAllCount, 0);
+      expect(await repository.read(memberOneKey), isNull);
+      expect((await repository.read(memberTwoKey))?.fields['title'], '다른 계정');
+    });
+
+    test('migrates pre-index legacy drafts on first member scan', () async {
+      final storage = _CountingDraftRecoveryStorage();
+      final repository = StorageDraftRecoveryRepository(storage: storage);
+      const legacyKey = DraftKey(
+        memberId: 33,
+        surface: DraftSurface.diary,
+      );
+      await storage.write(
+        legacyKey.storageKey,
+        '{"memberId":33,"surface":"diary","scopeId":"","fields":{"title":"레거시","content":"본문"},"status":"failed","failureMessage":"오류","updatedAt":"2026-05-24T08:00:00.000"}',
+      );
+
+      final firstFailed = await repository.listFailed(memberId: 33);
+      expect(firstFailed.single.key.storageKey, legacyKey.storageKey);
+      expect(storage.readAllCount, 1);
+
+      storage.readAllCount = 0;
+      final secondFailed = await repository.listFailed(memberId: 33);
+      expect(secondFailed.single.key.storageKey, legacyKey.storageKey);
+      expect(storage.readAllCount, 0);
+    });
   });
+}
+
+class _CountingDraftRecoveryStorage implements DraftRecoveryStorage {
+  final Map<String, String> _values = {};
+  int readAllCount = 0;
+
+  @override
+  Future<void> delete(String key) async {
+    _values.remove(key);
+  }
+
+  @override
+  Future<String?> read(String key) async => _values[key];
+
+  @override
+  Future<Map<String, String>> readAll() async {
+    readAllCount += 1;
+    return Map<String, String>.unmodifiable(_values);
+  }
+
+  @override
+  Future<void> write(String key, String value) async {
+    _values[key] = value;
+  }
 }

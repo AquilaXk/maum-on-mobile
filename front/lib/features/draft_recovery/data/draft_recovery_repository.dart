@@ -44,6 +44,10 @@ class StorageDraftRecoveryRepository implements DraftRecoveryRepository {
 
   final DraftRecoveryStorage _storage;
 
+  static const String _memberIndexPrefix = 'maum_on.draft.v1.index.';
+
+  String _memberIndexKey(int memberId) => '$_memberIndexPrefix$memberId';
+
   @override
   Future<DraftEntry?> read(DraftKey key) async {
     final raw = await _storage.read(key.storageKey);
@@ -93,9 +97,8 @@ class StorageDraftRecoveryRepository implements DraftRecoveryRepository {
     required int memberId,
     DraftSurface? surface,
   }) async {
-    final entries = await _readAllEntries();
+    final entries = await _readMemberEntries(memberId);
     return entries
-        .where((entry) => entry.key.memberId == memberId)
         .where((entry) => surface == null || entry.key.surface == surface)
         .where((entry) => entry.status == DraftRecoveryStatus.failed)
         .toList(growable: false)
@@ -103,31 +106,127 @@ class StorageDraftRecoveryRepository implements DraftRecoveryRepository {
   }
 
   @override
-  Future<void> delete(DraftKey key) {
-    return _storage.delete(key.storageKey);
+  Future<void> delete(DraftKey key) async {
+    await _storage.delete(key.storageKey);
+    await _removeKeyFromIndex(key.memberId, key.storageKey);
   }
 
   @override
   Future<void> clearMember(int memberId) async {
+    final indexedKeys = await _readMemberIndex(memberId);
+    if (indexedKeys != null) {
+      for (final storageKey in indexedKeys) {
+        await _storage.delete(storageKey);
+      }
+      await _storage.delete(_memberIndexKey(memberId));
+      return;
+    }
+
     final entries = await _readAllEntries();
     for (final entry in entries) {
       if (entry.key.memberId == memberId) {
         await _storage.delete(entry.key.storageKey);
       }
     }
+    await _storage.delete(_memberIndexKey(memberId));
   }
 
-  Future<void> _write(DraftEntry entry) {
-    return _storage.write(entry.key.storageKey, jsonEncode(entry.toJson()));
+  Future<void> _write(DraftEntry entry) async {
+    await _storage.write(entry.key.storageKey, jsonEncode(entry.toJson()));
+    await _addKeyToIndex(entry.key.memberId, entry.key.storageKey);
+  }
+
+  Future<List<DraftEntry>> _readMemberEntries(int memberId) async {
+    final indexedKeys = await _readMemberIndex(memberId);
+    if (indexedKeys != null) {
+      if (indexedKeys.isEmpty) {
+        return const [];
+      }
+      final raws = await Future.wait(indexedKeys.map(_storage.read));
+      final entries = <DraftEntry>[];
+      final activeKeys = <String>[];
+      for (var index = 0; index < indexedKeys.length; index += 1) {
+        final raw = raws[index];
+        if (raw == null || raw.isEmpty) {
+          continue;
+        }
+        final entry = _decodeOrNull(raw);
+        if (entry != null && entry.key.memberId == memberId) {
+          entries.add(entry);
+          activeKeys.add(indexedKeys[index]);
+        }
+      }
+      if (activeKeys.length != indexedKeys.length) {
+        await _writeMemberIndex(memberId, activeKeys);
+      }
+      return entries;
+    }
+
+    final allEntries = await _readAllEntries();
+    final memberEntries = <DraftEntry>[];
+    final memberKeys = <String>[];
+    for (final entry in allEntries) {
+      if (entry.key.memberId == memberId) {
+        memberEntries.add(entry);
+        memberKeys.add(entry.key.storageKey);
+      }
+    }
+    await _writeMemberIndex(memberId, memberKeys);
+    return memberEntries;
+  }
+
+  Future<List<String>?> _readMemberIndex(int memberId) async {
+    final raw = await _storage.read(_memberIndexKey(memberId));
+    if (raw == null) {
+      return null;
+    }
+    try {
+      final decoded = jsonDecode(raw);
+      if (decoded is! List) {
+        return null;
+      }
+      return decoded.map((item) => item.toString()).toList(growable: true);
+    } on Object {
+      return null;
+    }
+  }
+
+  Future<void> _writeMemberIndex(int memberId, List<String> keys) async {
+    if (keys.isEmpty) {
+      await _storage.delete(_memberIndexKey(memberId));
+      return;
+    }
+    await _storage.write(_memberIndexKey(memberId), jsonEncode(keys));
+  }
+
+  Future<void> _addKeyToIndex(int memberId, String storageKey) async {
+    final existing = await _readMemberIndex(memberId) ?? <String>[];
+    if (existing.contains(storageKey)) {
+      return;
+    }
+    existing.add(storageKey);
+    await _writeMemberIndex(memberId, existing);
+  }
+
+  Future<void> _removeKeyFromIndex(int memberId, String storageKey) async {
+    final existing = await _readMemberIndex(memberId);
+    if (existing == null || !existing.contains(storageKey)) {
+      return;
+    }
+    existing.remove(storageKey);
+    await _writeMemberIndex(memberId, existing);
   }
 
   Future<List<DraftEntry>> _readAllEntries() async {
     final values = await _storage.readAll();
     final entries = <DraftEntry>[];
-    for (final raw in values.values) {
-      final entry = _decodeOrNull(raw);
-      if (entry != null) {
-        entries.add(entry);
+    for (final entry in values.entries) {
+      if (entry.key.startsWith(_memberIndexPrefix)) {
+        continue;
+      }
+      final parsed = _decodeOrNull(entry.value);
+      if (parsed != null) {
+        entries.add(parsed);
       }
     }
     return entries;
