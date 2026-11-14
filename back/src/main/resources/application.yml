@@ -150,7 +150,7 @@ app:
       model: ${AI_MODERATION_MODEL:gemini-2.5-flash}
       request-timeout: ${AI_MODERATION_REQUEST_TIMEOUT:PT4S}
       max-attempts: ${AI_MODERATION_MAX_ATTEMPTS:2}
-      max-input-chars: ${AI_MODERATION_MAX_INPUT_CHARS:2000}
+      max-input-chars: ${AI_MODERATION_MAX_INPUT_CHARS:20000}
       recent-message-limit: 0
   store-review:
     seed:

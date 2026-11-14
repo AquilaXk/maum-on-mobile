@@ -6,6 +6,7 @@ import com.maumonmobile.adapter.out.persistence.jdbc.withValue
 import com.maumonmobile.application.port.out.AdminAuditRepository
 import com.maumonmobile.domain.admin.AdminAuditEvent
 import com.maumonmobile.domain.admin.AdminAuditEventDraft
+import com.maumonmobile.domain.common.toUtcIso6
 import org.springframework.context.annotation.Profile
 import org.springframework.jdbc.core.RowMapper
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate
@@ -50,7 +51,7 @@ class JdbcAdminAuditRepository(
                 .withValue("previousValue", draft.previousValue)
                 .withValue("newValue", draft.newValue)
                 .withValue("reason", draft.reason)
-                .withValue("createdAt", Instant.now().toString())
+                .withValue("createdAt", Instant.now().toUtcIso6())
                 .withValue("targetResourceType", draft.targetResourceType)
                 .withValue("targetResourceId", draft.targetResourceId),
         )
@@ -81,6 +82,21 @@ class JdbcAdminAuditRepository(
         )
     }
 
+    override fun countCreatedBetween(startInclusive: String, endExclusive: String): Long {
+        return jdbc.queryForObject(
+            """
+                select count(*)
+                  from admin_audit_events
+                 where created_at >= :startInclusive
+                   and created_at < :endExclusive
+            """.trimIndent(),
+            params()
+                .withValue("startInclusive", startInclusive)
+                .withValue("endExclusive", endExclusive),
+            Long::class.java,
+        ) ?: 0L
+    }
+
     override fun findByTargetResource(resourceType: String, resourceId: Long): List<AdminAuditEvent> {
         return jdbc.query(
             """
@@ -95,6 +111,27 @@ class JdbcAdminAuditRepository(
                 .withValue("resourceId", resourceId),
             rowMapper,
         )
+    }
+
+    override fun countByTargetResources(resourceType: String, resourceIds: Collection<Long>): Map<Long, Int> {
+        val distinctIds = resourceIds.distinct()
+        if (distinctIds.isEmpty()) {
+            return emptyMap()
+        }
+        return jdbc.query(
+            """
+                select target_resource_id, count(*) as event_count
+                  from admin_audit_events
+                 where target_resource_type = :resourceType
+                   and target_resource_id in (:resourceIds)
+                 group by target_resource_id
+            """.trimIndent(),
+            params()
+                .withValue("resourceType", resourceType)
+                .withValue("resourceIds", distinctIds),
+        ) { rs, _ ->
+            rs.getLong("target_resource_id") to rs.getInt("event_count")
+        }.toMap()
     }
 
     private fun findById(id: Long): AdminAuditEvent? {

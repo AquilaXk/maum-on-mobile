@@ -121,9 +121,15 @@ class _HomeScreenState extends State<HomeScreen> {
               onSelected: widget.homeController.selectCategory,
             ),
             const SizedBox(height: AppSpacing.md),
-            _PopularStorySection(stats: state.stats),
+            _PopularStorySection(
+              stats: state.stats,
+              onStoryTap: widget.onViewStory,
+            ),
             const SizedBox(height: AppSpacing.md),
-            _FeedSection(state: state),
+            _FeedSection(
+              state: state,
+              onStoryTap: widget.onViewStory,
+            ),
           ],
         );
       },
@@ -687,6 +693,8 @@ class _HomeTextTab extends StatelessWidget {
     return Semantics(
       button: true,
       selected: selected,
+      label: label,
+      onTap: onTap,
       child: ExcludeSemantics(
         child: InkWell(
           onTap: onTap,
@@ -733,9 +741,13 @@ class _HomeTextTab extends StatelessWidget {
 }
 
 class _PopularStorySection extends StatelessWidget {
-  const _PopularStorySection({required this.stats});
+  const _PopularStorySection({
+    required this.stats,
+    required this.onStoryTap,
+  });
 
   final HomeStats? stats;
+  final VoidCallback onStoryTap;
 
   @override
   Widget build(BuildContext context) {
@@ -756,7 +768,8 @@ class _PopularStorySection extends StatelessWidget {
             subtitle:
                 '${story.label} · ${story.nickname} · 조회 ${story.viewCount}',
             leadingIcon: Icons.trending_up,
-            trailingIcon: null,
+            trailingIcon: Icons.chevron_right_rounded,
+            onTap: onStoryTap,
             semanticLabel:
                 '인기 스토리: ${story.title}, ${story.label}, 조회 ${story.viewCount}',
           ),
@@ -768,9 +781,13 @@ class _PopularStorySection extends StatelessWidget {
 }
 
 class _FeedSection extends StatelessWidget {
-  const _FeedSection({required this.state});
+  const _FeedSection({
+    required this.state,
+    required this.onStoryTap,
+  });
 
   final HomeState state;
+  final VoidCallback onStoryTap;
 
   @override
   Widget build(BuildContext context) {
@@ -800,7 +817,7 @@ class _FeedSection extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         for (final story in state.visibleStories) ...[
-          _StoryCard(story: story),
+          _StoryCard(story: story, onTap: onStoryTap),
           const SizedBox(height: AppSpacing.sm),
         ],
       ],
@@ -809,9 +826,13 @@ class _FeedSection extends StatelessWidget {
 }
 
 class _StoryCard extends StatelessWidget {
-  const _StoryCard({required this.story});
+  const _StoryCard({
+    required this.story,
+    required this.onTap,
+  });
 
   final HomeStory story;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
@@ -819,42 +840,55 @@ class _StoryCard extends StatelessWidget {
 
     return KeyedSubtree(
       key: ValueKey('home-feed-story-${story.id}'),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(
-          horizontal: AppSpacing.xxs,
-          vertical: AppSpacing.sm,
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              '#${story.category.label}',
-              style: theme.textTheme.labelLarge?.copyWith(
-                color: theme.colorScheme.primary,
+      child: Semantics(
+        button: true,
+        label:
+            '${story.title}, ${story.category.label}, ${story.authorNickname}, 조회 ${story.viewCount}',
+        onTap: onTap,
+        child: ExcludeSemantics(
+          child: InkWell(
+            borderRadius: AppRadii.card,
+            onTap: onTap,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(
+                horizontal: AppSpacing.xxs,
+                vertical: AppSpacing.sm,
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '#${story.category.label}',
+                    style: theme.textTheme.labelLarge?.copyWith(
+                      color: theme.colorScheme.primary,
+                    ),
+                  ),
+                  const SizedBox(height: AppSpacing.xs),
+                  Text(
+                    story.title,
+                    style: theme.textTheme.titleMedium,
+                  ),
+                  const SizedBox(height: AppSpacing.xs),
+                  Text(
+                    story.summary,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: AppSpacing.sm),
+                  Text(
+                    '${story.authorNickname} · 조회 ${story.viewCount}',
+                    style: theme.textTheme.bodySmall,
+                  ),
+                  const SizedBox(height: AppSpacing.sm),
+                  Divider(
+                    height: 1,
+                    color:
+                        theme.colorScheme.outlineVariant.withValues(alpha: 0.72),
+                  ),
+                ],
               ),
             ),
-            const SizedBox(height: AppSpacing.xs),
-            Text(
-              story.title,
-              style: theme.textTheme.titleMedium,
-            ),
-            const SizedBox(height: AppSpacing.xs),
-            Text(
-              story.summary,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-            ),
-            const SizedBox(height: AppSpacing.sm),
-            Text(
-              '${story.authorNickname} · 조회 ${story.viewCount}',
-              style: theme.textTheme.bodySmall,
-            ),
-            const SizedBox(height: AppSpacing.sm),
-            Divider(
-              height: 1,
-              color: theme.colorScheme.outlineVariant.withValues(alpha: 0.72),
-            ),
-          ],
+          ),
         ),
       ),
     );
@@ -889,6 +923,27 @@ _HomeActionColors _homeActionColors(
   ColorScheme colorScheme,
   AppStatusTone tone,
 ) {
+  if (colorScheme.brightness == Brightness.dark) {
+    return switch (tone) {
+      AppStatusTone.success => const _HomeActionColors(
+          background: Color(0xFF163547),
+          foreground: Color(0xFFBAE6FD),
+        ),
+      AppStatusTone.warning => const _HomeActionColors(
+          background: Color(0xFF1A2F4F),
+          foreground: Color(0xFFBFDBFE),
+        ),
+      AppStatusTone.danger => _HomeActionColors(
+          background: colorScheme.errorContainer,
+          foreground: colorScheme.onErrorContainer,
+        ),
+      AppStatusTone.neutral => _HomeActionColors(
+          background: colorScheme.primaryContainer,
+          foreground: colorScheme.onPrimaryContainer,
+        ),
+    };
+  }
+
   return switch (tone) {
     AppStatusTone.success => const _HomeActionColors(
         background: Color(0xFFEAF6FF),

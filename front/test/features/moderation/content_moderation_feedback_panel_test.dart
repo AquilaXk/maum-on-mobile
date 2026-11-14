@@ -59,5 +59,35 @@ void main() {
 
     expect(retryCount, 1);
     expect(dismissCount, 1);
+
+    final semantics = tester.ensureSemantics();
+    try {
+      expect(
+        tester.getSemantics(find.widgetWithText(FilledButton, '수정 후 다시 검수')),
+        matchesSemantics(
+          label: '수정 후 다시 검수',
+          isButton: true,
+          isEnabled: true,
+          hasEnabledState: true,
+          isFocusable: true,
+          hasFocusAction: true,
+          hasTapAction: true,
+        ),
+      );
+      expect(
+        tester.getSemantics(find.widgetWithText(OutlinedButton, '취소')),
+        matchesSemantics(
+          label: '취소',
+          isButton: true,
+          isEnabled: true,
+          hasEnabledState: true,
+          isFocusable: true,
+          hasFocusAction: true,
+          hasTapAction: true,
+        ),
+      );
+    } finally {
+      semantics.dispose();
+    }
   });
 }

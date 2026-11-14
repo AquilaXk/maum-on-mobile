@@ -129,6 +129,32 @@ class MobileTelemetryControllerTest @Autowired constructor(
                 status { isBadRequest() }
                 jsonPath("$.error.code") { value("INVALID_REQUEST") }
             }
+
+        // Chunked request without Content-Length header must also fail-closed past 32KB stream cap.
+        mockMvc.post("/api/v1/telemetry/events") {
+            header("Authorization", "Bearer ${member.accessToken}")
+            header("Transfer-Encoding", "chunked")
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"events":[{"type":"screen_view","route":"$oversizedRoute"}]}"""
+            with { req ->
+                val rawBytes = req.contentAsByteArray!!
+                object : org.springframework.mock.web.MockHttpServletRequest(req.servletContext, req.method ?: "POST", req.requestURI) {
+                    init {
+                        setContentType(req.contentType)
+                        req.headerNames.asIterator().forEachRemaining { h ->
+                            req.getHeader(h)?.let { value -> addHeader(h, value) }
+                        }
+                        setContent(rawBytes)
+                    }
+                    override fun getContentLength(): Int = -1
+                    override fun getContentLengthLong(): Long = -1L
+                }
+            }
+        }
+            .andExpect {
+                status { isBadRequest() }
+                jsonPath("$.error.code") { value("INVALID_REQUEST") }
+            }
     }
 
     @Test

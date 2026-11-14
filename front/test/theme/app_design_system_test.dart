@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/semantics.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:maum_on_mobile_front/shared/ui/app_design_system.dart';
 import 'package:maum_on_mobile_front/theme/app_theme.dart';
@@ -363,5 +364,83 @@ void main() {
     expect(find.text('수정'), findsOneWidget);
     expect(find.text('삭제'), findsOneWidget);
     expect(tester.takeException(), isNull);
+  });
+
+  testWidgets(
+      'content card keeps actions accessible outside ExcludeSemantics when semanticLabel is set',
+      (tester) async {
+    final semanticsHandle = tester.ensureSemantics();
+    try {
+      var cardTapped = 0;
+      var editTapped = 0;
+      var reportTapped = 0;
+
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: buildAppTheme(),
+          home: Scaffold(
+            body: AppContentCard(
+              key: const ValueKey('semantic-action-card'),
+              title: 'very.long.email@example-service.test/path_name',
+              subtitle: '일반 한국어 부제목',
+              badges: const [AppStatusPill(label: '공개')],
+              content: const Text('본문 내용'),
+              semanticLabel: '콘텐츠 카드 요약',
+              onTap: () => cardTapped += 1,
+              actions: [
+                OutlinedButton(
+                  key: const ValueKey('card-edit-action'),
+                  onPressed: () => editTapped += 1,
+                  child: const Text('수정'),
+                ),
+                OutlinedButton(
+                  key: const ValueKey('card-report-action'),
+                  onPressed: () => reportTapped += 1,
+                  child: const Text('신고'),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+
+      expect(find.bySemanticsLabel('콘텐츠 카드 요약'), findsOneWidget);
+
+      final editSemantics = tester.getSemantics(
+        find.byKey(const ValueKey('card-edit-action')),
+      );
+      expect(editSemantics.label, contains('수정'));
+      expect(
+        editSemantics.getSemanticsData().hasAction(SemanticsAction.tap),
+        isTrue,
+      );
+
+      final reportSemantics = tester.getSemantics(
+        find.byKey(const ValueKey('card-report-action')),
+      );
+      expect(reportSemantics.label, contains('신고'));
+      expect(
+        reportSemantics.getSemanticsData().hasAction(SemanticsAction.tap),
+        isTrue,
+      );
+
+      await tester.tap(find.byKey(const ValueKey('card-edit-action')));
+      await tester.tap(find.byKey(const ValueKey('card-report-action')));
+      await tester.tap(find.bySemanticsLabel('콘텐츠 카드 요약'));
+      await tester.pump();
+
+      expect(editTapped, 1);
+      expect(reportTapped, 1);
+      expect(cardTapped, 1);
+
+      final titleWidget = tester.widget<Text>(
+        find.text(
+          'very.\u200Blong.\u200Bemail@\u200Bexample-\u200Bservice.\u200Btest/\u200Bpath_\u200Bname',
+        ),
+      );
+      expect(titleWidget.data, contains('\u200B'));
+    } finally {
+      semanticsHandle.dispose();
+    }
   });
 }

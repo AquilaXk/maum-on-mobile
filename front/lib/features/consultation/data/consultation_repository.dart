@@ -99,13 +99,23 @@ class HttpConsultationStreamClient implements ConsultationStreamClient {
         _tokenRefreshCoordinator =
             tokenRefreshCoordinator ?? AuthTokenRefreshCoordinator(),
         _httpClient =
-            httpClient ?? (HttpClient()..connectionTimeout = _connectTimeout);
+            httpClient ?? (HttpClient()..connectionTimeout = _connectTimeout),
+        _ownsHttpClient = httpClient == null;
 
   final Uri _baseUrl;
   final AuthTokenStore _tokenStore;
   final AuthTokenRefresher? _tokenRefresher;
   final AuthTokenRefreshCoordinator _tokenRefreshCoordinator;
   final HttpClient _httpClient;
+  final bool _ownsHttpClient;
+
+  static final RegExp _trailingSlashPattern = RegExp(r'/$');
+
+  void close({bool force = true}) {
+    if (_ownsHttpClient) {
+      _httpClient.close(force: force);
+    }
+  }
 
   @override
   Stream<ConsultationStreamEvent> connect() {
@@ -210,7 +220,9 @@ class HttpConsultationStreamClient implements ConsultationStreamClient {
 }
 
 Uri _resolveApiPath(Uri baseUrl, String path) {
-  final base = baseUrl.toString().replaceFirst(RegExp(r'/$'), '');
+  final base = baseUrl
+      .toString()
+      .replaceFirst(HttpConsultationStreamClient._trailingSlashPattern, '');
   final normalizedPath = path.startsWith('/') ? path.substring(1) : path;
   return Uri.parse('$base/$normalizedPath');
 }

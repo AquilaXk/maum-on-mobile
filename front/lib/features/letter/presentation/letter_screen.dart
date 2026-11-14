@@ -26,9 +26,14 @@ class LetterScreen extends StatefulWidget {
 }
 
 class _LetterScreenState extends State<LetterScreen> {
+  final ScrollController _scrollController = ScrollController();
+  LetterViewMode? _lastMode;
+
   @override
   void initState() {
     super.initState();
+    _lastMode = widget.controller.state.mode;
+    widget.controller.addListener(_handleControllerChanged);
     if (widget.initiallyCompose) {
       widget.controller.startCompose();
     } else if (widget.initialLetterId != null) {
@@ -42,9 +47,15 @@ class _LetterScreenState extends State<LetterScreen> {
   @override
   void didUpdateWidget(covariant LetterScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
+    final controllerChanged = oldWidget.controller != widget.controller;
+    if (controllerChanged) {
+      oldWidget.controller.removeListener(_handleControllerChanged);
+      _lastMode = widget.controller.state.mode;
+      widget.controller.addListener(_handleControllerChanged);
+    }
     final shouldStartCompose =
         !oldWidget.initiallyCompose && widget.initiallyCompose;
-    if (oldWidget.controller != widget.controller || shouldStartCompose) {
+    if (controllerChanged || shouldStartCompose) {
       if (widget.initiallyCompose) {
         widget.controller.startCompose();
       }
@@ -56,6 +67,39 @@ class _LetterScreenState extends State<LetterScreen> {
         () => widget.controller.openLetterById(widget.initialLetterId!),
       );
     }
+  }
+
+  @override
+  void dispose() {
+    widget.controller.removeListener(_handleControllerChanged);
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  void _handleControllerChanged() {
+    final currentMode = widget.controller.state.mode;
+    if (_lastMode != currentMode) {
+      _resetScrollPosition();
+    }
+    _lastMode = currentMode;
+  }
+
+  void _resetScrollPosition() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !_scrollController.hasClients) {
+        return;
+      }
+      _scrollController.jumpTo(0);
+    });
+  }
+
+  void _handleBackToMailbox() {
+    if (widget.controller.state.mode != LetterViewMode.mailbox) {
+      widget.controller.backToMailbox();
+      _resetScrollPosition();
+      return;
+    }
+    widget.onBack?.call();
   }
 
   void _loadIfNeeded() {
@@ -77,60 +121,71 @@ class _LetterScreenState extends State<LetterScreen> {
       animation: widget.controller,
       builder: (context, _) {
         final state = widget.controller.state;
-        final onHeaderBack =
-            state.mode == LetterViewMode.mailbox ? null : widget.onBack;
+        final onHeaderBack = state.mode == LetterViewMode.mailbox
+            ? null
+            : _handleBackToMailbox;
 
-        return AppScreen(
-          title: '편지함',
-          onBack: onHeaderBack,
-          onRefresh: state.mode == LetterViewMode.mailbox
-              ? widget.controller.load
-              : null,
-          actions: [
-            if (state.mode != LetterViewMode.compose)
-              FilledButton.icon(
-                key: const ValueKey('letter-compose-button'),
-                onPressed: widget.controller.startCompose,
-                icon: const Icon(Icons.edit_outlined),
-                label: const Text('새 편지'),
-              ),
-          ],
-          children: [
-            if (state.moderationFeedback != null) ...[
-              ContentModerationFeedbackPanel(
-                feedback: state.moderationFeedback!,
-                onRetry: () => _retryModeration(state),
-                onDismiss: widget.controller.clearModerationFeedback,
-              ),
-              const SizedBox(height: AppSpacing.md),
-            ] else if (state.errorMessage != null) ...[
-              AppNotice(
-                message: state.errorMessage!,
-                tone: AppNoticeTone.error,
-              ),
-              const SizedBox(height: AppSpacing.md),
+        return PopScope<void>(
+          canPop: state.mode == LetterViewMode.mailbox,
+          onPopInvokedWithResult: (didPop, _) {
+            if (!didPop &&
+                widget.controller.state.mode != LetterViewMode.mailbox) {
+              _handleBackToMailbox();
+            }
+          },
+          child: AppScreen(
+            scrollController: _scrollController,
+            title: '편지함',
+            onBack: onHeaderBack,
+            onRefresh: state.mode == LetterViewMode.mailbox
+                ? widget.controller.load
+                : null,
+            actions: [
+              if (state.mode != LetterViewMode.compose)
+                FilledButton.icon(
+                  key: const ValueKey('letter-compose-button'),
+                  onPressed: widget.controller.startCompose,
+                  icon: const Icon(Icons.edit_outlined),
+                  label: const Text('새 편지'),
+                ),
             ],
-            if (state.noticeMessage != null) ...[
-              _LetterNotice(message: state.noticeMessage!),
-              const SizedBox(height: AppSpacing.md),
+            children: [
+              if (state.moderationFeedback != null) ...[
+                ContentModerationFeedbackPanel(
+                  feedback: state.moderationFeedback!,
+                  onRetry: () => _retryModeration(state),
+                  onDismiss: widget.controller.clearModerationFeedback,
+                ),
+                const SizedBox(height: AppSpacing.md),
+              ] else if (state.errorMessage != null) ...[
+                AppNotice(
+                  message: state.errorMessage!,
+                  tone: AppNoticeTone.error,
+                ),
+                const SizedBox(height: AppSpacing.md),
+              ],
+              if (state.noticeMessage != null) ...[
+                _LetterNotice(message: state.noticeMessage!),
+                const SizedBox(height: AppSpacing.md),
+              ],
+              switch (state.mode) {
+                LetterViewMode.mailbox => _MailboxView(
+                    state: state,
+                    controller: widget.controller,
+                    onOpenRandomReceiveSettings:
+                        widget.onOpenRandomReceiveSettings,
+                  ),
+                LetterViewMode.detail => _LetterDetailView(
+                    state: state,
+                    controller: widget.controller,
+                  ),
+                LetterViewMode.compose => _LetterComposeView(
+                    state: state,
+                    controller: widget.controller,
+                  ),
+              },
             ],
-            switch (state.mode) {
-              LetterViewMode.mailbox => _MailboxView(
-                  state: state,
-                  controller: widget.controller,
-                  onOpenRandomReceiveSettings:
-                      widget.onOpenRandomReceiveSettings,
-                ),
-              LetterViewMode.detail => _LetterDetailView(
-                  state: state,
-                  controller: widget.controller,
-                ),
-              LetterViewMode.compose => _LetterComposeView(
-                  state: state,
-                  controller: widget.controller,
-                ),
-            },
-          ],
+          ),
         );
       },
     );
@@ -734,7 +789,7 @@ Widget? _hideLengthCounter(
 }) {
   final resolvedMaxLength = maxLength ?? currentLength;
   return Semantics(
-    liveRegion: isFocused,
+    liveRegion: false,
     label: '현재 글자 수 $currentLength / 최대 $resolvedMaxLength',
     child: const SizedBox.shrink(),
   );

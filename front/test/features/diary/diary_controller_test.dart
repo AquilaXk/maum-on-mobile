@@ -714,6 +714,108 @@ void main() {
       expect(unauthorizedCount, 1);
       expect(controller.state.errorMessage, '다시 로그인해 주세요.');
     });
+
+    test('resetForm clears moodScore and emotion/trigger tags cleanly', () {
+      final controller = DiaryController(
+        diaryRepository: _FakeDiaryRepository(pages: [_page([])]),
+        imageRepository: _FakeDiaryImageRepository(),
+        now: DateTime(2026, 5, 20),
+      );
+
+      controller.setMoodScore(3);
+      controller.toggleEmotionTag('평온');
+      controller.toggleEmotionTag('감사');
+      controller.toggleTriggerTag('산책');
+      expect(controller.state.moodScore, 3);
+      expect(controller.state.emotionTags, '평온,감사');
+      expect(controller.state.triggerTags, '산책');
+
+      controller.toggleEmotionTag('평온');
+      expect(controller.state.emotionTags, '감사');
+
+      controller.resetForm();
+      expect(controller.state.moodScore, isNull);
+      expect(controller.state.emotionTags, isNull);
+      expect(controller.state.triggerTags, isNull);
+    });
+
+    test('debounces draft persistence during rapid typing and flushes on dispose',
+        () async {
+      final draftStorage = MemoryDraftRecoveryStorage();
+      final draftRepository = StorageDraftRecoveryRepository(
+        storage: draftStorage,
+      );
+      final controller = DiaryController(
+        diaryRepository: _FakeDiaryRepository(pages: [_page([])]),
+        imageRepository: _FakeDiaryImageRepository(),
+        currentMemberId: 12,
+        draftRepository: draftRepository,
+        now: DateTime(2026, 5, 20),
+        draftSaveDebounce: const Duration(milliseconds: 80),
+      );
+
+      controller.updateTitle('ㄱ');
+      controller.updateTitle('기');
+      controller.updateTitle('기록 제목');
+      controller.updateContent('연속 입력 중');
+
+      // Not persisted synchronously inside the keystroke burst.
+      expect(
+        await draftRepository.read(
+          const DraftKey(memberId: 12, surface: DraftSurface.diary),
+        ),
+        isNull,
+      );
+
+      // Disposing with a pending draft save flushes immediately once.
+      controller.dispose();
+      await Future<void>.delayed(Duration.zero);
+
+      final saved = await draftRepository.read(
+        const DraftKey(memberId: 12, surface: DraftSurface.diary),
+      );
+      expect(saved?.fields['title'], '기록 제목');
+      expect(saved?.fields['content'], '연속 입력 중');
+    });
+
+    test('precomputes date index and MoodYearBitmap across state lookups',
+        () async {
+      final controller = DiaryController(
+        diaryRepository: _FakeDiaryRepository(
+          pages: [
+            _page([
+              _entry(
+                id: 1,
+                title: '첫째 날',
+                createDate: '2026-05-19T08:00:00',
+                moodScore: 2,
+              ),
+              _entry(
+                id: 2,
+                title: '둘째 날',
+                createDate: '2026-05-20T09:00:00',
+                moodScore: 5,
+              ),
+            ]),
+          ],
+        ),
+        imageRepository: _FakeDiaryImageRepository(),
+        now: DateTime(2026, 5, 20),
+      );
+
+      await controller.load();
+      final bitmap = controller.state.bitmapForYear(2026);
+      expect(bitmap, isNotNull);
+      expect(bitmap!.moodScore(DateTime(2026, 5, 19)), 2);
+      expect(bitmap.moodScore(DateTime(2026, 5, 20)), 5);
+      expect(bitmap.currentStreak(DateTime(2026, 5, 20)), 2);
+
+      // Typing title does not mutate entries and reuses indexed selectedDateEntries.
+      final selectedBefore = controller.state.selectedDateEntries;
+      controller.updateTitle('입력 중');
+      expect(identical(controller.state.selectedDateEntries, selectedBefore),
+          isTrue);
+    });
   });
 }
 

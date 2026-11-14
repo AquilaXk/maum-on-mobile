@@ -9,12 +9,15 @@ import com.maumonmobile.application.port.out.ContentModerationAuditRepository
 import com.maumonmobile.application.port.out.ContentModerationClassifier
 import com.maumonmobile.application.port.out.ContentModerationUnavailableException
 import com.maumonmobile.domain.moderation.ContentModerationAuditDraft
+import com.maumonmobile.domain.moderation.ContentModerationCategory
 import com.maumonmobile.domain.moderation.ContentModerationModelStatus
 import com.maumonmobile.domain.moderation.ContentModerationPreFilter
 import com.maumonmobile.domain.moderation.ContentModerationPreFilterAction
 import com.maumonmobile.domain.moderation.ContentModerationPreFilterResult
 import com.maumonmobile.domain.moderation.ContentModerationResult
+import com.maumonmobile.domain.moderation.ContentModerationRiskLevel
 import com.maumonmobile.domain.moderation.ContentModerationTarget
+import com.maumonmobile.domain.moderation.ModerationTextEngine
 import com.maumonmobile.global.observability.MobileApiMetricsRegistry
 import com.maumonmobile.global.security.AuthenticatedUser
 import com.maumonmobile.global.web.ApiException
@@ -48,10 +51,22 @@ class ContentModerationService(
     }
 
     fun ensureAllowed(target: ContentModerationTarget, vararg values: String?) {
+        ensureAllowedInternal(memberId = null, target = target, values = values)
+    }
+
+    fun ensureAllowed(memberId: Long, target: ContentModerationTarget, vararg values: String?) {
+        ensureAllowedInternal(memberId = memberId, target = target, values = values)
+    }
+
+    private fun ensureAllowedInternal(
+        memberId: Long?,
+        target: ContentModerationTarget,
+        values: Array<out String?>,
+    ) {
         val text = values
             .mapNotNull { value -> value?.trim()?.takeIf(String::isNotEmpty) }
             .joinToString(separator = "\n")
-        val result = reviewText(target = target, text = text, memberId = null)
+        val result = reviewText(target = target, text = text, memberId = memberId)
         if (!result.allowed) {
             throw ApiException(ErrorCode.INVALID_REQUEST, result.message)
         }
@@ -77,20 +92,29 @@ class ContentModerationService(
         lateinit var classification: ContentModerationClassification
         val latencyMs = measureNanoTime {
             val preFilterResult = preFilter.evaluate(target = target, text = text)
-            classification = when (preFilterResult.action) {
-                ContentModerationPreFilterAction.ALLOW -> {
+            classification = when {
+                preFilterResult.action == ContentModerationPreFilterAction.ALLOW -> {
                     modelStatus = ContentModerationModelStatus.LOCAL_ALLOW
                     preFilterResult.toClassification(allowed = true)
                 }
-                ContentModerationPreFilterAction.BLOCK -> {
+                preFilterResult.action == ContentModerationPreFilterAction.BLOCK -> {
                     modelStatus = ContentModerationModelStatus.LOCAL_BLOCK
                     preFilterResult.toClassification(allowed = false)
                 }
-                ContentModerationPreFilterAction.REVIEW_WITH_AI -> try {
+                text.length > MODEL_INPUT_MAX_LENGTH -> {
+                    modelStatus = ContentModerationModelStatus.LOCAL_BLOCK
+                    ContentModerationClassification(
+                        allowed = false,
+                        riskLevel = ContentModerationRiskLevel.HIGH,
+                        categories = listOf(ContentModerationCategory.INAPPROPRIATE),
+                        message = "위험도가 높은 표현이 포함되어 수정이 필요합니다.",
+                    )
+                }
+                else -> try {
                     contentModerationClassifier.classify(
                         ContentModerationClassificationRequest(
                             target = target,
-                            text = text.take(MODEL_INPUT_MAX_LENGTH),
+                            text = text,
                             timeout = moderationTimeout,
                         ),
                     )
@@ -134,7 +158,7 @@ class ContentModerationService(
     }
 
     private companion object {
-        private const val MODEL_INPUT_MAX_LENGTH = 2_000
+        private const val MODEL_INPUT_MAX_LENGTH = ModerationTextEngine.MAX_MODERATION_SCAN_LENGTH
         private const val NANOSECONDS_PER_MILLISECOND = 1_000_000L
     }
 }
@@ -160,7 +184,7 @@ private fun String.sha256(): String {
 
 private fun String.toPrivacySafeSummary(categoryCount: Int): String {
     val normalized = trim()
-    val wordCount = normalized.split(Regex("\\s+")).count(String::isNotBlank)
+    val wordCount = ModerationTextEngine.countWhitespaceTokens(normalized)
     val hasPersonalInfo = EMAIL_PATTERN.containsMatchIn(normalized) || PHONE_PATTERN.containsMatchIn(normalized)
     return "length=$length;words=$wordCount;personalInfo=$hasPersonalInfo;categoryCount=$categoryCount"
 }

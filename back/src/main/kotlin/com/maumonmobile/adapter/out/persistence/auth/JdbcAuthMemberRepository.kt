@@ -1,14 +1,18 @@
 package com.maumonmobile.adapter.out.persistence.auth
 
+import com.maumonmobile.adapter.out.persistence.jdbc.containsLikePattern
 import com.maumonmobile.adapter.out.persistence.jdbc.insertAndReturnId
 import com.maumonmobile.adapter.out.persistence.jdbc.params
 import com.maumonmobile.adapter.out.persistence.jdbc.withValue
+import com.maumonmobile.application.port.out.AuthMemberDashboardCounts
 import com.maumonmobile.application.port.out.AuthMemberRepository
 import com.maumonmobile.domain.auth.AuthMember
 import com.maumonmobile.domain.auth.AuthMemberRole
 import com.maumonmobile.domain.auth.AuthMemberStatus
+import com.maumonmobile.domain.common.toUtcIso6
 import org.springframework.context.annotation.Profile
 import org.springframework.jdbc.core.RowMapper
+import org.springframework.jdbc.core.namedparam.MapSqlParameterSource
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate
 import org.springframework.stereotype.Repository
 import org.springframework.transaction.annotation.Transactional
@@ -100,6 +104,26 @@ class JdbcAuthMemberRepository(
         ).singleOrNull()
     }
 
+    override fun findByIds(ids: Collection<Long>): Map<Long, AuthMember> {
+        val distinctIds = ids.distinct()
+        if (distinctIds.isEmpty()) {
+            return emptyMap()
+        }
+        return jdbc.query(
+            "select * from auth_members where id in (:ids)",
+            params().withValue("ids", distinctIds),
+            rowMapper,
+        ).associateBy(AuthMember::id)
+    }
+
+    override fun findIdsMatchingEmail(query: String): Set<Long> {
+        val normalized = query.trim().takeIf(String::isNotEmpty) ?: return emptySet()
+        return jdbc.query(
+            "select id from auth_members where lower(email) like :pattern escape '!'",
+            params().withValue("pattern", containsLikePattern(normalized)),
+        ) { rs, _ -> rs.getLong("id") }.toSet()
+    }
+
     override fun findAll(): List<AuthMember> {
         return jdbc.query(
             "select * from auth_members order by id asc",
@@ -118,6 +142,104 @@ class JdbcAuthMemberRepository(
             params().withValue("status", AuthMemberStatus.ACTIVE.name),
             rowMapper,
         )
+    }
+
+    override fun findPage(
+        query: String?,
+        status: AuthMemberStatus?,
+        role: AuthMemberRole?,
+        socialAccount: Boolean?,
+        page: Int,
+        size: Int,
+    ): List<AuthMember> {
+        val safePage = page.coerceAtLeast(0)
+        val safeSize = size.coerceIn(1, 100)
+        val offset = safePage.toLong() * safeSize.toLong()
+        val filter = buildMemberFilter(query, status, role, socialAccount)
+        val queryParams = filter.params
+            .withValue("limit", safeSize)
+            .withValue("offset", offset)
+
+        return jdbc.query(
+            """
+                select *
+                  from auth_members
+                 ${filter.whereSql}
+                 order by id asc
+                 limit :limit offset :offset
+            """.trimIndent(),
+            queryParams,
+            rowMapper,
+        )
+    }
+
+    override fun countMembers(
+        query: String?,
+        status: AuthMemberStatus?,
+        role: AuthMemberRole?,
+        socialAccount: Boolean?,
+    ): Long {
+        val filter = buildMemberFilter(query, status, role, socialAccount)
+        return jdbc.queryForObject(
+            "select count(*) from auth_members ${filter.whereSql}",
+            filter.params,
+            Long::class.java,
+        ) ?: 0L
+    }
+
+    override fun countDashboardMetrics(): AuthMemberDashboardCounts {
+        return jdbc.queryForObject(
+            """
+                select coalesce(sum(case when status = :activeStatus and random_receive_allowed = true then 1 else 0 end), 0) as receivable_count,
+                       coalesce(sum(case when status = :blockedStatus then 1 else 0 end), 0) as blocked_count,
+                       coalesce(sum(case when role = :adminRole then 1 else 0 end), 0) as admin_count
+                  from auth_members
+            """.trimIndent(),
+            params()
+                .withValue("activeStatus", AuthMemberStatus.ACTIVE.name)
+                .withValue("blockedStatus", AuthMemberStatus.BLOCKED.name)
+                .withValue("adminRole", AuthMemberRole.ADMIN.name),
+        ) { rs, _ ->
+            AuthMemberDashboardCounts(
+                receivableMemberCount = rs.getLong("receivable_count"),
+                blockedMemberCount = rs.getLong("blocked_count"),
+                adminMemberCount = rs.getLong("admin_count"),
+            )
+        } ?: AuthMemberDashboardCounts(0L, 0L, 0L)
+    }
+
+    private data class MemberFilterQuery(
+        val whereSql: String,
+        val params: MapSqlParameterSource,
+    )
+
+    private fun buildMemberFilter(
+        query: String?,
+        status: AuthMemberStatus?,
+        role: AuthMemberRole?,
+        socialAccount: Boolean?,
+    ): MemberFilterQuery {
+        val clauses = mutableListOf<String>()
+        val queryParams = params()
+        if (status != null) {
+            clauses += "status = :status"
+            queryParams.withValue("status", status.name)
+        }
+        if (role != null) {
+            clauses += "role = :role"
+            queryParams.withValue("role", role.name)
+        }
+        if (socialAccount != null) {
+            clauses += "social_account = :socialAccount"
+            queryParams.withValue("socialAccount", socialAccount)
+        }
+        val normalizedQuery = query?.trim()?.takeIf(String::isNotEmpty)
+        if (normalizedQuery != null) {
+            clauses += "(lower(email) like :pattern escape '!' or lower(nickname) like :pattern escape '!')"
+            queryParams.withValue("pattern", containsLikePattern(normalizedQuery))
+        }
+        val whereSql = if (clauses.isEmpty()) "" else "where ${clauses.joinToString(" and ")}"
+        return MemberFilterQuery(whereSql = whereSql, params = queryParams)
     }
 
     override fun findByEmail(email: String): AuthMember? {
@@ -142,7 +264,7 @@ class JdbcAuthMemberRepository(
             params()
                 .withValue("refreshToken", refreshToken)
                 .withValue("memberId", memberId)
-                .withValue("createdAt", Instant.now().toString()),
+                .withValue("createdAt", Instant.now().toUtcIso6()),
         )
     }
 

@@ -12,6 +12,7 @@ import com.maumonmobile.application.port.out.MemberDataExportRepository
 import com.maumonmobile.application.port.out.StoryRepository
 import com.maumonmobile.domain.auth.AuthMember
 import com.maumonmobile.domain.auth.AuthMemberStatus
+import com.maumonmobile.domain.common.toUtcIso6
 import com.maumonmobile.domain.consultation.ConsultationMessage
 import com.maumonmobile.domain.diary.Diary
 import com.maumonmobile.domain.letter.Letter
@@ -45,12 +46,13 @@ class MemberDataExportService(
     override fun request(user: AuthenticatedUser): MemberDataExportJobResult {
         val member = findActiveMember(user)
         val now = Instant.now(clock)
+        val nowIso = now.toUtcIso6()
         val pendingJob = memberDataExportRepository.save(
             MemberDataExportJob(
                 id = 0L,
                 memberId = member.id,
                 status = MemberDataExportStatus.PENDING,
-                requestedAt = now.toString(),
+                requestedAt = nowIso,
                 completedAt = null,
                 expiresAt = null,
                 downloadedAt = null,
@@ -61,11 +63,12 @@ class MemberDataExportService(
 
         val completedJob = runCatching {
             val expiresAt = now.plus(EXPORT_TTL)
-            val content = buildExportContent(member, now, expiresAt)
+            val expiresAtIso = expiresAt.toUtcIso6()
+            val content = buildExportContent(member, nowIso, expiresAtIso)
             pendingJob.copy(
                 status = MemberDataExportStatus.COMPLETED,
-                completedAt = now.toString(),
-                expiresAt = expiresAt.toString(),
+                completedAt = nowIso,
+                expiresAt = expiresAtIso,
                 contentJson = content,
             )
         }.getOrElse { error ->
@@ -80,8 +83,12 @@ class MemberDataExportService(
 
     override fun get(user: AuthenticatedUser, exportId: Long): MemberDataExportJobResult {
         val member = findActiveMember(user)
-        val job = findOwnedJob(exportId, member.id)
-        return MemberDataExportJobResult.from(job, Instant.now(clock))
+        val summary = memberDataExportRepository.findSummaryById(exportId)
+            ?: throw ApiException(ErrorCode.NOT_FOUND, "내보내기 요청을 찾을 수 없습니다.")
+        if (summary.memberId != member.id) {
+            throw ApiException(ErrorCode.FORBIDDEN, "내보내기 파일에 접근할 수 없습니다.")
+        }
+        return MemberDataExportJobResult.from(summary, Instant.now(clock))
     }
 
     @Transactional
@@ -97,7 +104,7 @@ class MemberDataExportService(
             throw ApiException(ErrorCode.CONFLICT, "내보내기 파일이 아직 준비되지 않았습니다.", retryable = true)
         }
 
-        memberDataExportRepository.save(job.copy(downloadedAt = now.toString()))
+        memberDataExportRepository.save(job.copy(downloadedAt = now.toUtcIso6()))
         return MemberDataExportFileResult(
             filename = "maum-on-data-export-${job.id}.json",
             contentType = "application/json",
@@ -106,7 +113,7 @@ class MemberDataExportService(
         )
     }
 
-    private fun buildExportContent(member: AuthMember, generatedAt: Instant, expiresAt: Instant): String {
+    private fun buildExportContent(member: AuthMember, generatedAtIso: String, expiresAtIso: String): String {
         val posts = storyRepository.findPostsByAuthorId(member.id)
         val postIds = posts.map(StoryPost::id).toSet()
         val ownComments = storyRepository.findCommentsByAuthorId(member.id)
@@ -116,8 +123,8 @@ class MemberDataExportService(
             .groupBy(StoryComment::postId)
 
         val payload = mapOf(
-            "generatedAt" to generatedAt.toString(),
-            "expiresAt" to expiresAt.toString(),
+            "generatedAt" to generatedAtIso,
+            "expiresAt" to expiresAtIso,
             "account" to mapOf(
                 "id" to member.id,
                 "email" to maskEmail(member.email),

@@ -14,5 +14,11 @@ interface ConsultationRepository {
 
     fun findByMemberId(memberId: Long, afterId: Long? = null, limit: Int? = null): List<ConsultationMessage>
 
+    fun findRecentNonSensitiveByMemberId(
+        memberId: Long,
+        excludeMessageId: Long,
+        limit: Int,
+    ): List<ConsultationMessage>
+
     fun hideSensitiveByMemberId(memberId: Long): Int
 }

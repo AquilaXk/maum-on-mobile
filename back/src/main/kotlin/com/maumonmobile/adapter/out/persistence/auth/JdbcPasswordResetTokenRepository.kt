@@ -5,6 +5,7 @@ import com.maumonmobile.adapter.out.persistence.jdbc.params
 import com.maumonmobile.adapter.out.persistence.jdbc.withValue
 import com.maumonmobile.application.port.out.PasswordResetTokenRepository
 import com.maumonmobile.domain.auth.PasswordResetToken
+import com.maumonmobile.domain.common.toUtcIso6
 import org.springframework.context.annotation.Profile
 import org.springframework.jdbc.core.RowMapper
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate
@@ -72,7 +73,7 @@ class JdbcPasswordResetTokenRepository(
             """.trimIndent(),
             params()
                 .withValue("requestKeyHash", requestKeyHash)
-                .withValue("now", now.toString()),
+                .withValue("now", now.toUtcIso6()),
             Int::class.java,
         ) ?: 0
     }
@@ -99,7 +100,7 @@ class JdbcPasswordResetTokenRepository(
             """.trimIndent(),
             params()
                 .withValue("id", id)
-                .withValue("consumedAt", consumedAt.toString()),
+                .withValue("consumedAt", consumedAt.toUtcIso6()),
         ) > 0
     }
 
@@ -123,10 +124,10 @@ class JdbcPasswordResetTokenRepository(
         .withValue("requestKeyHash", requestKeyHash)
         .withValue("memberId", memberId)
         .withValue("tokenHash", tokenHash)
-        .withValue("expiresAt", expiresAt.toString())
-        .withValue("consumedAt", consumedAt?.toString())
+        .withValue("expiresAt", expiresAt.toUtcIso6())
+        .withValue("consumedAt", consumedAt?.toUtcIso6())
         .withValue("failedAttempts", failedAttempts)
-        .withValue("createdAt", createdAt.toString())
+        .withValue("createdAt", createdAt.toUtcIso6())
 
     private companion object {
         private val rowMapper = RowMapper { rs, _ ->

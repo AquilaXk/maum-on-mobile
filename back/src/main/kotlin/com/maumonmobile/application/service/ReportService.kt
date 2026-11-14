@@ -20,11 +20,15 @@ import com.maumonmobile.domain.admin.AdminAuditEventDraft
 import com.maumonmobile.domain.auth.AuthMember
 import com.maumonmobile.domain.auth.AuthMemberRole
 import com.maumonmobile.domain.auth.AuthMemberStatus
+import com.maumonmobile.domain.common.toUtcIso6
+import com.maumonmobile.domain.letter.Letter
 import com.maumonmobile.domain.moderation.ContentModerationTarget
 import com.maumonmobile.domain.report.Report
 import com.maumonmobile.domain.report.ReportDraft
 import com.maumonmobile.domain.report.ReportReason
 import com.maumonmobile.domain.report.ReportTargetType
+import com.maumonmobile.domain.story.StoryComment
+import com.maumonmobile.domain.story.StoryPost
 import com.maumonmobile.global.security.AuthenticatedUser
 import com.maumonmobile.global.web.ApiException
 import com.maumonmobile.global.web.ErrorCode
@@ -45,8 +49,11 @@ class ReportService(
     override fun create(user: AuthenticatedUser, command: ReportCreateCommand): Long {
         val reporterId = user.id.toLongOrNull()
             ?: throw ApiException(ErrorCode.UNAUTHORIZED, "다시 로그인해 주세요.")
-        authMemberRepository.findById(reporterId)
+        val member = authMemberRepository.findById(reporterId)
             ?: throw ApiException(ErrorCode.UNAUTHORIZED, "다시 로그인해 주세요.")
+        if (member.status != AuthMemberStatus.ACTIVE) {
+            throw ApiException(ErrorCode.UNAUTHORIZED, "다시 로그인해 주세요.")
+        }
 
         val targetId = command.targetId
         if (targetId == null || targetId <= 0L) {
@@ -59,7 +66,7 @@ class ReportService(
             throw ApiException(ErrorCode.INVALID_REQUEST, "이미 신고한 콘텐츠입니다.")
         }
 
-        contentModerationService.ensureAllowed(ContentModerationTarget.REPORT, command.content)
+        contentModerationService.ensureAllowed(member.id, ContentModerationTarget.REPORT, command.content)
         val ownerId = resolveTargetOwnerId(targetType, targetId)
             ?: throw ApiException(ErrorCode.NOT_FOUND, "신고 대상을 찾을 수 없습니다.")
 
@@ -97,12 +104,58 @@ class ReportService(
         val expectedStatus = status?.takeIf(String::isNotBlank)?.toReportStatusFilter()
         val expectedTargetType = targetType?.takeIf(String::isNotBlank)?.toReportTargetType()
         val reportSort = sort.toAdminReportSort()
+        val reports = reportRepository.findFilteredForAdmin(
+            status = expectedStatus,
+            targetType = expectedTargetType,
+            openFirst = reportSort == AdminReportSort.OPEN_FIRST,
+        )
+        if (reports.isEmpty()) {
+            return emptyList()
+        }
 
-        return reportRepository.findAll()
-            .filter { report -> expectedStatus == null || report.status == expectedStatus }
-            .filter { report -> expectedTargetType == null || report.targetType == expectedTargetType }
-            .sortedForAdmin(reportSort)
-            .map { report -> report.toSummary() }
+        val postIds = mutableSetOf<Long>()
+        val commentIds = mutableSetOf<Long>()
+        val letterIds = mutableSetOf<Long>()
+        reports.forEach { report ->
+            when (report.targetType) {
+                ReportTargetType.POST -> postIds += report.targetId
+                ReportTargetType.COMMENT -> commentIds += report.targetId
+                ReportTargetType.LETTER -> letterIds += report.targetId
+            }
+        }
+        val postsById = storyRepository.findPostsByIds(postIds)
+        val commentsById = storyRepository.findCommentsByIds(commentIds)
+        val lettersById = letterRepository.findByIds(letterIds)
+        val actionCountsByReportId = adminAuditRepository.countByTargetResources(
+            REPORT_RESOURCE_TYPE,
+            reports.map(Report::id),
+        )
+
+        val memberIds = buildSet {
+            reports.forEach { report ->
+                add(report.reporterId)
+                report.handledBy?.let(::add)
+                val targetOwnerId = when (report.targetType) {
+                    ReportTargetType.POST -> postsById[report.targetId]?.authorId
+                    ReportTargetType.COMMENT -> commentsById[report.targetId]?.authorId
+                    ReportTargetType.LETTER -> lettersById[report.targetId]?.senderId
+                }
+                if (targetOwnerId != null) {
+                    add(targetOwnerId)
+                }
+            }
+        }
+        val membersById = authMemberRepository.findByIds(memberIds)
+
+        return reports.map { report ->
+            report.toSummary(
+                postsById = postsById,
+                commentsById = commentsById,
+                lettersById = lettersById,
+                membersById = membersById,
+                actionCount = actionCountsByReportId[report.id] ?: 0,
+            )
+        }
     }
 
     override fun getForAdmin(user: AuthenticatedUser, reportId: Long): AdminReportDetail {
@@ -129,7 +182,7 @@ class ReportService(
                 "신고 처리 사유를 ${ACTION_REASON_MIN_LENGTH}자 이상 입력해 주세요.",
             )
         }
-        val handledAt = Instant.now().toString()
+        val handledAt = Instant.now().toUtcIso6()
         val report = reportRepository.updateStatus(
             id = reportId,
             status = status,
@@ -158,7 +211,9 @@ class ReportService(
             id = report.id,
             status = report.status,
             actionReason = report.actionReason,
-            handledBy = report.handledBy?.let(::memberSummary),
+            handledBy = report.handledBy?.let { handlerId ->
+                memberSummary(handlerId, mapOf(admin.id to admin))
+            },
             handledAt = report.handledAt,
             latestAudit = audit.toResult(),
         )
@@ -190,8 +245,14 @@ class ReportService(
         return admin
     }
 
-    private fun Report.toSummary(): AdminReportSummary {
-        val target = resolveTarget(targetType, targetId)
+    private fun Report.toSummary(
+        postsById: Map<Long, StoryPost>,
+        commentsById: Map<Long, StoryComment>,
+        lettersById: Map<Long, Letter>,
+        membersById: Map<Long, AuthMember>,
+        actionCount: Int,
+    ): AdminReportSummary {
+        val target = resolveTarget(targetType, targetId, postsById, commentsById, lettersById)
         return AdminReportSummary(
             id = id,
             targetId = targetId,
@@ -202,17 +263,20 @@ class ReportService(
             createdAt = createdAt,
             targetTitle = target.title,
             targetPreview = target.preview,
-            reporter = memberSummary(reporterId),
-            targetOwner = target.ownerId?.let(::memberSummary),
+            reporter = memberSummary(reporterId, membersById),
+            targetOwner = target.ownerId?.let { ownerId -> memberSummary(ownerId, membersById) },
             actionReason = actionReason,
-            handledBy = handledBy?.let(::memberSummary),
+            handledBy = handledBy?.let { handlerId -> memberSummary(handlerId, membersById) },
             handledAt = handledAt,
-            actionCount = adminAuditRepository.findByTargetResource(REPORT_RESOURCE_TYPE, id).size,
+            actionCount = actionCount,
         )
     }
 
     private fun Report.toDetail(): AdminReportDetail {
         val target = resolveTarget(targetType, targetId)
+        val membersById = authMemberRepository.findByIds(
+            listOfNotNull(reporterId, target.ownerId, handledBy),
+        )
         return AdminReportDetail(
             id = id,
             targetId = targetId,
@@ -222,10 +286,10 @@ class ReportService(
             status = status,
             createdAt = createdAt,
             target = target,
-            reporter = memberSummary(reporterId),
-            targetOwner = target.ownerId?.let(::memberSummary),
+            reporter = memberSummary(reporterId, membersById),
+            targetOwner = target.ownerId?.let { ownerId -> memberSummary(ownerId, membersById) },
             actionReason = actionReason,
-            handledBy = handledBy?.let(::memberSummary),
+            handledBy = handledBy?.let { handlerId -> memberSummary(handlerId, membersById) },
             handledAt = handledAt,
             auditEvents = adminAuditRepository
                 .findByTargetResource(REPORT_RESOURCE_TYPE, id)
@@ -258,41 +322,58 @@ class ReportService(
 
     private fun resolveTarget(targetType: ReportTargetType, targetId: Long): AdminReportTarget {
         return when (targetType) {
-            ReportTargetType.POST -> {
-                val post = storyRepository.findPostById(targetId)
-                AdminReportTarget(
-                    id = targetId,
-                    type = targetType.name,
-                    title = post?.title ?: "삭제된 게시글 #$targetId",
-                    preview = post?.content ?: "",
-                    ownerId = post?.authorId,
-                )
-            }
-            ReportTargetType.COMMENT -> {
-                val comment = storyRepository.findCommentById(targetId)
-                AdminReportTarget(
-                    id = targetId,
-                    type = targetType.name,
-                    title = "댓글 #$targetId",
-                    preview = comment?.content ?: "",
-                    ownerId = comment?.authorId,
-                )
-            }
-            ReportTargetType.LETTER -> {
-                val letter = letterRepository.findById(targetId)
-                AdminReportTarget(
-                    id = targetId,
-                    type = targetType.name,
-                    title = letter?.title ?: "삭제된 편지 #$targetId",
-                    preview = letter?.content ?: "",
-                    ownerId = letter?.senderId,
-                )
-            }
+            ReportTargetType.POST -> buildPostTarget(targetId, storyRepository.findPostById(targetId))
+            ReportTargetType.COMMENT -> buildCommentTarget(targetId, storyRepository.findCommentById(targetId))
+            ReportTargetType.LETTER -> buildLetterTarget(targetId, letterRepository.findById(targetId))
         }
     }
 
-    private fun memberSummary(memberId: Long): AdminReportMember {
-        val member = authMemberRepository.findById(memberId)
+    private fun resolveTarget(
+        targetType: ReportTargetType,
+        targetId: Long,
+        postsById: Map<Long, StoryPost>,
+        commentsById: Map<Long, StoryComment>,
+        lettersById: Map<Long, Letter>,
+    ): AdminReportTarget {
+        return when (targetType) {
+            ReportTargetType.POST -> buildPostTarget(targetId, postsById[targetId])
+            ReportTargetType.COMMENT -> buildCommentTarget(targetId, commentsById[targetId])
+            ReportTargetType.LETTER -> buildLetterTarget(targetId, lettersById[targetId])
+        }
+    }
+
+    private fun buildPostTarget(targetId: Long, post: StoryPost?): AdminReportTarget {
+        return AdminReportTarget(
+            id = targetId,
+            type = ReportTargetType.POST.name,
+            title = post?.title ?: "삭제된 게시글 #$targetId",
+            preview = post?.content ?: "",
+            ownerId = post?.authorId,
+        )
+    }
+
+    private fun buildCommentTarget(targetId: Long, comment: StoryComment?): AdminReportTarget {
+        return AdminReportTarget(
+            id = targetId,
+            type = ReportTargetType.COMMENT.name,
+            title = "댓글 #$targetId",
+            preview = comment?.content ?: "",
+            ownerId = comment?.authorId,
+        )
+    }
+
+    private fun buildLetterTarget(targetId: Long, letter: Letter?): AdminReportTarget {
+        return AdminReportTarget(
+            id = targetId,
+            type = ReportTargetType.LETTER.name,
+            title = letter?.title ?: "삭제된 편지 #$targetId",
+            preview = letter?.content ?: "",
+            ownerId = letter?.senderId,
+        )
+    }
+
+    private fun memberSummary(memberId: Long, membersById: Map<Long, AuthMember>): AdminReportMember {
+        val member = membersById[memberId]
         return AdminReportMember(
             id = memberId,
             email = member?.email ?: "",

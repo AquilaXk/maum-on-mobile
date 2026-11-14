@@ -271,7 +271,7 @@ class RemoteConsultationAiResponder internal constructor(
     }
 
     private fun String.toPromptSentences(): List<String> {
-        val normalized = replace(Regex("\\s+"), " ").trim()
+        val normalized = replace(WHITESPACE_RUN_PATTERN, " ").trim()
         if (normalized.isBlank()) {
             return emptyList()
         }
@@ -295,7 +295,7 @@ class RemoteConsultationAiResponder internal constructor(
     }
 
     private fun String.toRepetitionMaterial(): String {
-        val normalized = replace(Regex("\\s+"), " ").trim()
+        val normalized = replace(WHITESPACE_RUN_PATTERN, " ").trim()
         return if (normalized.length <= MAX_REPETITION_MATERIAL_CHARS) {
             normalized
         } else {
@@ -305,7 +305,7 @@ class RemoteConsultationAiResponder internal constructor(
 
     private fun String.normalizedRepetitionKey(): String {
         return lowercase()
-            .replace(Regex("[\\s\\p{Punct}]+"), "")
+            .replace(REPETITION_KEY_STRIP_PATTERN, "")
             .take(MAX_REPETITION_KEY_CHARS)
     }
 
@@ -582,6 +582,8 @@ class RemoteConsultationAiResponder internal constructor(
         )
 
         private val SENTENCE_END_CHARS = setOf('.', '!', '?', '。', '！', '？')
+        private val WHITESPACE_RUN_PATTERN = Regex("""\s+""")
+        private val REPETITION_KEY_STRIP_PATTERN = Regex("""[\s\p{Punct}]+""")
 
         private val ACTION_CUE_PATTERNS = listOf(
             Regex("""해\s*보(?:세요|는|자|면|기)?"""),

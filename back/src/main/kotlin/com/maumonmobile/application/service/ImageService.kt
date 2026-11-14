@@ -8,7 +8,9 @@ import com.maumonmobile.application.port.out.ImageAssetRepository
 import com.maumonmobile.application.port.out.ImageLifecyclePort
 import com.maumonmobile.application.port.out.ImageStorageCommand
 import com.maumonmobile.application.port.out.ImageStoragePort
+import com.maumonmobile.domain.common.toUtcIso6
 import com.maumonmobile.domain.image.ImageAsset
+import com.maumonmobile.domain.common.toUtcIso6
 import com.maumonmobile.domain.image.ImageAssetStatus
 import com.maumonmobile.domain.image.ImageTargetType
 import com.maumonmobile.global.observability.MobileApiMetricsRegistry
@@ -52,7 +54,7 @@ class ImageService(
                 bytes = command.bytes,
             ),
         )
-        val now = Instant.now().toString()
+        val now = Instant.now().toUtcIso6()
         val asset = imageAssetRepository.save(
             ImageAsset(
                 id = 0,
@@ -105,7 +107,7 @@ class ImageService(
                 status = ImageAssetStatus.ATTACHED,
                 targetType = ImageTargetType.DIARY,
                 targetId = diaryId,
-                updatedAt = Instant.now().toString(),
+                updatedAt = Instant.now().toUtcIso6(),
             ),
         )
         if (asset.status != ImageAssetStatus.ATTACHED) {
@@ -133,7 +135,7 @@ class ImageService(
     @Scheduled(fixedDelayString = "\${app.images.cleanup-fixed-delay-ms:3600000}")
     @Transactional
     override fun cleanupTemporaryImages() {
-        val cutoff = Instant.now().minus(temporaryTtl).toString()
+        val cutoff = Instant.now().minus(temporaryTtl).toUtcIso6()
         imageAssetRepository.findTemporaryCreatedBefore(cutoff)
             .forEach { asset -> markDeleted(asset, ImageAssetStatus.EXPIRED, IMAGE_LIFECYCLE_EXPIRED) }
     }
@@ -197,7 +199,7 @@ class ImageService(
                 status = finalStatus,
                 targetType = null,
                 targetId = null,
-                updatedAt = Instant.now().toString(),
+                updatedAt = Instant.now().toUtcIso6(),
             ),
         )
         imageStoragePort.delete(asset.storageKey)

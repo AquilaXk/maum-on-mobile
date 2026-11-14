@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/widgets.dart';
 
 import '../../../core/network/api_error.dart';
+import '../../../shared/algorithm/bounded_key_ring_set.dart';
 import '../data/notification_repository.dart';
 import '../data/push_notification_permission_client.dart';
 import '../domain/notification_models.dart';
@@ -103,7 +104,8 @@ class NotificationController extends ChangeNotifier {
   int _localEventSequence = 0;
   int _reconnectAttempts = 0;
   String? _registeredDeviceToken;
-  final Set<String> _seenStreamEventKeys = <String>{};
+  final BoundedKeyRingSet<String> _seenStreamEventKeys =
+      BoundedKeyRingSet<String>(capacity: 512);
   final Set<int> _openingNotificationIds = <int>{};
 
   NotificationState get state => _state;
@@ -593,10 +595,25 @@ class NotificationController extends ChangeNotifier {
       return current;
     }
 
-    // 서버 ID가 없는 실시간 알림은 음수 로컬 ID로만 구분되므로
-    // 양수 서버 ID와 절댓값을 맞춰 제거하면 첫 알림이 유실될 수 있다.
-    final localOnly = current.where((notification) => notification.id < 0);
+    // 서버 ID가 없는 실시간 알림은 음수 로컬 ID로만 구분되므로,
+    // 같은 내용/대상의 서버 항목이 이미 내려온 경우에만 로컬 임시 항목을 정리한다.
+    final localOnly = current.where((notification) {
+      if (notification.id >= 0) {
+        return false;
+      }
+      return !fetched.any((remote) => _matchesNotificationPayload(notification, remote));
+    });
     return [...localOnly, ...fetched];
+  }
+
+  bool _matchesNotificationPayload(
+    NotificationItem local,
+    NotificationItem remote,
+  ) {
+    return local.content == remote.content &&
+        local.routeKey == remote.routeKey &&
+        local.targetType == remote.targetType &&
+        local.targetId == remote.targetId;
   }
 
   void _handleError(Object error) {

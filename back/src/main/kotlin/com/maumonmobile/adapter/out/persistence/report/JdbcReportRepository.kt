@@ -3,7 +3,9 @@ package com.maumonmobile.adapter.out.persistence.report
 import com.maumonmobile.adapter.out.persistence.jdbc.insertAndReturnId
 import com.maumonmobile.adapter.out.persistence.jdbc.params
 import com.maumonmobile.adapter.out.persistence.jdbc.withValue
+import com.maumonmobile.application.port.out.ReportDashboardCounts
 import com.maumonmobile.application.port.out.ReportRepository
+import com.maumonmobile.domain.common.toUtcIso6
 import com.maumonmobile.domain.report.Report
 import com.maumonmobile.domain.report.ReportDraft
 import com.maumonmobile.domain.report.ReportReason
@@ -48,7 +50,7 @@ class JdbcReportRepository(
                 .withValue("reason", draft.reason.name)
                 .withValue("content", draft.content)
                 .withValue("status", "RECEIVED")
-                .withValue("createdAt", Instant.now().toString()),
+                .withValue("createdAt", Instant.now().toUtcIso6()),
         )
         return findById(id) ?: error("저장된 신고를 확인하지 못했습니다.")
     }
@@ -61,11 +63,123 @@ class JdbcReportRepository(
         ).singleOrNull()
     }
 
+    override fun existByIds(ids: Collection<Long>): Set<Long> {
+        val distinctIds = ids.distinct()
+        if (distinctIds.isEmpty()) {
+            return emptySet()
+        }
+        return jdbc.query(
+            "select id from reports where id in (:ids)",
+            params().withValue("ids", distinctIds),
+        ) { rs, _ -> rs.getLong("id") }.toSet()
+    }
+
     override fun findAll(): List<Report> {
         return jdbc.query(
             "select * from reports order by created_at desc, id desc",
             rowMapper,
         )
+    }
+
+    override fun findFilteredForAdmin(
+        status: String?,
+        targetType: ReportTargetType?,
+        openFirst: Boolean,
+    ): List<Report> {
+        val clauses = mutableListOf<String>()
+        val queryParams = params()
+        if (status != null) {
+            clauses += "status = :status"
+            queryParams.withValue("status", status)
+        }
+        if (targetType != null) {
+            clauses += "target_type = :targetType"
+            queryParams.withValue("targetType", targetType.name)
+        }
+        val whereSql = if (clauses.isEmpty()) "" else "where ${clauses.joinToString(" and ")}"
+        val orderSql = if (openFirst) {
+            "order by case when status = 'RECEIVED' then 0 else 1 end asc, created_at desc, id desc"
+        } else {
+            "order by created_at desc, id desc"
+        }
+        return jdbc.query(
+            "select * from reports $whereSql $orderSql",
+            queryParams,
+            rowMapper,
+        )
+    }
+
+    override fun findByReporterOrTargets(
+        reporterId: Long,
+        postIds: Collection<Long>,
+        commentIds: Collection<Long>,
+        letterIds: Collection<Long>,
+    ): List<Report> {
+        val clauses = mutableListOf("reporter_id = :reporterId")
+        val queryParams = params().withValue("reporterId", reporterId)
+        val distinctPosts = postIds.distinct()
+        if (distinctPosts.isNotEmpty()) {
+            clauses += "(target_type = 'POST' and target_id in (:postIds))"
+            queryParams.withValue("postIds", distinctPosts)
+        }
+        val distinctComments = commentIds.distinct()
+        if (distinctComments.isNotEmpty()) {
+            clauses += "(target_type = 'COMMENT' and target_id in (:commentIds))"
+            queryParams.withValue("commentIds", distinctComments)
+        }
+        val distinctLetters = letterIds.distinct()
+        if (distinctLetters.isNotEmpty()) {
+            clauses += "(target_type = 'LETTER' and target_id in (:letterIds))"
+            queryParams.withValue("letterIds", distinctLetters)
+        }
+        return jdbc.query(
+            """
+                select *
+                  from reports
+                 where ${clauses.joinToString(" or ")}
+                 order by created_at desc, id desc
+            """.trimIndent(),
+            queryParams,
+            rowMapper,
+        )
+    }
+
+    override fun countDashboardMetrics(startInclusive: String, endExclusive: String): ReportDashboardCounts {
+        return jdbc.queryForObject(
+            """
+                select coalesce(sum(case when created_at >= :startInclusive and created_at < :endExclusive then 1 else 0 end), 0) as today_count,
+                       coalesce(sum(case when status = 'RECEIVED' then 1 else 0 end), 0) as open_count,
+                       coalesce(sum(case when status <> 'RECEIVED' then 1 else 0 end), 0) as processed_count
+                  from reports
+            """.trimIndent(),
+            params()
+                .withValue("startInclusive", startInclusive)
+                .withValue("endExclusive", endExclusive),
+        ) { rs, _ ->
+            ReportDashboardCounts(
+                todayReportCount = rs.getLong("today_count"),
+                openReportCount = rs.getLong("open_count"),
+                processedReportCount = rs.getLong("processed_count"),
+            )
+        } ?: ReportDashboardCounts(0L, 0L, 0L)
+    }
+
+    override fun countByReporterIds(reporterIds: Collection<Long>): Map<Long, Int> {
+        val distinctIds = reporterIds.distinct()
+        if (distinctIds.isEmpty()) {
+            return emptyMap()
+        }
+        return jdbc.query(
+            """
+                select reporter_id, count(*) as report_count
+                  from reports
+                 where reporter_id in (:reporterIds)
+                 group by reporter_id
+            """.trimIndent(),
+            params().withValue("reporterIds", distinctIds),
+        ) { rs, _ ->
+            rs.getLong("reporter_id") to rs.getInt("report_count")
+        }.toMap()
     }
 
     override fun updateStatus(

@@ -1,5 +1,7 @@
 import 'dart:convert';
 
+import 'mood_year_bitmap.dart';
+
 enum DiaryCategory {
   love(label: '연애'),
   friend(label: '친구'),
@@ -291,7 +293,7 @@ class DiaryDraft {
 }
 
 class DiaryEntry {
-  const DiaryEntry({
+  DiaryEntry({
     required this.id,
     required this.title,
     required this.content,
@@ -305,7 +307,10 @@ class DiaryEntry {
     this.moodScore,
     this.emotionTags,
     this.triggerTags,
-  });
+    DateTime? parsedCreateDate,
+  })  : parsedCreateDate = parsedCreateDate ?? DateTime.tryParse(createDate),
+        dateKey = dateKeyFromDateTime(createDate),
+        packedDateKey = tryPackDateKeyString(createDate);
 
   factory DiaryEntry.fromJson(Object? json) {
     if (json is! Map) {
@@ -348,8 +353,9 @@ class DiaryEntry {
   final int? moodScore;
   final String? emotionTags;
   final String? triggerTags;
-
-  String get dateKey => dateKeyFromDateTime(createDate);
+  final DateTime? parsedCreateDate;
+  final String dateKey;
+  final int? packedDateKey;
 
   List<DiaryContentBlock> get readableContentBlocks {
     if (contentBlocks.isNotEmpty) {
@@ -391,6 +397,7 @@ class DiaryEntry {
       moodScore: clearMoodScore ? null : moodScore ?? this.moodScore,
       emotionTags: clearEmotionTags ? null : emotionTags ?? this.emotionTags,
       triggerTags: clearTriggerTags ? null : triggerTags ?? this.triggerTags,
+      parsedCreateDate: createDate == null ? parsedCreateDate : null,
     );
   }
 }
@@ -457,6 +464,30 @@ List<DiaryContentBlock> legacyDiaryContentBlocks({
   return parseHtmlToDiaryContentBlocks(content: content, imageUrl: imageUrl);
 }
 
+abstract final class _DiaryHtmlPatterns {
+  static final RegExp htmlTag = RegExp(r'<[^>]+>');
+  static final RegExp imgTag = RegExp(
+    r'''<img[^>]*src=["']([^"']+)["'][^>]*>''',
+    caseSensitive: false,
+  );
+  static final RegExp dataFilenameAttr = RegExp(
+    r'''data-filename=["']([^"']+)["']''',
+    caseSensitive: false,
+  );
+  static final RegExp altAttr = RegExp(
+    r'''alt=["']([^"']+)["']''',
+    caseSensitive: false,
+  );
+  static final RegExp dataSizeAttr = RegExp(
+    r'''data-size=["']([^"']+)["']''',
+    caseSensitive: false,
+  );
+  static final RegExp brTag = RegExp(r'<br\s*/?>', caseSensitive: false);
+  static final RegExp closingParagraphTag =
+      RegExp(r'</p>', caseSensitive: false);
+  static final RegExp stripHtmlTag = RegExp(r'<[^>]+>');
+}
+
 List<DiaryContentBlock> parseHtmlToDiaryContentBlocks({
   required String content,
   String? imageUrl,
@@ -470,7 +501,7 @@ List<DiaryContentBlock> parseHtmlToDiaryContentBlocks({
     ];
   }
 
-  final hasHtml = RegExp(r'<[^>]+>').hasMatch(trimmed);
+  final hasHtml = _DiaryHtmlPatterns.htmlTag.hasMatch(trimmed);
   if (!hasHtml) {
     return [
       DiaryContentBlock.text(id: 'text-0', text: content),
@@ -483,13 +514,9 @@ List<DiaryContentBlock> parseHtmlToDiaryContentBlocks({
   var blockIndex = 0;
   final seenImageUrls = <String>{};
 
-  final imgRegex = RegExp(
-    r'''<img[^>]*src=["']([^"']+)["'][^>]*>''',
-    caseSensitive: false,
-  );
   var lastIndex = 0;
 
-  for (final match in imgRegex.allMatches(trimmed)) {
+  for (final match in _DiaryHtmlPatterns.imgTag.allMatches(trimmed)) {
     final textBefore = trimmed.substring(lastIndex, match.start);
     final cleanText = _stripHtmlTags(textBefore);
     if (cleanText.isNotEmpty) {
@@ -503,19 +530,11 @@ List<DiaryContentBlock> parseHtmlToDiaryContentBlocks({
     final imgTag = match.group(0) ?? '';
     if (imgSrc != null && imgSrc.isNotEmpty) {
       seenImageUrls.add(imgSrc);
-      final dataFilenameMatch = RegExp(
-        r'''data-filename=["']([^"']+)["']''',
-        caseSensitive: false,
-      ).firstMatch(imgTag);
-      final altMatch = RegExp(
-        r'''alt=["']([^"']+)["']''',
-        caseSensitive: false,
-      ).firstMatch(imgTag);
+      final dataFilenameMatch =
+          _DiaryHtmlPatterns.dataFilenameAttr.firstMatch(imgTag);
+      final altMatch = _DiaryHtmlPatterns.altAttr.firstMatch(imgTag);
       final filename = dataFilenameMatch?.group(1) ?? altMatch?.group(1);
-      final sizeMatch = RegExp(
-        r'''data-size=["']([^"']+)["']''',
-        caseSensitive: false,
-      ).firstMatch(imgTag);
+      final sizeMatch = _DiaryHtmlPatterns.dataSizeAttr.firstMatch(imgTag);
 
       blocks.add(DiaryContentBlock.image(
         id: 'image-${blockIndex++}',
@@ -551,9 +570,9 @@ List<DiaryContentBlock> parseHtmlToDiaryContentBlocks({
 
 String _stripHtmlTags(String html) {
   return html
-      .replaceAll(RegExp(r'<br\s*/?>', caseSensitive: false), '\n')
-      .replaceAll(RegExp(r'</p>', caseSensitive: false), '\n')
-      .replaceAll(RegExp(r'<[^>]+>'), '')
+      .replaceAll(_DiaryHtmlPatterns.brTag, '\n')
+      .replaceAll(_DiaryHtmlPatterns.closingParagraphTag, '\n')
+      .replaceAll(_DiaryHtmlPatterns.stripHtmlTag, '')
       .replaceAll('&nbsp;', ' ')
       .replaceAll('&amp;', '&')
       .replaceAll('&lt;', '<')

@@ -20,3 +20,14 @@ internal fun MapSqlParameterSource.withValue(name: String, value: Any?): MapSqlP
     addValue(name, value)
     return this
 }
+
+internal fun escapeLikePattern(raw: String): String {
+    return raw
+        .replace("!", "!!")
+        .replace("%", "!%")
+        .replace("_", "!_")
+}
+
+internal fun containsLikePattern(raw: String): String {
+    return "%${escapeLikePattern(raw.lowercase())}%"
+}

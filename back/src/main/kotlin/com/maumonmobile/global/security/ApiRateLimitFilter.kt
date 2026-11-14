@@ -50,6 +50,9 @@ class ApiRateLimitFilter(
 
     private fun consume(clientKey: String, nowMillis: Long): RateLimitDecision {
         val windowMillis = properties.window.toMillis()
+        if (!windows.containsKey(clientKey) && windows.size >= MAX_RATE_LIMIT_ENTRIES) {
+            evictToCapacity(nowMillis, windowMillis)
+        }
         val window = windows.compute(clientKey) { _, current ->
             if (current == null || nowMillis - current.startedAtMillis >= windowMillis) {
                 ClientWindow(startedAtMillis = nowMillis, count = 1)
@@ -65,6 +68,19 @@ class ApiRateLimitFilter(
             allowed = window.count <= properties.capacity,
             retryAfterSeconds = retryAfterSeconds,
         )
+    }
+
+    private fun evictToCapacity(nowMillis: Long, windowMillis: Long) {
+        windows.entries.removeIf { (_, window) ->
+            nowMillis - window.startedAtMillis >= windowMillis * RETAINED_WINDOW_COUNT
+        }
+        if (windows.size >= MAX_RATE_LIMIT_ENTRIES) {
+            val iterator = windows.entries.iterator()
+            while (windows.size >= MAX_RATE_LIMIT_ENTRIES && iterator.hasNext()) {
+                iterator.next()
+                iterator.remove()
+            }
+        }
     }
 
     private fun cleanupExpiredWindows(nowMillis: Long, windowMillis: Long) {
@@ -122,5 +138,6 @@ class ApiRateLimitFilter(
     private companion object {
         private const val CLEANUP_INTERVAL_MILLIS = 60_000L
         private const val RETAINED_WINDOW_COUNT = 2
+        private const val MAX_RATE_LIMIT_ENTRIES = 4_096
     }
 }

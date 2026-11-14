@@ -48,6 +48,14 @@ class RemoteContentModerationClassifier internal constructor(
     }
 
     override fun classify(request: ContentModerationClassificationRequest): ContentModerationClassification {
+        if (request.text.length > endpoint.maxInputChars) {
+            return ContentModerationClassification(
+                allowed = false,
+                riskLevel = ContentModerationRiskLevel.HIGH,
+                categories = listOf(ContentModerationCategory.INAPPROPRIATE),
+                message = "위험도가 높은 표현이 포함되어 수정이 필요합니다.",
+            )
+        }
         if (circuitBreaker.isOpen()) {
             throw ContentModerationUnavailableException("콘텐츠 검수 모델 호출이 일시 중단되었습니다.")
         }
@@ -101,7 +109,7 @@ class RemoteContentModerationClassifier internal constructor(
             Treat mixed-script, spacing, consonant-only, or digit-substituted profanity as PROFANITY.
             Treat family-directed degradation combined with slavery, confinement, exploitation, or abuse terms as ABUSE even when euphemistic or spaced out.
             targetType: ${request.target.name}
-            text: ${request.text.take(endpoint.maxInputChars)}
+            text: ${request.text}
         """.trimIndent()
     }
 

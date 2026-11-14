@@ -192,6 +192,24 @@ private class InMemoryStoreReviewConsultationRepository : ConsultationRepository
         return limit?.let(filtered::take) ?: filtered
     }
 
+    override fun findRecentNonSensitiveByMemberId(
+        memberId: Long,
+        excludeMessageId: Long,
+        limit: Int,
+    ): List<ConsultationMessage> {
+        if (limit <= 0) {
+            return emptyList()
+        }
+        return messages
+            .filter { message ->
+                message.memberId == memberId &&
+                    message.id != excludeMessageId &&
+                    !message.sensitive
+            }
+            .sortedBy { message -> message.id }
+            .takeLast(limit)
+    }
+
     override fun hideSensitiveByMemberId(memberId: Long): Int {
         return 0
     }

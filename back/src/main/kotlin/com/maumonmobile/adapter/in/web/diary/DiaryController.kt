@@ -12,6 +12,7 @@ import com.maumonmobile.global.security.AuthenticatedUser
 import com.maumonmobile.global.web.ApiResponse
 import jakarta.validation.Valid
 import jakarta.validation.constraints.NotBlank
+import jakarta.validation.constraints.Size
 import org.springframework.security.core.Authentication
 import org.springframework.web.bind.annotation.DeleteMapping
 import org.springframework.web.bind.annotation.GetMapping
@@ -108,18 +109,24 @@ class DiaryController(
 
 data class DiarySaveRequest(
     @field:NotBlank
+    @field:Size(max = 255)
     val title: String,
     @field:NotBlank
+    @field:Size(max = 20_000)
     val content: String,
     @field:NotBlank
+    @field:Size(max = 80)
     val categoryName: String,
     val imageUrl: String? = null,
     @param:JsonProperty("isPrivate")
     @get:JsonProperty("isPrivate")
     val isPrivate: Boolean = false,
     val moodScore: Int? = null,
+    @field:Size(max = 500)
     val emotionTags: String? = null,
+    @field:Size(max = 500)
     val triggerTags: String? = null,
+    @field:Size(max = 50)
     val contentBlocks: List<DiaryContentBlockSaveRequest>? = null,
 )
 

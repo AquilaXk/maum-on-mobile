@@ -58,7 +58,8 @@ class NotificationItem {
     this.targetId,
     this.routeKey = 'notifications',
     this.readAt,
-  });
+    DateTime? parsedCreatedAt,
+  }) : _parsedCreatedAt = parsedCreatedAt;
 
   factory NotificationItem.fromJson(Object? json) {
     if (json is! Map) {
@@ -66,6 +67,12 @@ class NotificationItem {
     }
 
     final map = _stringKeyedMap(json);
+    final createdAt = (map['createdAt'] ??
+            map['createdDate'] ??
+            map['createDate'] ??
+            map['modifyDate'] ??
+            '')
+        .toString();
     return NotificationItem(
       id: _readInt(map, 'id'),
       content: map['content']?.toString() ?? '',
@@ -74,13 +81,9 @@ class NotificationItem {
       targetId: _readOptionalInt(map, 'targetId'),
       routeKey: _readNullableString(map['routeKey']) ?? 'notifications',
       isRead: map['isRead'] == true || map['read'] == true,
-      createdAt: (map['createdAt'] ??
-              map['createdDate'] ??
-              map['createDate'] ??
-              map['modifyDate'] ??
-              '')
-          .toString(),
+      createdAt: createdAt,
       readAt: _readNullableString(map['readAt']),
+      parsedCreatedAt: _tryParseNotificationDate(createdAt),
     );
   }
 
@@ -93,6 +96,10 @@ class NotificationItem {
   final bool isRead;
   final String createdAt;
   final String? readAt;
+  final DateTime? _parsedCreatedAt;
+
+  DateTime? get parsedCreatedAt =>
+      _parsedCreatedAt ?? _tryParseNotificationDate(createdAt);
 
   int? get letterId {
     return targetType?.toUpperCase() == 'LETTER' ? targetId : null;
@@ -158,8 +165,19 @@ class NotificationItem {
       isRead: isRead ?? this.isRead,
       createdAt: createdAt ?? this.createdAt,
       readAt: readAt ?? this.readAt,
+      parsedCreatedAt: createdAt == null
+          ? _parsedCreatedAt
+          : _tryParseNotificationDate(createdAt),
     );
   }
+}
+
+DateTime? _tryParseNotificationDate(String value) {
+  final trimmed = value.trim();
+  if (trimmed.isEmpty) {
+    return null;
+  }
+  return DateTime.tryParse(trimmed)?.toLocal();
 }
 
 class NotificationTapPayload {

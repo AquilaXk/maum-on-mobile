@@ -111,7 +111,8 @@ class DioNotificationStreamClient implements NotificationStreamClient {
   DioNotificationStreamClient({
     required ApiConfig apiConfig,
     Dio? dio,
-  }) : _dio = dio ??
+  })  : _ownsDio = dio == null,
+        _dio = dio ??
             Dio(
               BaseOptions(
                 baseUrl: apiConfig.baseUrl.toString(),
@@ -121,7 +122,14 @@ class DioNotificationStreamClient implements NotificationStreamClient {
               ),
             );
 
+  final bool _ownsDio;
   final Dio _dio;
+
+  void close({bool force = false}) {
+    if (_ownsDio) {
+      _dio.close(force: force);
+    }
+  }
 
   @override
   Stream<NotificationStreamEvent> connect(String ticket) async* {

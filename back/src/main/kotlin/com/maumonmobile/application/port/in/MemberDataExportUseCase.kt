@@ -1,5 +1,6 @@
 package com.maumonmobile.application.port.`in`
 
+import com.maumonmobile.application.port.out.MemberDataExportSummary
 import com.maumonmobile.domain.member.MemberDataExportJob
 import com.maumonmobile.domain.member.MemberDataExportStatus
 import com.maumonmobile.global.security.AuthenticatedUser
@@ -37,6 +38,23 @@ data class MemberDataExportJobResult(
                     null
                 },
                 failureReason = job.failureReason,
+            )
+        }
+
+        fun from(summary: MemberDataExportSummary, now: Instant): MemberDataExportJobResult {
+            val status = summary.statusAt(now)
+            return MemberDataExportJobResult(
+                id = summary.id,
+                status = status.name,
+                requestedAt = summary.requestedAt,
+                completedAt = summary.completedAt,
+                expiresAt = summary.expiresAt,
+                downloadUrl = if (status == MemberDataExportStatus.COMPLETED) {
+                    "/api/v1/members/me/data-exports/${summary.id}/download"
+                } else {
+                    null
+                },
+                failureReason = summary.failureReason,
             )
         }
     }

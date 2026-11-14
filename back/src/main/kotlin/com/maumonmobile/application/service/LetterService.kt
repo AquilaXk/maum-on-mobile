@@ -10,6 +10,8 @@ import com.maumonmobile.application.port.out.AuthMemberRepository
 import com.maumonmobile.application.port.out.LetterRepository
 import com.maumonmobile.application.port.out.NotificationDeliveryPort
 import com.maumonmobile.domain.auth.AuthMember
+import com.maumonmobile.domain.auth.AuthMemberStatus
+import com.maumonmobile.domain.common.toUtcIso6
 import com.maumonmobile.domain.letter.InvalidLetterStatusTransitionException
 import com.maumonmobile.domain.letter.Letter
 import com.maumonmobile.domain.letter.LetterDraft
@@ -31,10 +33,8 @@ class LetterService(
 ) : LetterUseCase {
 
     override fun create(user: AuthenticatedUser, command: LetterSaveCommand): Long {
-        val memberId = user.memberId()
-        val member = authMemberRepository.findById(memberId)
-            ?: throw ApiException(ErrorCode.UNAUTHORIZED, "다시 로그인해 주세요.")
-        contentModerationService.ensureAllowed(ContentModerationTarget.LETTER, command.title, command.content)
+        val member = findActiveMember(user)
+        contentModerationService.ensureAllowed(member.id, ContentModerationTarget.LETTER, command.title, command.content)
         val receiver = availableLetterReceivers(senderId = member.id).maxByOrNull { receiver -> receiver.id }
             ?: throw ApiException(
                 ErrorCode.NOT_FOUND,
@@ -59,46 +59,59 @@ class LetterService(
     }
 
     override fun received(user: AuthenticatedUser, page: Int, size: Int): LetterListResult {
-        val memberId = user.memberId()
-        return letterRepository.findAll()
-            .filter { letter -> letter.isReceivedBy(memberId) }
-            .toPage(memberId, page, size, authMemberRepository)
+        val member = findActiveMember(user)
+        val safePage = page.coerceAtLeast(0)
+        val safeSize = size.coerceIn(1, MAX_PAGE_SIZE)
+        val letters = letterRepository.findReceivedPage(member.id, safePage, safeSize)
+        val totalElements = letterRepository.countReceived(member.id)
+        val receiverNicknames = receiverNicknamesFor(letters)
+        return letters.toPageResult(member.id, safePage, safeSize, totalElements, receiverNicknames)
     }
 
     override fun sent(user: AuthenticatedUser, page: Int, size: Int): LetterListResult {
-        val memberId = user.memberId()
-        return letterRepository.findAll()
-            .filter { letter -> letter.senderId == memberId }
-            .toPage(memberId, page, size, authMemberRepository)
+        val member = findActiveMember(user)
+        val safePage = page.coerceAtLeast(0)
+        val safeSize = size.coerceIn(1, MAX_PAGE_SIZE)
+        val letters = letterRepository.findSentPage(member.id, safePage, safeSize)
+        val totalElements = letterRepository.countSent(member.id)
+        val receiverNicknames = receiverNicknamesFor(letters)
+        return letters.toPageResult(member.id, safePage, safeSize, totalElements, receiverNicknames)
     }
 
     override fun get(user: AuthenticatedUser, letterId: Long): LetterResult {
-        val memberId = user.memberId()
-        val letter = findAccessibleLetter(memberId, letterId)
-        return letter.toResult(memberId, authMemberRepository)
+        val member = findActiveMember(user)
+        val letter = findAccessibleLetter(member.id, letterId)
+        return letter.toResult(member.id, authMemberRepository)
     }
 
     override fun stats(user: AuthenticatedUser): LetterStatsResult {
-        val memberId = user.memberId()
-        val member = authMemberRepository.findById(memberId)
-            ?: throw ApiException(ErrorCode.UNAUTHORIZED, "다시 로그인해 주세요.")
-        val receivedLetters = letterRepository.findAll()
-            .filter { letter -> letter.isReceivedBy(memberId) }
-            .sortedByDescending { letter -> letter.createdDate }
-        val sentLetters = letterRepository.findAll()
-            .filter { letter -> letter.senderId == memberId }
-            .sortedByDescending { letter -> letter.createdDate }
+        val member = findActiveMember(user)
+        val stats = letterRepository.findStatsForMember(member.id)
+        val receiverNicknames = receiverNicknamesFor(
+            listOfNotNull(stats.latestReceivedLetter, stats.latestSentLetter),
+        )
 
         return LetterStatsResult(
-            receivedCount = receivedLetters.size,
+            receivedCount = stats.receivedCount.toInt(),
             randomReceiveAllowed = member.randomReceiveAllowed,
-            latestReceivedLetter = receivedLetters.firstOrNull()?.toSummaryResult(memberId, authMemberRepository),
-            latestSentLetter = sentLetters.firstOrNull()?.toSummaryResult(memberId, authMemberRepository),
+            latestReceivedLetter = stats.latestReceivedLetter?.let { letter ->
+                letter.toSummaryResult(
+                    memberId = member.id,
+                    receiverNickname = letter.receiverId?.let(receiverNicknames::get),
+                )
+            },
+            latestSentLetter = stats.latestSentLetter?.let { letter ->
+                letter.toSummaryResult(
+                    memberId = member.id,
+                    receiverNickname = letter.receiverId?.let(receiverNicknames::get),
+                )
+            },
         )
     }
 
     override fun accept(user: AuthenticatedUser, letterId: Long) {
-        val letter = findReceivedLetter(user.memberId(), letterId)
+        val member = findActiveMember(user)
+        val letter = findReceivedLetter(member.id, letterId)
         val transition = letter.transitionOrConflict { accept() }
         if (!transition.changed) {
             return
@@ -114,15 +127,16 @@ class LetterService(
     }
 
     override fun reject(user: AuthenticatedUser, letterId: Long) {
-        val memberId = user.memberId()
-        val letter = findReceivedLetter(memberId, letterId)
+        val member = findActiveMember(user)
+        val letter = findReceivedLetter(member.id, letterId)
         letterRepository.update(
-            letter.copy(rejectedMemberIds = letter.rejectedMemberIds + memberId),
+            letter.copy(rejectedMemberIds = letter.rejectedMemberIds + member.id),
         )
     }
 
     override fun markWriting(user: AuthenticatedUser, letterId: Long) {
-        val letter = findReceivedLetter(user.memberId(), letterId)
+        val member = findActiveMember(user)
+        val letter = findReceivedLetter(member.id, letterId)
         val transition = letter.transitionOrConflict { startWriting() }
         if (!transition.changed) {
             return
@@ -138,14 +152,15 @@ class LetterService(
     }
 
     override fun reply(user: AuthenticatedUser, letterId: Long, replyContent: String) {
-        val letter = findReceivedLetter(user.memberId(), letterId)
+        val member = findActiveMember(user)
+        val letter = findReceivedLetter(member.id, letterId)
         val transition = letter.transitionOrConflict {
-            completeReply(replyContent = replyContent, replyCreatedDate = Instant.now().toString())
+            completeReply(replyContent = replyContent, replyCreatedDate = Instant.now().toUtcIso6())
         }
         if (!transition.changed) {
             return
         }
-        contentModerationService.ensureAllowed(ContentModerationTarget.LETTER, replyContent)
+        contentModerationService.ensureAllowed(member.id, ContentModerationTarget.LETTER, replyContent)
         val updated = letterRepository.update(transition.letter)
         deliverLetterNotification(
             memberId = updated.senderId,
@@ -165,7 +180,7 @@ class LetterService(
     private fun findAccessibleLetter(memberId: Long, letterId: Long): Letter {
         val letter = letterRepository.findById(letterId)
             ?: throw ApiException(ErrorCode.NOT_FOUND)
-        if (letter.senderId == memberId || letter.isReceivedBy(memberId)) {
+        if (letter.senderId == memberId || letter.isVisibleToReceiver(memberId)) {
             return letter
         }
 
@@ -175,7 +190,7 @@ class LetterService(
     private fun findReceivedLetter(memberId: Long, letterId: Long): Letter {
         val letter = letterRepository.findById(letterId)
             ?: throw ApiException(ErrorCode.NOT_FOUND)
-        if (!letter.isReceivedBy(memberId)) {
+        if (!letter.isVisibleToReceiver(memberId)) {
             throw ApiException(ErrorCode.FORBIDDEN)
         }
 
@@ -185,6 +200,23 @@ class LetterService(
     private fun availableLetterReceivers(senderId: Long): List<AuthMember> {
         return authMemberRepository.findAllActive()
             .filter { receiver -> receiver.id != senderId && receiver.randomReceiveAllowed }
+    }
+
+    private fun findActiveMember(user: AuthenticatedUser): AuthMember {
+        val member = authMemberRepository.findById(user.memberId())
+            ?: throw ApiException(ErrorCode.UNAUTHORIZED, "다시 로그인해 주세요.")
+        if (member.status != AuthMemberStatus.ACTIVE) {
+            throw ApiException(ErrorCode.UNAUTHORIZED, "다시 로그인해 주세요.")
+        }
+        return member
+    }
+
+    private fun receiverNicknamesFor(letters: List<Letter>): Map<Long, String> {
+        val receiverIds = letters.mapNotNull(Letter::receiverId)
+        if (receiverIds.isEmpty()) {
+            return emptyMap()
+        }
+        return authMemberRepository.findByIds(receiverIds).mapValues { (_, member) -> member.nickname }
     }
 
     private fun deliverLetterNotification(
@@ -216,32 +248,28 @@ private fun LetterSaveCommand.toDraft(): LetterDraft {
     )
 }
 
-private fun Letter.isReceivedBy(memberId: Long): Boolean {
-    return isVisibleToReceiver(memberId)
-}
-
-private fun List<Letter>.toPage(
+private fun List<Letter>.toPageResult(
     memberId: Long,
-    page: Int,
-    size: Int,
-    authMemberRepository: AuthMemberRepository,
+    safePage: Int,
+    safeSize: Int,
+    totalElements: Long,
+    receiverNicknames: Map<Long, String>,
 ): LetterListResult {
-    val safePage = page.coerceAtLeast(0)
-    val safeSize = size.coerceAtLeast(1)
-    val sorted = sortedByDescending { letter -> letter.createdDate }
-    val fromIndex = (safePage * safeSize).coerceAtMost(sorted.size)
-    val toIndex = (fromIndex + safeSize).coerceAtMost(sorted.size)
-    val pageItems = sorted.subList(fromIndex, toIndex)
-    val totalPages = if (sorted.isEmpty()) {
+    val totalPages = if (totalElements == 0L) {
         1
     } else {
-        ceil(sorted.size.toDouble() / safeSize.toDouble()).toInt()
+        ceil(totalElements.toDouble() / safeSize.toDouble()).toInt()
     }
 
     return LetterListResult(
-        letters = pageItems.map { letter -> letter.toSummaryResult(memberId, authMemberRepository) },
+        letters = map { letter ->
+            letter.toSummaryResult(
+                memberId = memberId,
+                receiverNickname = letter.receiverId?.let(receiverNicknames::get),
+            )
+        },
         totalPages = totalPages,
-        totalElements = sorted.size,
+        totalElements = totalElements.toInt(),
         currentPage = safePage,
         isFirst = safePage == 0,
         isLast = safePage >= totalPages - 1,
@@ -250,7 +278,7 @@ private fun List<Letter>.toPage(
 
 private fun Letter.toSummaryResult(
     memberId: Long,
-    authMemberRepository: AuthMemberRepository,
+    receiverNickname: String?,
 ): LetterSummaryResult {
     return LetterSummaryResult(
         id = id,
@@ -259,7 +287,7 @@ private fun Letter.toSummaryResult(
         senderId = senderId,
         senderNickname = senderNickname,
         receiverId = receiverId,
-        receiverNickname = receiverNickname(authMemberRepository),
+        receiverNickname = receiverNickname,
         createdDate = createdDate,
         status = status,
         replied = replied,
@@ -283,13 +311,9 @@ private fun Letter.toResult(
         createdDate = createdDate,
         replyCreatedDate = replyCreatedDate,
         senderNickname = senderNickname,
-        receiverNickname = receiverNickname(authMemberRepository),
+        receiverNickname = receiverId?.let(authMemberRepository::findById)?.nickname,
         availableActions = availableActionsFor(memberId).map { action -> action.name },
     )
-}
-
-private fun Letter.receiverNickname(authMemberRepository: AuthMemberRepository): String? {
-    return receiverId?.let(authMemberRepository::findById)?.nickname
 }
 
 private fun Letter.transitionOrConflict(block: Letter.() -> LetterTransition): LetterTransition {
@@ -308,6 +332,7 @@ private fun AuthenticatedUser.memberId(): Long {
     return id.toLongOrNull() ?: throw ApiException(ErrorCode.UNAUTHORIZED, "다시 로그인해 주세요.")
 }
 
+private const val MAX_PAGE_SIZE = 100
 private const val NEW_LETTER_EVENT = "new_letter"
 private const val LETTER_READ_EVENT = "letter_read"
 private const val WRITING_STATUS_EVENT = "writing_status"

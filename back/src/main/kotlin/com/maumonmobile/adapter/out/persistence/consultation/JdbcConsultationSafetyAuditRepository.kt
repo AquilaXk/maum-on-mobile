@@ -9,6 +9,8 @@ import com.maumonmobile.domain.consultation.ConsultationSafetyAuditEvent
 import org.springframework.context.annotation.Profile
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate
 import org.springframework.stereotype.Repository
+import org.springframework.transaction.annotation.Propagation
+import org.springframework.transaction.annotation.Transactional
 
 @Repository
 @Profile("!memory")
@@ -16,6 +18,7 @@ class JdbcConsultationSafetyAuditRepository(
     private val jdbc: NamedParameterJdbcTemplate,
 ) : ConsultationSafetyAuditRepository {
 
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     override fun save(event: ConsultationSafetyAuditEvent): ConsultationSafetyAuditEvent {
         val id = jdbc.insertAndReturnId(
             """

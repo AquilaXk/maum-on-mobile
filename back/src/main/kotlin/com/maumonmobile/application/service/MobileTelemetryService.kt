@@ -100,7 +100,11 @@ class MobileTelemetryService(
             return 0
         }
         val now = System.currentTimeMillis()
-        val window = rateLimits.computeIfAbsent(memberKey) { RateLimitWindow(now, 0) }
+        var window = rateLimits[memberKey]
+        if (window == null) {
+            evictRateLimitsIfNeeded(now)
+            window = rateLimits.computeIfAbsent(memberKey) { RateLimitWindow(now, 0) }
+        }
         return synchronized(window) {
             if (now - window.startedAtMillis >= RATE_LIMIT_WINDOW_MS) {
                 window.startedAtMillis = now
@@ -110,6 +114,24 @@ class MobileTelemetryService(
             val allowed = requestedCount.coerceAtMost(remaining)
             window.acceptedCount += allowed
             allowed
+        }
+    }
+
+    private fun evictRateLimitsIfNeeded(now: Long) {
+        if (rateLimits.size < MAX_RATE_LIMIT_ENTRIES) {
+            return
+        }
+        rateLimits.entries.removeIf { (_, window) ->
+            synchronized(window) {
+                now - window.startedAtMillis >= RATE_LIMIT_WINDOW_MS
+            }
+        }
+        if (rateLimits.size >= MAX_RATE_LIMIT_ENTRIES) {
+            val iterator = rateLimits.entries.iterator()
+            while (rateLimits.size >= MAX_RATE_LIMIT_ENTRIES && iterator.hasNext()) {
+                iterator.next()
+                iterator.remove()
+            }
         }
     }
 
@@ -173,6 +195,7 @@ class MobileTelemetryService(
         private const val MAX_PAYLOAD_BYTES = 32_768
         private const val MAX_EVENTS_PER_BATCH = 40
         private const val MAX_EVENTS_PER_WINDOW = 30
+        private const val MAX_RATE_LIMIT_ENTRIES = 4_096
         private const val RATE_LIMIT_WINDOW_MS = 60_000L
         private const val MAX_DURATION_MS = 600_000L
         private const val MAX_ROUTE_LENGTH = 120

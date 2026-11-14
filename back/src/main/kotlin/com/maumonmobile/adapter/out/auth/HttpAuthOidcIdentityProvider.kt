@@ -8,12 +8,14 @@ import com.maumonmobile.application.port.out.AuthOidcVerificationException
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.http.MediaType
 import org.springframework.security.oauth2.jwt.Jwt
+import org.springframework.security.oauth2.jwt.JwtDecoder
 import org.springframework.security.oauth2.jwt.NimbusJwtDecoder
 import org.springframework.stereotype.Component
 import org.springframework.util.LinkedMultiValueMap
 import org.springframework.web.client.RestClient
 import org.springframework.web.util.UriComponentsBuilder
 import java.time.Instant
+import java.util.concurrent.ConcurrentHashMap
 
 @Component
 class HttpAuthOidcIdentityProvider(
@@ -55,6 +57,7 @@ class HttpAuthOidcIdentityProvider(
     private val appleIssuer: String,
 ) : AuthOidcIdentityProvider {
     private val restClient = RestClient.create()
+    private val jwtDecoders = ConcurrentHashMap<String, JwtDecoder>()
 
     override fun verify(command: AuthOidcTokenCommand): AuthOidcIdentity {
         val token = exchangeCode(command)
@@ -106,11 +109,12 @@ class HttpAuthOidcIdentityProvider(
         val token = idToken?.takeIf(String::isNotBlank)
             ?: throw AuthOidcVerificationException("외부 로그인 ID 토큰이 없습니다.")
 
+        val normalizedProvider = provider.trim().lowercase()
+        val decoder = jwtDecoders.computeIfAbsent(normalizedProvider) { key ->
+            NimbusJwtDecoder.withJwkSetUri(jwksUri(key)).build()
+        }
         return runCatching {
-            NimbusJwtDecoder
-                .withJwkSetUri(jwksUri(provider))
-                .build()
-                .decode(token)
+            decoder.decode(token)
         }.getOrElse { cause ->
             throw AuthOidcVerificationException("외부 로그인 ID 토큰을 검증하지 못했습니다.", cause)
         }

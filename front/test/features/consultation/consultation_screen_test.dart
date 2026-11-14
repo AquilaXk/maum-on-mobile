@@ -568,6 +568,125 @@ void main() {
     expect(
         find.byKey(const ValueKey('consultation-safety-notice')), findsNothing);
   });
+
+  testWidgets('invokes crisis emergency dialer callback alongside notice',
+      (tester) async {
+    final dialedNumbers = <String>[];
+    final repository = _FakeConsultationRepository(
+      sendResult: const ConsultationSendResult(
+        accepted: false,
+        safety: ConsultationSafetyResult(
+          category: ConsultationRiskCategory.selfHarm,
+          severity: ConsultationRiskSeverity.critical,
+          actionPolicy: ConsultationActionPolicy.blockAndEscalate,
+          message: '즉시 1577-0199에 도움을 요청해 주세요.',
+        ),
+      ),
+    );
+    final controller = ConsultationController(repository: repository);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: ConsultationScreen(
+          controller: controller,
+          onBack: () {},
+          emergencyDialer: (number) async {
+            dialedNumbers.add(number);
+          },
+        ),
+      ),
+    );
+    await tester.pump();
+    repository.emit(const ConsultationStreamEvent.connect('connected'));
+    await tester.pump();
+
+    await tester.enterText(
+      find.byKey(const ValueKey('consultation-message-field')),
+      '위기 지원이 필요해요',
+    );
+    await tester.pump();
+    await tester.tap(find.byKey(const ValueKey('consultation-send-button')));
+    await tester.pumpAndSettle();
+
+    await tester.tap(
+      find.byKey(const ValueKey('consultation-emergency-1577-0199-button')),
+    );
+    await tester.pump();
+
+    expect(dialedNumbers, ['1577-0199']);
+    expect(find.text('기기 전화 앱에서 1577-0199에 연락해 주세요.'), findsOneWidget);
+  });
+
+  testWidgets('does not force-scroll when user scrolled up and offers jump pill',
+      (tester) async {
+    tester.view.physicalSize = const Size(390, 560);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    final recent = List<ConsultationMessage>.generate(
+      24,
+      (index) => ConsultationMessage(
+        id: 'm-$index',
+        role: index.isEven
+            ? ConsultationMessageRole.user
+            : ConsultationMessageRole.assistant,
+        content: '이전 대화 메시지 $index — 스크롤 테스트를 위해 충분한 높이의 문장을 적습니다.',
+        createdAt: DateTime(2026, 5, 1, 10, index),
+      ),
+    );
+    final repository = _FakeConsultationRepository()
+      ..recentMessagesAfterDelete = recent;
+    final controller = ConsultationController(repository: repository);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: ConsultationScreen(
+          controller: controller,
+          onBack: () {},
+        ),
+      ),
+    );
+    await tester.pump();
+    repository.emit(const ConsultationStreamEvent.connect('connected'));
+    await tester.pumpAndSettle();
+
+    final listFinder = find.byKey(const ValueKey('consultation-message-list'));
+    final scrollable = tester.state<ScrollableState>(
+      find.descendant(of: listFinder, matching: find.byType(Scrollable)),
+    );
+    final scrollPosition = scrollable.position;
+    expect(scrollPosition.maxScrollExtent, greaterThan(0));
+
+    // Scroll far up away from the bottom.
+    scrollPosition.jumpTo(0);
+    await tester.pump();
+
+    expect(
+      find.byKey(const ValueKey('consultation-jump-to-bottom-button')),
+      findsOneWidget,
+    );
+
+    await tester.enterText(
+      find.byKey(const ValueKey('consultation-message-field')),
+      '새 질문',
+    );
+    await tester.pump();
+    await tester.tap(find.byKey(const ValueKey('consultation-send-button')));
+    await tester.pump();
+    repository.emit(const ConsultationStreamEvent.chat('답변 중입니다.'));
+    await tester.pump();
+
+    // Scroll must remain where the user left it.
+    expect(scrollPosition.pixels, lessThan(scrollPosition.maxScrollExtent - 64));
+
+    await tester.tap(
+      find.byKey(const ValueKey('consultation-jump-to-bottom-button')),
+    );
+    await tester.pump();
+
+    expect(scrollPosition.extentAfter, lessThanOrEqualTo(1));
+  });
 }
 
 SemanticsData? _findSemanticsWithLengthLimit(

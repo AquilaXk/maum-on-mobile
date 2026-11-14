@@ -15,9 +15,19 @@ interface StoryRepository {
 
     fun findPostById(id: Long): StoryPost?
 
+    fun findPostsByIds(ids: Collection<Long>): Map<Long, StoryPost>
+
+    fun existPostsByIds(ids: Collection<Long>): Set<Long>
+
     fun findPosts(): List<StoryPost>
 
+    fun findPostsPage(titleKeyword: String?, category: String?, page: Int, size: Int): List<StoryPost>
+
+    fun countPosts(titleKeyword: String?, category: String?): Long
+
     fun findPostsByAuthorId(authorId: Long): List<StoryPost>
+
+    fun countPostsByAuthorIds(authorIds: Collection<Long>): Map<Long, Int>
 
     fun countPostsByCategoryCreatedBetween(
         category: String,
@@ -45,6 +55,12 @@ interface StoryRepository {
     fun markCommentDeleted(comment: StoryComment): StoryComment
 
     fun findCommentById(id: Long): StoryComment?
+
+    fun findCommentsByIds(ids: Collection<Long>): Map<Long, StoryComment>
+
+    fun existCommentsByIds(ids: Collection<Long>): Set<Long>
+
+    fun existsChildComment(parentCommentId: Long): Boolean
 
     fun findCommentsByPostId(postId: Long): List<StoryComment>
 

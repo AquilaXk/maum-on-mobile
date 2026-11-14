@@ -5,6 +5,7 @@ import com.maumonmobile.adapter.out.persistence.jdbc.params
 import com.maumonmobile.adapter.out.persistence.jdbc.withValue
 import com.maumonmobile.application.port.out.NotificationRepository
 import com.maumonmobile.application.port.out.NotificationQueryCondition
+import com.maumonmobile.domain.common.toUtcIso6
 import com.maumonmobile.domain.notification.Notification
 import com.maumonmobile.domain.notification.NotificationTargetMetadata
 import org.springframework.context.annotation.Profile
@@ -53,7 +54,7 @@ class JdbcNotificationRepository(
                 .withValue("targetId", metadata.targetId)
                 .withValue("routeKey", metadata.routeKey)
                 .withValue("isRead", false)
-                .withValue("createdAt", Instant.now().toString())
+                .withValue("createdAt", Instant.now().toUtcIso6())
                 .withValue("readAt", null),
         )
         return findById(id) ?: error("저장된 알림을 확인하지 못했습니다.")
@@ -72,13 +73,18 @@ class JdbcNotificationRepository(
         condition.limit?.let { limit ->
             queryParams.withValue("limit", limit)
         }
+        val orderClause = if (condition.afterId != null) {
+            "order by id asc"
+        } else {
+            "order by created_at desc, id desc"
+        }
 
         return jdbc.query(
             """
                 select *
                   from notifications
                  where ${whereClauses.joinToString(" and ")}
-                 order by created_at desc, id desc
+                 $orderClause
                  ${condition.limit?.let { "limit :limit" } ?: ""}
             """.trimIndent(),
             queryParams,

@@ -9,6 +9,8 @@ import com.maumonmobile.application.port.`in`.DiaryUseCase
 import com.maumonmobile.application.port.out.AuthMemberRepository
 import com.maumonmobile.application.port.out.DiaryRepository
 import com.maumonmobile.application.port.out.ImageLifecyclePort
+import com.maumonmobile.domain.auth.AuthMember
+import com.maumonmobile.domain.auth.AuthMemberStatus
 import com.maumonmobile.domain.diary.Diary
 import com.maumonmobile.domain.diary.DiaryContentBlock
 import com.maumonmobile.domain.diary.DiaryContentBlockDraft
@@ -32,13 +34,9 @@ class DiaryService(
 
     @Transactional
     override fun create(user: AuthenticatedUser, command: DiarySaveCommand): Long {
-        val member = authMemberRepository.findById(user.memberId())
-            ?: throw ApiException(ErrorCode.UNAUTHORIZED, "다시 로그인해 주세요.")
+        val member = findActiveMember(user)
         val draft = command.toDraft()
-        contentModerationService.ensureAllowed(ContentModerationTarget.DIARY, draft.title, draft.content)
-        draft.managedImageUrls().forEach { imageUrl ->
-            imageLifecyclePort.validateDiaryImage(member.id, imageUrl)
-        }
+        contentModerationService.ensureAllowed(member.id, ContentModerationTarget.DIARY, draft.title, draft.content)
 
         val diary = diaryRepository.save(
             memberId = member.id,
@@ -53,50 +51,55 @@ class DiaryService(
     }
 
     override fun list(user: AuthenticatedUser, page: Int, size: Int): DiaryPageResult {
-        val memberId = user.memberId()
-        return pageResult(diaryRepository.findByMemberId(memberId), page, size)
+        val member = findActiveMember(user)
+        val safePage = page.coerceAtLeast(0)
+        val safeSize = size.coerceIn(1, MAX_PAGE_SIZE)
+        val pageItems = diaryRepository.findPageByMemberId(member.id, safePage, safeSize)
+        val totalElements = diaryRepository.countByMemberId(member.id)
+        return pageResult(pageItems, totalElements, safePage, safeSize)
     }
 
     override fun listPublic(page: Int, size: Int): DiaryPageResult {
-        return pageResult(diaryRepository.findPublic(), page, size)
+        val safePage = page.coerceAtLeast(0)
+        val safeSize = size.coerceIn(1, MAX_PAGE_SIZE)
+        val pageItems = diaryRepository.findPublicPage(safePage, safeSize)
+        val totalElements = diaryRepository.countPublic()
+        return pageResult(pageItems, totalElements, safePage, safeSize)
     }
 
-    private fun pageResult(items: List<Diary>, page: Int, size: Int): DiaryPageResult {
-        val safePage = page.coerceAtLeast(0)
-        val safeSize = size.coerceAtLeast(1)
-        val allItems = items
-            .sortedByDescending { diary -> diary.createDate }
-        val fromIndex = (safePage * safeSize).coerceAtMost(allItems.size)
-        val toIndex = (fromIndex + safeSize).coerceAtMost(allItems.size)
-        val pageItems = allItems.subList(fromIndex, toIndex)
-        val totalPages = if (allItems.isEmpty()) {
+    private fun pageResult(
+        pageItems: List<Diary>,
+        totalElements: Long,
+        page: Int,
+        size: Int,
+    ): DiaryPageResult {
+        val totalPages = if (totalElements == 0L) {
             1
         } else {
-            ceil(allItems.size.toDouble() / safeSize.toDouble()).toInt()
+            ceil(totalElements.toDouble() / size.toDouble()).toInt()
         }
 
         return DiaryPageResult(
             content = pageItems.map(Diary::toResult),
-            page = safePage,
-            size = safeSize,
-            totalElements = allItems.size.toLong(),
+            page = page,
+            size = size,
+            totalElements = totalElements,
             totalPages = totalPages,
-            last = safePage >= totalPages - 1,
+            last = page >= totalPages - 1,
         )
     }
 
     override fun get(user: AuthenticatedUser, diaryId: Long): DiaryResult {
-        return findOwnedDiary(user, diaryId).toResult()
+        val member = findActiveMember(user)
+        return findOwnedDiary(member.id, diaryId).toResult()
     }
 
     @Transactional
     override fun update(user: AuthenticatedUser, diaryId: Long, command: DiarySaveCommand) {
-        val diary = findOwnedDiary(user, diaryId)
+        val member = findActiveMember(user)
+        val diary = findOwnedDiary(member.id, diaryId)
         val draft = command.toDraft()
-        contentModerationService.ensureAllowed(ContentModerationTarget.DIARY, draft.title, draft.content)
-        draft.managedImageUrls().forEach { imageUrl ->
-            imageLifecyclePort.validateDiaryImage(diary.memberId, imageUrl)
-        }
+        contentModerationService.ensureAllowed(member.id, ContentModerationTarget.DIARY, draft.title, draft.content)
 
         val updatedDiary = diaryRepository.update(diary, draft)
         val previousImageUrls = diary.managedImageUrls()
@@ -111,24 +114,36 @@ class DiaryService(
 
     @Transactional
     override fun delete(user: AuthenticatedUser, diaryId: Long) {
-        val diary = findOwnedDiary(user, diaryId)
+        val member = findActiveMember(user)
+        val diary = findOwnedDiary(member.id, diaryId)
         diaryRepository.delete(diaryId)
         diary.managedImageUrls().forEach { imageUrl ->
             imageLifecyclePort.deleteDiaryImage(diary.memberId, imageUrl)
         }
     }
 
-    private fun findOwnedDiary(user: AuthenticatedUser, diaryId: Long): Diary {
+    private fun findActiveMember(user: AuthenticatedUser): AuthMember {
+        val member = authMemberRepository.findById(user.memberId())
+            ?: throw ApiException(ErrorCode.UNAUTHORIZED, "다시 로그인해 주세요.")
+        if (member.status != AuthMemberStatus.ACTIVE) {
+            throw ApiException(ErrorCode.UNAUTHORIZED, "다시 로그인해 주세요.")
+        }
+        return member
+    }
+
+    private fun findOwnedDiary(memberId: Long, diaryId: Long): Diary {
         val diary = diaryRepository.findById(diaryId)
             ?: throw ApiException(ErrorCode.NOT_FOUND)
 
-        if (diary.memberId != user.memberId()) {
+        if (diary.memberId != memberId) {
             throw ApiException(ErrorCode.NOT_FOUND)
         }
 
         return diary
     }
 }
+
+private const val MAX_PAGE_SIZE = 100
 
 private fun AuthenticatedUser.memberId(): Long {
     return id.toLongOrNull() ?: throw ApiException(ErrorCode.UNAUTHORIZED, "다시 로그인해 주세요.")

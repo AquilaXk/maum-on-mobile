@@ -2,6 +2,7 @@ package com.maumonmobile.adapter.out.persistence.notification
 
 import com.maumonmobile.application.port.out.NotificationRepository
 import com.maumonmobile.application.port.out.NotificationQueryCondition
+import com.maumonmobile.domain.common.toUtcIso6
 import com.maumonmobile.domain.notification.Notification
 import com.maumonmobile.domain.notification.NotificationTargetMetadata
 import org.springframework.context.annotation.Profile
@@ -26,18 +27,23 @@ class InMemoryNotificationRepository : NotificationRepository {
             targetId = metadata.targetId,
             routeKey = metadata.routeKey,
             isRead = false,
-            createdAt = Instant.now().toString(),
+            createdAt = Instant.now().toUtcIso6(),
         )
         notificationsById[notification.id] = notification
         return notification
     }
 
     override fun findByReceiverId(receiverId: Long, condition: NotificationQueryCondition): List<Notification> {
+        val comparator = if (condition.afterId != null) {
+            compareBy<Notification> { it.id }
+        } else {
+            compareByDescending<Notification> { it.createdAt }.thenByDescending { it.id }
+        }
         val sortedNotifications = notificationsById.values
             .filter { notification -> notification.receiverId == receiverId }
             .filter { notification -> condition.afterId?.let { afterId -> notification.id > afterId } ?: true }
             .filter { notification -> !condition.unreadOnly || !notification.isRead }
-            .sortedByDescending { notification -> notification.createdAt }
+            .sortedWith(comparator)
         return condition.limit?.let(sortedNotifications::take) ?: sortedNotifications
     }
 

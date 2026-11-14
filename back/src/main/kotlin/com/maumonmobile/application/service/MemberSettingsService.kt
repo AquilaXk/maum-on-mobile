@@ -157,8 +157,8 @@ class MemberSettingsService(
 
     private fun AuthMember.toSettingsResult(): MemberSettingsResult {
         val now = Instant.now(clock)
-        val latestExport = memberDataExportRepository.findLatestByMemberId(id)
-            ?.let { job -> MemberDataExportJobResult.from(job, now) }
+        val latestExport = memberDataExportRepository.findLatestSummaryByMemberId(id)
+            ?.let { summary -> MemberDataExportJobResult.from(summary, now) }
         return MemberSettingsResult(
             id = id,
             email = email,

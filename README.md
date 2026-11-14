@@ -10,7 +10,7 @@
   <img src="https://img.shields.io/badge/iOS-Native-000000?style=for-the-badge&logo=apple&logoColor=white" alt="iOS" />
   <img src="https://img.shields.io/badge/Kotlin-2.2.21-7F52FF?style=for-the-badge&logo=kotlin&logoColor=white" alt="Kotlin" />
   <img src="https://img.shields.io/badge/Spring%20Boot-4.0.3-6DB33F?style=for-the-badge&logo=springboot&logoColor=white" alt="Spring Boot" />
-  <img src="https://img.shields.io/badge/Flyway-V21-CC0200?style=for-the-badge&logo=flyway&logoColor=white" alt="Flyway" />
+  <img src="https://img.shields.io/badge/Flyway-V22-CC0200?style=for-the-badge&logo=flyway&logoColor=white" alt="Flyway" />
   <img src="https://img.shields.io/badge/OCI-Ampere%20A1%20CD-F80000?style=for-the-badge&logo=oracle&logoColor=white" alt="OCI CD" />
 </p>
 
@@ -95,7 +95,7 @@ flowchart TD
 
     subgraph Storage ["Database & Storage"]
         H2[(Local H2 Dev DB)]
-        PG[(PostgreSQL 16 Prod\nFlyway V1~V21)]
+        PG[(PostgreSQL 16 Prod\nFlyway V1~V22)]
         FCM["FCM / APNs Push"]
         Vertex["Vertex AI / Rule-Based Model"]
     end
@@ -131,7 +131,7 @@ maum-on-mobile/
 │   │   ├── application/       # 유스케이스, 포트, 비즈니스 서비스, 멱등성 보장
 │   │   ├── adapter/           # REST 컨트롤러, SSE 레지스트리, JDBC/인메모리 레포지토리
 │   │   └── global/            # JWT 보안 필터, 공통 응답, 레이트 리미터, 예외 처리
-│   ├── src/main/resources/    # application-{dev, prod, test}.yaml, Flyway V1~V21 마이그레이션
+│   ├── src/main/resources/    # application-{dev, prod, test}.yaml, Flyway V1~V22 마이그레이션
 │   └── build.gradle.kts       # Kotlin DSL 빌드 설정
 ├── contracts/                 # API JSON Schema 계약 및 릴리스 기준 정의
 ├── tools/                     # 저장소 전용 래퍼 도구 (flutterw)
@@ -218,7 +218,7 @@ cd front && ../tools/flutterw build web --target lib/admin_main.dart --dart-defi
 - **Language**: **Kotlin 2.2.21** (JVM 21) — *백엔드는 100% Kotlin으로만 작성되며 Java 코드 작성이 엄격히 제한됩니다.*
 - **Framework**: Spring Boot 4.0.3, Spring Security, Spring JDBC
 - **Database**: H2 (개발용), PostgreSQL 16 (운영용)
-- **Migration**: Flyway 11 (`V1__bootstrap.sql` ~ `V21__diary_mood_and_tags.sql`)
+- **Migration**: Flyway 11 (`V1__bootstrap.sql` ~ `V22__query_efficiency_indexes.sql`)
 - **Architecture**: Hexagonal Architecture (`domain` -> `application` -> `adapter` -> `global`)
 
 ### 로컬 개발 서버 구동 (H2 Dev Profile)
@@ -233,7 +233,7 @@ cd front && ../tools/flutterw build web --target lib/admin_main.dart --dart-defi
 
 ### 테스트 및 커버리지 검증
 ```bash
-# 전체 테스트 실행 (47개 테스트 클래스 및 Jacoco 커버리지 리포트 생성)
+# 전체 테스트 실행 (49개 테스트 클래스 및 Jacoco 커버리지 리포트 생성)
 ./back/gradlew -p back test
 
 # 특정 컨트롤러 또는 도메인 테스트 실행
@@ -298,3 +298,22 @@ bash tools/ci/run-mobile-release-preflight.sh --platform all
    - 백엔드 코드는 순수 Kotlin으로만 작성하며, `SourceLayoutPolicyTest`를 통해 엄격하게 강제됩니다.
 4. **접근성 및 터치 타깃 규약**:
    - 모든 인터랙티브 UI 컴포넌트는 최소 48dp 터치 타깃을 확보해야 하며, 텍스트 확대(1.5x) 시 레이아웃 깨짐이 없어야 합니다.
+
+---
+
+## 📜 오픈소스 참조 및 라이선스 고지 (Third-Party Notices)
+
+본 저장소 일부 모듈은 아래 허용 라이선스(Apache-2.0, MIT, BSD-3-Clause) 오픈소스 알고리즘과 UI 패턴을 참조해 독립적으로 이식·최적화했다.
+
+| 참조 프로젝트 | 라이선스 | 적용 모듈 및 역할 |
+| :--- | :--- | :--- |
+| [robert-bor/aho-corasick](https://github.com/robert-bor/aho-corasick) | Apache-2.0 | `back/.../domain/moderation/ModerationTextEngine.kt` (다중 금칙어 오토마톤 설계 참조) |
+| [hankcs/AhoCorasickDoubleArrayTrie](https://github.com/hankcs/AhoCorasickDoubleArrayTrie) | Apache-2.0 | `back/.../domain/moderation/ModerationTextEngine.kt` (평면 `IntArray` 기반 전이 테이블 최적화) |
+| [krisk/Fuse](https://github.com/krisk/Fuse) (Myers 1999) | Apache-2.0 | `back/.../domain/moderation/ModerationTextEngine.kt`, `front/lib/shared/algorithm/bitap_hangul_search.dart` (64-bit Myers / 31-bit Bitap 비트-병렬 유사 검색) |
+| [toss/es-hangul](https://github.com/toss/es-hangul) | MIT | `back/.../domain/moderation/ModerationTextEngine.kt`, `front/lib/shared/algorithm/bitap_hangul_search.dart` (산술 한글 음절/초성 분해) |
+| [usememos/memos](https://github.com/usememos/memos) | MIT | `front/lib/features/diary/presentation/diary_screen.dart` (감정 히트맵 상단 요약 + 빠른 필터 타임라인 레이아웃 참조) |
+| [devappmin/flutter_heatmap_calendar](https://github.com/devappmin/flutter_heatmap_calendar) | MIT | `front/lib/features/diary/domain/mood_year_bitmap.dart`, `front/lib/features/diary/presentation/mood_heatmap_strip.dart` (연간/주간 히트맵 셀 배치 패턴) |
+| [hashirshoaeb/star_book](https://github.com/hashirshoaeb/star_book) | MIT | `front/lib/features/diary/domain/mood_year_bitmap.dart` (5단계 기분 점수 색상 매핑 참조) |
+| [contribution_heatmap](https://pub.dev/packages/contribution_heatmap) | BSD-3-Clause | `front/lib/features/diary/presentation/mood_heatmap_strip.dart` (단일 `CustomPainter` 캔버스 히트맵 렌더링) |
+| [flyerhq/flutter_chat_ui](https://github.com/flyerhq/flutter_chat_ui) & [flutter/ai](https://github.com/flutter/ai) | Apache-2.0 / BSD-3-Clause | `front/lib/features/consultation/presentation/consultation_screen.dart`, `consultation_controller.dart` (`ValueListenableBuilder` 스트리밍 말풍선 분리 패턴) |
+| [nank1ro/flutter-shadcn-ui](https://github.com/nank1ro/flutter-shadcn-ui) | MIT | `front/lib/shared/ui/app_design_system.dart`, `front/lib/app/maum_bottom_navigation.dart` (다크 모드 대비 토큰 및 카드/내비게이션 계층 참조) |

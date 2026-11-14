@@ -6,6 +6,8 @@ import com.maumonmobile.application.service.WriteIdempotencyService
 import com.maumonmobile.domain.write.WriteOperation
 import com.maumonmobile.global.security.AuthenticatedUser
 import com.maumonmobile.global.web.ApiResponse
+import jakarta.validation.Valid
+import jakarta.validation.constraints.Size
 import org.springframework.security.core.Authentication
 import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.RequestBody
@@ -24,7 +26,7 @@ class ReportController(
     fun create(
         authentication: Authentication,
         @RequestHeader(name = IDEMPOTENCY_HEADER, required = false) idempotencyKey: String?,
-        @RequestBody request: ReportCreateRequest,
+        @Valid @RequestBody request: ReportCreateRequest,
     ): ApiResponse<Long> {
         val user = authentication.authenticatedUser()
         return ApiResponse.success(
@@ -39,6 +41,7 @@ data class ReportCreateRequest(
     val targetId: Long? = null,
     val targetType: String? = null,
     val reason: String? = null,
+    @field:Size(max = 2_000)
     val content: String? = null,
 )
 

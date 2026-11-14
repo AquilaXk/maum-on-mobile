@@ -22,9 +22,14 @@ class StoryScreen extends StatefulWidget {
 }
 
 class _StoryScreenState extends State<StoryScreen> {
+  final ScrollController _scrollController = ScrollController();
+  StoryViewMode? _lastMode;
+
   @override
   void initState() {
     super.initState();
+    _lastMode = widget.controller.state.mode;
+    widget.controller.addListener(_handleControllerChanged);
     _openInitialStoryIfNeeded();
     _loadIfNeeded();
   }
@@ -34,6 +39,9 @@ class _StoryScreenState extends State<StoryScreen> {
     super.didUpdateWidget(oldWidget);
     final controllerChanged = oldWidget.controller != widget.controller;
     if (controllerChanged) {
+      oldWidget.controller.removeListener(_handleControllerChanged);
+      _lastMode = widget.controller.state.mode;
+      widget.controller.addListener(_handleControllerChanged);
       _openInitialStoryIfNeeded();
       _loadIfNeeded();
     }
@@ -41,6 +49,39 @@ class _StoryScreenState extends State<StoryScreen> {
         oldWidget.initialStoryId != widget.initialStoryId) {
       _openInitialStoryIfNeeded();
     }
+  }
+
+  @override
+  void dispose() {
+    widget.controller.removeListener(_handleControllerChanged);
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  void _handleControllerChanged() {
+    final currentMode = widget.controller.state.mode;
+    if (_lastMode != currentMode) {
+      _resetScrollPosition();
+    }
+    _lastMode = currentMode;
+  }
+
+  void _resetScrollPosition() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !_scrollController.hasClients) {
+        return;
+      }
+      _scrollController.jumpTo(0);
+    });
+  }
+
+  void _handleBackToList() {
+    if (widget.controller.state.mode != StoryViewMode.list) {
+      widget.controller.backToList();
+      _resetScrollPosition();
+      return;
+    }
+    widget.onBack?.call();
   }
 
   void _loadIfNeeded() {
@@ -81,57 +122,66 @@ class _StoryScreenState extends State<StoryScreen> {
       builder: (context, _) {
         final state = widget.controller.state;
         final onHeaderBack =
-            state.mode == StoryViewMode.list ? null : widget.onBack;
+            state.mode == StoryViewMode.list ? null : _handleBackToList;
 
-        return AppScreen(
-          title: '스토리',
-          onBack: onHeaderBack,
-          onRefresh: state.mode == StoryViewMode.list
-              ? widget.controller.loadStories
-              : null,
-          actions: [
-            if (state.mode != StoryViewMode.editor)
-              FilledButton.icon(
-                key: const ValueKey('story-create-button'),
-                onPressed: widget.controller.startCreate,
-                icon: const Icon(Icons.edit_outlined),
-                label: const Text('글쓰기'),
-              ),
-          ],
-          children: [
-            if (state.moderationFeedback != null) ...[
-              ContentModerationFeedbackPanel(
-                feedback: state.moderationFeedback!,
-                onRetry: () => _retryModeration(state),
-                onDismiss: widget.controller.clearModerationFeedback,
-              ),
-              const SizedBox(height: AppSpacing.md),
-            ] else if (state.errorMessage != null) ...[
-              AppNotice(
-                message: state.errorMessage!,
-                tone: AppNoticeTone.error,
-              ),
-              const SizedBox(height: AppSpacing.md),
+        return PopScope<void>(
+          canPop: state.mode == StoryViewMode.list,
+          onPopInvokedWithResult: (didPop, _) {
+            if (!didPop && widget.controller.state.mode != StoryViewMode.list) {
+              _handleBackToList();
+            }
+          },
+          child: AppScreen(
+            scrollController: _scrollController,
+            title: '스토리',
+            onBack: onHeaderBack,
+            onRefresh: state.mode == StoryViewMode.list
+                ? widget.controller.loadStories
+                : null,
+            actions: [
+              if (state.mode != StoryViewMode.editor)
+                FilledButton.icon(
+                  key: const ValueKey('story-create-button'),
+                  onPressed: widget.controller.startCreate,
+                  icon: const Icon(Icons.edit_outlined),
+                  label: const Text('글쓰기'),
+                ),
             ],
-            if (state.noticeMessage != null) ...[
-              AppNotice(message: state.noticeMessage!),
-              const SizedBox(height: AppSpacing.md),
+            children: [
+              if (state.moderationFeedback != null) ...[
+                ContentModerationFeedbackPanel(
+                  feedback: state.moderationFeedback!,
+                  onRetry: () => _retryModeration(state),
+                  onDismiss: widget.controller.clearModerationFeedback,
+                ),
+                const SizedBox(height: AppSpacing.md),
+              ] else if (state.errorMessage != null) ...[
+                AppNotice(
+                  message: state.errorMessage!,
+                  tone: AppNoticeTone.error,
+                ),
+                const SizedBox(height: AppSpacing.md),
+              ],
+              if (state.noticeMessage != null) ...[
+                AppNotice(message: state.noticeMessage!),
+                const SizedBox(height: AppSpacing.md),
+              ],
+              switch (state.mode) {
+                StoryViewMode.list => _StoryListView(
+                    state: state,
+                    controller: widget.controller,
+                  ),
+                StoryViewMode.detail => _StoryDetailView(
+                    state: state,
+                    controller: widget.controller,
+                  ),
+                StoryViewMode.editor => _StoryEditorView(
+                    state: state,
+                    controller: widget.controller,
+                  ),
+              },
             ],
-            switch (state.mode) {
-              StoryViewMode.list => _StoryListView(
-                  state: state,
-                  controller: widget.controller,
-                ),
-              StoryViewMode.detail => _StoryDetailView(
-                  state: state,
-                  controller: widget.controller,
-                ),
-              StoryViewMode.editor => _StoryEditorView(
-                  state: state,
-                  controller: widget.controller,
-                ),
-            },
-          ],
+          ),
         );
       },
     );
@@ -201,7 +251,7 @@ class _StoryListView extends StatelessWidget {
   }
 }
 
-class _StoryDiscoveryStrip extends StatelessWidget {
+class _StoryDiscoveryStrip extends StatefulWidget {
   const _StoryDiscoveryStrip({
     required this.state,
     required this.controller,
@@ -211,7 +261,36 @@ class _StoryDiscoveryStrip extends StatelessWidget {
   final StoryController controller;
 
   @override
+  State<_StoryDiscoveryStrip> createState() => _StoryDiscoveryStripState();
+}
+
+class _StoryDiscoveryStripState extends State<_StoryDiscoveryStrip> {
+  late final TextEditingController _searchController =
+      TextEditingController(text: widget.state.searchQuery);
+
+  @override
+  void didUpdateWidget(covariant _StoryDiscoveryStrip oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    final nextQuery = widget.state.searchQuery;
+    if (oldWidget.state.searchQuery != nextQuery &&
+        _searchController.text != nextQuery) {
+      _searchController.value = TextEditingValue(
+        text: nextQuery,
+        selection: TextSelection.collapsed(offset: nextQuery.length),
+      );
+    }
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final state = widget.state;
+    final controller = widget.controller;
     final storyCountLabel = '${state.stories.length}개의 스토리';
     final colorScheme = Theme.of(context).colorScheme;
     final theme = Theme.of(context);
@@ -263,6 +342,7 @@ class _StoryDiscoveryStrip extends StatelessWidget {
                 Expanded(
                   child: TextField(
                     key: const ValueKey('story-search-field'),
+                    controller: _searchController,
                     decoration: const InputDecoration(
                       hintText: '제목 검색',
                       prefixIcon: Icon(Icons.search),

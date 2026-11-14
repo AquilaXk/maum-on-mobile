@@ -4,6 +4,7 @@ import com.maumonmobile.adapter.out.persistence.jdbc.insertAndReturnId
 import com.maumonmobile.adapter.out.persistence.jdbc.params
 import com.maumonmobile.adapter.out.persistence.jdbc.withValue
 import com.maumonmobile.application.port.out.DiaryRepository
+import com.maumonmobile.domain.common.toUtcIso6
 import com.maumonmobile.domain.diary.Diary
 import com.maumonmobile.domain.diary.DiaryContentBlock
 import com.maumonmobile.domain.diary.DiaryContentBlockDraft
@@ -26,7 +27,7 @@ class JdbcDiaryRepository(
 
     @Transactional
     override fun save(memberId: Long, nickname: String, draft: DiaryDraft): Diary {
-        val now = Instant.now().toString()
+        val now = Instant.now().toUtcIso6()
         val id = jdbc.insertAndReturnId(
             """
                 insert into diaries (
@@ -107,7 +108,7 @@ class JdbcDiaryRepository(
                 .withValue("categoryName", draft.categoryName)
                 .withValue("imageUrl", draft.imageUrlFor(diary.id))
                 .withValue("isPrivate", draft.isPrivate)
-                .withValue("modifyDate", Instant.now().toString())
+                .withValue("modifyDate", Instant.now().toUtcIso6())
                 .withValue("moodScore", draft.moodScore)
                 .withValue("emotionTags", draft.emotionTags)
                 .withValue("triggerTags", draft.triggerTags),
@@ -124,6 +125,17 @@ class JdbcDiaryRepository(
         ).singleOrNull()?.let(::withContentBlocks)
     }
 
+    override fun existByIds(ids: Collection<Long>): Set<Long> {
+        val distinctIds = ids.distinct()
+        if (distinctIds.isEmpty()) {
+            return emptySet()
+        }
+        return jdbc.query(
+            "select id from diaries where id in (:ids)",
+            params().withValue("ids", distinctIds),
+        ) { rs, _ -> rs.getLong("id") }.toSet()
+    }
+
     override fun findByMemberId(memberId: Long): List<Diary> {
         return withContentBlocks(
             jdbc.query(
@@ -134,6 +146,54 @@ class JdbcDiaryRepository(
         )
     }
 
+    override fun findPageByMemberId(memberId: Long, page: Int, size: Int): List<Diary> {
+        val safePage = page.coerceAtLeast(0)
+        val safeSize = size.coerceIn(1, 100)
+        val offset = safePage.toLong() * safeSize.toLong()
+        return withContentBlocks(
+            jdbc.query(
+                """
+                    select *
+                      from diaries
+                     where member_id = :memberId
+                     order by create_date desc, id desc
+                     limit :limit offset :offset
+                """.trimIndent(),
+                params()
+                    .withValue("memberId", memberId)
+                    .withValue("limit", safeSize)
+                    .withValue("offset", offset),
+                rowMapper,
+            ),
+        )
+    }
+
+    override fun countByMemberId(memberId: Long): Long {
+        return jdbc.queryForObject(
+            "select count(*) from diaries where member_id = :memberId",
+            params().withValue("memberId", memberId),
+            Long::class.java,
+        ) ?: 0L
+    }
+
+    override fun countByMemberIds(memberIds: Collection<Long>): Map<Long, Int> {
+        val distinctIds = memberIds.distinct()
+        if (distinctIds.isEmpty()) {
+            return emptyMap()
+        }
+        return jdbc.query(
+            """
+                select member_id, count(*) as diary_count
+                  from diaries
+                 where member_id in (:memberIds)
+                 group by member_id
+            """.trimIndent(),
+            params().withValue("memberIds", distinctIds),
+        ) { rs, _ ->
+            rs.getLong("member_id") to rs.getInt("diary_count")
+        }.toMap()
+    }
+
     override fun findPublic(): List<Diary> {
         return withContentBlocks(
             jdbc.query(
@@ -142,6 +202,35 @@ class JdbcDiaryRepository(
                 rowMapper,
             ),
         )
+    }
+
+    override fun findPublicPage(page: Int, size: Int): List<Diary> {
+        val safePage = page.coerceAtLeast(0)
+        val safeSize = size.coerceIn(1, 100)
+        val offset = safePage.toLong() * safeSize.toLong()
+        return withContentBlocks(
+            jdbc.query(
+                """
+                    select *
+                      from diaries
+                     where is_private = false
+                     order by create_date desc, id desc
+                     limit :limit offset :offset
+                """.trimIndent(),
+                params()
+                    .withValue("limit", safeSize)
+                    .withValue("offset", offset),
+                rowMapper,
+            ),
+        )
+    }
+
+    override fun countPublic(): Long {
+        return jdbc.queryForObject(
+            "select count(*) from diaries where is_private = false",
+            emptyMap<String, Any>(),
+            Long::class.java,
+        ) ?: 0L
     }
 
     override fun findAllPublicAndPrivate(): List<Diary> {
@@ -199,47 +288,52 @@ class JdbcDiaryRepository(
             "delete from diary_content_blocks where diary_id = :diaryId",
             params().withValue("diaryId", diaryId),
         )
-
-        contentBlocks.forEach { block ->
-            jdbc.update(
-                """
-                    insert into diary_content_blocks (
-                        diary_id,
-                        client_block_id,
-                        block_type,
-                        display_order,
-                        text_content,
-                        image_url,
-                        filename,
-                        byte_size,
-                        source,
-                        content_type
-                    ) values (
-                        :diaryId,
-                        :clientBlockId,
-                        :blockType,
-                        :displayOrder,
-                        :textContent,
-                        :imageUrl,
-                        :filename,
-                        :byteSize,
-                        :source,
-                        :contentType
-                    )
-                """.trimIndent(),
-                params()
-                    .withValue("diaryId", diaryId)
-                    .withValue("clientBlockId", block.id)
-                    .withValue("blockType", block.type.name)
-                    .withValue("displayOrder", block.displayOrder)
-                    .withValue("textContent", block.text)
-                    .withValue("imageUrl", block.imageUrl)
-                    .withValue("filename", block.filename)
-                    .withValue("byteSize", block.byteSize)
-                    .withValue("source", block.source)
-                    .withValue("contentType", block.contentType),
-            )
+        if (contentBlocks.isEmpty()) {
+            return
         }
+
+        val batchParams = contentBlocks.map { block ->
+            params()
+                .withValue("diaryId", diaryId)
+                .withValue("clientBlockId", block.id)
+                .withValue("blockType", block.type.name)
+                .withValue("displayOrder", block.displayOrder)
+                .withValue("textContent", block.text)
+                .withValue("imageUrl", block.imageUrl)
+                .withValue("filename", block.filename)
+                .withValue("byteSize", block.byteSize)
+                .withValue("source", block.source)
+                .withValue("contentType", block.contentType)
+        }.toTypedArray()
+
+        jdbc.batchUpdate(
+            """
+                insert into diary_content_blocks (
+                    diary_id,
+                    client_block_id,
+                    block_type,
+                    display_order,
+                    text_content,
+                    image_url,
+                    filename,
+                    byte_size,
+                    source,
+                    content_type
+                ) values (
+                    :diaryId,
+                    :clientBlockId,
+                    :blockType,
+                    :displayOrder,
+                    :textContent,
+                    :imageUrl,
+                    :filename,
+                    :byteSize,
+                    :source,
+                    :contentType
+                )
+            """.trimIndent(),
+            batchParams,
+        )
     }
 
     private fun withContentBlocks(diary: Diary): Diary {

@@ -493,6 +493,132 @@ void main() {
       expect(controller.state.connectionState,
           NotificationConnectionState.connecting);
     });
+
+    test(
+        'reconciles negative local SSE placeholder when silent load fetches persisted server notification',
+        () async {
+      final repository = _FakeNotificationRepository(
+        notificationsQueue: [
+          const [],
+          [
+            const NotificationItem(
+              id: 501,
+              content: '신고 처리 결과가 등록되었습니다: RESOLVED',
+              isRead: false,
+              routeKey: 'notifications',
+              targetType: 'REPORT',
+              targetId: 9,
+              createdAt: '2026-05-24T09:05:00',
+            ),
+          ],
+        ],
+      );
+      final controller = NotificationController(repository: repository);
+
+      await controller.load();
+      await controller.connect();
+      repository.emit(
+        const NotificationStreamEvent.reportStatus(
+          '신고 처리 결과가 등록되었습니다: RESOLVED',
+          status: 'RESOLVED',
+          reportId: 9,
+          createdAt: '2026-05-24T09:04:00',
+        ),
+      );
+      repository.emit(
+        const NotificationStreamEvent.reportStatus(
+          '아직 동기화되지 않은 알림',
+          status: 'PENDING',
+          reportId: 10,
+          createdAt: '2026-05-24T09:04:30',
+        ),
+      );
+      await Future<void>.delayed(Duration.zero);
+      expect(controller.state.notifications, hasLength(2));
+
+      await controller.load(silent: true);
+
+      expect(controller.state.notifications, hasLength(2));
+      expect(
+        controller.state.notifications.where((item) => item.targetId == 9),
+        hasLength(1),
+      );
+      expect(
+        controller.state.notifications
+            .firstWhere((item) => item.targetId == 9)
+            .id,
+        501,
+      );
+      expect(
+        controller.state.notifications
+            .any((item) => item.targetId == 10 && item.id < 0),
+        isTrue,
+      );
+    });
+
+    test('evicts oldest seen stream dedupe key after 512 events', () async {
+      final repository = _FakeNotificationRepository(
+        notificationsQueue: [const []],
+      );
+      final controller = NotificationController(repository: repository);
+
+      await controller.load();
+      await controller.connect();
+
+      repository.emit(
+        const NotificationStreamEvent.reportStatus(
+          '신고 처리 결과가 등록되었습니다: RESOLVED',
+          status: 'RESOLVED',
+          reportId: 1000,
+          notificationId: 1000,
+          createdAt: '2026-05-24T09:00:00',
+        ),
+      );
+      // Re-emitting within 512 keys is deduplicated.
+      repository.emit(
+        const NotificationStreamEvent.reportStatus(
+          '신고 처리 결과가 등록되었습니다: RESOLVED',
+          status: 'RESOLVED',
+          reportId: 1000,
+          notificationId: 1000,
+          createdAt: '2026-05-24T09:00:00',
+        ),
+      );
+      await Future<void>.delayed(Duration.zero);
+      expect(controller.state.notifications, hasLength(1));
+
+      for (var id = 1001; id <= 1512; id += 1) {
+        repository.emit(
+          NotificationStreamEvent.reportStatus(
+            '신고 처리 $id',
+            status: 'RESOLVED',
+            reportId: id,
+            notificationId: id,
+            createdAt: '2026-05-24T09:01:00',
+          ),
+        );
+      }
+      await Future<void>.delayed(Duration.zero);
+
+      // Re-emitting key 1000 after 512 newer keys proves ring eviction happened.
+      repository.emit(
+        const NotificationStreamEvent.reportStatus(
+          '신고 처리 결과가 등록되었습니다: REOPENED',
+          status: 'RESOLVED',
+          reportId: 1000,
+          notificationId: 1000,
+          createdAt: '2026-05-24T09:02:00',
+        ),
+      );
+      await Future<void>.delayed(Duration.zero);
+
+      expect(
+        controller.state.notifications
+            .firstWhere((item) => item.id == 1000)
+            .content,
+        '신고 처리 결과가 등록되었습니다: REOPENED',
+      );
+    });
   });
 }
 

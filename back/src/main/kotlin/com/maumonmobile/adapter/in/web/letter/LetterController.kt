@@ -11,6 +11,7 @@ import com.maumonmobile.global.security.AuthenticatedUser
 import com.maumonmobile.global.web.ApiResponse
 import jakarta.validation.Valid
 import jakarta.validation.constraints.NotBlank
+import jakarta.validation.constraints.Size
 import org.springframework.security.core.Authentication
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PathVariable
@@ -122,13 +123,16 @@ class LetterController(
 
 data class LetterSaveRequest(
     @field:NotBlank
+    @field:Size(max = 255)
     val title: String,
     @field:NotBlank
+    @field:Size(max = 5_000)
     val content: String,
 )
 
 data class ReplyRequest(
     @field:NotBlank
+    @field:Size(max = 5_000)
     val replyContent: String,
 )
 

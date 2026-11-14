@@ -4,6 +4,7 @@ import com.maumonmobile.adapter.out.persistence.jdbc.insertAndReturnId
 import com.maumonmobile.adapter.out.persistence.jdbc.params
 import com.maumonmobile.adapter.out.persistence.jdbc.withValue
 import com.maumonmobile.application.port.out.ConsultationRepository
+import com.maumonmobile.domain.common.toUtcIso6
 import com.maumonmobile.domain.consultation.ConsultationMessage
 import com.maumonmobile.domain.consultation.ConsultationMessageSender
 import org.springframework.context.annotation.Profile
@@ -52,7 +53,7 @@ class JdbcConsultationRepository(
                 .withValue("sessionId", sessionId)
                 .withValue("sender", sender.name)
                 .withValue("content", content)
-                .withValue("createdAt", Instant.now().toString())
+                .withValue("createdAt", Instant.now().toUtcIso6())
                 .withValue("sensitive", sensitive)
                 .withValue("retentionUntil", retentionUntil),
         )
@@ -95,6 +96,40 @@ class JdbcConsultationRepository(
             parameters,
             rowMapper,
         )
+    }
+
+    override fun findRecentNonSensitiveByMemberId(
+        memberId: Long,
+        excludeMessageId: Long,
+        limit: Int,
+    ): List<ConsultationMessage> {
+        if (limit <= 0) {
+            return emptyList()
+        }
+        return jdbc.query(
+            """
+                select m.id,
+                       s.member_id,
+                       m.sender,
+                       m.content,
+                       m.created_at,
+                       m.sensitive,
+                       m.retention_until
+                  from consultation_messages m
+                  join consultation_sessions s on s.id = m.session_id
+                 where s.member_id = :memberId
+                   and m.hidden = false
+                   and m.sensitive = false
+                   and m.id <> :excludeMessageId
+                 order by m.created_at desc, m.id desc
+                 limit :limit
+            """.trimIndent(),
+            params()
+                .withValue("memberId", memberId)
+                .withValue("excludeMessageId", excludeMessageId)
+                .withValue("limit", limit),
+            rowMapper,
+        ).asReversed()
     }
 
     override fun hideSensitiveByMemberId(memberId: Long): Int {
@@ -147,7 +182,7 @@ class JdbcConsultationRepository(
     }
 
     private fun createSession(memberId: Long): Long {
-        val now = Instant.now().toString()
+        val now = Instant.now().toUtcIso6()
         return jdbc.insertAndReturnId(
             """
                 insert into consultation_sessions (member_id, created_at, updated_at)
@@ -165,7 +200,7 @@ class JdbcConsultationRepository(
             "update consultation_sessions set updated_at = :updatedAt where id = :id",
             params()
                 .withValue("id", sessionId)
-                .withValue("updatedAt", Instant.now().toString()),
+                .withValue("updatedAt", Instant.now().toUtcIso6()),
         )
     }
 
