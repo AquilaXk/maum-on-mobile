@@ -12,6 +12,7 @@ import com.maumonmobile.global.security.AuthenticatedUser
 import com.maumonmobile.global.web.ApiResponse
 import jakarta.validation.Valid
 import jakarta.validation.constraints.NotBlank
+import jakarta.validation.constraints.Size
 import org.springframework.security.core.Authentication
 import org.springframework.web.bind.annotation.DeleteMapping
 import org.springframework.web.bind.annotation.GetMapping
@@ -148,8 +149,10 @@ class StoryController(
 
 data class StorySaveRequest(
     @field:NotBlank
+    @field:Size(max = 255)
     val title: String,
     @field:NotBlank
+    @field:Size(max = 20_000)
     val content: String,
     @field:NotBlank
     val category: String,
@@ -163,6 +166,7 @@ data class ResolutionStatusRequest(
 
 data class CommentSaveRequest(
     @field:NotBlank
+    @field:Size(max = 2_000)
     val content: String,
     val authorId: Long? = null,
     val parentCommentId: Long? = null,
@@ -170,6 +174,7 @@ data class CommentSaveRequest(
 
 data class CommentUpdateRequest(
     @field:NotBlank
+    @field:Size(max = 2_000)
     val content: String,
 )
 

@@ -16,6 +16,8 @@ import com.maumonmobile.application.port.out.ConsultationRepository
 import com.maumonmobile.application.port.out.ConsultationSafetyAuditRepository
 import com.maumonmobile.application.port.out.NotificationDeliveryPort
 import com.maumonmobile.domain.auth.AuthMember
+import com.maumonmobile.domain.auth.AuthMemberStatus
+import com.maumonmobile.domain.common.toUtcIso6
 import com.maumonmobile.domain.consultation.ConsultationActionPolicy
 import com.maumonmobile.domain.consultation.ConsultationMessage
 import com.maumonmobile.domain.consultation.ConsultationMessageSender
@@ -26,6 +28,7 @@ import com.maumonmobile.domain.consultation.ConsultationSafetyAssessment
 import com.maumonmobile.domain.consultation.ConsultationSafetyAuditEvent
 import com.maumonmobile.domain.moderation.ContentModerationCategory
 import com.maumonmobile.domain.moderation.ContentModerationTarget
+import com.maumonmobile.domain.moderation.ModerationTextEngine
 import com.maumonmobile.global.observability.MobileApiMetricsRegistry
 import com.maumonmobile.global.security.AuthenticatedUser
 import com.maumonmobile.global.web.ApiException
@@ -149,7 +152,7 @@ class ConsultationService(
         persistUserMessage: Boolean = true,
     ): ConsultationChatResult {
         val now = Instant.now()
-        val retentionUntil = now.plus(SENSITIVE_RETENTION).toString()
+        val retentionUntil = now.plus(SENSITIVE_RETENTION).toUtcIso6()
         if (persistUserMessage) {
             consultationRepository.appendMessage(
                 memberId = member.id,
@@ -173,7 +176,7 @@ class ConsultationService(
                 severity = safety.severity,
                 actionPolicy = safety.actionPolicy,
                 messagePreview = message.take(SAFETY_AUDIT_PREVIEW_LENGTH),
-                createdAt = now.toString(),
+                createdAt = now.toUtcIso6(),
             ),
         )
         metricsRegistry.recordConsultationSafety(safety.category.name, safety.actionPolicy.name)
@@ -204,15 +207,16 @@ class ConsultationService(
         now: Instant,
         assistantResponse: Boolean = false,
     ): ConsultationSafetyAssessment {
-        val normalized = text.lowercase()
-        val compact = normalized.compactForConsultationSafety()
+        val compact = ModerationTextEngine.compactForModeration(text)
+        val compactMask = ModerationTextEngine.scanCompactMask(compact)
         val category = when {
-            containsConsultationSafetyTerm(normalized, compact, SELF_HARM_TERMS) -> ConsultationRiskCategory.SELF_HARM
-            containsConsultationSafetyTerm(normalized, compact, VIOLENCE_TERMS) -> ConsultationRiskCategory.VIOLENCE
-            containsConsultationSafetyTerm(normalized, compact, ABUSE_TERMS) ||
-                containsConsultationFamilyExploitation(compact, FAMILY_TARGET_TERMS, EXPLOITATION_TERMS) ->
+            (compactMask and ModerationTextEngine.BIT_PRE_SELF_HARM) != 0 -> ConsultationRiskCategory.SELF_HARM
+            (compactMask and ModerationTextEngine.BIT_PRE_VIOLENCE) != 0 -> ConsultationRiskCategory.VIOLENCE
+            (compactMask and ModerationTextEngine.BIT_PRE_ABUSE) != 0 ||
+                ((compactMask and ModerationTextEngine.BIT_FAMILY_TARGET) != 0 &&
+                    (compactMask and ModerationTextEngine.BIT_EXPLOITATION) != 0) ->
                 ConsultationRiskCategory.ABUSE
-            containsConsultationSafetyTerm(normalized, compact, PROFANITY_TERMS) -> ConsultationRiskCategory.PROFANITY
+            (compactMask and ModerationTextEngine.BIT_CLASSIFIER_PROFANITY) != 0 -> ConsultationRiskCategory.PROFANITY
             else -> ConsultationRiskCategory.NONE
         }
 
@@ -240,7 +244,7 @@ class ConsultationService(
             val recentCriticalCount = consultationSafetyAuditRepository.countSince(
                 memberId = memberId,
                 severity = ConsultationRiskSeverity.CRITICAL,
-                since = now.minus(SAFETY_RATE_WINDOW).toString(),
+                since = now.minus(SAFETY_RATE_WINDOW).toUtcIso6(),
             )
             if (recentCriticalCount >= CRITICAL_RATE_LIMIT) {
                 return ConsultationSafetyAssessment(
@@ -299,7 +303,7 @@ class ConsultationService(
             val recentCriticalCount = consultationSafetyAuditRepository.countSince(
                 memberId = memberId,
                 severity = ConsultationRiskSeverity.CRITICAL,
-                since = now.minus(SAFETY_RATE_WINDOW).toString(),
+                since = now.minus(SAFETY_RATE_WINDOW).toUtcIso6(),
             )
             if (recentCriticalCount >= CRITICAL_RATE_LIMIT) {
                 return ConsultationSafetyAssessment(
@@ -381,16 +385,15 @@ class ConsultationService(
                 ConsultationAiRequest(
                     memberId = member.id,
                     message = message.minimizeForModel(),
-                    recentMessages = consultationRepository.findByMemberId(member.id)
-                        // 현재 사용자 입력은 userMessage로 별도 전달하므로 최근 맥락에서는 중복 제거한다.
-                        .filterNot { recentMessage -> recentMessage.id == currentUserMessageId }
-                        .filterNot { recentMessage -> recentMessage.sensitive }
-                        .takeLast(AI_CONTEXT_MESSAGE_LIMIT)
-                        .map { recentMessage ->
-                            recentMessage.copy(
-                                content = recentMessage.content.minimizeForModel(),
-                            )
-                        },
+                    recentMessages = consultationRepository.findRecentNonSensitiveByMemberId(
+                        memberId = member.id,
+                        excludeMessageId = currentUserMessageId,
+                        limit = AI_CONTEXT_MESSAGE_LIMIT,
+                    ).map { recentMessage ->
+                        recentMessage.copy(
+                            content = recentMessage.content.minimizeForModel(),
+                        )
+                    },
                     timeout = aiTimeout,
                 ),
             )
@@ -407,8 +410,12 @@ class ConsultationService(
         val memberId = user.id.toLongOrNull()
             ?: throw ApiException(ErrorCode.UNAUTHORIZED, "다시 로그인해 주세요.")
 
-        return authMemberRepository.findById(memberId)
+        val member = authMemberRepository.findById(memberId)
             ?: throw ApiException(ErrorCode.UNAUTHORIZED, "다시 로그인해 주세요.")
+        if (member.status != AuthMemberStatus.ACTIVE) {
+            throw ApiException(ErrorCode.UNAUTHORIZED, "다시 로그인해 주세요.")
+        }
+        return member
     }
 
     private data class ConsultationReplyResult(
@@ -440,45 +447,6 @@ class ConsultationService(
             "위기 표현이 반복되어 자동 답변을 잠시 중단합니다. 지금은 119, 112, 가까운 응급실 또는 신뢰할 수 있는 사람에게 즉시 도움을 요청해 주세요."
         private const val RESPONSE_REWRITE_MESSAGE =
             "안전하지 않은 답변을 표시하지 않았습니다. 지금은 안전 확보와 즉시 도움 요청이 우선입니다."
-        private val SELF_HARM_TERMS = setOf("죽고 싶", "죽고싶", "자해", "자살", "목숨을 끊", "목숨을끊", "끝내고 싶", "끝내고싶")
-        private val VIOLENCE_TERMS = setOf("죽일", "죽여버", "죽어버", "해치고 싶", "해치고싶", "때리고 싶", "때리고싶", "칼로", "복수할 거", "복수할거")
-        private val ABUSE_TERMS = setOf("학대", "맞고 있어", "맞고있", "폭행", "성폭력", "감금", "섬노예", "착취")
-        private val PROFANITY_TERMS = setOf(
-            "시발",
-            "씨발",
-            "씨팔",
-            "she발",
-            "쉬발",
-            "쉬2발",
-            "야발",
-            "병신",
-            "개새끼",
-            "꺼져",
-            "좆같",
-            "ㅅㅂ",
-            "ㅆㅂ",
-            "ㅅㅣ발",
-            "ㅂㅅ",
-            "ㅄ",
-            "ㅈ같",
-            "시바",
-            "느금마",
-            "느그엄마",
-            "니엄마",
-            "니애미",
-        )
-        private val FAMILY_TARGET_TERMS = setOf(
-            "너희어머니",
-            "니어머니",
-            "어머니",
-            "너희엄마",
-            "느그엄마",
-            "니엄마",
-            "엄마",
-            "니애미",
-            "애미",
-        )
-        private val EXPLOITATION_TERMS = setOf("섬노예", "노예", "감금", "착취", "팔려", "학대")
     }
 }
 
@@ -497,30 +465,6 @@ private val CONSULTATION_SENTENCE_PUNCTUATION = setOf('.', '!', '?', '…', '。
 private val CONSULTATION_CLOSING_PUNCTUATION = setOf('"', '\'', '’', '”', ')', ']', '}', '』', '」')
 private val EMAIL_PATTERN = Regex("""[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}""")
 private val PHONE_PATTERN = Regex("""01[016789][-.\s]?\d{3,4}[-.\s]?\d{4}""")
-
-private fun containsConsultationSafetyTerm(
-    normalized: String,
-    compact: String,
-    terms: Set<String>,
-): Boolean {
-    return terms.any { term ->
-        normalized.contains(term) || compact.contains(term.compactForConsultationSafety())
-    }
-}
-
-private fun containsConsultationFamilyExploitation(
-    compact: String,
-    familyTargets: Set<String>,
-    exploitationTerms: Set<String>,
-): Boolean {
-    return familyTargets.any { term -> compact.contains(term.compactForConsultationSafety()) } &&
-        exploitationTerms.any { term -> compact.contains(term.compactForConsultationSafety()) }
-}
-
-private fun String.compactForConsultationSafety(): String {
-    return lowercase()
-        .replace(Regex("""[^0-9a-z가-힣ㄱ-ㅎㅏ-ㅣ]+"""), "")
-}
 
 private fun String.minimizeForModel(): String {
     return replace(EMAIL_PATTERN, "[email]")

@@ -1,6 +1,7 @@
 package com.maumonmobile.adapter.out.persistence.member
 
 import com.maumonmobile.application.port.out.MemberDataExportRepository
+import com.maumonmobile.application.port.out.MemberDataExportSummary
 import com.maumonmobile.domain.member.MemberDataExportJob
 import org.springframework.context.annotation.Profile
 import org.springframework.stereotype.Repository
@@ -29,5 +30,24 @@ class InMemoryMemberDataExportRepository : MemberDataExportRepository {
         return jobsById.values
             .filter { job -> job.memberId == memberId }
             .maxWithOrNull(compareBy<MemberDataExportJob> { job -> job.requestedAt }.thenBy { job -> job.id })
+    }
+
+    override fun findSummaryById(id: Long): MemberDataExportSummary? = jobsById[id]?.toSummary()
+
+    override fun findLatestSummaryByMemberId(memberId: Long): MemberDataExportSummary? {
+        return findLatestByMemberId(memberId)?.toSummary()
+    }
+
+    private fun MemberDataExportJob.toSummary(): MemberDataExportSummary {
+        return MemberDataExportSummary(
+            id = id,
+            memberId = memberId,
+            status = status,
+            requestedAt = requestedAt,
+            completedAt = completedAt,
+            expiresAt = expiresAt,
+            downloadedAt = downloadedAt,
+            failureReason = failureReason,
+        )
     }
 }

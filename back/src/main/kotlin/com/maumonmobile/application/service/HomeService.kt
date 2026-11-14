@@ -10,6 +10,7 @@ import com.maumonmobile.application.port.`in`.HomeUseCase
 import com.maumonmobile.application.port.out.DiaryRepository
 import com.maumonmobile.application.port.out.LetterRepository
 import com.maumonmobile.application.port.out.StoryRepository
+import com.maumonmobile.domain.common.toUtcIso6
 import org.springframework.stereotype.Service
 import java.time.LocalDate
 import java.time.LocalDateTime
@@ -24,8 +25,8 @@ class HomeService(
 
     override fun stats(): HomeStatsResult {
         val today = LocalDate.now(SERVICE_ZONE)
-        val startInclusive = today.atStartOfDay(SERVICE_ZONE).toInstant().toString()
-        val endExclusive = today.plusDays(1).atStartOfDay(SERVICE_ZONE).toInstant().toString()
+        val startInclusive = today.atStartOfDay(SERVICE_ZONE).toInstant().toUtcIso6()
+        val endExclusive = today.plusDays(1).atStartOfDay(SERVICE_ZONE).toInstant().toUtcIso6()
         val todayWorryCount = storyRepository.countPostsByCategoryCreatedBetween(
             category = WORRY_CATEGORY,
             startInclusive = startInclusive,

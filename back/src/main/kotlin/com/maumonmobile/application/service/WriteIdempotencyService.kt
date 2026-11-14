@@ -1,6 +1,7 @@
 package com.maumonmobile.application.service
 
 import com.maumonmobile.application.port.out.WriteIdempotencyRepository
+import com.maumonmobile.domain.common.toUtcIso6
 import com.maumonmobile.domain.write.WriteIdempotencyRecord
 import com.maumonmobile.domain.write.WriteIdempotencyStatus
 import com.maumonmobile.domain.write.WriteOperation
@@ -35,7 +36,7 @@ class WriteIdempotencyService(
         }
 
         val memberId = user.memberId()
-        val now = Instant.now().toString()
+        val now = Instant.now().toUtcIso6()
         val created = writeIdempotencyRepository.createPending(
             WriteIdempotencyRecord(
                 id = 0,
@@ -59,7 +60,7 @@ class WriteIdempotencyService(
             operation = operation,
             idempotencyKey = normalizedKey,
             resourceId = resourceId,
-            updatedAt = Instant.now().toString(),
+            updatedAt = Instant.now().toUtcIso6(),
         )?.resourceId ?: resourceId
     }
 

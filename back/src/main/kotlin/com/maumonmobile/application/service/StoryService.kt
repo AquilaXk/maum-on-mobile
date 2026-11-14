@@ -11,6 +11,7 @@ import com.maumonmobile.application.port.`in`.StoryUseCase
 import com.maumonmobile.application.port.out.AuthMemberRepository
 import com.maumonmobile.application.port.out.StoryRepository
 import com.maumonmobile.domain.auth.AuthMember
+import com.maumonmobile.domain.auth.AuthMemberStatus
 import com.maumonmobile.domain.moderation.ContentModerationTarget
 import com.maumonmobile.domain.story.StoryComment
 import com.maumonmobile.domain.story.StoryPost
@@ -30,24 +31,24 @@ class StoryService(
 
     override fun list(title: String?, category: String?, page: Int, size: Int): StoryPageResult {
         val safePage = page.coerceAtLeast(0)
-        val safeSize = size.coerceAtLeast(1)
+        val safeSize = size.coerceIn(1, MAX_PAGE_SIZE)
         val titleFilter = title?.trim()?.takeIf(String::isNotEmpty)
-        val categoryFilter = category?.trim()?.takeIf(String::isNotEmpty)
-        val allItems = storyRepository.findPosts()
-            .asSequence()
-            .filter { post -> titleFilter == null || post.title.contains(titleFilter, ignoreCase = true) }
-            .filter { post -> categoryFilter == null || post.category == normalizeCategory(categoryFilter) }
-            .sortedByDescending { post -> post.createDate }
-            .toList()
-        val pageItems = allItems.pageSlice(safePage, safeSize)
+        val categoryFilter = category?.trim()?.takeIf(String::isNotEmpty)?.let(::normalizeCategory)
+        val totalElements = storyRepository.countPosts(titleFilter, categoryFilter)
+        val pageItems = if (totalElements == 0L) {
+            emptyList()
+        } else {
+            storyRepository.findPostsPage(titleFilter, categoryFilter, safePage, safeSize)
+        }
+        val totalPages = totalPages(totalElements, safeSize)
 
         return StoryPageResult(
             content = pageItems.map(StoryPost::toSummaryResult),
             page = safePage,
             size = safeSize,
-            totalElements = allItems.size.toLong(),
-            totalPages = totalPages(allItems.size, safeSize),
-            last = safePage >= totalPages(allItems.size, safeSize) - 1,
+            totalElements = totalElements,
+            totalPages = totalPages,
+            last = safePage >= totalPages - 1,
         )
     }
 
@@ -59,7 +60,7 @@ class StoryService(
 
     override fun create(user: AuthenticatedUser, command: StorySaveCommand): Long {
         val member = findMember(user)
-        contentModerationService.ensureAllowed(ContentModerationTarget.STORY, command.title, command.content)
+        contentModerationService.ensureAllowed(member.id, ContentModerationTarget.STORY, command.title, command.content)
         return storyRepository.savePost(
             authorId = member.id,
             authorNickname = member.nickname,
@@ -68,13 +69,15 @@ class StoryService(
     }
 
     override fun update(user: AuthenticatedUser, postId: Long, command: StorySaveCommand) {
-        val post = findOwnedPost(user, postId)
-        contentModerationService.ensureAllowed(ContentModerationTarget.STORY, command.title, command.content)
+        val member = findMember(user)
+        val post = findOwnedPost(member, postId)
+        contentModerationService.ensureAllowed(member.id, ContentModerationTarget.STORY, command.title, command.content)
         storyRepository.updatePost(post, command.toDraft())
     }
 
     override fun delete(user: AuthenticatedUser, postId: Long) {
-        findOwnedPost(user, postId)
+        val member = findMember(user)
+        findOwnedPost(member, postId)
         storyRepository.deleteCommentsByPostId(postId)
         storyRepository.deletePost(postId)
     }
@@ -84,7 +87,8 @@ class StoryService(
         postId: Long,
         resolutionStatus: String,
     ) {
-        val post = findOwnedPost(user, postId)
+        val member = findMember(user)
+        val post = findOwnedPost(member, postId)
         storyRepository.updateResolutionStatus(post, normalizeResolutionStatus(resolutionStatus))
     }
 
@@ -94,7 +98,7 @@ class StoryService(
         }
 
         val safePage = page.coerceAtLeast(0)
-        val safeSize = size.coerceAtLeast(1)
+        val safeSize = size.coerceIn(1, MAX_PAGE_SIZE)
         val comments = storyRepository.findCommentsByPostId(postId)
         val repliesByParent = comments
             .filter { comment -> comment.parentCommentId != null }
@@ -106,7 +110,7 @@ class StoryService(
                     .thenByDescending { comment -> comment.id },
             )
         val pageItems = topLevel.pageSlice(safePage, safeSize)
-        val totalPages = totalPages(topLevel.size, safeSize)
+        val totalPages = totalPages(topLevel.size.toLong(), safeSize)
         val hasNext = safePage + 1 < totalPages
 
         return StoryCommentPageResult(
@@ -142,7 +146,7 @@ class StoryService(
             }
         }
 
-        contentModerationService.ensureAllowed(ContentModerationTarget.COMMENT, command.content)
+        contentModerationService.ensureAllowed(member.id, ContentModerationTarget.COMMENT, command.content)
         return storyRepository.saveComment(
             postId = postId,
             authorId = member.id,
@@ -154,21 +158,23 @@ class StoryService(
     }
 
     override fun updateComment(user: AuthenticatedUser, commentId: Long, content: String) {
-        val comment = findOwnedComment(user, commentId)
-        if (!comment.canBeEditedBy(user.memberId())) {
+        val member = findMember(user)
+        val comment = findOwnedComment(member, commentId)
+        if (!comment.canBeEditedBy(member.id)) {
             throw ApiException(ErrorCode.CONFLICT, "삭제된 댓글은 수정할 수 없습니다.")
         }
-        contentModerationService.ensureAllowed(ContentModerationTarget.COMMENT, content)
+        contentModerationService.ensureAllowed(member.id, ContentModerationTarget.COMMENT, content)
         storyRepository.updateComment(comment, content.trim())
     }
 
     override fun deleteComment(user: AuthenticatedUser, commentId: Long) {
-        val comment = findOwnedComment(user, commentId)
+        val member = findMember(user)
+        val comment = findOwnedComment(member, commentId)
         if (comment.deleted) {
             throw ApiException(ErrorCode.CONFLICT, "이미 삭제된 댓글입니다.")
         }
 
-        if (storyRepository.findCommentsByPostId(comment.postId).any { it.parentCommentId == commentId }) {
+        if (storyRepository.existsChildComment(commentId)) {
             storyRepository.markCommentDeleted(comment)
         } else {
             storyRepository.deleteComment(commentId)
@@ -176,28 +182,36 @@ class StoryService(
     }
 
     private fun findMember(user: AuthenticatedUser): AuthMember {
-        return authMemberRepository.findById(user.memberId())
+        val member = authMemberRepository.findById(user.memberId())
             ?: throw ApiException(ErrorCode.UNAUTHORIZED, "다시 로그인해 주세요.")
+        if (member.status != AuthMemberStatus.ACTIVE) {
+            throw ApiException(ErrorCode.UNAUTHORIZED, "다시 로그인해 주세요.")
+        }
+        return member
     }
 
-    private fun findOwnedPost(user: AuthenticatedUser, postId: Long): StoryPost {
+    private fun findOwnedPost(member: AuthMember, postId: Long): StoryPost {
         val post = storyRepository.findPostById(postId)
             ?: throw ApiException(ErrorCode.NOT_FOUND)
-        if (post.authorId != user.memberId()) {
+        if (post.authorId != member.id) {
             throw ApiException(ErrorCode.FORBIDDEN)
         }
 
         return post
     }
 
-    private fun findOwnedComment(user: AuthenticatedUser, commentId: Long): StoryComment {
+    private fun findOwnedComment(member: AuthMember, commentId: Long): StoryComment {
         val comment = storyRepository.findCommentById(commentId)
             ?: throw ApiException(ErrorCode.NOT_FOUND)
-        if (comment.authorId != user.memberId()) {
+        if (comment.authorId != member.id) {
             throw ApiException(ErrorCode.FORBIDDEN)
         }
 
         return comment
+    }
+
+    private companion object {
+        private const val MAX_PAGE_SIZE = 100
     }
 }
 
@@ -269,13 +283,13 @@ private fun AuthenticatedUser.memberId(): Long {
 }
 
 private fun <T> List<T>.pageSlice(page: Int, size: Int): List<T> {
-    val fromIndex = (page * size).coerceAtMost(this.size)
-    val toIndex = (fromIndex + size).coerceAtMost(this.size)
+    val fromIndex = (page.toLong() * size.toLong()).coerceAtMost(this.size.toLong()).toInt()
+    val toIndex = (fromIndex.toLong() + size.toLong()).coerceAtMost(this.size.toLong()).toInt()
     return subList(fromIndex, toIndex)
 }
 
-private fun totalPages(totalElements: Int, size: Int): Int {
-    return if (totalElements == 0) 1 else ceil(totalElements.toDouble() / size.toDouble()).toInt()
+private fun totalPages(totalElements: Long, size: Int): Int {
+    return if (totalElements == 0L) 1 else ceil(totalElements.toDouble() / size.toDouble()).toInt()
 }
 
 private fun normalizeCategory(category: String): String {

@@ -10,9 +10,21 @@ interface DiaryRepository {
 
     fun findById(id: Long): Diary?
 
+    fun existByIds(ids: Collection<Long>): Set<Long>
+
     fun findByMemberId(memberId: Long): List<Diary>
 
+    fun findPageByMemberId(memberId: Long, page: Int, size: Int): List<Diary>
+
+    fun countByMemberId(memberId: Long): Long
+
+    fun countByMemberIds(memberIds: Collection<Long>): Map<Long, Int>
+
     fun findPublic(): List<Diary>
+
+    fun findPublicPage(page: Int, size: Int): List<Diary>
+
+    fun countPublic(): Long
 
     fun findAllPublicAndPrivate(): List<Diary>
 

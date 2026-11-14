@@ -19,6 +19,13 @@ class JwtTokenProvider(
     private val jwtProperties: JwtProperties,
     private val objectMapper: ObjectMapper = ObjectMapper(),
 ) {
+    private val signingKey = SecretKeySpec(
+        jwtProperties.secret.toByteArray(StandardCharsets.UTF_8),
+        HMAC_ALGORITHM,
+    )
+    private val macThreadLocal = ThreadLocal.withInitial {
+        Mac.getInstance(HMAC_ALGORITHM).apply { init(signingKey) }
+    }
 
     fun authenticate(rawToken: String): Authentication? {
         val user = readToken(rawToken, tokenType = ACCESS_TOKEN_TYPE) ?: return null
@@ -92,20 +99,26 @@ class JwtTokenProvider(
             return null
         }
 
-        val parts = rawToken.split(".")
-        if (parts.size != 3) {
+        val firstDot = rawToken.indexOf('.')
+        if (firstDot < 0) {
+            return null
+        }
+        val secondDot = rawToken.indexOf('.', firstDot + 1)
+        if (secondDot < 0 || rawToken.indexOf('.', secondDot + 1) >= 0) {
             return null
         }
 
-        val unsignedToken = "${parts[0]}.${parts[1]}"
+        val unsignedToken = rawToken.substring(0, secondDot)
         val expectedSignature = sign(unsignedToken)
-        val actualSignature = runCatching { base64UrlDecode(parts[2]) }.getOrNull() ?: return null
+        val signaturePart = rawToken.substring(secondDot + 1)
+        val actualSignature = runCatching { base64UrlDecode(signaturePart) }.getOrNull() ?: return null
         if (!MessageDigest.isEqual(expectedSignature, actualSignature)) {
             return null
         }
 
+        val payloadPart = rawToken.substring(firstDot + 1, secondDot)
         val payloadJson = runCatching {
-            String(base64UrlDecode(parts[1]), StandardCharsets.UTF_8)
+            String(base64UrlDecode(payloadPart), StandardCharsets.UTF_8)
         }.getOrNull() ?: return null
         val payload = runCatching { objectMapper.readTree(payloadJson) }.getOrNull() ?: return null
 
@@ -144,8 +157,7 @@ class JwtTokenProvider(
     }
 
     private fun sign(value: String): ByteArray {
-        val mac = Mac.getInstance(HMAC_ALGORITHM)
-        mac.init(SecretKeySpec(jwtProperties.secret.toByteArray(StandardCharsets.UTF_8), HMAC_ALGORITHM))
+        val mac = macThreadLocal.get()
         return mac.doFinal(value.toByteArray(StandardCharsets.UTF_8))
     }
 

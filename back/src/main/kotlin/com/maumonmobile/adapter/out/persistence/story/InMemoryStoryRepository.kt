@@ -1,6 +1,7 @@
 package com.maumonmobile.adapter.out.persistence.story
 
 import com.maumonmobile.application.port.out.StoryRepository
+import com.maumonmobile.domain.common.toUtcIso6
 import com.maumonmobile.domain.story.StoryComment
 import com.maumonmobile.domain.story.StoryPost
 import com.maumonmobile.domain.story.StoryPostDraft
@@ -20,7 +21,7 @@ class InMemoryStoryRepository : StoryRepository {
 
     override fun savePost(authorId: Long, authorNickname: String, draft: StoryPostDraft): StoryPost {
         val id = postSequence.getAndIncrement()
-        val now = Instant.now().toString()
+        val now = Instant.now().toUtcIso6()
         val post = StoryPost(
             id = id,
             authorId = authorId,
@@ -45,7 +46,7 @@ class InMemoryStoryRepository : StoryRepository {
             content = draft.content,
             category = draft.category,
             thumbnail = draft.thumbnail,
-            modifyDate = Instant.now().toString(),
+            modifyDate = Instant.now().toUtcIso6(),
         )
         postsById[updatedPost.id] = updatedPost
         return updatedPost
@@ -54,7 +55,7 @@ class InMemoryStoryRepository : StoryRepository {
     override fun updateResolutionStatus(post: StoryPost, resolutionStatus: String): StoryPost {
         val updatedPost = post.copy(
             resolutionStatus = resolutionStatus,
-            modifyDate = Instant.now().toString(),
+            modifyDate = Instant.now().toUtcIso6(),
         )
         postsById[updatedPost.id] = updatedPost
         return updatedPost
@@ -68,12 +69,62 @@ class InMemoryStoryRepository : StoryRepository {
 
     override fun findPostById(id: Long): StoryPost? = postsById[id]
 
+    override fun findPostsByIds(ids: Collection<Long>): Map<Long, StoryPost> {
+        if (ids.isEmpty()) {
+            return emptyMap()
+        }
+        return buildMap {
+            ids.forEach { id -> postsById[id]?.let { put(id, it) } }
+        }
+    }
+
+    override fun existPostsByIds(ids: Collection<Long>): Set<Long> {
+        if (ids.isEmpty()) {
+            return emptySet()
+        }
+        return ids.filterTo(mutableSetOf()) { id -> postsById.containsKey(id) }
+    }
+
     override fun findPosts(): List<StoryPost> = postsById.values.toList()
+
+    override fun findPostsPage(titleKeyword: String?, category: String?, page: Int, size: Int): List<StoryPost> {
+        val safePage = page.coerceAtLeast(0)
+        val safeSize = size.coerceIn(1, 100)
+        val filtered = filterPosts(titleKeyword, category)
+            .sortedWith(compareByDescending<StoryPost> { it.createDate }.thenByDescending { it.id })
+        val offset = (safePage.toLong() * safeSize.toLong()).coerceAtMost(filtered.size.toLong()).toInt()
+        val endIndex = (offset + safeSize).coerceAtMost(filtered.size)
+        return filtered.subList(offset, endIndex)
+    }
+
+    override fun countPosts(titleKeyword: String?, category: String?): Long {
+        return filterPosts(titleKeyword, category).size.toLong()
+    }
+
+    private fun filterPosts(titleKeyword: String?, category: String?): List<StoryPost> {
+        val keyword = titleKeyword?.trim()?.takeIf(String::isNotEmpty)
+        val cat = category?.trim()?.takeIf(String::isNotEmpty)
+        return postsById.values.filter { post ->
+            (keyword == null || post.title.contains(keyword, ignoreCase = true)) &&
+                (cat == null || post.category == cat)
+        }
+    }
 
     override fun findPostsByAuthorId(authorId: Long): List<StoryPost> {
         return postsById.values
             .filter { post -> post.authorId == authorId }
             .toList()
+    }
+
+    override fun countPostsByAuthorIds(authorIds: Collection<Long>): Map<Long, Int> {
+        if (authorIds.isEmpty()) {
+            return emptyMap()
+        }
+        val targetIds = authorIds.toSet()
+        return postsById.values
+            .filter { post -> post.authorId in targetIds }
+            .groupingBy(StoryPost::authorId)
+            .eachCount()
     }
 
     override fun countPostsByCategoryCreatedBetween(
@@ -124,7 +175,7 @@ class InMemoryStoryRepository : StoryRepository {
         content: String,
     ): StoryComment {
         val id = commentSequence.getAndIncrement()
-        val now = Instant.now().toString()
+        val now = Instant.now().toUtcIso6()
         val comment = StoryComment(
             id = id,
             postId = postId,
@@ -144,7 +195,7 @@ class InMemoryStoryRepository : StoryRepository {
     override fun updateComment(comment: StoryComment, content: String): StoryComment {
         val updatedComment = comment.copy(
             content = content,
-            modifyDate = Instant.now().toString(),
+            modifyDate = Instant.now().toUtcIso6(),
         )
         commentsById[updatedComment.id] = updatedComment
         return updatedComment
@@ -154,13 +205,33 @@ class InMemoryStoryRepository : StoryRepository {
         val deletedComment = comment.copy(
             content = StoryComment.DELETED_CONTENT,
             deleted = true,
-            modifyDate = Instant.now().toString(),
+            modifyDate = Instant.now().toUtcIso6(),
         )
         commentsById[deletedComment.id] = deletedComment
         return deletedComment
     }
 
     override fun findCommentById(id: Long): StoryComment? = commentsById[id]
+
+    override fun findCommentsByIds(ids: Collection<Long>): Map<Long, StoryComment> {
+        if (ids.isEmpty()) {
+            return emptyMap()
+        }
+        return buildMap {
+            ids.forEach { id -> commentsById[id]?.let { put(id, it) } }
+        }
+    }
+
+    override fun existCommentsByIds(ids: Collection<Long>): Set<Long> {
+        if (ids.isEmpty()) {
+            return emptySet()
+        }
+        return ids.filterTo(mutableSetOf()) { id -> commentsById.containsKey(id) }
+    }
+
+    override fun existsChildComment(parentCommentId: Long): Boolean {
+        return commentsById.values.any { comment -> comment.parentCommentId == parentCommentId }
+    }
 
     override fun findCommentsByPostId(postId: Long): List<StoryComment> {
         return commentsById.values

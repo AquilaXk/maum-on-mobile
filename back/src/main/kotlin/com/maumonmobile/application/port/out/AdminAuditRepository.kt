@@ -8,7 +8,11 @@ interface AdminAuditRepository {
 
     fun findAll(): List<AdminAuditEvent>
 
+    fun countCreatedBetween(startInclusive: String, endExclusive: String): Long
+
     fun findByTargetMemberId(memberId: Long): List<AdminAuditEvent>
 
     fun findByTargetResource(resourceType: String, resourceId: Long): List<AdminAuditEvent>
+
+    fun countByTargetResources(resourceType: String, resourceIds: Collection<Long>): Map<Long, Int>
 }

@@ -27,17 +27,43 @@ interface VertexAiGenerateContentClient {
 class ServiceAccountVertexAiAccessTokenProvider(
     private val properties: VertexAiProperties,
 ) : VertexAiAccessTokenProvider {
+    private val refreshLock = Any()
+
+    @Volatile
+    private var cachedCredential: GoogleCredential? = null
+
     override fun accessToken(): String {
-        Files.newInputStream(Path.of(properties.credentialsPath.trim())).use { inputStream ->
-            val credential = GoogleCredential.fromStream(inputStream)
-                .createScoped(listOf(CLOUD_PLATFORM_SCOPE))
-            credential.refreshToken()
+        val existing = cachedCredential
+        if (existing != null && hasValidToken(existing)) {
+            return existing.accessToken
+        }
+        synchronized(refreshLock) {
+            val credential = cachedCredential ?: loadCredential().also { loaded ->
+                cachedCredential = loaded
+            }
+            if (!hasValidToken(credential)) {
+                credential.refreshToken()
+            }
             return credential.accessToken
+        }
+    }
+
+    private fun hasValidToken(credential: GoogleCredential): Boolean {
+        val token = credential.accessToken ?: return false
+        val expiresInSeconds = credential.expiresInSeconds ?: return false
+        return token.isNotEmpty() && expiresInSeconds > TOKEN_REFRESH_LEAD_SECONDS
+    }
+
+    private fun loadCredential(): GoogleCredential {
+        Files.newInputStream(Path.of(properties.credentialsPath.trim())).use { inputStream ->
+            return GoogleCredential.fromStream(inputStream)
+                .createScoped(listOf(CLOUD_PLATFORM_SCOPE))
         }
     }
 
     private companion object {
         private const val CLOUD_PLATFORM_SCOPE = "https://www.googleapis.com/auth/cloud-platform"
+        private const val TOKEN_REFRESH_LEAD_SECONDS = 60L
     }
 }
 

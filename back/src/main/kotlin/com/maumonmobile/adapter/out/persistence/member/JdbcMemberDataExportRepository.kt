@@ -4,6 +4,7 @@ import com.maumonmobile.adapter.out.persistence.jdbc.insertAndReturnId
 import com.maumonmobile.adapter.out.persistence.jdbc.params
 import com.maumonmobile.adapter.out.persistence.jdbc.withValue
 import com.maumonmobile.application.port.out.MemberDataExportRepository
+import com.maumonmobile.application.port.out.MemberDataExportSummary
 import com.maumonmobile.domain.member.MemberDataExportJob
 import com.maumonmobile.domain.member.MemberDataExportStatus
 import org.springframework.context.annotation.Profile
@@ -86,6 +87,32 @@ class JdbcMemberDataExportRepository(
         ).singleOrNull()
     }
 
+    override fun findSummaryById(id: Long): MemberDataExportSummary? {
+        return jdbc.query(
+            """
+                select id, member_id, status, requested_at, completed_at, expires_at, downloaded_at, failure_reason
+                  from member_data_exports
+                 where id = :id
+            """.trimIndent(),
+            params().withValue("id", id),
+            summaryRowMapper,
+        ).singleOrNull()
+    }
+
+    override fun findLatestSummaryByMemberId(memberId: Long): MemberDataExportSummary? {
+        return jdbc.query(
+            """
+                select id, member_id, status, requested_at, completed_at, expires_at, downloaded_at, failure_reason
+                  from member_data_exports
+                 where member_id = :memberId
+                 order by requested_at desc, id desc
+                 limit 1
+            """.trimIndent(),
+            params().withValue("memberId", memberId),
+            summaryRowMapper,
+        ).singleOrNull()
+    }
+
     private fun MemberDataExportJob.toParams() = params()
         .withValue("memberId", memberId)
         .withValue("status", status.name)
@@ -97,6 +124,19 @@ class JdbcMemberDataExportRepository(
         .withValue("contentJson", contentJson)
 
     private companion object {
+        private val summaryRowMapper = RowMapper { rs, _ ->
+            MemberDataExportSummary(
+                id = rs.getLong("id"),
+                memberId = rs.getLong("member_id"),
+                status = MemberDataExportStatus.valueOf(rs.getString("status")),
+                requestedAt = rs.getString("requested_at"),
+                completedAt = rs.getString("completed_at"),
+                expiresAt = rs.getString("expires_at"),
+                downloadedAt = rs.getString("downloaded_at"),
+                failureReason = rs.getString("failure_reason"),
+            )
+        }
+
         private val rowMapper = RowMapper { rs, _ ->
             MemberDataExportJob(
                 id = rs.getLong("id"),

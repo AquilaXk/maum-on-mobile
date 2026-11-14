@@ -3,6 +3,7 @@ package com.maumonmobile.adapter.out.persistence.notification
 import com.maumonmobile.adapter.out.persistence.jdbc.params
 import com.maumonmobile.adapter.out.persistence.jdbc.withValue
 import com.maumonmobile.application.port.out.NotificationDeviceTokenRepository
+import com.maumonmobile.domain.common.toUtcIso6
 import com.maumonmobile.domain.notification.NotificationDevicePlatform
 import com.maumonmobile.domain.notification.NotificationDeviceToken
 import org.springframework.context.annotation.Profile
@@ -24,7 +25,7 @@ class JdbcNotificationDeviceTokenRepository(
         platform: NotificationDevicePlatform,
         token: String,
     ): NotificationDeviceToken {
-        val updatedAt = Instant.now().toString()
+        val updatedAt = Instant.now().toUtcIso6()
         jdbc.update(
             """
                 delete from notification_device_tokens
@@ -73,7 +74,7 @@ class JdbcNotificationDeviceTokenRepository(
             params()
                 .withValue("memberId", memberId)
                 .withValue("token", token)
-                .withValue("updatedAt", Instant.now().toString()),
+                .withValue("updatedAt", Instant.now().toUtcIso6()),
         )
         return updatedRows > 0
     }
@@ -89,7 +90,7 @@ class JdbcNotificationDeviceTokenRepository(
             """.trimIndent(),
             params()
                 .withValue("memberId", memberId)
-                .withValue("updatedAt", Instant.now().toString()),
+                .withValue("updatedAt", Instant.now().toUtcIso6()),
         )
     }
 

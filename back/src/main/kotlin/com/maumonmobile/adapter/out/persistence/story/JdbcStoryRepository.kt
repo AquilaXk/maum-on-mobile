@@ -1,14 +1,17 @@
 package com.maumonmobile.adapter.out.persistence.story
 
+import com.maumonmobile.adapter.out.persistence.jdbc.containsLikePattern
 import com.maumonmobile.adapter.out.persistence.jdbc.insertAndReturnId
 import com.maumonmobile.adapter.out.persistence.jdbc.params
 import com.maumonmobile.adapter.out.persistence.jdbc.withValue
 import com.maumonmobile.application.port.out.StoryRepository
+import com.maumonmobile.domain.common.toUtcIso6
 import com.maumonmobile.domain.story.StoryComment
 import com.maumonmobile.domain.story.StoryPost
 import com.maumonmobile.domain.story.StoryPostDraft
 import org.springframework.context.annotation.Profile
 import org.springframework.jdbc.core.RowMapper
+import org.springframework.jdbc.core.namedparam.MapSqlParameterSource
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate
 import org.springframework.stereotype.Repository
 import org.springframework.transaction.annotation.Transactional
@@ -21,7 +24,7 @@ class JdbcStoryRepository(
 ) : StoryRepository {
 
     override fun savePost(authorId: Long, authorNickname: String, draft: StoryPostDraft): StoryPost {
-        val now = Instant.now().toString()
+        val now = Instant.now().toUtcIso6()
         val id = jdbc.insertAndReturnId(
             """
                 insert into story_posts (
@@ -80,7 +83,7 @@ class JdbcStoryRepository(
                 .withValue("content", draft.content)
                 .withValue("category", draft.category)
                 .withValue("thumbnail", draft.thumbnail)
-                .withValue("modifyDate", Instant.now().toString()),
+                .withValue("modifyDate", Instant.now().toUtcIso6()),
         )
         return findPostById(post.id) ?: error("수정된 스토리를 확인하지 못했습니다.")
     }
@@ -96,7 +99,7 @@ class JdbcStoryRepository(
             params()
                 .withValue("id", post.id)
                 .withValue("resolutionStatus", resolutionStatus)
-                .withValue("modifyDate", Instant.now().toString()),
+                .withValue("modifyDate", Instant.now().toUtcIso6()),
         )
         return findPostById(post.id) ?: error("수정된 스토리 상태를 확인하지 못했습니다.")
     }
@@ -117,12 +120,88 @@ class JdbcStoryRepository(
         ).singleOrNull()
     }
 
+    override fun findPostsByIds(ids: Collection<Long>): Map<Long, StoryPost> {
+        val distinctIds = ids.distinct()
+        if (distinctIds.isEmpty()) {
+            return emptyMap()
+        }
+        return jdbc.query(
+            "select * from story_posts where id in (:ids)",
+            params().withValue("ids", distinctIds),
+            postRowMapper,
+        ).associateBy(StoryPost::id)
+    }
+
+    override fun existPostsByIds(ids: Collection<Long>): Set<Long> {
+        val distinctIds = ids.distinct()
+        if (distinctIds.isEmpty()) {
+            return emptySet()
+        }
+        return jdbc.query(
+            "select id from story_posts where id in (:ids)",
+            params().withValue("ids", distinctIds),
+        ) { rs, _ -> rs.getLong("id") }.toSet()
+    }
+
     override fun findPosts(): List<StoryPost> {
         return jdbc.query(
             "select * from story_posts order by create_date desc, id desc",
             emptyMap<String, Any>(),
             postRowMapper,
         )
+    }
+
+    override fun findPostsPage(titleKeyword: String?, category: String?, page: Int, size: Int): List<StoryPost> {
+        val safePage = page.coerceAtLeast(0)
+        val safeSize = size.coerceIn(1, 100)
+        val offset = safePage.toLong() * safeSize.toLong()
+        val filter = buildPostFilter(titleKeyword, category)
+        val queryParams = filter.params
+            .withValue("limit", safeSize)
+            .withValue("offset", offset)
+
+        return jdbc.query(
+            """
+                select *
+                  from story_posts
+                 ${filter.whereSql}
+                 order by create_date desc, id desc
+                 limit :limit offset :offset
+            """.trimIndent(),
+            queryParams,
+            postRowMapper,
+        )
+    }
+
+    override fun countPosts(titleKeyword: String?, category: String?): Long {
+        val filter = buildPostFilter(titleKeyword, category)
+        return jdbc.queryForObject(
+            "select count(*) from story_posts ${filter.whereSql}",
+            filter.params,
+            Long::class.java,
+        ) ?: 0L
+    }
+
+    private data class PostFilterQuery(
+        val whereSql: String,
+        val params: MapSqlParameterSource,
+    )
+
+    private fun buildPostFilter(titleKeyword: String?, category: String?): PostFilterQuery {
+        val clauses = mutableListOf<String>()
+        val queryParams = params()
+        val normalizedKeyword = titleKeyword?.trim()?.takeIf(String::isNotEmpty)
+        if (normalizedKeyword != null) {
+            clauses += "lower(title) like :pattern escape '!'"
+            queryParams.withValue("pattern", containsLikePattern(normalizedKeyword))
+        }
+        val normalizedCategory = category?.trim()?.takeIf(String::isNotEmpty)
+        if (normalizedCategory != null) {
+            clauses += "category = :category"
+            queryParams.withValue("category", normalizedCategory)
+        }
+        val whereSql = if (clauses.isEmpty()) "" else "where ${clauses.joinToString(" and ")}"
+        return PostFilterQuery(whereSql = whereSql, params = queryParams)
     }
 
     override fun findPostsByAuthorId(authorId: Long): List<StoryPost> {
@@ -136,6 +215,24 @@ class JdbcStoryRepository(
             params().withValue("authorId", authorId),
             postRowMapper,
         )
+    }
+
+    override fun countPostsByAuthorIds(authorIds: Collection<Long>): Map<Long, Int> {
+        val distinctIds = authorIds.distinct()
+        if (distinctIds.isEmpty()) {
+            return emptyMap()
+        }
+        return jdbc.query(
+            """
+                select author_id, count(*) as post_count
+                  from story_posts
+                 where author_id in (:authorIds)
+                 group by author_id
+            """.trimIndent(),
+            params().withValue("authorIds", distinctIds),
+        ) { rs, _ ->
+            rs.getLong("author_id") to rs.getInt("post_count")
+        }.toMap()
     }
 
     override fun countPostsByCategoryCreatedBetween(
@@ -209,7 +306,7 @@ class JdbcStoryRepository(
         parentCommentId: Long?,
         content: String,
     ): StoryComment {
-        val now = Instant.now().toString()
+        val now = Instant.now().toUtcIso6()
         val id = jdbc.insertAndReturnId(
             """
                 insert into story_comments (
@@ -256,7 +353,7 @@ class JdbcStoryRepository(
             params()
                 .withValue("id", comment.id)
                 .withValue("content", content)
-                .withValue("modifyDate", Instant.now().toString()),
+                .withValue("modifyDate", Instant.now().toUtcIso6()),
         )
         return findCommentById(comment.id) ?: error("수정된 댓글을 확인하지 못했습니다.")
     }
@@ -273,7 +370,7 @@ class JdbcStoryRepository(
             params()
                 .withValue("id", comment.id)
                 .withValue("content", StoryComment.DELETED_CONTENT)
-                .withValue("modifyDate", Instant.now().toString()),
+                .withValue("modifyDate", Instant.now().toUtcIso6()),
         )
         return findCommentById(comment.id) ?: error("삭제 상태 댓글을 확인하지 못했습니다.")
     }
@@ -284,6 +381,46 @@ class JdbcStoryRepository(
             params().withValue("id", id),
             commentRowMapper,
         ).singleOrNull()
+    }
+
+    override fun findCommentsByIds(ids: Collection<Long>): Map<Long, StoryComment> {
+        val distinctIds = ids.distinct()
+        if (distinctIds.isEmpty()) {
+            return emptyMap()
+        }
+        return jdbc.query(
+            "select * from story_comments where id in (:ids)",
+            params().withValue("ids", distinctIds),
+            commentRowMapper,
+        ).associateBy(StoryComment::id)
+    }
+
+    override fun existCommentsByIds(ids: Collection<Long>): Set<Long> {
+        val distinctIds = ids.distinct()
+        if (distinctIds.isEmpty()) {
+            return emptySet()
+        }
+        return jdbc.query(
+            "select id from story_comments where id in (:ids)",
+            params().withValue("ids", distinctIds),
+        ) { rs, _ -> rs.getLong("id") }.toSet()
+    }
+
+    override fun existsChildComment(parentCommentId: Long): Boolean {
+        return jdbc.queryForObject(
+            """
+                select case
+                         when exists (
+                             select 1
+                               from story_comments
+                              where parent_comment_id = :parentCommentId
+                         ) then true
+                         else false
+                       end
+            """.trimIndent(),
+            params().withValue("parentCommentId", parentCommentId),
+            Boolean::class.java,
+        ) ?: false
     }
 
     override fun findCommentsByPostId(postId: Long): List<StoryComment> {

@@ -2,11 +2,9 @@ package com.maumonmobile.adapter.`in`.web.observability
 
 import com.maumonmobile.application.port.out.AuthMemberRepository
 import com.maumonmobile.application.port.out.ContentModerationAuditRepository
+import com.maumonmobile.application.port.out.ContentModerationAuditSummary
 import com.maumonmobile.domain.auth.AuthMemberRole
 import com.maumonmobile.domain.auth.AuthMemberStatus
-import com.maumonmobile.domain.moderation.ContentModerationAuditEvent
-import com.maumonmobile.domain.moderation.ContentModerationModelStatus
-import com.maumonmobile.domain.moderation.ContentModerationRiskLevel
 import com.maumonmobile.global.observability.MobileApiMetricsRegistry
 import com.maumonmobile.global.observability.MobileApiMetricsSnapshot
 import com.maumonmobile.global.observability.MobileContentModerationHistoryMetrics
@@ -34,7 +32,7 @@ class MobileObservabilityController(
         return ApiResponse.success(
             snapshot.copy(
                 ai = snapshot.ai.copy(
-                    contentModerationHistory = contentModerationAuditRepository.findAll().toHistoryMetrics(),
+                    contentModerationHistory = contentModerationAuditRepository.summarize().toHistoryMetrics(),
                 ),
             ),
         )
@@ -64,18 +62,23 @@ class MobileObservabilityController(
     }
 }
 
-private fun List<ContentModerationAuditEvent>.toHistoryMetrics(): MobileContentModerationHistoryMetrics {
+private fun ContentModerationAuditSummary.toHistoryMetrics(): MobileContentModerationHistoryMetrics {
     return MobileContentModerationHistoryMetrics(
-        totalCount = size,
-        blockedCount = count { audit -> !audit.allowed },
-        modelFailureCount = count { audit -> audit.modelStatus != ContentModerationModelStatus.SUCCESS },
-        highRiskCategories = filter { audit -> audit.riskLevel == ContentModerationRiskLevel.HIGH }
-            .flatMap { audit -> audit.categories }
-            .groupingBy { category -> category.name }
-            .eachCount()
+        totalCount = totalCount.toInt(),
+        blockedCount = blockedCount.toInt(),
+        modelFailureCount = modelFailureCount.toInt(),
+        highRiskCategories = highRiskCategories
+            .mapKeys { (category, _) -> category.name }
+            .mapValues { (_, count) -> count.toInt() }
             .toSortedMap(),
-        modelStatuses = groupingBy { audit -> audit.modelStatus.name }.eachCount().toSortedMap(),
-        targets = groupingBy { audit -> audit.target.name }.eachCount().toSortedMap(),
+        modelStatuses = modelStatuses
+            .mapKeys { (status, _) -> status.name }
+            .mapValues { (_, count) -> count.toInt() }
+            .toSortedMap(),
+        targets = targets
+            .mapKeys { (target, _) -> target.name }
+            .mapValues { (_, count) -> count.toInt() }
+            .toSortedMap(),
     )
 }
 

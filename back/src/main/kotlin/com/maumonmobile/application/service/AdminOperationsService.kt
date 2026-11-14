@@ -38,17 +38,17 @@ import com.maumonmobile.domain.admin.AdminAuditEventDraft
 import com.maumonmobile.domain.auth.AuthMember
 import com.maumonmobile.domain.auth.AuthMemberRole
 import com.maumonmobile.domain.auth.AuthMemberStatus
+import com.maumonmobile.domain.common.toUtcIso6
 import com.maumonmobile.domain.letter.Letter
 import com.maumonmobile.domain.moderation.ContentModerationAuditEvent
-import com.maumonmobile.domain.moderation.ContentModerationModelStatus
-import com.maumonmobile.domain.moderation.ContentModerationRiskLevel
 import com.maumonmobile.domain.report.Report
 import com.maumonmobile.domain.report.ReportTargetType
+import com.maumonmobile.domain.story.StoryComment
+import com.maumonmobile.domain.story.StoryPost
 import com.maumonmobile.global.security.AuthenticatedUser
 import com.maumonmobile.global.web.ApiException
 import com.maumonmobile.global.web.ErrorCode
 import org.springframework.stereotype.Service
-import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneOffset
 import kotlin.math.ceil
@@ -69,50 +69,54 @@ class AdminOperationsService(
     override fun dashboard(user: AuthenticatedUser): AdminDashboardResult {
         ensureAdmin(user)
         val todayStart = LocalDate.now(ZoneOffset.UTC).atStartOfDay().toInstant(ZoneOffset.UTC)
-        val reports = reportRepository.findAll()
-        val letters = letterRepository.findAll()
-        val diaries = diaryRepository.findAllPublicAndPrivate()
-        val members = authMemberRepository.findAll()
-        val adminActions = adminAuditRepository.findAll()
+        val todayStartIso = todayStart.toUtcIso6()
+        val todayEndIso = todayStart.plusSeconds(86_400).toUtcIso6()
+        val reportCounts = reportRepository.countDashboardMetrics(todayStartIso, todayEndIso)
+        val letterCounts = letterRepository.countDashboardMetrics(todayStartIso, todayEndIso)
+        val memberCounts = authMemberRepository.countDashboardMetrics()
+        val todayDiaryCount = diaryRepository.countCreatedBetween(todayStartIso, todayEndIso)
+        val todayAdminActionCount = adminAuditRepository.countCreatedBetween(todayStartIso, todayEndIso)
 
         return AdminDashboardResult(
-            todayReportCount = reports.count { report -> report.createdAt.isOnOrAfter(todayStart) },
-            openReportCount = reports.count { report -> report.status == "RECEIVED" },
-            processedReportCount = reports.count { report -> report.status != "RECEIVED" },
-            todayLetterCount = letters.count { letter -> letter.createdDate.isOnOrAfter(todayStart) },
-            todayDiaryCount = diaries.count { diary -> diary.createDate.isOnOrAfter(todayStart) },
-            receivableMemberCount = members.count { member ->
-                member.status == AuthMemberStatus.ACTIVE && member.randomReceiveAllowed
-            },
-            blockedMemberCount = members.count { member -> member.status == AuthMemberStatus.BLOCKED },
-            adminMemberCount = members.count { member -> member.role == AuthMemberRole.ADMIN },
-            unassignedLetterCount = letters.count { letter -> letter.receiverId == null && letter.status == "SENT" },
-            todayAdminActionCount = adminActions.count { event -> event.createdAt.isOnOrAfter(todayStart) },
+            todayReportCount = reportCounts.todayReportCount.toInt(),
+            openReportCount = reportCounts.openReportCount.toInt(),
+            processedReportCount = reportCounts.processedReportCount.toInt(),
+            todayLetterCount = letterCounts.todayLetterCount.toInt(),
+            todayDiaryCount = todayDiaryCount.toInt(),
+            receivableMemberCount = memberCounts.receivableMemberCount.toInt(),
+            blockedMemberCount = memberCounts.blockedMemberCount.toInt(),
+            adminMemberCount = memberCounts.adminMemberCount.toInt(),
+            unassignedLetterCount = letterCounts.unassignedLetterCount.toInt(),
+            todayAdminActionCount = todayAdminActionCount.toInt(),
         )
     }
 
     override fun contentModerationSummary(user: AuthenticatedUser): AdminContentModerationSummaryResult {
         ensureAdmin(user)
-        val audits = contentModerationAuditRepository.findAll()
-        val failureCount = audits.count { audit -> audit.modelStatus != ContentModerationModelStatus.SUCCESS }
+        val summary = contentModerationAuditRepository.summarize()
+        val recentFailures = contentModerationAuditRepository
+            .findRecentFailures(RECENT_MODERATION_FAILURE_LIMIT)
+            .map { audit -> audit.toContentModerationAuditResult() }
+        val failureRate = if (summary.totalCount == 0L) {
+            0.0
+        } else {
+            summary.modelFailureCount.toDouble() / summary.totalCount.toDouble()
+        }
         return AdminContentModerationSummaryResult(
-            totalCount = audits.size,
-            blockedCount = audits.count { audit -> !audit.allowed },
-            modelFailureCount = failureCount,
-            failureRate = if (audits.isEmpty()) {
-                0.0
-            } else {
-                failureCount.toDouble() / audits.size.toDouble()
-            },
-            highRiskCategories = audits.highRiskCategoryCounts(),
-            modelStatuses = audits.groupingBy { audit -> audit.modelStatus.name }.eachCount().toSortedMap(),
-            targets = audits.groupingBy { audit -> audit.target.name }.eachCount().toSortedMap(),
-            recentFailures = audits
-                .filter { audit ->
-                    !audit.allowed || audit.modelStatus != ContentModerationModelStatus.SUCCESS
-                }
-                .take(RECENT_MODERATION_FAILURE_LIMIT)
-                .map { audit -> audit.toContentModerationAuditResult() },
+            totalCount = summary.totalCount.toInt(),
+            blockedCount = summary.blockedCount.toInt(),
+            modelFailureCount = summary.modelFailureCount.toInt(),
+            failureRate = failureRate,
+            highRiskCategories = summary.highRiskCategories.entries
+                .associate { (category, count) -> category.name to count.toInt() }
+                .toSortedMap(),
+            modelStatuses = summary.modelStatuses.entries
+                .associate { (status, count) -> status.name to count.toInt() }
+                .toSortedMap(),
+            targets = summary.targets.entries
+                .associate { (target, count) -> target.name to count.toInt() }
+                .toSortedMap(),
+            recentFailures = recentFailures,
         )
     }
 
@@ -132,33 +136,32 @@ class AdminOperationsService(
         val expectedRole = role?.takeIf(String::isNotBlank)?.toMemberRole()
         val normalizedQuery = query?.trim()?.lowercase()?.takeIf(String::isNotEmpty)
 
-        val filteredMembers = authMemberRepository.findAll()
-            .filter { member -> expectedStatus == null || member.status == expectedStatus }
-            .filter { member -> expectedRole == null || member.role == expectedRole }
-            .filter { member -> socialAccount == null || member.socialAccount == socialAccount }
-            .filter { member ->
-                normalizedQuery == null ||
-                    member.email.lowercase().contains(normalizedQuery) ||
-                    member.nickname.lowercase().contains(normalizedQuery)
-            }
-            .sortedBy { member -> member.id }
-
-        val fromIndex = (normalizedPage * normalizedSize).coerceAtMost(filteredMembers.size)
-        val toIndex = (fromIndex + normalizedSize).coerceAtMost(filteredMembers.size)
-        val content = filteredMembers
-            .subList(fromIndex, toIndex)
-            .map(::memberSummary)
-        val totalPages = if (filteredMembers.isEmpty()) {
+        val totalElements = authMemberRepository.countMembers(
+            query = normalizedQuery,
+            status = expectedStatus,
+            role = expectedRole,
+            socialAccount = socialAccount,
+        )
+        val membersPage = authMemberRepository.findPage(
+            query = normalizedQuery,
+            status = expectedStatus,
+            role = expectedRole,
+            socialAccount = socialAccount,
+            page = normalizedPage,
+            size = normalizedSize,
+        )
+        val content = memberSummaries(membersPage)
+        val totalPages = if (totalElements == 0L) {
             0
         } else {
-            ceil(filteredMembers.size.toDouble() / normalizedSize.toDouble()).toInt()
+            ceil(totalElements.toDouble() / normalizedSize.toDouble()).toInt()
         }
 
         return AdminMemberPage(
             content = content,
             page = normalizedPage,
             size = normalizedSize,
-            totalElements = filteredMembers.size,
+            totalElements = totalElements.toInt(),
             totalPages = totalPages,
             last = normalizedPage + 1 >= totalPages,
         )
@@ -168,23 +171,37 @@ class AdminOperationsService(
         ensureAdmin(user)
         val member = authMemberRepository.findById(memberId)
             ?: throw ApiException(ErrorCode.NOT_FOUND, "회원을 찾을 수 없습니다.")
-        val posts = storyRepository.findPosts()
-            .filter { post -> post.authorId == memberId }
+        val posts = storyRepository.findPostsByAuthorId(memberId)
             .sortedByDescending { post -> post.createDate }
-        val letters = letterRepository.findAll()
-            .filter { letter -> letter.senderId == memberId || letter.receiverId == memberId }
+        val comments = storyRepository.findCommentsByAuthorId(memberId)
+        val letters = letterRepository.findByMemberId(memberId)
             .sortedByDescending { letter -> letter.createdDate }
         val diaries = diaryRepository.findByMemberId(memberId)
             .sortedByDescending { diary -> diary.createDate }
-        val reports = reportRepository.findAll()
-            .filter { report ->
-                report.reporterId == memberId ||
-                    resolveTargetOwnerId(report.targetType, report.targetId) == memberId
-            }
-            .map { report -> report.toReportSummary() }
+        val rawReports = reportRepository.findByReporterOrTargets(
+            reporterId = memberId,
+            postIds = posts.map { post -> post.id },
+            commentIds = comments.map { comment -> comment.id },
+            letterIds = letters.filter { letter -> letter.senderId == memberId }.map(Letter::id),
+        )
+        val reports = toReportSummaries(rawReports, posts, comments, letters)
+        val reportCount = reportRepository.countByReporterIds(listOf(member.id))[member.id] ?: 0
+        val memberSummary = AdminMemberSummary(
+            id = member.id,
+            email = member.email,
+            nickname = member.nickname,
+            role = member.role.name,
+            status = member.status.name,
+            socialAccount = member.socialAccount,
+            randomReceiveAllowed = member.randomReceiveAllowed,
+            reportCount = reportCount,
+            postCount = posts.size,
+            letterCount = letters.size,
+            diaryCount = diaries.size,
+        )
 
         return AdminMemberDetail(
-            member = memberSummary(member),
+            member = memberSummary,
             reports = reports,
             posts = posts.map { post ->
                 AdminMemberContentSummary(
@@ -312,34 +329,36 @@ class AdminOperationsService(
         val normalizedSize = size.coerceIn(1, MAX_PAGE_SIZE)
         val expectedStatus = status?.takeIf(String::isNotBlank)?.toAdminLetterStatus()
         val normalizedQuery = query?.trim()?.lowercase()?.takeIf(String::isNotEmpty)
+        val matchingSenderIds = if (normalizedQuery != null) {
+            authMemberRepository.findIdsMatchingEmail(normalizedQuery)
+        } else {
+            emptySet()
+        }
 
-        val filteredLetters = letterRepository.findAll()
-            .filter { letter -> expectedStatus == null || letter.matchesAdminLetterStatus(expectedStatus) }
-            .filter { letter ->
-                normalizedQuery == null ||
-                    letter.title.lowercase().contains(normalizedQuery) ||
-                    letter.content.lowercase().contains(normalizedQuery) ||
-                    letter.replyContent.orEmpty().lowercase().contains(normalizedQuery) ||
-                    letter.senderNickname.lowercase().contains(normalizedQuery) ||
-                    memberReportSummary(letter.senderId).email.lowercase().contains(normalizedQuery)
-            }
-            .sortedByDescending { letter -> letter.createdDate }
-
-        val fromIndex = (normalizedPage * normalizedSize).coerceAtMost(filteredLetters.size)
-        val toIndex = (fromIndex + normalizedSize).coerceAtMost(filteredLetters.size)
-        val totalPages = if (filteredLetters.isEmpty()) {
+        val totalElements = letterRepository.countAdminLetters(
+            status = expectedStatus,
+            query = normalizedQuery,
+            matchingSenderIds = matchingSenderIds,
+        )
+        val lettersPage = letterRepository.findAdminLettersPage(
+            status = expectedStatus,
+            query = normalizedQuery,
+            matchingSenderIds = matchingSenderIds,
+            page = normalizedPage,
+            size = normalizedSize,
+        )
+        val content = toAdminLetterSummaries(lettersPage)
+        val totalPages = if (totalElements == 0L) {
             0
         } else {
-            ceil(filteredLetters.size.toDouble() / normalizedSize.toDouble()).toInt()
+            ceil(totalElements.toDouble() / normalizedSize.toDouble()).toInt()
         }
 
         return AdminLetterPage(
-            content = filteredLetters
-                .subList(fromIndex, toIndex)
-                .map { letter -> letter.toAdminLetterSummary() },
+            content = content,
             page = normalizedPage,
             size = normalizedSize,
-            totalElements = filteredLetters.size,
+            totalElements = totalElements.toInt(),
             totalPages = totalPages,
             last = normalizedPage + 1 >= totalPages,
         )
@@ -485,29 +504,70 @@ class AdminOperationsService(
             ?: throw ApiException(ErrorCode.NOT_FOUND, "편지를 찾을 수 없습니다.")
     }
 
-    private fun Letter.toAdminLetterSummary(): AdminLetterSummary {
-        val receivers = currentReceivers()
-        return AdminLetterSummary(
-            id = id,
-            title = title,
-            sender = memberReportSummary(senderId),
-            receiver = receiverId?.let(::memberReportSummary) ?: receivers.singleOrNull()?.toReportMember(),
-            status = status,
-            createdAt = createdDate,
-            originalSummary = content.toSensitiveSummary(),
-            replySummary = replyContent?.toSensitiveSummary(),
-            availableReceiverCount = receivers.size,
-            actionCount = adminAuditRepository.findByTargetResource(LETTER_RESOURCE_TYPE, id).size,
+    private fun toAdminLetterSummaries(letters: List<Letter>): List<AdminLetterSummary> {
+        if (letters.isEmpty()) {
+            return emptyList()
+        }
+        val memberIds = buildSet {
+            letters.forEach { letter ->
+                add(letter.senderId)
+                letter.receiverId?.let(::add)
+            }
+        }
+        val membersById = authMemberRepository.findByIds(memberIds)
+        val activeReceivers = if (letters.any { letter -> letter.receiverId == null }) {
+            authMemberRepository.findAllActive()
+                .filter { member -> member.canReceiveLetter() }
+                .sortedBy { member -> member.id }
+        } else {
+            emptyList()
+        }
+        val actionCountsByLetterId = adminAuditRepository.countByTargetResources(
+            LETTER_RESOURCE_TYPE,
+            letters.map(Letter::id),
         )
+
+        return letters.map { letter ->
+            val assignedReceiver = letter.receiverId?.let(membersById::get)
+            val receivers = if (letter.receiverId != null) {
+                listOfNotNull(assignedReceiver)
+            } else {
+                activeReceivers.filter { candidate ->
+                    candidate.id != letter.senderId && candidate.id !in letter.rejectedMemberIds
+                }
+            }
+            val senderMember = membersById[letter.senderId]?.toReportMember()
+                ?: unknownReportMember(letter.senderId)
+            val receiverMember = letter.receiverId?.let { receiverId ->
+                membersById[receiverId]?.toReportMember() ?: unknownReportMember(receiverId)
+            } ?: receivers.singleOrNull()?.toReportMember()
+
+            AdminLetterSummary(
+                id = letter.id,
+                title = letter.title,
+                sender = senderMember,
+                receiver = receiverMember,
+                status = letter.status,
+                createdAt = letter.createdDate,
+                originalSummary = letter.content.toSensitiveSummary(),
+                replySummary = letter.replyContent?.toSensitiveSummary(),
+                availableReceiverCount = receivers.size,
+                actionCount = actionCountsByLetterId[letter.id] ?: 0,
+            )
+        }
     }
 
     private fun Letter.toAdminLetterDetail(): AdminLetterDetail {
         val receivers = currentReceivers().map { member -> member.toReportMember() }
+        val membersById = authMemberRepository.findByIds(
+            listOfNotNull(senderId, receiverId),
+        )
         return AdminLetterDetail(
             id = id,
             title = title,
-            sender = memberReportSummary(senderId),
-            receiver = receiverId?.let(::memberReportSummary) ?: receivers.singleOrNull(),
+            sender = memberReportSummary(senderId, membersById),
+            receiver = receiverId?.let { id -> memberReportSummary(id, membersById) }
+                ?: receivers.singleOrNull(),
             receivers = receivers,
             status = status,
             createdAt = createdDate,
@@ -558,21 +618,33 @@ class AdminOperationsService(
     }
 
     private fun memberSummary(member: AuthMember): AdminMemberSummary {
-        return AdminMemberSummary(
-            id = member.id,
-            email = member.email,
-            nickname = member.nickname,
-            role = member.role.name,
-            status = member.status.name,
-            socialAccount = member.socialAccount,
-            randomReceiveAllowed = member.randomReceiveAllowed,
-            reportCount = reportRepository.findAll().count { report -> report.reporterId == member.id },
-            postCount = storyRepository.findPosts().count { post -> post.authorId == member.id },
-            letterCount = letterRepository.findAll().count { letter ->
-                letter.senderId == member.id || letter.receiverId == member.id
-            },
-            diaryCount = diaryRepository.findByMemberId(member.id).size,
-        )
+        return memberSummaries(listOf(member)).single()
+    }
+
+    private fun memberSummaries(members: List<AuthMember>): List<AdminMemberSummary> {
+        if (members.isEmpty()) {
+            return emptyList()
+        }
+        val memberIds = members.map(AuthMember::id)
+        val reportCounts = reportRepository.countByReporterIds(memberIds)
+        val postCounts = storyRepository.countPostsByAuthorIds(memberIds)
+        val letterCounts = letterRepository.countLettersByMemberIds(memberIds)
+        val diaryCounts = diaryRepository.countByMemberIds(memberIds)
+        return members.map { member ->
+            AdminMemberSummary(
+                id = member.id,
+                email = member.email,
+                nickname = member.nickname,
+                role = member.role.name,
+                status = member.status.name,
+                socialAccount = member.socialAccount,
+                randomReceiveAllowed = member.randomReceiveAllowed,
+                reportCount = reportCounts[member.id] ?: 0,
+                postCount = postCounts[member.id] ?: 0,
+                letterCount = letterCounts[member.id] ?: 0,
+                diaryCount = diaryCounts[member.id] ?: 0,
+            )
+        }
     }
 
     private fun actionResult(member: AuthMember, audit: AdminAuditEvent): AdminMemberActionResult {
@@ -584,31 +656,90 @@ class AdminOperationsService(
         )
     }
 
-    private fun Report.toReportSummary(): AdminReportSummary {
-        val target = resolveTarget(targetType, targetId)
-        return AdminReportSummary(
-            id = id,
-            targetId = targetId,
-            targetType = targetType.name,
-            reason = reason.name,
-            content = content,
-            status = status,
-            createdAt = createdAt,
-            targetTitle = target.title,
-            targetPreview = target.preview,
-            reporter = memberReportSummary(reporterId),
-            targetOwner = target.ownerId?.let(::memberReportSummary),
-            actionReason = actionReason,
-            handledBy = handledBy?.let(::memberReportSummary),
-            handledAt = handledAt,
-            actionCount = adminAuditRepository.findByTargetResource(REPORT_RESOURCE_TYPE, id).size,
+    private fun toReportSummaries(
+        reports: List<Report>,
+        knownPosts: List<StoryPost>,
+        knownComments: List<StoryComment>,
+        knownLetters: List<Letter>,
+    ): List<AdminReportSummary> {
+        if (reports.isEmpty()) {
+            return emptyList()
+        }
+        val postsById = knownPosts.associateBy(StoryPost::id).toMutableMap()
+        val commentsById = knownComments.associateBy(StoryComment::id).toMutableMap()
+        val lettersById = knownLetters.associateBy(Letter::id).toMutableMap()
+
+        val missingPostIds = reports
+            .filter { report -> report.targetType == ReportTargetType.POST && report.targetId !in postsById }
+            .map(Report::targetId)
+        if (missingPostIds.isNotEmpty()) {
+            postsById.putAll(storyRepository.findPostsByIds(missingPostIds))
+        }
+        val missingCommentIds = reports
+            .filter { report -> report.targetType == ReportTargetType.COMMENT && report.targetId !in commentsById }
+            .map(Report::targetId)
+        if (missingCommentIds.isNotEmpty()) {
+            commentsById.putAll(storyRepository.findCommentsByIds(missingCommentIds))
+        }
+        val missingLetterIds = reports
+            .filter { report -> report.targetType == ReportTargetType.LETTER && report.targetId !in lettersById }
+            .map(Report::targetId)
+        if (missingLetterIds.isNotEmpty()) {
+            lettersById.putAll(letterRepository.findByIds(missingLetterIds))
+        }
+
+        val memberIds = buildSet {
+            reports.forEach { report ->
+                add(report.reporterId)
+                report.handledBy?.let(::add)
+                val targetOwnerId = when (report.targetType) {
+                    ReportTargetType.POST -> postsById[report.targetId]?.authorId
+                    ReportTargetType.COMMENT -> commentsById[report.targetId]?.authorId
+                    ReportTargetType.LETTER -> lettersById[report.targetId]?.senderId
+                }
+                if (targetOwnerId != null) {
+                    add(targetOwnerId)
+                }
+            }
+        }
+        val membersById = authMemberRepository.findByIds(memberIds)
+        val actionCountsByReportId = adminAuditRepository.countByTargetResources(
+            REPORT_RESOURCE_TYPE,
+            reports.map(Report::id),
         )
+
+        return reports.map { report ->
+            val target = resolveTarget(report.targetType, report.targetId, postsById, commentsById, lettersById)
+            AdminReportSummary(
+                id = report.id,
+                targetId = report.targetId,
+                targetType = report.targetType.name,
+                reason = report.reason.name,
+                content = report.content,
+                status = report.status,
+                createdAt = report.createdAt,
+                targetTitle = target.title,
+                targetPreview = target.preview,
+                reporter = memberReportSummary(report.reporterId, membersById),
+                targetOwner = target.ownerId?.let { ownerId -> memberReportSummary(ownerId, membersById) },
+                actionReason = report.actionReason,
+                handledBy = report.handledBy?.let { handlerId -> memberReportSummary(handlerId, membersById) },
+                handledAt = report.handledAt,
+                actionCount = actionCountsByReportId[report.id] ?: 0,
+            )
+        }
     }
 
-    private fun resolveTarget(targetType: ReportTargetType, targetId: Long): AdminReportTarget {
+    private fun resolveTarget(
+        targetType: ReportTargetType,
+        targetId: Long,
+        postsById: Map<Long, StoryPost>,
+        commentsById: Map<Long, StoryComment>,
+        lettersById: Map<Long, Letter>,
+    ): AdminReportTarget {
         return when (targetType) {
             ReportTargetType.POST -> {
-                val post = storyRepository.findPostById(targetId)
+                val post = postsById[targetId]
                 AdminReportTarget(
                     id = targetId,
                     type = targetType.name,
@@ -618,7 +749,7 @@ class AdminOperationsService(
                 )
             }
             ReportTargetType.COMMENT -> {
-                val comment = storyRepository.findCommentById(targetId)
+                val comment = commentsById[targetId]
                 AdminReportTarget(
                     id = targetId,
                     type = targetType.name,
@@ -628,7 +759,7 @@ class AdminOperationsService(
                 )
             }
             ReportTargetType.LETTER -> {
-                val letter = letterRepository.findById(targetId)
+                val letter = lettersById[targetId]
                 AdminReportTarget(
                     id = targetId,
                     type = targetType.name,
@@ -640,22 +771,20 @@ class AdminOperationsService(
         }
     }
 
-    private fun resolveTargetOwnerId(targetType: ReportTargetType, targetId: Long): Long? {
-        return when (targetType) {
-            ReportTargetType.POST -> storyRepository.findPostById(targetId)?.authorId
-            ReportTargetType.COMMENT -> storyRepository.findCommentById(targetId)?.authorId
-            ReportTargetType.LETTER -> letterRepository.findById(targetId)?.senderId
-        }
+    private fun memberReportSummary(
+        memberId: Long,
+        membersById: Map<Long, AuthMember>,
+    ): AdminReportMember {
+        return membersById[memberId]?.toReportMember() ?: unknownReportMember(memberId)
     }
 
-    private fun memberReportSummary(memberId: Long): AdminReportMember {
-        val member = authMemberRepository.findById(memberId)
+    private fun unknownReportMember(memberId: Long): AdminReportMember {
         return AdminReportMember(
             id = memberId,
-            email = member?.email ?: "",
-            nickname = member?.nickname ?: "탈퇴한 회원",
-            role = member?.role?.name ?: AuthMemberRole.USER.name,
-            status = member?.status?.name ?: AuthMemberStatus.WITHDRAWN.name,
+            email = "",
+            nickname = "탈퇴한 회원",
+            role = AuthMemberRole.USER.name,
+            status = AuthMemberStatus.WITHDRAWN.name,
         )
     }
 
@@ -684,14 +813,6 @@ class AdminOperationsService(
         )
     }
 
-    private fun List<ContentModerationAuditEvent>.highRiskCategoryCounts(): Map<String, Int> {
-        return filter { audit -> audit.riskLevel == ContentModerationRiskLevel.HIGH }
-            .flatMap { audit -> audit.categories }
-            .groupingBy { category -> category.name }
-            .eachCount()
-            .toSortedMap()
-    }
-
     private fun ContentModerationAuditEvent.toContentModerationAuditResult(): AdminContentModerationAuditResult {
         return AdminContentModerationAuditResult(
             id = id,
@@ -707,10 +828,6 @@ class AdminOperationsService(
             contentSummary = contentSummary,
             createdAt = createdAt,
         )
-    }
-
-    private fun String.isOnOrAfter(since: Instant): Boolean {
-        return runCatching { !Instant.parse(this).isBefore(since) }.getOrDefault(false)
     }
 
     private fun String?.toMemberStatus(allowWithdrawn: Boolean): AuthMemberStatus {
@@ -761,19 +878,12 @@ class AdminOperationsService(
         return normalized!!
     }
 
-    private fun Letter.matchesAdminLetterStatus(expectedStatus: String): Boolean {
-        return when (expectedStatus) {
-            "UNASSIGNED" -> receiverId == null && status == "SENT"
-            else -> status == expectedStatus
-        }
-    }
-
     private fun AuthMember.canReceiveLetter(): Boolean {
         return status == AuthMemberStatus.ACTIVE && randomReceiveAllowed
     }
 
     private fun String.toSensitiveSummary(maxLength: Int = LETTER_SUMMARY_MAX_LENGTH): String {
-        val normalized = trim().replace(Regex("\\s+"), " ")
+        val normalized = trim().replace(WHITESPACE_RUN_PATTERN, " ")
         return if (normalized.length <= maxLength) {
             normalized
         } else {
@@ -782,6 +892,7 @@ class AdminOperationsService(
     }
 
     private companion object {
+        private val WHITESPACE_RUN_PATTERN = Regex("""\s+""")
         private const val MAX_PAGE_SIZE = 100
         private const val ACTION_REASON_MIN_LENGTH = 4
         private const val LETTER_NOTE_MIN_LENGTH = 2

@@ -2,14 +2,15 @@ package com.maumonmobile.global.observability
 
 import org.springframework.stereotype.Component
 import java.util.concurrent.ConcurrentHashMap
-import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.atomic.AtomicInteger
+import java.util.concurrent.atomic.AtomicLong
+import java.util.concurrent.atomic.AtomicReferenceArray
 import kotlin.math.ceil
 
 @Component
 class MobileApiMetricsRegistry {
-    private val samples = ConcurrentLinkedQueue<MobileApiMetricSample>()
-    private val clientTelemetryDurations = ConcurrentLinkedQueue<MobileClientTelemetryDurationSample>()
+    private val samples = LockFreeRingBuffer<MobileApiMetricSample>(MAX_SAMPLES)
+    private val clientTelemetryDurations = LockFreeRingBuffer<MobileClientTelemetryDurationSample>(MAX_SAMPLES)
     private val duplicatePreventions = ConcurrentHashMap<String, AtomicInteger>()
     private val imageLifecycle = ConcurrentHashMap<String, AtomicInteger>()
     private val pushDelivery = ConcurrentHashMap<String, AtomicInteger>()
@@ -25,20 +26,19 @@ class MobileApiMetricsRegistry {
     private val clientTelemetryDropped = ConcurrentHashMap<String, AtomicInteger>()
 
     fun record(method: String, path: String, statusCode: Int, latencyMs: Long) {
-        samples += MobileApiMetricSample(
-            method = method.uppercase(),
-            route = sanitizeRoute(path),
-            statusCode = statusCode,
-            latencyMs = latencyMs.coerceAtLeast(0),
+        samples.add(
+            MobileApiMetricSample(
+                method = method.uppercase(),
+                route = sanitizeRoute(path),
+                statusCode = statusCode,
+                latencyMs = latencyMs.coerceAtLeast(0),
+            ),
         )
-        while (samples.size > MAX_SAMPLES) {
-            samples.poll()
-        }
     }
 
     fun snapshot(): MobileApiMetricsSnapshot {
-        val currentSamples = samples.toList()
-        val currentClientDurations = clientTelemetryDurations.toList()
+        val currentSamples = samples.snapshot()
+        val currentClientDurations = clientTelemetryDurations.snapshot()
         val endpoints = currentSamples
             .groupBy { sample -> "${sample.method} ${sample.route}" }
             .map { (name, groupedSamples) ->
@@ -132,23 +132,21 @@ class MobileApiMetricsRegistry {
     ) {
         val normalizedEventType = eventType.uppercase()
         clientTelemetryEvents.increment(normalizedEventType)
-        clientTelemetryRoutes.increment(route)
+        clientTelemetryRoutes.incrementBounded(route, MAX_CARDINALITY, OVERFLOW_BUCKET)
         clientTelemetryPlatforms.increment(platform.uppercase())
-        clientTelemetryAppVersions.increment(appVersion)
+        clientTelemetryAppVersions.incrementBounded(appVersion, MAX_CARDINALITY, OVERFLOW_BUCKET)
         clientTelemetryNetworkStatus.increment(networkStatus.uppercase())
-        clientTelemetryDurations += MobileClientTelemetryDurationSample(
-            eventType = normalizedEventType,
-            durationMs = durationMs.coerceAtLeast(0),
+        clientTelemetryDurations.add(
+            MobileClientTelemetryDurationSample(
+                eventType = normalizedEventType,
+                durationMs = durationMs.coerceAtLeast(0),
+            ),
         )
-        while (clientTelemetryDurations.size > MAX_SAMPLES) {
-            clientTelemetryDurations.poll()
-        }
     }
 
     fun recordClientTelemetryDropped(reason: String, count: Int = 1) {
-        repeat(count.coerceAtLeast(0)) {
-            clientTelemetryDropped.increment(reason)
-        }
+        if (count <= 0) return
+        clientTelemetryDropped.computeIfAbsent(reason) { AtomicInteger(0) }.addAndGet(count)
     }
 
     fun clear() {
@@ -181,16 +179,57 @@ class MobileApiMetricsRegistry {
         if (values.isEmpty()) {
             return 0
         }
-        val sorted = values.sorted()
+        val sorted = LongArray(values.size) { index -> values[index] }
+        sorted.sort()
         val index = ceil(sorted.size * percentile).toInt() - 1
         return sorted[index.coerceIn(0, sorted.lastIndex)]
     }
 
     private companion object {
         private const val MAX_SAMPLES = 5_000
+        private const val MAX_CARDINALITY = 256
+        private const val OVERFLOW_BUCKET = "other"
         private const val MAX_ROUTE_LENGTH = 160
         private val NUMERIC_SEGMENT = Regex("""/\d+""")
         private val UUID_SEGMENT = Regex("""/[0-9a-fA-F]{8}-[0-9a-fA-F-]{27,36}""")
+    }
+}
+
+private class LockFreeRingBuffer<T : Any>(
+    private val capacity: Int,
+) {
+    private val slots = AtomicReferenceArray<T>(capacity)
+    private val sequence = AtomicLong(0L)
+
+    fun add(item: T) {
+        val index = sequence.getAndIncrement()
+        val slotIndex = ((index and Long.MAX_VALUE) % capacity).toInt()
+        slots.set(slotIndex, item)
+    }
+
+    fun snapshot(): List<T> {
+        val currentSeq = sequence.get()
+        val count = minOf(currentSeq, capacity.toLong()).toInt()
+        if (count == 0) {
+            return emptyList()
+        }
+        val start = if (currentSeq >= capacity) currentSeq - capacity else 0L
+        val result = ArrayList<T>(count)
+        for (offset in 0 until count) {
+            val slotIndex = (((start + offset) and Long.MAX_VALUE) % capacity).toInt()
+            val item = slots.get(slotIndex)
+            if (item != null) {
+                result.add(item)
+            }
+        }
+        return result
+    }
+
+    fun clear() {
+        sequence.set(0L)
+        for (i in 0 until capacity) {
+            slots.set(i, null)
+        }
     }
 }
 
@@ -262,6 +301,20 @@ private data class MobileClientTelemetryDurationSample(
 
 private fun ConcurrentHashMap<String, AtomicInteger>.increment(key: String) {
     computeIfAbsent(key) { AtomicInteger(0) }.incrementAndGet()
+}
+
+private fun ConcurrentHashMap<String, AtomicInteger>.incrementBounded(
+    key: String,
+    maxCardinality: Int,
+    overflowKey: String,
+) {
+    val existing = get(key)
+    if (existing != null) {
+        existing.incrementAndGet()
+        return
+    }
+    val targetKey = if (size >= maxCardinality) overflowKey else key
+    computeIfAbsent(targetKey) { AtomicInteger(0) }.incrementAndGet()
 }
 
 private fun ConcurrentHashMap<String, AtomicInteger>.toCountMap(): Map<String, Int> {

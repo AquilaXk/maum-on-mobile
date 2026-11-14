@@ -38,6 +38,7 @@ import com.maumonmobile.domain.auth.AuthMemberStatus
 import com.maumonmobile.domain.auth.AuthOidcState
 import com.maumonmobile.domain.auth.PasswordResetToken
 import com.maumonmobile.domain.auth.SignupEmailVerification
+import com.maumonmobile.domain.common.toUtcIso6
 import com.maumonmobile.global.security.AuthenticatedUser
 import com.maumonmobile.global.security.JwtTokenProvider
 import com.maumonmobile.global.web.ApiException
@@ -53,6 +54,7 @@ import java.security.SecureRandom
 import java.time.Duration
 import java.time.Instant
 import java.util.Base64
+import java.util.HexFormat
 import java.util.Locale
 import javax.crypto.Mac
 import javax.crypto.spec.SecretKeySpec
@@ -218,6 +220,7 @@ class AuthService(
         return issueSession(findActiveMember(user.id.toLongOrNull()))
     }
 
+    @Transactional
     override fun refresh(command: RefreshCommand): AuthSessionResult {
         val member = authMemberRepository.findByRefreshToken(command.refreshToken)
             ?: throw ApiException(ErrorCode.UNAUTHORIZED, "다시 로그인해 주세요.")
@@ -279,6 +282,7 @@ class AuthService(
         return PasswordResetRequestResult(accepted = true)
     }
 
+    @Transactional
     override fun confirmPasswordReset(command: PasswordResetConfirmCommand): PasswordResetConfirmResult {
         val token = command.token.trim()
         if (token.isEmpty()) {
@@ -308,15 +312,15 @@ class AuthService(
                 throw invalidPasswordResetToken()
             }
 
+        if (!passwordResetTokenRepository.markConsumed(savedToken.id, now)) {
+            throw invalidPasswordResetToken()
+        }
         authMemberRepository.save(
             member.copy(
                 passwordHash = passwordEncoder.encode(command.newPassword)
                     ?: throw ApiException(ErrorCode.INTERNAL_SERVER_ERROR),
             ),
         )
-        if (!passwordResetTokenRepository.markConsumed(savedToken.id, now)) {
-            throw invalidPasswordResetToken()
-        }
         val revokedRefreshTokens = authMemberRepository.revokeRefreshTokens(member.id)
         log.info("Password reset completed for member {}; revoked refresh tokens={}", member.id, revokedRefreshTokens)
 
@@ -342,9 +346,9 @@ class AuthService(
                 nonce = randomToken(),
                 codeVerifier = codeVerifier,
                 redirectUri = redirectUri,
-                expiresAt = now.plus(oidcStateTtl).toString(),
+                expiresAt = now.plus(oidcStateTtl).toUtcIso6(),
                 consumedAt = null,
-                createdAt = now.toString(),
+                createdAt = now.toUtcIso6(),
             ),
         )
 
@@ -412,7 +416,7 @@ class AuthService(
             return OidcCallbackResult(stateMismatchRedirect(defaultAppRedirectUri))
         }
 
-        if (!authOidcStateRepository.markConsumed(savedState.id, Instant.now().toString())) {
+        if (!authOidcStateRepository.markConsumed(savedState.id, Instant.now().toUtcIso6())) {
             return OidcCallbackResult(stateMismatchRedirect(defaultAppRedirectUri))
         }
 
@@ -479,14 +483,14 @@ class AuthService(
 
     private fun findOrCreateSocialMember(provider: String, identity: AuthOidcIdentity): AuthMember {
         val subject = identity.subject.lowercase(Locale.ROOT)
-            .replace(Regex("[^a-z0-9._-]"), "-")
+            .replace(OIDC_SUBJECT_SANITIZE_PATTERN, "-")
             .trim('-')
             .take(80)
             .ifBlank { "user" }
         val email = identity.email
             ?.trim()
             ?.lowercase(Locale.ROOT)
-            ?.takeIf { candidate -> candidate.matches(Regex("[^@\\s]+@[^@\\s]+\\.[^@\\s]+")) }
+            ?.takeIf { candidate -> candidate.matches(OIDC_EMAIL_PATTERN) }
             ?: "$provider-$subject@social.maumon.local"
         authMemberRepository.findByEmail(email)?.let { member -> return member }
 
@@ -532,7 +536,7 @@ class AuthService(
             throw ApiException(ErrorCode.UNAUTHORIZED, "외부 로그인 요청을 확인하지 못했습니다.")
         }
 
-        if (!authOidcStateRepository.markConsumed(savedState.id, Instant.now().toString())) {
+        if (!authOidcStateRepository.markConsumed(savedState.id, Instant.now().toUtcIso6())) {
             throw ApiException(ErrorCode.UNAUTHORIZED, "외부 로그인 요청을 확인하지 못했습니다.")
         }
 
@@ -710,9 +714,9 @@ class AuthService(
     }
 
     private fun sha256(value: String): String {
-        return MessageDigest.getInstance("SHA-256")
+        val digest = MessageDigest.getInstance("SHA-256")
             .digest(value.toByteArray(Charsets.UTF_8))
-            .joinToString("") { byte -> "%02x".format(byte) }
+        return HexFormat.of().formatHex(digest)
     }
 
     private fun normalizedSignupEmail(email: String): String {
@@ -748,16 +752,22 @@ class AuthService(
         }
     }
 
-    private fun signupVerificationCodeHash(email: String, code: String): String {
+    private val signupVerificationSecretKey: SecretKeySpec by lazy {
         val normalizedSecret = signupEmailVerificationHashSecret.trim()
         check(normalizedSecret.isNotEmpty()) {
             "app.auth.signup-email.hash-secret is required."
         }
+        SecretKeySpec(normalizedSecret.toByteArray(Charsets.UTF_8), "HmacSHA256")
+    }
 
-        val mac = Mac.getInstance("HmacSHA256")
-        mac.init(SecretKeySpec(normalizedSecret.toByteArray(Charsets.UTF_8), "HmacSHA256"))
-        return mac.doFinal("${email.trim().lowercase(Locale.ROOT)}:${code.trim()}".utf8Bytes())
-            .joinToString("") { byte -> "%02x".format(byte) }
+    private val signupVerificationMacThreadLocal = ThreadLocal.withInitial {
+        Mac.getInstance("HmacSHA256").apply { init(signupVerificationSecretKey) }
+    }
+
+    private fun signupVerificationCodeHash(email: String, code: String): String {
+        val digest = signupVerificationMacThreadLocal.get()
+            .doFinal("${email.trim().lowercase(Locale.ROOT)}:${code.trim()}".utf8Bytes())
+        return HexFormat.of().formatHex(digest)
     }
 
     private fun randomVerificationCode(): String {
@@ -801,6 +811,8 @@ class AuthService(
 
     private companion object {
         private val PROVIDER_ID_PATTERN = Regex("[a-z0-9_-]{2,40}")
+        private val OIDC_SUBJECT_SANITIZE_PATTERN = Regex("[^a-z0-9._-]")
+        private val OIDC_EMAIL_PATTERN = Regex("[^@\\s]+@[^@\\s]+\\.[^@\\s]+")
         private const val NAVER_PROVIDER = "naver"
         private const val KAKAO_PROVIDER = "kakao"
         private const val FACEBOOK_PROVIDER = "facebook"
