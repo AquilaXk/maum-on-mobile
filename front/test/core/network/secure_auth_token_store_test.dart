@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:maum_on_mobile_front/core/network/auth_token_store.dart';
@@ -38,15 +40,53 @@ void main() {
       expect(storage.deleteCount, 2);
       expect(storage.readCount, 2);
     });
+
+    test('prevents slow in-flight read from overwriting newer save or clear',
+        () async {
+      final readGate = Completer<void>();
+      final storage = _CountingSecureStorage(
+        initialValues: {
+          'auth.accessToken': 'stale-access',
+          'auth.refreshToken': 'stale-refresh',
+        },
+        readGate: readGate,
+      );
+      final store = SecureAuthTokenStore(storage: storage);
+
+      final pendingRead = store.readAccessToken();
+      await store.saveTokens(
+        const TokenPair(
+          accessToken: 'fresh-access',
+          refreshToken: 'fresh-refresh',
+        ),
+      );
+      readGate.complete();
+
+      expect(await pendingRead, 'fresh-access');
+      expect(await store.readAccessToken(), 'fresh-access');
+      expect(await store.readRefreshToken(), 'fresh-refresh');
+
+      final secondReadGate = Completer<void>();
+      storage.readGate = secondReadGate;
+      final freshStore = SecureAuthTokenStore(storage: storage);
+      final staleBeforeClear = freshStore.readAccessToken();
+      await freshStore.clear();
+      secondReadGate.complete();
+
+      expect(await staleBeforeClear, isNull);
+      expect(await freshStore.readAccessToken(), isNull);
+    });
   });
 }
 
 class _CountingSecureStorage extends Fake implements FlutterSecureStorage {
   _CountingSecureStorage({
     Map<String, String> initialValues = const {},
+    this.readGate,
   }) : values = Map<String, String>.of(initialValues);
 
   final Map<String, String> values;
+  Completer<void>? readGate;
   int readCount = 0;
   int writeCount = 0;
   int deleteCount = 0;
@@ -62,7 +102,12 @@ class _CountingSecureStorage extends Fake implements FlutterSecureStorage {
     WindowsOptions? wOptions,
   }) async {
     readCount += 1;
-    return values[key];
+    final snapshot = values[key];
+    final gate = readGate;
+    if (gate != null && !gate.isCompleted) {
+      await gate.future;
+    }
+    return snapshot;
   }
 
   @override

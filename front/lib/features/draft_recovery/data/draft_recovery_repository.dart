@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
@@ -45,16 +46,44 @@ class StorageDraftRecoveryRepository implements DraftRecoveryRepository {
   final DraftRecoveryStorage _storage;
 
   static const String _memberIndexPrefix = 'maum_on.draft.v1.index.';
+  static final Expando<Map<int, Future<void>>> _memberQueuesByStorage =
+      Expando<Map<int, Future<void>>>();
 
   String _memberIndexKey(int memberId) => '$_memberIndexPrefix$memberId';
 
+  Future<T> _serializeMember<T>(
+    int memberId,
+    Future<T> Function() action,
+  ) {
+    final queues = _memberQueuesByStorage[_storage] ??= <int, Future<void>>{};
+    final previous = queues[memberId] ?? Future<void>.value();
+    final completer = Completer<T>();
+    final next = previous.whenComplete(() async {
+      try {
+        completer.complete(await action());
+      } catch (error, stackTrace) {
+        completer.completeError(error, stackTrace);
+      }
+    });
+    late final Future<void> guardedTail;
+    guardedTail = next.catchError((Object _, StackTrace __) {}).whenComplete(() {
+      if (identical(queues[memberId], guardedTail)) {
+        queues.remove(memberId);
+      }
+    });
+    queues[memberId] = guardedTail;
+    return completer.future;
+  }
+
   @override
-  Future<DraftEntry?> read(DraftKey key) async {
-    final raw = await _storage.read(key.storageKey);
-    if (raw == null || raw.isEmpty) {
-      return null;
-    }
-    return _decode(raw);
+  Future<DraftEntry?> read(DraftKey key) {
+    return _serializeMember(key.memberId, () async {
+      final raw = await _storage.read(key.storageKey);
+      if (raw == null || raw.isEmpty) {
+        return null;
+      }
+      return _decode(raw);
+    });
   }
 
   @override
@@ -96,44 +125,52 @@ class StorageDraftRecoveryRepository implements DraftRecoveryRepository {
   Future<List<DraftEntry>> listFailed({
     required int memberId,
     DraftSurface? surface,
-  }) async {
-    final entries = await _readMemberEntries(memberId);
-    return entries
-        .where((entry) => surface == null || entry.key.surface == surface)
-        .where((entry) => entry.status == DraftRecoveryStatus.failed)
-        .toList(growable: false)
-      ..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
+  }) {
+    return _serializeMember(memberId, () async {
+      final entries = await _readMemberEntries(memberId);
+      return entries
+          .where((entry) => surface == null || entry.key.surface == surface)
+          .where((entry) => entry.status == DraftRecoveryStatus.failed)
+          .toList(growable: false)
+        ..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
+    });
   }
 
   @override
-  Future<void> delete(DraftKey key) async {
-    await _storage.delete(key.storageKey);
-    await _removeKeyFromIndex(key.memberId, key.storageKey);
+  Future<void> delete(DraftKey key) {
+    return _serializeMember(key.memberId, () async {
+      await _storage.delete(key.storageKey);
+      await _removeKeyFromIndex(key.memberId, key.storageKey);
+    });
   }
 
   @override
-  Future<void> clearMember(int memberId) async {
-    final indexedKeys = await _readMemberIndex(memberId);
-    if (indexedKeys != null) {
-      for (final storageKey in indexedKeys) {
-        await _storage.delete(storageKey);
+  Future<void> clearMember(int memberId) {
+    return _serializeMember(memberId, () async {
+      final indexedKeys = await _readMemberIndex(memberId);
+      if (indexedKeys != null) {
+        for (final storageKey in indexedKeys) {
+          await _storage.delete(storageKey);
+        }
+        await _storage.delete(_memberIndexKey(memberId));
+        return;
+      }
+
+      final entries = await _readAllEntries();
+      for (final entry in entries) {
+        if (entry.key.memberId == memberId) {
+          await _storage.delete(entry.key.storageKey);
+        }
       }
       await _storage.delete(_memberIndexKey(memberId));
-      return;
-    }
-
-    final entries = await _readAllEntries();
-    for (final entry in entries) {
-      if (entry.key.memberId == memberId) {
-        await _storage.delete(entry.key.storageKey);
-      }
-    }
-    await _storage.delete(_memberIndexKey(memberId));
+    });
   }
 
-  Future<void> _write(DraftEntry entry) async {
-    await _storage.write(entry.key.storageKey, jsonEncode(entry.toJson()));
-    await _addKeyToIndex(entry.key.memberId, entry.key.storageKey);
+  Future<void> _write(DraftEntry entry) {
+    return _serializeMember(entry.key.memberId, () async {
+      await _storage.write(entry.key.storageKey, jsonEncode(entry.toJson()));
+      await _addKeyToIndex(entry.key.memberId, entry.key.storageKey);
+    });
   }
 
   Future<List<DraftEntry>> _readMemberEntries(int memberId) async {
@@ -200,12 +237,24 @@ class StorageDraftRecoveryRepository implements DraftRecoveryRepository {
   }
 
   Future<void> _addKeyToIndex(int memberId, String storageKey) async {
-    final existing = await _readMemberIndex(memberId) ?? <String>[];
-    if (existing.contains(storageKey)) {
+    final existing = await _readMemberIndex(memberId);
+    if (existing != null) {
+      if (existing.contains(storageKey)) {
+        return;
+      }
+      existing.add(storageKey);
+      await _writeMemberIndex(memberId, existing);
       return;
     }
-    existing.add(storageKey);
-    await _writeMemberIndex(memberId, existing);
+
+    final keys = <String>{};
+    for (final entry in await _readAllEntries()) {
+      if (entry.key.memberId == memberId) {
+        keys.add(entry.key.storageKey);
+      }
+    }
+    keys.add(storageKey);
+    await _writeMemberIndex(memberId, keys.toList(growable: false));
   }
 
   Future<void> _removeKeyFromIndex(int memberId, String storageKey) async {
