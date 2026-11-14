@@ -298,3 +298,22 @@ bash tools/ci/run-mobile-release-preflight.sh --platform all
    - 백엔드 코드는 순수 Kotlin으로만 작성하며, `SourceLayoutPolicyTest`를 통해 엄격하게 강제됩니다.
 4. **접근성 및 터치 타깃 규약**:
    - 모든 인터랙티브 UI 컴포넌트는 최소 48dp 터치 타깃을 확보해야 하며, 텍스트 확대(1.5x) 시 레이아웃 깨짐이 없어야 합니다.
+
+---
+
+## 📜 오픈소스 참조 및 라이선스 고지 (Third-Party Notices)
+
+본 저장소 일부 모듈은 아래 허용 라이선스(Apache-2.0, MIT, BSD-3-Clause) 오픈소스 알고리즘과 UI 패턴을 참조해 독립적으로 이식·최적화했다.
+
+| 참조 프로젝트 | 라이선스 | 적용 모듈 및 역할 |
+| :--- | :--- | :--- |
+| [robert-bor/aho-corasick](https://github.com/robert-bor/aho-corasick) | Apache-2.0 | `back/.../domain/moderation/ModerationTextEngine.kt` (다중 금칙어 오토마톤 설계 참조) |
+| [hankcs/AhoCorasickDoubleArrayTrie](https://github.com/hankcs/AhoCorasickDoubleArrayTrie) | Apache-2.0 | `back/.../domain/moderation/ModerationTextEngine.kt` (평면 `IntArray` 기반 전이 테이블 최적화) |
+| [krisk/Fuse](https://github.com/krisk/Fuse) (Myers 1999) | Apache-2.0 | `back/.../domain/moderation/ModerationTextEngine.kt`, `front/lib/shared/algorithm/bitap_hangul_search.dart` (64-bit Myers / 31-bit Bitap 비트-병렬 유사 검색) |
+| [toss/es-hangul](https://github.com/toss/es-hangul) | MIT | `back/.../domain/moderation/ModerationTextEngine.kt`, `front/lib/shared/algorithm/bitap_hangul_search.dart` (산술 한글 음절/초성 분해) |
+| [usememos/memos](https://github.com/usememos/memos) | MIT | `front/lib/features/diary/presentation/diary_screen.dart` (감정 히트맵 상단 요약 + 빠른 필터 타임라인 레이아웃 참조) |
+| [devappmin/flutter_heatmap_calendar](https://github.com/devappmin/flutter_heatmap_calendar) | MIT | `front/lib/features/diary/domain/mood_year_bitmap.dart`, `front/lib/features/diary/presentation/mood_heatmap_strip.dart` (연간/주간 히트맵 셀 배치 패턴) |
+| [hashirshoaeb/star_book](https://github.com/hashirshoaeb/star_book) | MIT | `front/lib/features/diary/domain/mood_year_bitmap.dart` (5단계 기분 점수 색상 매핑 참조) |
+| [contribution_heatmap](https://pub.dev/packages/contribution_heatmap) | BSD-3-Clause | `front/lib/features/diary/presentation/mood_heatmap_strip.dart` (단일 `CustomPainter` 캔버스 히트맵 렌더링) |
+| [flyerhq/flutter_chat_ui](https://github.com/flyerhq/flutter_chat_ui) & [flutter/ai](https://github.com/flutter/ai) | Apache-2.0 / BSD-3-Clause | `front/lib/features/consultation/presentation/consultation_screen.dart`, `consultation_controller.dart` (`ValueListenableBuilder` 스트리밍 말풍선 분리 패턴) |
+| [nank1ro/flutter-shadcn-ui](https://github.com/nank1ro/flutter-shadcn-ui) | MIT | `front/lib/shared/ui/app_design_system.dart`, `front/lib/app/maum_bottom_navigation.dart` (다크 모드 대비 토큰 및 카드/내비게이션 계층 참조) |
