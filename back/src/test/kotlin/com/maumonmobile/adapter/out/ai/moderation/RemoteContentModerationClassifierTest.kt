@@ -80,6 +80,65 @@ class RemoteContentModerationClassifierTest {
         assertThat(client.calls).isEqualTo(1)
     }
 
+    @Test
+    fun `moderation passes payloads up to 20000 chars without silent truncation`() {
+        val tailToken = "END_MARKER_SAFE"
+        val longText = "가".repeat(3_500) + tailToken
+        val client = RecordingVertexAiGenerateContentClient(
+            responseBody = vertexResponse("""{"allowed":true,"riskLevel":"LOW","categories":[],"message":"통과"}"""),
+        )
+        val properties = aiProperties()
+        assertThat(properties.moderation.maxInputChars).isEqualTo(20_000)
+
+        val classifier = RemoteContentModerationClassifier(
+            properties = properties,
+            objectMapper = ObjectMapper(),
+            accessTokenProvider = { "vertex-token" },
+            generateContentClient = client,
+        )
+
+        val result = classifier.classify(
+            ContentModerationClassificationRequest(
+                target = ContentModerationTarget.DIARY,
+                text = longText,
+                timeout = Duration.ofSeconds(1),
+            ),
+        )
+
+        assertThat(result.allowed).isTrue()
+        assertThat(client.calls).isEqualTo(1)
+        assertThat(client.requestBody).contains(tailToken)
+    }
+
+    @Test
+    fun `moderation fails closed without truncating or calling remote when input exceeds maxInputChars`() {
+        val client = RecordingVertexAiGenerateContentClient(
+            responseBody = vertexResponse("""{"allowed":true,"riskLevel":"LOW","categories":[],"message":"통과"}"""),
+        )
+        val properties = aiProperties().apply {
+            moderation.maxInputChars = 200
+        }
+        val classifier = RemoteContentModerationClassifier(
+            properties = properties,
+            objectMapper = ObjectMapper(),
+            accessTokenProvider = { "vertex-token" },
+            generateContentClient = client,
+        )
+
+        val result = classifier.classify(
+            ContentModerationClassificationRequest(
+                target = ContentModerationTarget.STORY,
+                text = "가".repeat(201),
+                timeout = Duration.ofSeconds(1),
+            ),
+        )
+
+        assertThat(result.allowed).isFalse()
+        assertThat(result.riskLevel).isEqualTo(ContentModerationRiskLevel.HIGH)
+        assertThat(result.categories).containsExactly(ContentModerationCategory.INAPPROPRIATE)
+        assertThat(client.calls).isEqualTo(0)
+    }
+
     private fun aiProperties(): RemoteAiModelProperties {
         return RemoteAiModelProperties().apply {
             vertex.projectId = "maum-on-mobile-dev"

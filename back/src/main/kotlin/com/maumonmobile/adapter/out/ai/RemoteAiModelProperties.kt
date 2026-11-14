@@ -8,7 +8,9 @@ import java.time.Duration
 class RemoteAiModelProperties {
     var vertex: VertexAiProperties = VertexAiProperties()
     var consultation: RemoteAiEndpointProperties = RemoteAiEndpointProperties()
-    var moderation: RemoteAiEndpointProperties = RemoteAiEndpointProperties()
+    var moderation: RemoteAiEndpointProperties = RemoteAiEndpointProperties().apply {
+        maxInputChars = 20_000
+    }
     var circuitBreaker: RemoteAiCircuitBreakerProperties = RemoteAiCircuitBreakerProperties()
 }
 
