@@ -497,7 +497,7 @@ class AuthService(
         val fallbackEmail = "$provider-$subject@social.maumon.local"
         val existingByEmail = if (rawEmail != null) authMemberRepository.findByEmail(rawEmail) else null
         if (existingByEmail != null) {
-            if (!existingByEmail.socialAccount && !identity.emailVerified) {
+            if (!identity.emailVerified) {
                 throw ApiException(ErrorCode.UNAUTHORIZED, "이메일 인증이 완료된 소셜 계정으로만 기존 계정에 연결할 수 있습니다.")
             }
             return existingByEmail

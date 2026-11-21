@@ -9,6 +9,7 @@ import com.maumonmobile.global.observability.MobileApiMetricsRegistry
 import com.maumonmobile.global.security.AuthenticatedUser
 import com.maumonmobile.global.web.ApiException
 import com.maumonmobile.global.web.ErrorCode
+import org.springframework.dao.DuplicateKeyException
 import org.springframework.stereotype.Service
 import org.springframework.transaction.PlatformTransactionManager
 import org.springframework.transaction.TransactionDefinition
@@ -45,20 +46,24 @@ class WriteIdempotencyService(
 
         val memberId = user.memberId()
         val now = Instant.now().toUtcIso6()
-        val created = requiresNewTransaction.execute {
-            writeIdempotencyRepository.createPending(
-                WriteIdempotencyRecord(
-                    id = 0,
-                    memberId = memberId,
-                    operation = operation,
-                    idempotencyKey = normalizedKey,
-                    status = WriteIdempotencyStatus.IN_PROGRESS,
-                    resourceId = null,
-                    createdAt = now,
-                    updatedAt = now,
-                ),
-            )
-        } == true
+        val created = try {
+            requiresNewTransaction.execute {
+                writeIdempotencyRepository.createPending(
+                    WriteIdempotencyRecord(
+                        id = 0,
+                        memberId = memberId,
+                        operation = operation,
+                        idempotencyKey = normalizedKey,
+                        status = WriteIdempotencyStatus.IN_PROGRESS,
+                        resourceId = null,
+                        createdAt = now,
+                        updatedAt = now,
+                    ),
+                )
+            } == true
+        } catch (_: DuplicateKeyException) {
+            false
+        }
 
         if (!created) {
             return resolveExisting(memberId, operation, normalizedKey)

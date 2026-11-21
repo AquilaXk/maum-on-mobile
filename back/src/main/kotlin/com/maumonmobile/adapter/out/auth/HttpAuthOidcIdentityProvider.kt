@@ -65,12 +65,7 @@ class HttpAuthOidcIdentityProvider(
         validateClaims(command, jwt)
 
         val email = jwt.claimAsString("email")
-        val emailVerified = when (val rawVerified = jwt.claims["email_verified"]) {
-            is Boolean -> rawVerified
-            is String -> rawVerified.equals("true", ignoreCase = true)
-            null -> true
-            else -> false
-        }
+        val emailVerified = parseEmailVerifiedClaim(jwt)
 
         return AuthOidcIdentity(
             issuer = jwt.requiredIssuer(),
@@ -79,6 +74,15 @@ class HttpAuthOidcIdentityProvider(
             nickname = jwt.claimAsString("nickname") ?: jwt.claimAsString("name"),
             emailVerified = emailVerified,
         )
+    }
+
+    internal fun parseEmailVerifiedClaim(jwt: Jwt): Boolean {
+        return when (val rawVerified = jwt.claims["email_verified"]) {
+            is Boolean -> rawVerified
+            is String -> rawVerified.equals("true", ignoreCase = true)
+            null -> false
+            else -> false
+        }
     }
 
     override fun isReady(provider: String): Boolean {

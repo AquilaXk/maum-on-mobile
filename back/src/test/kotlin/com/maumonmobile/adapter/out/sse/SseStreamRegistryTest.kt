@@ -84,7 +84,6 @@ class SseStreamRegistryTest {
         right.open(SseStreamType.NOTIFICATION, memberId = 9L, connectData = "connected")
         sessions.closeMemberSessions(memberId = 9L, closedAt = clock.instant().toString())
 
-        right.sendHeartbeats()
         left.publish(SseStreamType.NOTIFICATION, memberId = 9L, eventName = "new_letter", data = "새 편지")
         right.drainBusEvents()
 

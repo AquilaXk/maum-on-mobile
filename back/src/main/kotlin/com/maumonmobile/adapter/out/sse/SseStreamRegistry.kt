@@ -94,7 +94,7 @@ class SseStreamRegistry(
         emitter.onError {
             closeLocalSession(session.id, completeEmitter = false)
         }
-        sendOrRemove(connection, CONNECT_EVENT, connectDataFactory(session))
+        sendOrRemove(connection, CONNECT_EVENT, connectDataFactory(session), checkActiveSession = false)
         return emitter
     }
 
@@ -164,7 +164,12 @@ class SseStreamRegistry(
             if (activeSession == null) {
                 closeLocalSession(connection.session.id, completeEmitter = true)
             } else {
-                sendOrRemove(connection, HEARTBEAT_EVENT, """{"intervalSeconds":${properties.heartbeatInterval.seconds}}""")
+                sendOrRemove(
+                    connection = connection,
+                    eventName = HEARTBEAT_EVENT,
+                    data = """{"intervalSeconds":${properties.heartbeatInterval.seconds}}""",
+                    checkActiveSession = false,
+                )
             }
         }
     }
@@ -223,7 +228,16 @@ class SseStreamRegistry(
         eventName: String,
         data: String,
         eventId: Long? = null,
+        checkActiveSession: Boolean = true,
     ) {
+        if (checkActiveSession) {
+            val activeSession = sessionRepository.findActiveSession(connection.session.id, now().toString())
+            if (activeSession == null) {
+                closeLocalSession(connection.session.id, completeEmitter = true)
+                return
+            }
+        }
+
         try {
             val builder = SseEmitter.event()
                 .name(eventName)

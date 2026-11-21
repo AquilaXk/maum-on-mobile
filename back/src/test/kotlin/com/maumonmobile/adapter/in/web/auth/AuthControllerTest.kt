@@ -581,6 +581,45 @@ class AuthControllerTest @Autowired constructor(
             }
     }
 
+    @DisplayName("이메일 인증이 없는 OIDC 토큰은 기존 소셜 계정의 이메일을 탈취 연결할 수 없다")
+    @Test
+    fun oidcRejectsUnverifiedEmailClaimingExistingSocialAccount() {
+        val kakaoAuthorize = mockMvc.get("/api/v1/auth/oidc/authorize/kakao") {
+            param("redirect_uri", "maumon://auth/callback?provider=kakao")
+        }
+            .andReturn()
+            .response
+            .getHeader("Location")!!
+        val kakaoState = URI(kakaoAuthorize).queryParameters().getValue("state")
+
+        mockMvc.post("/api/v1/auth/oidc/session/kakao") {
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"code":"existing-social-victim","state":"$kakaoState"}"""
+        }
+            .andExpect {
+                status { isOk() }
+                jsonPath("$.data.member.email") { value("kakao-verified-existing-social-victim@social.maumon.local") }
+            }
+
+        val googleAuthorize = mockMvc.get("/api/v1/auth/oidc/authorize/google") {
+            param("redirect_uri", "maumon://auth/callback?provider=google")
+        }
+            .andReturn()
+            .response
+            .getHeader("Location")!!
+        val googleState = URI(googleAuthorize).queryParameters().getValue("state")
+
+        mockMvc.post("/api/v1/auth/oidc/session/google") {
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"code":"unverified-existing-social","state":"$googleState"}"""
+        }
+            .andExpect {
+                status { isUnauthorized() }
+                jsonPath("$.success") { value(false) }
+                jsonPath("$.error.code") { value("UNAUTHORIZED") }
+            }
+    }
+
     @DisplayName("OIDC 서버 callback은 모바일 세션 토큰을 deeplink로 노출하지 않는다")
     @Test
     fun oidcServerCallbackDoesNotExposeMobileSessionTokensInDeeplink() {
@@ -654,11 +693,21 @@ class AuthControllerTest @Autowired constructor(
                 if (command.provider == "google") {
                     assertThat(command.clientSecret).isEqualTo("maum-on-google-secret")
                 }
+                if (command.code == "unverified-existing-social") {
+                    return AuthOidcIdentity(
+                        issuer = "https://login.maumon.local/${command.provider}",
+                        subject = "attacker-sub",
+                        email = "kakao-verified-existing-social-victim@social.maumon.local",
+                        nickname = "공격자",
+                        emailVerified = false,
+                    )
+                }
                 return AuthOidcIdentity(
                     issuer = "https://login.maumon.local/${command.provider}",
                     subject = "verified-${command.code}",
                     email = "${command.provider}-verified-${command.code}@social.maumon.local",
                     nickname = "${command.provider.uppercase()} 사용자",
+                    emailVerified = true,
                 )
             }
         }
