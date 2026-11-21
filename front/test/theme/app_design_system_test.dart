@@ -5,6 +5,7 @@ import 'package:flutter/semantics.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:maum_on_mobile_front/shared/ui/app_design_system.dart';
 import 'package:maum_on_mobile_front/theme/app_theme.dart';
+import 'package:shadcn_ui/shadcn_ui.dart';
 
 double _contrastRatio(Color foreground, Color background) {
   double linear(double channel) {
@@ -109,9 +110,31 @@ void main() {
     );
 
     expect(find.byType(SingleChildScrollView), findsOneWidget);
+    expect(find.byType(ShadCard), findsNWidgets(2));
+    expect(find.byType(ShadBadge), findsOneWidget);
     expect(find.text('마음 기록'), findsOneWidget);
     expect(find.text('AI 상담 연결됨'), findsOneWidget);
     expect(tester.takeException(), isNull);
+  });
+
+  test('buildMaumShadThemeData maps Light Sky-Blue and Dark Slate-Periwinkle tokens',
+      () {
+    final lightShad = buildMaumShadThemeData(Brightness.light);
+    final darkShad = buildMaumShadThemeData(Brightness.dark);
+
+    expect(lightShad.brightness, Brightness.light);
+    expect(lightShad.radius, BorderRadius.circular(16));
+    expect(lightShad.colorScheme.background, const Color(0xFFEDF5FF));
+    expect(lightShad.colorScheme.card, const Color(0xFFFFFFFF));
+    expect(lightShad.colorScheme.primary, const Color(0xFF2563EB));
+    expect(lightShad.colorScheme.border, const Color(0xFFDBE7FB));
+
+    expect(darkShad.brightness, Brightness.dark);
+    expect(darkShad.radius, BorderRadius.circular(16));
+    expect(darkShad.colorScheme.background, const Color(0xFF18191D));
+    expect(darkShad.colorScheme.card, const Color(0xFF212529));
+    expect(darkShad.colorScheme.primary, const Color(0xFF8E9CE6));
+    expect(darkShad.colorScheme.border, const Color(0xFF343A40));
   });
 
   testWidgets('uses clamping refresh physics to avoid stretch overscroll',

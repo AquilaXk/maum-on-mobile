@@ -9,9 +9,10 @@ import 'package:maum_on_mobile_front/features/home/home_screen.dart';
 import 'package:maum_on_mobile_front/shared/ui/app_design_system.dart';
 import 'package:maum_on_mobile_front/shared/ui/brand_identity.dart';
 import 'package:maum_on_mobile_front/theme/app_theme.dart';
+import 'package:shadcn_ui/shadcn_ui.dart';
 
 void main() {
-  testWidgets('홈은 스크롤 안에서 지표와 스토리 목록을 평면 UI로 렌더링한다', (tester) async {
+  testWidgets('홈은 스크롤 안에서 체크인 히어로, Bento 카드, 스토리 목록을 렌더링한다', (tester) async {
     final controller = HomeController(
       homeRepository: const _FakeHomeRepository(),
     );
@@ -35,6 +36,22 @@ void main() {
     expect(find.byType(SingleChildScrollView), findsOneWidget);
     expect(find.text('홈'), findsNothing);
     expect(find.text('마음이님, 오늘의 마음을 이어가세요.'), findsNothing);
+    expect(find.text('마음이님, 오늘 마음은 어떤가요?'), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('home-checkin-hero-card')),
+      findsOneWidget,
+    );
+    for (var score = 1; score <= 5; score += 1) {
+      expect(
+        find.byKey(ValueKey('home-mood-checkin-$score')),
+        findsOneWidget,
+      );
+    }
+    expect(
+      find.byKey(const ValueKey('home-hero-consultation-cta')),
+      findsOneWidget,
+    );
+    expect(find.text('지금 마음을 천천히 살펴보세요.'), findsOneWidget);
     expect(find.text('오늘 올라온 고민'), findsOneWidget);
     expect(find.text('전달된 비밀 편지'), findsOneWidget);
     expect(find.text('오늘의 기록'), findsOneWidget);
@@ -46,7 +63,6 @@ void main() {
     expect(find.text('읽지 않은 알림 없음 · 알림 센터'), findsNothing);
     expect(find.byKey(const ValueKey('home-primary-panel')), findsNothing);
     expect(find.byKey(const ValueKey('home-blue-hero')), findsNothing);
-    expect(find.text('지금 마음을 천천히 살펴보세요.'), findsNothing);
     expect(find.byKey(const ValueKey('home-primary-actions-panel')),
         findsOneWidget);
     expect(find.text('이어쓸 내용이 없습니다.'), findsNothing);
@@ -58,9 +74,17 @@ void main() {
     expect(find.text('최근 인기'), findsOneWidget);
     expect(find.text('오늘 너무 지쳐요'), findsWidgets);
     expect(find.byKey(const ValueKey('home-feed-story-1')), findsOneWidget);
-    expect(find.byType(Card), findsNothing);
+    expect(
+      find.byKey(const ValueKey('home-category-summary-worry')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey('home-category-summary-question')),
+      findsOneWidget,
+    );
+    expect(find.byType(ShadCard), findsWidgets);
+    expect(find.byType(ShadBadge), findsWidgets);
     expect(find.byType(ChoiceChip), findsNothing);
-    expect(find.byType(AppStatusPill), findsNothing);
     expect(find.text('ANDROID'), findsNothing);
     expect(find.text('IOS'), findsNothing);
 
@@ -108,7 +132,7 @@ void main() {
     expect(worryTop, moreOrLessEquals(diaryTop, epsilon: 1));
   });
 
-  testWidgets('넓은 홈 요약 지표도 카드 없이 평면 텍스트로 표시한다', (tester) async {
+  testWidgets('넓은 홈 요약 지표도 3열 ShadCard 펄스 타일로 정렬해 표시한다', (tester) async {
     tester.view.physicalSize = const Size(720, 844);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
@@ -135,14 +159,24 @@ void main() {
       ),
     );
 
-    expect(find.byType(AppMetricTile), findsNothing);
-    expect(find.byType(Card), findsNothing);
+    expect(
+      find.descendant(
+        of: find.byKey(const ValueKey('home-stats-section')),
+        matching: find.byType(ShadCard),
+      ),
+      findsNWidgets(3),
+    );
     expect(find.text('오늘의 기록'), findsOneWidget);
     expect(find.text('전달된 비밀 편지'), findsOneWidget);
     expect(find.text('오늘 올라온 고민'), findsOneWidget);
+    final diaryTop = tester.getTopLeft(find.text('오늘의 기록')).dy;
+    final letterTop = tester.getTopLeft(find.text('전달된 비밀 편지')).dy;
+    final worryTop = tester.getTopLeft(find.text('오늘 올라온 고민')).dy;
+    expect(letterTop, moreOrLessEquals(diaryTop, epsilon: 1));
+    expect(worryTop, moreOrLessEquals(diaryTop, epsilon: 1));
   });
 
-  testWidgets('홈 바로가기 액션은 사각 카드가 아닌 원형 아이콘 버튼으로 표시한다', (tester) async {
+  testWidgets('홈 바로가기 액션은 2x2 Bento ShadCard 타일로 표시한다', (tester) async {
     tester.view.physicalSize = const Size(390, 844);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
@@ -171,7 +205,6 @@ void main() {
 
     expect(find.byKey(const ValueKey('home-primary-panel')), findsNothing);
     expect(find.byKey(const ValueKey('home-blue-hero')), findsNothing);
-    expect(find.text('지금 마음을 천천히 살펴보세요.'), findsNothing);
     expect(find.text('마음이님, 오늘의 마음을 이어가세요.'), findsNothing);
     expect(
       find.byKey(const ValueKey('home-primary-actions-panel')),
@@ -179,23 +212,38 @@ void main() {
     );
     expect(find.byKey(const ValueKey('home-primary-actions')), findsOneWidget);
     expect(
+      find.descendant(
+        of: find.byKey(const ValueKey('home-primary-actions')),
+        matching: find.byType(ShadCard),
+      ),
+      findsNWidgets(4),
+    );
+    expect(
       find.byKey(const ValueKey('home-action-diary-surface')),
       findsOneWidget,
     );
     expect(
       tester.getSize(find.byKey(const ValueKey('home-action-diary-surface'))),
-      const Size(56, 56),
+      const Size(40, 40),
     );
     expect(
       tester.getSize(
         find.byKey(const ValueKey('home-action-consultation-primary')),
       ),
-      const Size(56, 56),
+      const Size(40, 40),
+    );
+    expect(
+      tester.getSize(find.byKey(const ValueKey('home-action-diary'))).height,
+      greaterThanOrEqualTo(48),
     );
     expect(
       find.byKey(const ValueKey('home-action-story-surface')),
       findsOneWidget,
     );
+    expect(find.text('24시간 대화'), findsOneWidget);
+    expect(find.text('감정 기록'), findsOneWidget);
+    expect(find.text('익명 우편함'), findsOneWidget);
+    expect(find.text('공감 피드'), findsOneWidget);
     expect(find.text('오늘 마음 정리'), findsNothing);
     expect(find.text('조용히 전하기'), findsNothing);
     expect(find.text('함께 읽기'), findsNothing);
@@ -328,12 +376,18 @@ void main() {
       tester.getSize(
         find.byKey(const ValueKey('home-action-consultation-primary')),
       ),
-      const Size(56, 56),
+      const Size(40, 40),
     );
     expect(
       tester.getSize(find.byKey(const ValueKey('home-action-diary-surface'))),
-      const Size(56, 56),
+      const Size(40, 40),
     );
+
+    final heroShadTheme = ShadTheme.of(
+      tester.element(find.byKey(const ValueKey('home-checkin-hero-card'))),
+    );
+    expect(heroShadTheme.brightness, Brightness.light);
+    expect(heroShadTheme.colorScheme.background, AppBrandColors.backgroundBlue);
 
     final wordmark = tester.widget<MaumOnBrandWordmark>(
       find.byKey(const ValueKey('maum-on-brand-wordmark')),
@@ -372,7 +426,8 @@ void main() {
     );
   });
 
-  testWidgets('홈 이어쓰기 행은 카드나 상태 배지 없이 작성 화면으로 이동한다', (tester) async {
+  testWidgets('홈 이어쓰기 행은 ShadCard와 상태 배지를 표시하고 작성 화면으로 이동한다',
+      (tester) async {
     final draftRepository = StorageDraftRecoveryRepository(
       storage: MemoryDraftRecoveryStorage(),
     );
@@ -414,13 +469,49 @@ void main() {
       ),
       findsOneWidget,
     );
-    expect(find.byType(Card), findsNothing);
-    expect(find.byType(AppStatusPill), findsNothing);
-    expect(find.text('임시 저장'), findsNothing);
+    expect(
+      find.ancestor(
+        of: find.byKey(const ValueKey('home-draft-diary')),
+        matching: find.byType(ShadCard),
+      ),
+      findsOneWidget,
+    );
+    expect(find.byType(AppStatusPill), findsWidgets);
+    expect(find.text('임시 저장'), findsOneWidget);
 
     await _tapVisibleKey(tester, const ValueKey('home-draft-diary'));
 
     expect(diaryTaps, 1);
+  });
+
+  testWidgets('홈 기분 체크인 버튼과 히어로 상담 CTA가 콜백을 실행한다', (tester) async {
+    final controller = HomeController(
+      homeRepository: const _FakeHomeRepository(),
+    );
+    await controller.load();
+    var diaryTaps = 0;
+    var consultationTaps = 0;
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: HomeScreen(
+          nickname: '마음이',
+          homeController: controller,
+          onWriteDiary: () => diaryTaps += 1,
+          onWriteLetter: () {},
+          onViewStory: () {},
+          onOpenConsultation: () => consultationTaps += 1,
+          onOpenNotifications: () {},
+          onOpenSettings: () {},
+        ),
+      ),
+    );
+
+    await _tapVisibleKey(tester, const ValueKey('home-mood-checkin-4'));
+    await _tapVisibleKey(tester, const ValueKey('home-hero-consultation-cta'));
+
+    expect(diaryTaps, 1);
+    expect(consultationTaps, 1);
   });
 
   testWidgets('홈 액션 콜백을 실행한다', (tester) async {

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../shared/ui/app_design_system.dart';
+import '../shared/ui/brand_identity.dart';
 import 'app_routes.dart';
 
 class MaumBottomNavigation extends StatelessWidget {
@@ -27,14 +28,21 @@ class MaumBottomNavigation extends StatelessWidget {
     return DecoratedBox(
       key: const ValueKey('app-bottom-navigation-surface'),
       decoration: BoxDecoration(
-        color: isDark ? colorScheme.surface : Colors.white,
+        color: colorScheme.surface,
         border: Border(
           top: BorderSide(
-            color: isDark
-                ? colorScheme.outlineVariant
-                : const Color(0xFFE6E6E6),
+            color: colorScheme.outlineVariant,
           ),
         ),
+        boxShadow: [
+          BoxShadow(
+            color: isDark
+                ? Colors.black.withValues(alpha: 0.32)
+                : AppBrandColors.primaryBlue.withValues(alpha: 0.08),
+            blurRadius: 16,
+            offset: const Offset(0, -4),
+          ),
+        ],
       ),
       child: SafeArea(
         top: false,
@@ -86,9 +94,10 @@ class _MaumBottomNavigationItem extends StatelessWidget {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
     final colorScheme = theme.colorScheme;
-    final iconForeground = isDark
-        ? (isSelected ? colorScheme.primary : colorScheme.onSurfaceVariant)
-        : (isSelected ? const Color(0xFF111111) : const Color(0xFF596577));
+    final selectedForeground =
+        isDark ? colorScheme.primary : AppBrandColors.primaryBluePressed;
+    final iconForeground =
+        isSelected ? selectedForeground : colorScheme.onSurfaceVariant;
     final labelForeground = iconForeground;
     void handleTap() {
       HapticFeedback.selectionClick();
@@ -105,64 +114,64 @@ class _MaumBottomNavigationItem extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xxs),
           child: Material(
             color: Colors.transparent,
-            borderRadius: AppRadii.card,
+            borderRadius: BorderRadius.circular(14),
             child: InkWell(
-              borderRadius: AppRadii.card,
+              borderRadius: BorderRadius.circular(14),
               canRequestFocus: false,
               enableFeedback: false,
               splashFactory: NoSplash.splashFactory,
               overlayColor: WidgetStateProperty.all(Colors.transparent),
               onTap: handleTap,
               child: ConstrainedBox(
-                constraints: const BoxConstraints(minHeight: 68),
+                constraints: const BoxConstraints(minHeight: 64),
                 child: Center(
                   heightFactor: 1,
                   child: AnimatedContainer(
                     key: ValueKey('route-tab-${route.key}-surface'),
                     duration: const Duration(milliseconds: 180),
-                    curve: Curves.easeOut,
-                    // 사진형 탭바는 배경 캡슐 없이 아이콘과 라벨 색상으로만 선택을 드러낸다.
+                    curve: Curves.easeOutCubic,
                     constraints: const BoxConstraints(
                       minWidth: 56,
-                      minHeight: 62,
+                      minHeight: 58,
                     ),
-                    decoration: const BoxDecoration(
-                      color: Colors.transparent,
-                      borderRadius: BorderRadius.zero,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: AppSpacing.xs,
+                      vertical: AppSpacing.xxs,
                     ),
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: AppSpacing.xxs,
-                      ),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(
-                            isSelected ? route.selectedIcon : route.icon,
-                            size: isSelected ? 27 : 26,
-                            color: iconForeground,
-                          ),
-                          const SizedBox(height: AppSpacing.xxs),
-                          Text(
-                            route.navLabel,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: theme.textTheme.labelSmall?.copyWith(
-                                  color: labelForeground,
-                                  fontWeight: isSelected
-                                      ? FontWeight.w800
-                                      : FontWeight.w700,
-                                ) ??
-                                TextStyle(
-                                  color: labelForeground,
-                                  fontWeight: isSelected
-                                      ? FontWeight.w800
-                                      : FontWeight.w700,
-                                ),
-                          ),
-                        ],
-                      ),
+                    decoration: BoxDecoration(
+                      color: isSelected
+                          ? colorScheme.primary.withValues(alpha: 0.14)
+                          : Colors.transparent,
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          isSelected ? route.selectedIcon : route.icon,
+                          size: isSelected ? 26 : 24,
+                          color: iconForeground,
+                        ),
+                        const SizedBox(height: AppSpacing.xxs),
+                        Text(
+                          route.navLabel,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.textTheme.labelSmall?.copyWith(
+                                color: labelForeground,
+                                fontWeight: isSelected
+                                    ? FontWeight.w800
+                                    : FontWeight.w700,
+                              ) ??
+                              TextStyle(
+                                color: labelForeground,
+                                fontWeight: isSelected
+                                    ? FontWeight.w800
+                                    : FontWeight.w700,
+                              ),
+                        ),
+                      ],
                     ),
                   ),
                 ),

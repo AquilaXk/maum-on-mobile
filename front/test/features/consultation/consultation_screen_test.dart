@@ -7,6 +7,7 @@ import 'package:maum_on_mobile_front/features/consultation/application/consultat
 import 'package:maum_on_mobile_front/features/consultation/data/consultation_repository.dart';
 import 'package:maum_on_mobile_front/features/consultation/domain/consultation_models.dart';
 import 'package:maum_on_mobile_front/features/consultation/presentation/consultation_screen.dart';
+import 'package:shadcn_ui/shadcn_ui.dart';
 
 void main() {
   testWidgets('shows compact consultation status on a phone viewport',
@@ -48,12 +49,23 @@ void main() {
       find.byKey(const ValueKey('consultation-empty-state')),
       findsOneWidget,
     );
+    expect(
+      find.descendant(
+        of: find.byKey(const ValueKey('consultation-empty-state')),
+        matching: find.byType(ShadCard),
+      ),
+      findsOneWidget,
+    );
     expect(find.text('상담 대기 중'), findsOneWidget);
     expect(find.text('입력 가능'), findsOneWidget);
     expect(
       find.byKey(const ValueKey('consultation-composer-section')),
       findsOneWidget,
     );
+
+    await tester.tap(find.text('마음이 지쳐서 쉬고 싶어요'));
+    await tester.pump();
+    expect(controller.state.draft, '마음이 지쳐서 쉬고 싶어요');
   });
 
   testWidgets('상담 상태 영역은 첫 화면 대화를 밀어내지 않는 얇은 스트립이다', (tester) async {

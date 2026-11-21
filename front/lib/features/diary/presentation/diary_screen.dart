@@ -2,9 +2,11 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:shadcn_ui/shadcn_ui.dart';
 
 import '../../../shared/ui/app_design_system.dart';
 import '../../../shared/ui/text_editing_sync.dart';
+import '../../../theme/app_theme.dart';
 import '../../moderation/presentation/content_moderation_feedback_panel.dart';
 import '../application/diary_controller.dart';
 import '../domain/diary_models.dart';
@@ -336,50 +338,54 @@ class _DiaryQuickCapturePanel extends StatelessWidget {
     final colorScheme = theme.colorScheme;
     final selectedCount = state.selectedDateEntries.length;
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xxs),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Wrap(
-            spacing: AppSpacing.xs,
-            runSpacing: AppSpacing.xs,
-            crossAxisAlignment: WrapCrossAlignment.center,
-            children: [
-              Text(
-                selectedDateLabel,
-                style: theme.textTheme.titleMedium?.copyWith(
-                  color: colorScheme.onSurface,
+    return MaumShadThemeScope(
+      child: ShadCard(
+        padding: const EdgeInsets.all(AppSpacing.md),
+        rowMainAxisSize: MainAxisSize.max,
+        columnCrossAxisAlignment: CrossAxisAlignment.stretch,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Wrap(
+              spacing: AppSpacing.xs,
+              runSpacing: AppSpacing.xs,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              children: [
+                Text(
+                  selectedDateLabel,
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    color: colorScheme.onSurface,
+                    fontWeight: FontWeight.w800,
+                  ),
                 ),
-              ),
-              Text(
-                '선택한 날 $selectedCount개',
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  color: colorScheme.onSurfaceVariant,
-                  fontWeight: FontWeight.w700,
+                ShadBadge.secondary(
+                  backgroundColor: colorScheme.surfaceContainerHighest,
+                  hoverBackgroundColor: colorScheme.surfaceContainerHighest,
+                  foregroundColor: colorScheme.onSurfaceVariant,
+                  child: Text('선택한 날 $selectedCount개'),
                 ),
-              ),
-              Text(
-                state.isEditing ? '수정 중' : state.category.label,
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  color: colorScheme.primary,
-                  fontWeight: FontWeight.w800,
+                ShadBadge.secondary(
+                  backgroundColor: colorScheme.primaryContainer,
+                  hoverBackgroundColor: colorScheme.primaryContainer,
+                  foregroundColor: colorScheme.onPrimaryContainer,
+                  child: Text(state.isEditing ? '수정 중' : state.category.label),
                 ),
-              ),
-            ],
-          ),
-          const SizedBox(height: AppSpacing.sm),
-          AppResponsiveActionWrap(
-            children: [
-              FilledButton.icon(
-                key: const ValueKey('diary-quick-write-button'),
-                onPressed: onWritePressed,
-                icon: const Icon(Icons.edit_outlined),
-                label: const Text('오늘 기록 쓰기'),
-              ),
-            ],
-          ),
-        ],
+              ],
+            ),
+            const SizedBox(height: AppSpacing.sm),
+            AppResponsiveActionWrap(
+              children: [
+                FilledButton.icon(
+                  key: const ValueKey('diary-quick-write-button'),
+                  onPressed: onWritePressed,
+                  icon: const Icon(Icons.edit_outlined),
+                  label: const Text('오늘 기록 쓰기'),
+                ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -399,31 +405,41 @@ class _CalendarSurface extends StatelessWidget {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
 
-    return Semantics(
-      container: true,
-      label: '월간 기록 달력',
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xxs),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Row(
-              children: [
-                Icon(
-                  Icons.calendar_month_outlined,
-                  size: 24,
-                  color: colorScheme.primary,
-                ),
-                const SizedBox(width: AppSpacing.xs),
-                Text('월간 기록', style: theme.textTheme.titleLarge),
-              ],
-            ),
-            const SizedBox(height: AppSpacing.sm),
-            _CalendarSection(
-              state: state,
-              onSelectDate: onSelectDate,
-            ),
-          ],
+    return MaumShadThemeScope(
+      child: Semantics(
+        container: true,
+        label: '월간 기록 달력',
+        child: ShadCard(
+          padding: const EdgeInsets.all(AppSpacing.md),
+          rowMainAxisSize: MainAxisSize.max,
+          columnCrossAxisAlignment: CrossAxisAlignment.stretch,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Row(
+                children: [
+                  Icon(
+                    Icons.calendar_month_outlined,
+                    size: 22,
+                    color: colorScheme.primary,
+                  ),
+                  const SizedBox(width: AppSpacing.xs),
+                  Text(
+                    '월간 기록',
+                    style: theme.textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: AppSpacing.sm),
+              _CalendarSection(
+                state: state,
+                onSelectDate: onSelectDate,
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -887,7 +903,11 @@ class _DiaryEntryContentPreview extends StatelessWidget {
             spacing: AppSpacing.xs,
             runSpacing: AppSpacing.xs,
             children: [
-              Chip(label: Text('이미지 $imageCount장')),
+              MaumShadThemeScope(
+                child: ShadBadge.secondary(
+                  child: Text('이미지 $imageCount장'),
+                ),
+              ),
             ],
           ),
         ],
@@ -1360,28 +1380,32 @@ class _ImageBlockPanel extends StatelessWidget {
     final byteSize = block.displayByteSize;
     final colorScheme = Theme.of(context).colorScheme;
 
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        border: Border.all(color: colorScheme.outlineVariant),
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Padding(
+    return MaumShadThemeScope(
+      child: ShadCard(
         padding: const EdgeInsets.all(12),
+        rowMainAxisSize: MainAxisSize.max,
+        columnCrossAxisAlignment: CrossAxisAlignment.stretch,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
+          mainAxisSize: MainAxisSize.min,
           children: [
             Wrap(
               spacing: AppSpacing.xs,
               runSpacing: AppSpacing.xs,
               crossAxisAlignment: WrapCrossAlignment.center,
               children: [
-                Chip(label: Text(block.uploadStatus.label)),
+                ShadBadge.secondary(
+                  backgroundColor: colorScheme.primaryContainer,
+                  hoverBackgroundColor: colorScheme.primaryContainer,
+                  foregroundColor: colorScheme.onPrimaryContainer,
+                  child: Text(block.uploadStatus.label),
+                ),
                 if (block.displaySource != null)
-                  Chip(label: Text(block.displaySource!.label)),
+                  ShadBadge.secondary(child: Text(block.displaySource!.label)),
                 if (byteSize != null)
-                  Chip(label: Text(_formatByteSize(byteSize))),
+                  ShadBadge.secondary(child: Text(_formatByteSize(byteSize))),
                 if (image?.wasCompressed == true)
-                  const Chip(label: Text('압축됨')),
+                  const ShadBadge.outline(child: Text('압축됨')),
               ],
             ),
             if (isUploadingImage &&

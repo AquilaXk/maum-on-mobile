@@ -29,6 +29,7 @@ import 'package:maum_on_mobile_front/features/settings/data/settings_repository.
 import 'package:maum_on_mobile_front/features/settings/domain/settings_models.dart';
 import 'package:maum_on_mobile_front/features/story/data/story_repository.dart';
 import 'package:maum_on_mobile_front/features/story/domain/story_models.dart';
+import 'package:maum_on_mobile_front/shared/ui/brand_identity.dart';
 import 'package:maum_on_mobile_front/theme/app_theme.dart';
 
 void main() {
@@ -56,8 +57,8 @@ void main() {
       find.descendant(of: selectedTab, matching: find.byIcon(Icons.edit_note)),
     );
 
-    expect(selectedLabel.style?.color, const Color(0xFF111111));
-    expect(selectedIcon.color, const Color(0xFF111111));
+    expect(selectedLabel.style?.color, AppBrandColors.primaryBluePressed);
+    expect(selectedIcon.color, AppBrandColors.primaryBluePressed);
   });
 
   testWidgets('restores a session and renders the authenticated home',
@@ -287,7 +288,13 @@ void main() {
         find.byKey(const ValueKey('route-tab-home-surface')),
       );
       final selectedDecoration = selectedSurface.decoration as BoxDecoration?;
-      expect(selectedDecoration?.color, Colors.transparent);
+      final navTheme = Theme.of(
+        tester.element(find.byKey(const ValueKey('route-tab-home-surface'))),
+      );
+      expect(
+        selectedDecoration?.color,
+        navTheme.colorScheme.primary.withValues(alpha: 0.14),
+      );
       final selectedInkWell = tester.widget<InkWell>(
         find.descendant(
           of: find.byKey(const ValueKey('route-tab-home')),
@@ -304,8 +311,8 @@ void main() {
       );
       final selectedSurfaceRadius =
           selectedDecoration!.borderRadius as BorderRadius;
-      expect(selectedSurfaceSize.width, lessThanOrEqualTo(76));
-      expect(selectedSurfaceRadius.topLeft.x, 0);
+      expect(selectedSurfaceSize.width, greaterThanOrEqualTo(56));
+      expect(selectedSurfaceRadius, BorderRadius.circular(14));
       expect(
         [
           'route-tab-home',
@@ -373,11 +380,12 @@ void main() {
     }
   });
 
-  testWidgets('하단 네비게이션은 흰색 평면 탭바처럼 표시한다', (tester) async {
+  testWidgets('하단 네비게이션은 상단 그림자와 활성 캡슐을 가진 독으로 표시한다', (tester) async {
     tester.view.physicalSize = const Size(390, 844);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
+    final lightTheme = buildAppTheme();
 
     await tester.pumpWidget(
       MaterialApp(
@@ -389,7 +397,7 @@ void main() {
             child: child!,
           );
         },
-        theme: buildAppTheme(),
+        theme: lightTheme,
         home: AuthenticatedAppShell(
           currentRoute: AuthenticatedRoute.home,
           onRouteSelected: (_) {},
@@ -406,8 +414,11 @@ void main() {
 
     expect(surfaceDecoration.color, Colors.white);
     expect(surfaceRadius, isNull);
-    expect(surfaceDecoration.boxShadow, isNull);
-    expect(surfaceDecoration.border?.top.color, const Color(0xFFE6E6E6));
+    expect(surfaceDecoration.boxShadow, isNotEmpty);
+    expect(
+      surfaceDecoration.border?.top.color,
+      lightTheme.colorScheme.outlineVariant,
+    );
     expect(
       find.descendant(
         of: find.byKey(const ValueKey('app-bottom-navigation-surface')),
@@ -434,7 +445,11 @@ void main() {
       find.byKey(const ValueKey('route-tab-home-surface')),
     );
     final selectedDecoration = selectedSurface.decoration as BoxDecoration?;
-    expect(selectedDecoration?.color, Colors.transparent);
+    expect(
+      selectedDecoration?.color,
+      lightTheme.colorScheme.primary.withValues(alpha: 0.14),
+    );
+    expect(selectedDecoration?.borderRadius, BorderRadius.circular(14));
 
     final selectedIcon = tester.widget<Icon>(
       find.descendant(
@@ -461,10 +476,10 @@ void main() {
       ),
     );
 
-    expect(selectedIcon.color, const Color(0xFF111111));
-    expect(selectedLabel.style?.color, const Color(0xFF111111));
-    expect(unselectedIcon.color, const Color(0xFF596577));
-    expect(unselectedLabel.style?.color, const Color(0xFF596577));
+    expect(selectedIcon.color, AppBrandColors.primaryBluePressed);
+    expect(selectedLabel.style?.color, AppBrandColors.primaryBluePressed);
+    expect(unselectedIcon.color, lightTheme.colorScheme.onSurfaceVariant);
+    expect(unselectedLabel.style?.color, lightTheme.colorScheme.onSurfaceVariant);
   });
 
   testWidgets('hides home back action on primary tab landing screens',
@@ -571,7 +586,13 @@ void main() {
                 find.descendant(of: tab, matching: find.byType(Icon)),
               )
               .single;
-          expect(icon.color, const Color(0xFF596577));
+          final tabTheme = Theme.of(tester.element(tab));
+          final capsule = tester.widget<AnimatedContainer>(
+            find.byKey(ValueKey('route-tab-${route.key}-surface')),
+          );
+          final capsuleDecoration = capsule.decoration as BoxDecoration?;
+          expect(icon.color, tabTheme.colorScheme.onSurfaceVariant);
+          expect(capsuleDecoration?.color, Colors.transparent);
           expect(
             tester.getSemantics(
               find.bySemanticsLabel(

@@ -7,6 +7,7 @@ import 'package:maum_on_mobile_front/features/diary/data/diary_repository.dart';
 import 'package:maum_on_mobile_front/features/diary/domain/diary_models.dart';
 import 'package:maum_on_mobile_front/features/diary/presentation/diary_image_picker.dart';
 import 'package:maum_on_mobile_front/features/diary/presentation/diary_screen.dart';
+import 'package:shadcn_ui/shadcn_ui.dart';
 
 void main() {
   testWidgets('shows compact write entry controls on a phone viewport',
@@ -50,6 +51,13 @@ void main() {
         matching: find.byType(Card),
       ),
       findsNothing,
+    );
+    expect(
+      find.descendant(
+        of: find.byKey(const ValueKey('diary-quick-capture-panel')),
+        matching: find.byType(ShadCard),
+      ),
+      findsOneWidget,
     );
     expect(find.text('오늘 기록 쓰기'), findsOneWidget);
     expect(find.text('선택한 날 1개'), findsOneWidget);

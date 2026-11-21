@@ -6,10 +6,12 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:shadcn_ui/shadcn_ui.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../../shared/ui/app_design_system.dart';
 import '../../../shared/ui/text_editing_sync.dart';
+import '../../../theme/app_theme.dart';
 import '../application/consultation_controller.dart';
 import '../domain/consultation_models.dart';
 
@@ -185,93 +187,101 @@ class _ConsultationScreenState extends State<ConsultationScreen>
         _syncText();
         _scheduleScrollToBottom();
 
-        return Scaffold(
-          body: SafeArea(
-            child: Column(
-              children: [
-                _ConsultationHeader(
-                  connectionState: state.connectionState,
-                  onBack: widget.onBack,
-                ),
-                if (state.errorMessage != null)
-                  AppNotice(
-                    message: state.errorMessage!,
-                    tone: AppNoticeTone.error,
+        return MaumShadThemeScope(
+          child: Scaffold(
+            body: SafeArea(
+              child: Column(
+                children: [
+                  _ConsultationHeader(
+                    connectionState: state.connectionState,
+                    onBack: widget.onBack,
                   ),
-                if (state.safetyNotice != null)
-                  _SafetyNotice(
-                    safety: state.safetyNotice!,
-                    onDeleteSensitive:
-                        widget.controller.deleteSensitiveMessages,
-                    onEmergencyContact: _handleEmergencyContact,
+                  if (state.errorMessage != null)
+                    AppNotice(
+                      message: state.errorMessage!,
+                      tone: AppNoticeTone.error,
+                    ),
+                  if (state.safetyNotice != null)
+                    _SafetyNotice(
+                      safety: state.safetyNotice!,
+                      onDeleteSensitive:
+                          widget.controller.deleteSensitiveMessages,
+                      onEmergencyContact: _handleEmergencyContact,
+                    ),
+                  if (state.safetyNotice == null && state.failedMessage != null)
+                    _FailedMessageNotice(
+                      failedMessage: state.failedMessage!,
+                      onRetry: widget.controller.retryFailedMessage,
+                      onDelete: widget.controller.deleteFailedMessage,
+                    ),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(
+                      AppSpacing.md,
+                      0,
+                      AppSpacing.md,
+                      AppSpacing.sm,
+                    ),
+                    child: _ConsultationStatusToolbar(
+                      state: state,
+                      onReconnect: widget.controller.reconnect,
+                    ),
                   ),
-                if (state.safetyNotice == null && state.failedMessage != null)
-                  _FailedMessageNotice(
-                    failedMessage: state.failedMessage!,
-                    onRetry: widget.controller.retryFailedMessage,
-                    onDelete: widget.controller.deleteFailedMessage,
-                  ),
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(
-                    AppSpacing.md,
-                    0,
-                    AppSpacing.md,
-                    AppSpacing.sm,
-                  ),
-                  child: _ConsultationStatusToolbar(
-                    state: state,
-                    onReconnect: widget.controller.reconnect,
-                  ),
-                ),
-                Expanded(
-                  key: const ValueKey('consultation-chat-section'),
-                  child: Stack(
-                    children: [
-                      _ConversationList(
-                        controller: _scrollController,
-                        messages: state.messages,
-                        streamingMessageId:
-                            widget.controller.activeStreamingMessageId,
-                        streamingContentListenable:
-                            widget.controller.streamingContentNotifier,
-                      ),
-                      Positioned(
-                        right: AppSpacing.md,
-                        bottom: AppSpacing.sm,
-                        child: ValueListenableBuilder<bool>(
-                          valueListenable: _showJumpToBottomNotifier,
-                          builder: (context, showJump, _) {
-                            if (!showJump) {
-                              return const SizedBox.shrink();
-                            }
-                            return Semantics(
-                              button: true,
-                              label: '최신 답변 보기',
-                              child: FilledButton.tonalIcon(
-                                key: const ValueKey(
-                                  'consultation-jump-to-bottom-button',
-                                ),
-                                onPressed: _jumpToBottom,
-                                icon: const Icon(
-                                  Icons.arrow_downward_rounded,
-                                  size: 18,
-                                ),
-                                label: const Text('최신 답변 보기'),
-                              ),
-                            );
-                          },
+                  Expanded(
+                    key: const ValueKey('consultation-chat-section'),
+                    child: Stack(
+                      children: [
+                        _ConversationList(
+                          controller: _scrollController,
+                          messages: state.messages,
+                          streamingMessageId:
+                              widget.controller.activeStreamingMessageId,
+                          streamingContentListenable:
+                              widget.controller.streamingContentNotifier,
+                          onSelectStarterPrompt: state.inputBlockedBySafety
+                              ? null
+                              : (prompt) {
+                                  widget.controller.updateDraft(prompt);
+                                  _syncText();
+                                },
                         ),
-                      ),
-                    ],
+                        Positioned(
+                          right: AppSpacing.md,
+                          bottom: AppSpacing.sm,
+                          child: ValueListenableBuilder<bool>(
+                            valueListenable: _showJumpToBottomNotifier,
+                            builder: (context, showJump, _) {
+                              if (!showJump) {
+                                return const SizedBox.shrink();
+                              }
+                              return Semantics(
+                                button: true,
+                                label: '최신 답변 보기',
+                                child: FilledButton.tonalIcon(
+                                  key: const ValueKey(
+                                    'consultation-jump-to-bottom-button',
+                                  ),
+                                  onPressed: _jumpToBottom,
+                                  icon: const Icon(
+                                    Icons.arrow_downward_rounded,
+                                    size: 18,
+                                  ),
+                                  label: const Text('최신 답변 보기'),
+                                ),
+                              );
+                            },
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
-                ),
-                _Composer(
-                  controller: _textController,
-                  state: state,
-                  onChanged: widget.controller.updateDraft,
-                  onSubmitted: widget.controller.submitMessage,
-                ),
-              ],
+                  _Composer(
+                    controller: _textController,
+                    state: state,
+                    onChanged: widget.controller.updateDraft,
+                    onSubmitted: widget.controller.submitMessage,
+                  ),
+                ],
+              ),
             ),
           ),
         );
@@ -303,63 +313,61 @@ class _FailedMessageNotice extends StatelessWidget {
         AppSpacing.md,
         AppSpacing.sm,
       ),
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          color: colorScheme.secondaryContainer,
-          borderRadius: AppRadii.card,
-          border: Border.all(color: colorScheme.secondary),
-        ),
-        child: Padding(
-          padding: const EdgeInsets.all(AppSpacing.md),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Semantics(
-                container: true,
-                liveRegion: true,
-                label: '전송 실패. ${failedMessage.errorMessage}',
-                child: ExcludeSemantics(
-                  child: Text(
-                    '전송하지 못한 메시지가 있습니다.',
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          color: colorScheme.onSecondaryContainer,
-                          fontWeight: FontWeight.w700,
-                        ),
-                  ),
+      child: ShadCard(
+        padding: const EdgeInsets.all(AppSpacing.md),
+        backgroundColor: colorScheme.secondaryContainer,
+        border: ShadBorder.all(color: colorScheme.secondary, width: 1),
+        rowMainAxisSize: MainAxisSize.max,
+        columnCrossAxisAlignment: CrossAxisAlignment.stretch,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Semantics(
+              container: true,
+              liveRegion: true,
+              label: '전송 실패. ${failedMessage.errorMessage}',
+              child: ExcludeSemantics(
+                child: Text(
+                  '전송하지 못한 메시지가 있습니다.',
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: colorScheme.onSecondaryContainer,
+                        fontWeight: FontWeight.w700,
+                      ),
                 ),
               ),
-              const SizedBox(height: AppSpacing.xs),
-              Text(
-                failedMessage.content,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: colorScheme.onSecondaryContainer,
-                    ),
-              ),
-              const SizedBox(height: AppSpacing.sm),
-              AppResponsiveActionWrap(
-                children: [
-                  FilledButton.tonalIcon(
-                    key: const ValueKey(
-                      'consultation-retry-failed-message-button',
-                    ),
-                    onPressed: () => onRetry(),
-                    icon: const Icon(Icons.refresh),
-                    label: const Text('다시 전송'),
+            ),
+            const SizedBox(height: AppSpacing.xs),
+            Text(
+              failedMessage.content,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: colorScheme.onSecondaryContainer,
                   ),
-                  TextButton.icon(
-                    key: const ValueKey(
-                      'consultation-delete-failed-message-button',
-                    ),
-                    onPressed: () => onDelete(),
-                    icon: const Icon(Icons.close),
-                    label: const Text('삭제'),
+            ),
+            const SizedBox(height: AppSpacing.sm),
+            AppResponsiveActionWrap(
+              children: [
+                FilledButton.tonalIcon(
+                  key: const ValueKey(
+                    'consultation-retry-failed-message-button',
                   ),
-                ],
-              ),
-            ],
-          ),
+                  onPressed: () => onRetry(),
+                  icon: const Icon(Icons.refresh),
+                  label: const Text('다시 전송'),
+                ),
+                TextButton.icon(
+                  key: const ValueKey(
+                    'consultation-delete-failed-message-button',
+                  ),
+                  onPressed: () => onDelete(),
+                  icon: const Icon(Icons.close),
+                  label: const Text('삭제'),
+                ),
+              ],
+            ),
+          ],
         ),
       ),
     );
@@ -623,27 +631,31 @@ class _CompactStatusPill extends StatelessWidget {
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     final colors = _compactStatusColors(colorScheme, tone);
+    final variant = switch (tone) {
+      AppStatusTone.neutral => ShadBadgeVariant.secondary,
+      AppStatusTone.success => ShadBadgeVariant.primary,
+      AppStatusTone.warning => ShadBadgeVariant.outline,
+      AppStatusTone.danger => ShadBadgeVariant.destructive,
+    };
 
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: colors.background,
-        borderRadius: AppRadii.status,
-        border: Border.all(color: colors.border),
+    return ShadBadge.raw(
+      variant: variant,
+      backgroundColor: colors.background,
+      hoverBackgroundColor: colors.background,
+      foregroundColor: colors.foreground,
+      shape: StadiumBorder(side: BorderSide(color: colors.border)),
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.sm,
+        vertical: AppSpacing.xxs,
       ),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(
-          horizontal: AppSpacing.sm,
-          vertical: AppSpacing.xxs,
-        ),
-        child: Text(
-          label,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                color: colors.foreground,
-                fontWeight: FontWeight.w800,
-              ),
-        ),
+      child: Text(
+        label,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: Theme.of(context).textTheme.labelMedium?.copyWith(
+              color: colors.foreground,
+              fontWeight: FontWeight.w800,
+            ),
       ),
     );
   }
@@ -718,12 +730,14 @@ class _ConversationList extends StatelessWidget {
     required this.messages,
     required this.streamingMessageId,
     required this.streamingContentListenable,
+    this.onSelectStarterPrompt,
   });
 
   final ScrollController controller;
   final List<ConsultationMessage> messages;
   final String? streamingMessageId;
   final ValueListenable<String?> streamingContentListenable;
+  final ValueChanged<String>? onSelectStarterPrompt;
 
   @override
   Widget build(BuildContext context) {
@@ -740,10 +754,19 @@ class _ConversationList extends StatelessWidget {
       itemCount: showEmptyState ? 1 : visibleMessages.length,
       itemBuilder: (context, index) {
         if (showEmptyState) {
-          return const _ConsultationEmptyState();
+          return _ConsultationEmptyState(
+            onSelectStarterPrompt: onSelectStarterPrompt,
+          );
         }
 
         final message = visibleMessages[index];
+        final prevRole = index > 0 ? visibleMessages[index - 1].role : null;
+        final nextRole = index + 1 < visibleMessages.length
+            ? visibleMessages[index + 1].role
+            : null;
+        final isFirstInGroup = prevRole != message.role;
+        final isLastInGroup = nextRole != message.role;
+
         if (streamingMessageId != null && message.id == streamingMessageId) {
           return RepaintBoundary(
             child: ValueListenableBuilder<String?>(
@@ -752,14 +775,22 @@ class _ConversationList extends StatelessWidget {
                 final activeMessage = streamedContent == null
                     ? message
                     : message.copyWith(content: streamedContent);
-                return _MessageBubble(message: activeMessage);
+                return _MessageBubble(
+                  message: activeMessage,
+                  isFirstInGroup: isFirstInGroup,
+                  isLastInGroup: isLastInGroup,
+                );
               },
             ),
           );
         }
 
         return RepaintBoundary(
-          child: _MessageBubble(message: message),
+          child: _MessageBubble(
+            message: message,
+            isFirstInGroup: isFirstInGroup,
+            isLastInGroup: isLastInGroup,
+          ),
         );
       },
     );
@@ -772,25 +803,105 @@ bool _isInitialSystemMessage(ConsultationMessage message) {
 }
 
 class _ConsultationEmptyState extends StatelessWidget {
-  const _ConsultationEmptyState();
+  const _ConsultationEmptyState({this.onSelectStarterPrompt});
+
+  final ValueChanged<String>? onSelectStarterPrompt;
+
+  static const List<String> _starterPrompts = [
+    '마음이 지쳐서 쉬고 싶어요',
+    '머릿속이 복잡해요',
+    '조용히 이야기하고 싶어요',
+  ];
 
   @override
   Widget build(BuildContext context) {
-    return const Padding(
-      key: ValueKey('consultation-empty-state'),
-      padding: EdgeInsets.only(top: AppSpacing.md),
-      child: AppStateView.empty(
-        title: '상담 대기 중',
-        message: '지금 떠오르는 마음을 적어 주세요.',
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    return Padding(
+      key: const ValueKey('consultation-empty-state'),
+      padding: const EdgeInsets.only(top: AppSpacing.sm),
+      child: ShadCard(
+        padding: const EdgeInsets.all(AppSpacing.lg),
+        rowMainAxisSize: MainAxisSize.max,
+        columnCrossAxisAlignment: CrossAxisAlignment.stretch,
+        child: Material(
+          type: MaterialType.transparency,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Row(
+                children: [
+                  DecoratedBox(
+                    decoration: BoxDecoration(
+                      color: colorScheme.primaryContainer,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Padding(
+                      padding: const EdgeInsets.all(AppSpacing.xs),
+                      child: Icon(
+                        Icons.support_agent_outlined,
+                        color: colorScheme.onPrimaryContainer,
+                        size: 22,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: AppSpacing.sm),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          '상담 대기 중',
+                          style: theme.textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          '지금 떠오르는 마음을 적어 주세요.',
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            color: colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: AppSpacing.md),
+              Wrap(
+                spacing: AppSpacing.xs,
+                runSpacing: AppSpacing.xs,
+                children: [
+                  for (final prompt in _starterPrompts)
+                    ActionChip(
+                      label: Text(prompt),
+                      onPressed: onSelectStarterPrompt == null
+                          ? null
+                          : () => onSelectStarterPrompt!(prompt),
+                    ),
+                ],
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
 }
 
 class _MessageBubble extends StatelessWidget {
-  const _MessageBubble({required this.message});
+  const _MessageBubble({
+    required this.message,
+    this.isFirstInGroup = true,
+    this.isLastInGroup = true,
+  });
 
   final ConsultationMessage message;
+  final bool isFirstInGroup;
+  final bool isLastInGroup;
 
   @override
   Widget build(BuildContext context) {
@@ -799,68 +910,113 @@ class _MessageBubble extends StatelessWidget {
     final isPendingAssistant =
         message.role == ConsultationMessageRole.assistant &&
             message.content.isEmpty;
-    final colorScheme = Theme.of(context).colorScheme;
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final bubbleRadius = isUser
+        ? BorderRadius.only(
+            topLeft: const Radius.circular(16),
+            bottomLeft: const Radius.circular(16),
+            topRight: Radius.circular(isFirstInGroup ? 16 : 6),
+            bottomRight: Radius.circular(isLastInGroup ? 16 : 6),
+          )
+        : BorderRadius.only(
+            topRight: const Radius.circular(16),
+            bottomRight: const Radius.circular(16),
+            topLeft: Radius.circular(isFirstInGroup ? 16 : 6),
+            bottomLeft: Radius.circular(isLastInGroup ? 16 : 6),
+          );
 
-    return Align(
-      alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 320),
-        child: Padding(
-          padding: const EdgeInsets.only(bottom: AppSpacing.sm),
-          child: DecoratedBox(
-            decoration: BoxDecoration(
-              color: isUser
-                  ? colorScheme.primary
-                  : isSystem
-                      ? colorScheme.errorContainer
-                      : colorScheme.surfaceContainerHighest,
-              borderRadius: AppRadii.card,
-            ),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(
-                horizontal: AppSpacing.md,
-                vertical: AppSpacing.sm,
-              ),
-              child: isPendingAssistant
-                  ? Semantics(
-                      container: true,
-                      liveRegion: true,
-                      label: 'AI가 답변을 작성 중입니다.',
-                      child: ExcludeSemantics(
-                        child: Row(
-                          key: const ValueKey('consultation-typing-indicator'),
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            SizedBox(
-                              width: 16,
-                              height: 16,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                color: colorScheme.onSurface,
-                              ),
-                            ),
-                            const SizedBox(width: AppSpacing.xs),
-                            Text(
-                              '응답 작성 중입니다.',
-                              style: TextStyle(color: colorScheme.onSurface),
-                            ),
-                          ],
+    final bubble = DecoratedBox(
+      decoration: BoxDecoration(
+        color: isUser
+            ? colorScheme.primary
+            : isSystem
+                ? colorScheme.errorContainer
+                : colorScheme.surface,
+        borderRadius: bubbleRadius,
+        border: isUser || isSystem
+            ? null
+            : Border.all(color: colorScheme.outlineVariant),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.md,
+          vertical: AppSpacing.sm,
+        ),
+        child: isPendingAssistant
+            ? Semantics(
+                container: true,
+                liveRegion: true,
+                label: 'AI가 답변을 작성 중입니다.',
+                child: ExcludeSemantics(
+                  child: Row(
+                    key: const ValueKey('consultation-typing-indicator'),
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: colorScheme.primary,
                         ),
                       ),
-                    )
-                  : Text(
-                      message.content,
-                      style: TextStyle(
-                        color: isUser
-                            ? colorScheme.onPrimary
-                            : isSystem
-                                ? colorScheme.onErrorContainer
-                                : colorScheme.onSurface,
+                      const SizedBox(width: AppSpacing.xs),
+                      Text(
+                        '응답 작성 중입니다.',
+                        style: TextStyle(color: colorScheme.onSurface),
                       ),
-                    ),
+                    ],
+                  ),
+                ),
+              )
+            : Text(
+                message.content,
+                style: TextStyle(
+                  color: isUser
+                      ? colorScheme.onPrimary
+                      : isSystem
+                          ? colorScheme.onErrorContainer
+                          : colorScheme.onSurface,
+                ),
+              ),
+      ),
+    );
+
+    return Padding(
+      padding: EdgeInsets.only(bottom: isLastInGroup ? AppSpacing.sm : 4),
+      child: Row(
+        mainAxisAlignment:
+            isUser ? MainAxisAlignment.end : MainAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: [
+          if (!isUser && !isSystem) ...[
+            if (isLastInGroup)
+              DecoratedBox(
+                decoration: BoxDecoration(
+                  color: colorScheme.primaryContainer,
+                  shape: BoxShape.circle,
+                ),
+                child: SizedBox.square(
+                  dimension: 28,
+                  child: Icon(
+                    Icons.support_agent_outlined,
+                    size: 16,
+                    color: colorScheme.onPrimaryContainer,
+                  ),
+                ),
+              )
+            else
+              const SizedBox(width: 28),
+            const SizedBox(width: AppSpacing.xs),
+          ],
+          Flexible(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 320),
+              child: bubble,
             ),
           ),
-        ),
+        ],
       ),
     );
   }

@@ -11,6 +11,7 @@ import 'package:maum_on_mobile_front/features/auth/domain/login_provider_policy.
 import 'package:maum_on_mobile_front/features/auth/presentation/auth_screen.dart';
 import 'package:maum_on_mobile_front/shared/ui/brand_identity.dart';
 import 'package:maum_on_mobile_front/theme/app_theme.dart';
+import 'package:shadcn_ui/shadcn_ui.dart';
 
 void main() {
   test('login provider policy exposes only configured linked providers', () {
@@ -117,17 +118,18 @@ void main() {
 
     final panelFinder = find.byKey(const ValueKey('auth-form-panel'));
     final panel = tester.widget(panelFinder);
-    expect(panel, isA<DecoratedBox>());
-    final panelDecoration = (panel as DecoratedBox).decoration as BoxDecoration;
+    expect(panel, isA<ShadCard>());
+    final panelContext = tester.element(panelFinder);
+    final shadTheme = ShadTheme.of(panelContext);
+    expect(shadTheme.colorScheme.card, AppBrandColors.surface);
+    expect(shadTheme.colorScheme.border, AppBrandColors.borderSoft);
     expect(
-        panelDecoration.color, Theme.of(tester.element(panelFinder)).cardColor);
+      find.byKey(const ValueKey('auth-brand-header-card')),
+      findsOneWidget,
+    );
     expect(
-      panelDecoration.border,
-      isA<Border>().having(
-        (border) => border.top.color,
-        'border color',
-        AppBrandColors.borderSoft,
-      ),
+      find.byKey(const ValueKey('auth-mode-segmented-bar')),
+      findsOneWidget,
     );
   });
 
@@ -170,16 +172,17 @@ void main() {
       ),
     );
 
-    final panel = tester.widget<DecoratedBox>(
+    final panel = tester.widget(
       find.byKey(const ValueKey('auth-form-panel')),
     );
-
-    final decoration = panel.decoration as BoxDecoration;
+    expect(panel, isA<ShadCard>());
 
     final panelContext =
         tester.element(find.byKey(const ValueKey('auth-form-panel')));
     final panelTheme = Theme.of(panelContext);
-    expect(decoration.color, panelTheme.cardColor);
+    final shadTheme = ShadTheme.of(panelContext);
+    expect(shadTheme.brightness, Brightness.light);
+    expect(shadTheme.colorScheme.card, AppBrandColors.surface);
     expect(panelTheme.colorScheme.brightness, Brightness.light);
     expect(panelTheme.scaffoldBackgroundColor, AppBrandColors.backgroundBlue);
   });
@@ -617,6 +620,16 @@ void main() {
       isFalse,
     );
 
+    expect(
+      tester
+          .widget<Semantics>(
+            find.byKey(const ValueKey('auth-mode-signup')),
+          )
+          .properties
+          .enabled,
+      isFalse,
+    );
+    await tester.ensureVisible(find.text('새 계정 만들기'));
     await tester.tap(find.text('새 계정 만들기'));
     await tester.pump();
     expect(

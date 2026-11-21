@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:shadcn_ui/shadcn_ui.dart';
 
 import '../../../shared/ui/app_design_system.dart';
 import '../../../shared/ui/text_editing_sync.dart';
+import '../../../theme/app_theme.dart';
 import '../../moderation/presentation/content_moderation_feedback_panel.dart';
 import '../application/letter_controller.dart';
 import '../domain/letter_models.dart';
@@ -230,18 +232,9 @@ class _MailboxView extends StatelessWidget {
                 title: '편지 목록',
               ),
               const SizedBox(height: AppSpacing.xs),
-              Wrap(
-                spacing: AppSpacing.xs,
-                runSpacing: AppSpacing.xs,
-                children: [
-                  for (final tab in LetterMailboxTab.values)
-                    ChoiceChip(
-                      key: ValueKey('letter-tab-${tab.name}'),
-                      label: Text(tab.label),
-                      selected: state.activeTab == tab,
-                      onSelected: (_) => controller.selectTab(tab),
-                    ),
-                ],
+              _LetterMailboxSegmentedTabs(
+                activeTab: state.activeTab,
+                onSelected: controller.selectTab,
               ),
               const SizedBox(height: AppSpacing.lg),
               if (state.isLoading)
@@ -313,15 +306,23 @@ class _StatsSection extends StatelessWidget {
     };
     final colorScheme = Theme.of(context).colorScheme;
     final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
 
     return DecoratedBox(
       key: const ValueKey('letter-mailbox-toolbar'),
       decoration: BoxDecoration(
-        color: colorScheme.surface.withValues(alpha: 0.52),
+        color: colorScheme.surface,
         borderRadius: AppRadii.card,
-        border: Border.all(
-          color: colorScheme.outlineVariant.withValues(alpha: 0.72),
-        ),
+        border: Border.all(color: colorScheme.outlineVariant),
+        boxShadow: [
+          BoxShadow(
+            color: isDark
+                ? Colors.black.withValues(alpha: 0.24)
+                : colorScheme.primary.withValues(alpha: 0.05),
+            blurRadius: 12,
+            offset: const Offset(0, 3),
+          ),
+        ],
       ),
       child: Padding(
         padding: const EdgeInsets.all(AppSpacing.sm),
@@ -408,6 +409,106 @@ class _StatsSection extends StatelessWidget {
   }
 }
 
+class _LetterMailboxSegmentedTabs extends StatelessWidget {
+  const _LetterMailboxSegmentedTabs({
+    required this.activeTab,
+    required this.onSelected,
+  });
+
+  final LetterMailboxTab activeTab;
+  final Future<void> Function(LetterMailboxTab tab) onSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: colorScheme.surface,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: colorScheme.outlineVariant),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(4),
+        child: Row(
+          children: [
+            for (var index = 0; index < LetterMailboxTab.values.length; index++) ...[
+              if (index > 0) const SizedBox(width: 4),
+              Expanded(
+                child: _LetterTabSegment(
+                  key: ValueKey('letter-tab-${LetterMailboxTab.values[index].name}'),
+                  label: LetterMailboxTab.values[index].label,
+                  selected: activeTab == LetterMailboxTab.values[index],
+                  onTap: () => onSelected(LetterMailboxTab.values[index]),
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _LetterTabSegment extends StatelessWidget {
+  const _LetterTabSegment({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+    super.key,
+  });
+
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    return Semantics(
+      button: true,
+      selected: selected,
+      label: label,
+      onTap: onTap,
+      child: ExcludeSemantics(
+        child: Material(
+          color: selected ? colorScheme.primaryContainer : Colors.transparent,
+          borderRadius: BorderRadius.circular(10),
+          child: InkWell(
+            borderRadius: BorderRadius.circular(10),
+            onTap: onTap,
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(minHeight: 44),
+              child: Center(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: AppSpacing.sm,
+                    vertical: AppSpacing.xs,
+                  ),
+                  child: Text(
+                    label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.labelLarge?.copyWith(
+                      color: selected
+                          ? colorScheme.onPrimaryContainer
+                          : colorScheme.onSurfaceVariant,
+                      fontWeight: selected ? FontWeight.w800 : FontWeight.w700,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _LetterCard extends StatelessWidget {
   const _LetterCard({
     required this.letter,
@@ -419,9 +520,15 @@ class _LetterCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final envelopeIcon = switch (letter.status) {
+      LetterStatus.sent => Icons.mark_email_unread_outlined,
+      LetterStatus.replied => Icons.mark_email_read_outlined,
+      _ => Icons.mail_outline,
+    };
+
     return AppContentCard(
       key: ValueKey('letter-card-${letter.id}'),
-      leadingIcon: Icons.mail_outline,
+      leadingIcon: envelopeIcon,
       title: letter.title.isEmpty ? '제목 없는 편지' : letter.title,
       subtitle: _formatLetterTimestamp(letter.createdDate),
       badges: [_StatusPill(status: letter.status)],
@@ -521,18 +628,28 @@ class _LetterDetailView extends StatelessWidget {
         ),
         if (letter.replied && letter.replyContent != null) ...[
           const SizedBox(height: AppSpacing.md),
-          Card(
-            margin: EdgeInsets.zero,
-            child: Padding(
-              padding: const EdgeInsets.all(16),
+          MaumShadThemeScope(
+            child: ShadCard(
+              padding: const EdgeInsets.all(AppSpacing.lg),
+              rowMainAxisSize: MainAxisSize.max,
+              columnCrossAxisAlignment: CrossAxisAlignment.stretch,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  Text(
-                    '답장',
-                    style: Theme.of(context).textTheme.titleMedium,
+                  Row(
+                    children: [
+                      ShadBadge.secondary(
+                        backgroundColor: Theme.of(context).colorScheme.primaryContainer,
+                        hoverBackgroundColor:
+                            Theme.of(context).colorScheme.primaryContainer,
+                        foregroundColor:
+                            Theme.of(context).colorScheme.onPrimaryContainer,
+                        child: const Text('답장'),
+                      ),
+                    ],
                   ),
-                  const SizedBox(height: AppSpacing.xs),
+                  const SizedBox(height: AppSpacing.sm),
                   Text(letter.replyContent!),
                 ],
               ),
@@ -667,13 +784,53 @@ class _LetterComposeViewState extends State<_LetterComposeView> {
 
   @override
   Widget build(BuildContext context) {
-    return AppSectionCard(
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
+
+    return MaumShadThemeScope(
       key: const ValueKey('letter-compose-form'),
-      title: '편지 쓰기',
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          TextFormField(
+      child: ShadCard(
+        padding: const EdgeInsets.all(AppSpacing.md),
+        backgroundColor: isDark ? colorScheme.surface : const Color(0xFFFBFDFF),
+        border: ShadBorder.all(
+          color: colorScheme.primary.withValues(alpha: isDark ? 0.28 : 0.2),
+          width: 1,
+        ),
+        rowMainAxisSize: MainAxisSize.max,
+        columnCrossAxisAlignment: CrossAxisAlignment.stretch,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Row(
+              children: [
+                Icon(
+                  Icons.mail_outline,
+                  size: 20,
+                  color: colorScheme.primary,
+                ),
+                const SizedBox(width: AppSpacing.xs),
+                Expanded(
+                  child: Text(
+                    '편지 쓰기',
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
+                ShadBadge.secondary(
+                  backgroundColor: colorScheme.primaryContainer,
+                  hoverBackgroundColor: colorScheme.primaryContainer,
+                  foregroundColor: colorScheme.onPrimaryContainer,
+                  child: const Text('익명 우편함'),
+                ),
+              ],
+            ),
+            const SizedBox(height: AppSpacing.sm),
+            Divider(height: 1, color: colorScheme.outlineVariant),
+            const SizedBox(height: AppSpacing.md),
+            TextFormField(
             key: const ValueKey('letter-title-field'),
             controller: _titleController,
             maxLength: LetterLimits.titleMaxLength,
@@ -732,6 +889,7 @@ class _LetterComposeViewState extends State<_LetterComposeView> {
           ),
         ],
       ),
+    ),
     );
   }
 

@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:shadcn_ui/shadcn_ui.dart';
 
+import '../../theme/app_theme.dart';
 import 'brand_identity.dart';
 
 abstract final class AppSpacing {
@@ -21,10 +23,12 @@ abstract final class AppBreakpoints {
 abstract final class AppRadii {
   static const double xs = 6;
   static const double sm = 8;
+  static const double md = 12;
+  static const double lg = 16;
   static const double pill = 999;
 
-  static BorderRadius get card => BorderRadius.circular(sm);
-  static BorderRadius get chip => BorderRadius.circular(xs);
+  static BorderRadius get card => BorderRadius.circular(lg);
+  static BorderRadius get chip => BorderRadius.circular(md);
   static BorderRadius get status => BorderRadius.circular(pill);
 }
 
@@ -97,14 +101,16 @@ class AppScreen extends StatelessWidget {
       ),
     );
 
-    return Scaffold(
-      body: SafeArea(
-        child: onRefresh == null
-            ? scrollView
-            : RefreshIndicator(
-                onRefresh: onRefresh!,
-                child: scrollView,
-              ),
+    return MaumShadThemeScope(
+      child: Scaffold(
+        body: SafeArea(
+          child: onRefresh == null
+              ? scrollView
+              : RefreshIndicator(
+                  onRefresh: onRefresh!,
+                  child: scrollView,
+                ),
+        ),
       ),
     );
   }
@@ -394,21 +400,21 @@ class AppMetricTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colors = _statusColors(Theme.of(context).colorScheme, tone);
+    final theme = Theme.of(context);
+    final colors = _statusColors(theme.colorScheme, tone);
 
-    return ConstrainedBox(
-      constraints: BoxConstraints(
-        minWidth: 148,
-        maxWidth: width,
-      ),
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          color: colors.background,
-          borderRadius: AppRadii.card,
-          border: Border.all(color: colors.border),
+    return MaumShadThemeScope(
+      child: ConstrainedBox(
+        constraints: BoxConstraints(
+          minWidth: 148,
+          maxWidth: width,
         ),
-        child: Padding(
+        child: ShadCard(
           padding: const EdgeInsets.all(AppSpacing.md),
+          backgroundColor: colors.background,
+          border: ShadBorder.all(color: colors.border, width: 1),
+          rowMainAxisSize: MainAxisSize.max,
+          columnCrossAxisAlignment: CrossAxisAlignment.stretch,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
@@ -417,17 +423,21 @@ class AppMetricTile extends StatelessWidget {
                 label,
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  color: colors.foreground,
-                  fontWeight: FontWeight.w700,
-                ),
+                style: theme.textTheme.labelMedium?.copyWith(
+                      color: colors.foreground,
+                      fontWeight: FontWeight.w700,
+                    ) ??
+                    TextStyle(
+                      color: colors.foreground,
+                      fontWeight: FontWeight.w700,
+                    ),
               ),
               const SizedBox(height: AppSpacing.xs),
               Text(
                 value,
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
-                style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                style: theme.textTheme.titleLarge?.copyWith(
                       color: colors.foreground,
                       fontWeight: FontWeight.w800,
                     ),
@@ -645,23 +655,38 @@ class AppSectionCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
-    return Card(
-      margin: EdgeInsets.zero,
-      child: Padding(
+    return MaumShadThemeScope(
+      child: ShadCard(
         padding: padding,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            if (title != null) ...[
-              Text(title!, style: theme.textTheme.titleMedium),
-              if (subtitle != null) ...[
-                const SizedBox(height: AppSpacing.xxs),
-                Text(subtitle!, style: theme.textTheme.bodyMedium),
+        rowMainAxisSize: MainAxisSize.max,
+        columnCrossAxisAlignment: CrossAxisAlignment.stretch,
+        child: Material(
+          type: MaterialType.transparency,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (title != null) ...[
+                Text(
+                  title!,
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                if (subtitle != null) ...[
+                  const SizedBox(height: AppSpacing.xxs),
+                  Text(
+                    subtitle!,
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ],
+                const SizedBox(height: AppSpacing.sm),
               ],
-              const SizedBox(height: AppSpacing.sm),
+              child,
             ],
-            child,
-          ],
+          ),
         ),
       ),
     );
@@ -798,7 +823,7 @@ class AppContentCard extends StatelessWidget {
         : InkWell(
             borderRadius: hasActions
                 ? const BorderRadius.vertical(
-                    top: Radius.circular(AppRadii.sm),
+                    top: Radius.circular(AppRadii.lg),
                   )
                 : AppRadii.card,
             excludeFromSemantics: semanticLabel != null,
@@ -818,23 +843,36 @@ class AppContentCard extends StatelessWidget {
             ),
           );
 
-    return Card(
-      margin: EdgeInsets.zero,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          wrappedSummary,
-          if (hasActions)
-            Padding(
-              padding: const EdgeInsets.fromLTRB(
-                AppSpacing.md,
-                AppSpacing.sm,
-                AppSpacing.md,
-                AppSpacing.md,
-              ),
-              child: _AppContentActions(key: actionsKey, children: actions),
-            ),
-        ],
+    return MaumShadThemeScope(
+      child: ShadCard(
+        padding: EdgeInsets.zero,
+        rowMainAxisSize: MainAxisSize.max,
+        columnCrossAxisAlignment: CrossAxisAlignment.stretch,
+        child: Material(
+          type: MaterialType.transparency,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              wrappedSummary,
+              if (hasActions) ...[
+                Divider(
+                  height: 1,
+                  color: colorScheme.outlineVariant.withValues(alpha: 0.65),
+                ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(
+                    AppSpacing.md,
+                    AppSpacing.sm,
+                    AppSpacing.md,
+                    AppSpacing.md,
+                  ),
+                  child: _AppContentActions(key: actionsKey, children: actions),
+                ),
+              ],
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -1104,15 +1142,22 @@ class AppStatusPill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colors = _statusColors(Theme.of(context).colorScheme, tone);
+    final theme = Theme.of(context);
+    final colors = _statusColors(theme.colorScheme, tone);
+    final variant = switch (tone) {
+      AppStatusTone.neutral => ShadBadgeVariant.secondary,
+      AppStatusTone.success => ShadBadgeVariant.primary,
+      AppStatusTone.warning => ShadBadgeVariant.outline,
+      AppStatusTone.danger => ShadBadgeVariant.destructive,
+    };
 
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: colors.background,
-        borderRadius: AppRadii.status,
-        border: Border.all(color: colors.border),
-      ),
-      child: Padding(
+    return MaumShadThemeScope(
+      child: ShadBadge.raw(
+        variant: variant,
+        backgroundColor: colors.background,
+        hoverBackgroundColor: colors.background,
+        foregroundColor: colors.foreground,
+        shape: StadiumBorder(side: BorderSide(color: colors.border)),
         padding: const EdgeInsets.symmetric(
           horizontal: AppSpacing.md,
           vertical: AppSpacing.xs,
@@ -1121,10 +1166,14 @@ class AppStatusPill extends StatelessWidget {
           label,
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
-          style: TextStyle(
-            color: colors.foreground,
-            fontWeight: FontWeight.w800,
-          ),
+          style: theme.textTheme.labelMedium?.copyWith(
+                color: colors.foreground,
+                fontWeight: FontWeight.w800,
+              ) ??
+              TextStyle(
+                color: colors.foreground,
+                fontWeight: FontWeight.w800,
+              ),
         ),
       ),
     );

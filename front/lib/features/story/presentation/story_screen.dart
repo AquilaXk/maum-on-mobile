@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:shadcn_ui/shadcn_ui.dart';
 
 import '../../../shared/ui/app_design_system.dart';
 import '../../../shared/ui/text_editing_sync.dart';
+import '../../../theme/app_theme.dart';
 import '../../moderation/presentation/content_moderation_feedback_panel.dart';
 import '../application/story_controller.dart';
 import '../domain/story_models.dart';
@@ -296,28 +298,24 @@ class _StoryDiscoveryStripState extends State<_StoryDiscoveryStrip> {
     final colorScheme = Theme.of(context).colorScheme;
     final theme = Theme.of(context);
 
-    return DecoratedBox(
-      key: const ValueKey('story-discovery-strip'),
-      decoration: BoxDecoration(
-        color: colorScheme.surface.withValues(alpha: 0.52),
-        borderRadius: AppRadii.card,
-        border: Border.all(
-          color: colorScheme.outlineVariant.withValues(alpha: 0.72),
-        ),
-      ),
-      child: Padding(
+    return MaumShadThemeScope(
+      child: ShadCard(
+        key: const ValueKey('story-discovery-strip'),
         padding: const EdgeInsets.symmetric(
           horizontal: AppSpacing.md,
           vertical: AppSpacing.sm,
         ),
+        rowMainAxisSize: MainAxisSize.max,
+        columnCrossAxisAlignment: CrossAxisAlignment.stretch,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
+          mainAxisSize: MainAxisSize.min,
           children: [
             Row(
               children: [
                 Icon(
                   Icons.travel_explore_outlined,
-                  size: 20,
+                  size: 18,
                   color: colorScheme.primary,
                 ),
                 const SizedBox(width: AppSpacing.xs),
@@ -339,7 +337,7 @@ class _StoryDiscoveryStripState extends State<_StoryDiscoveryStrip> {
                 ),
               ],
             ),
-            const SizedBox(height: AppSpacing.xs),
+            const SizedBox(height: 6),
             Row(
               key: const ValueKey('story-search-toolbar'),
               children: [
@@ -351,6 +349,10 @@ class _StoryDiscoveryStripState extends State<_StoryDiscoveryStrip> {
                       hintText: '제목 검색',
                       prefixIcon: Icon(Icons.search),
                       isDense: true,
+                      contentPadding: EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 10,
+                      ),
                       border: OutlineInputBorder(),
                     ),
                     onChanged: controller.updateSearchQuery,
@@ -371,7 +373,7 @@ class _StoryDiscoveryStripState extends State<_StoryDiscoveryStrip> {
                 ),
               ],
             ),
-            const SizedBox(height: AppSpacing.xs),
+            const SizedBox(height: 6),
             _StoryCategoryFilter(
               selectedCategory: state.selectedCategory,
               onSelected: controller.selectCategory,
@@ -395,23 +397,81 @@ class _StoryCategoryFilter extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
 
-    return Wrap(
-      spacing: AppSpacing.xs,
-      runSpacing: AppSpacing.xs,
-      children: [
-        for (final category in StoryCategory.values)
-          ChoiceChip(
-            key: ValueKey('story-category-${category.name}'),
-            label: Text(category.label),
-            selected: selectedCategory == category,
-            materialTapTargetSize: MaterialTapTargetSize.padded,
-            labelStyle: theme.textTheme.labelLarge?.copyWith(
-              fontWeight: selectedCategory == category ? FontWeight.w800 : null,
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: colorScheme.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: colorScheme.outlineVariant),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(3),
+        child: Wrap(
+          spacing: 4,
+          runSpacing: 4,
+          children: [
+            for (final category in StoryCategory.values)
+              _StoryCategorySegment(
+                key: ValueKey('story-category-${category.name}'),
+                label: category.label,
+                selected: selectedCategory == category,
+                onTap: () => onSelected(category),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _StoryCategorySegment extends StatelessWidget {
+  const _StoryCategorySegment({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+    super.key,
+  });
+
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    return Semantics(
+      button: true,
+      selected: selected,
+      label: label,
+      onTap: onTap,
+      child: ExcludeSemantics(
+        child: Material(
+          color: selected ? colorScheme.primaryContainer : Colors.transparent,
+          borderRadius: BorderRadius.circular(9),
+          child: InkWell(
+            borderRadius: BorderRadius.circular(9),
+            onTap: onTap,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(
+                horizontal: AppSpacing.md,
+                vertical: 6,
+              ),
+              child: Text(
+                label,
+                style: theme.textTheme.labelLarge?.copyWith(
+                  color: selected
+                      ? colorScheme.onPrimaryContainer
+                      : colorScheme.onSurfaceVariant,
+                  fontWeight: selected ? FontWeight.w800 : FontWeight.w700,
+                ),
+              ),
             ),
-            onSelected: (_) => onSelected(category),
           ),
-      ],
+        ),
+      ),
     );
   }
 }
@@ -615,12 +675,14 @@ class _CommentComposerState extends State<_CommentComposer> {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      margin: EdgeInsets.zero,
-      child: Padding(
+    return MaumShadThemeScope(
+      child: ShadCard(
         padding: const EdgeInsets.all(14),
+        rowMainAxisSize: MainAxisSize.max,
+        columnCrossAxisAlignment: CrossAxisAlignment.stretch,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
+          mainAxisSize: MainAxisSize.min,
           children: [
             TextField(
               key: const ValueKey('story-comment-field'),
@@ -703,12 +765,14 @@ class _CommentTile extends StatelessWidget {
 
     return Padding(
       padding: EdgeInsets.only(left: depth * 18),
-      child: Card(
-        margin: EdgeInsets.zero,
-        child: Padding(
+      child: MaumShadThemeScope(
+        child: ShadCard(
           padding: const EdgeInsets.all(14),
+          rowMainAxisSize: MainAxisSize.max,
+          columnCrossAxisAlignment: CrossAxisAlignment.stretch,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
             children: [
               Text(
                 comment.authorNickname,

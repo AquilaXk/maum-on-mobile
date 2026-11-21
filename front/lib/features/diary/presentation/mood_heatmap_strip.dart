@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:shadcn_ui/shadcn_ui.dart';
 
 import '../../../shared/ui/app_design_system.dart';
+import '../../../theme/app_theme.dart';
 import '../domain/mood_year_bitmap.dart';
 
 const int _heatmapWeeks = 12;
@@ -46,22 +48,18 @@ class MoodHeatmapStrip extends StatelessWidget {
         '최근 12주 감정 흐름, 기록 ${summary.recordedDays}일, 연속 ${summary.streakDays}일'
         '${summary.averageMood == null ? '' : ', 평균 기분 ${summary.averageMood!.toStringAsFixed(1)}점'}';
 
-    return Semantics(
-      key: const ValueKey('diary-mood-heatmap-strip'),
-      container: true,
-      label: semanticSummary,
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          color: colorScheme.surface,
-          borderRadius: AppRadii.card,
-          border: Border.all(
-            color: colorScheme.outlineVariant.withValues(alpha: 0.8),
-          ),
-        ),
-        child: Padding(
+    return MaumShadThemeScope(
+      child: Semantics(
+        key: const ValueKey('diary-mood-heatmap-strip'),
+        container: true,
+        label: semanticSummary,
+        child: ShadCard(
           padding: const EdgeInsets.all(AppSpacing.md),
+          rowMainAxisSize: MainAxisSize.max,
+          columnCrossAxisAlignment: CrossAxisAlignment.stretch,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
+            mainAxisSize: MainAxisSize.min,
             children: [
               Wrap(
                 spacing: AppSpacing.xs,
@@ -195,25 +193,22 @@ class _HeatmapStatBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: backgroundColor,
-        borderRadius: AppRadii.status,
+    return ShadBadge.secondary(
+      backgroundColor: backgroundColor,
+      hoverBackgroundColor: backgroundColor,
+      foregroundColor: foregroundColor,
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.xs,
+        vertical: 3,
       ),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(
-          horizontal: AppSpacing.xs,
-          vertical: 3,
-        ),
-        child: Text(
-          label,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                color: foregroundColor,
-                fontWeight: FontWeight.w700,
-              ),
-        ),
+      child: Text(
+        label,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: Theme.of(context).textTheme.labelSmall?.copyWith(
+              color: foregroundColor,
+              fontWeight: FontWeight.w700,
+            ),
       ),
     );
   }

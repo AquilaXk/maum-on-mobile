@@ -61,6 +61,7 @@
       "flutter_lints": "BSD-3-Clause",
       "flutter_secure_storage": "BSD-3-Clause",
       "flutter_test": "BSD-3-Clause",
+      "shadcn_ui": "MIT",
       "url_launcher": "BSD-3-Clause"
     },
     "gradle": {

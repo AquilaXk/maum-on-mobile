@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:maum_on_mobile_front/app/app_routes.dart';
 import 'package:maum_on_mobile_front/app/maum_bottom_navigation.dart';
+import 'package:maum_on_mobile_front/shared/ui/brand_identity.dart';
 import 'package:maum_on_mobile_front/theme/app_theme.dart';
 
 void main() {
@@ -12,10 +13,11 @@ void main() {
   testWidgets('preserves exact light theme tokens and tab semantics',
       (tester) async {
     AuthenticatedRoute? selected;
+    final lightTheme = buildAppTheme();
 
     await tester.pumpWidget(
       MaterialApp(
-        theme: buildAppTheme(),
+        theme: lightTheme,
         home: Scaffold(
           bottomNavigationBar: MaumBottomNavigation(
             routes: primaryRoutes,
@@ -31,7 +33,18 @@ void main() {
     );
     final decoration = surface.decoration as BoxDecoration;
     expect(decoration.color, Colors.white);
-    expect(decoration.border?.top.color, const Color(0xFFE6E6E6));
+    expect(decoration.border?.top.color, lightTheme.colorScheme.outlineVariant);
+    expect(decoration.boxShadow, isNotEmpty);
+
+    final activeSurface = tester.widget<AnimatedContainer>(
+      find.byKey(const ValueKey('route-tab-home-surface')),
+    );
+    final activeDecoration = activeSurface.decoration as BoxDecoration;
+    expect(
+      activeDecoration.color,
+      lightTheme.colorScheme.primary.withValues(alpha: 0.14),
+    );
+    expect(activeDecoration.borderRadius, BorderRadius.circular(14));
 
     final activeIcon = tester.widget<Icon>(
       find.descendant(
@@ -45,8 +58,8 @@ void main() {
         matching: find.byType(Icon),
       ),
     );
-    expect(activeIcon.color, const Color(0xFF111111));
-    expect(inactiveIcon.color, const Color(0xFF596577));
+    expect(activeIcon.color, AppBrandColors.primaryBluePressed);
+    expect(inactiveIcon.color, lightTheme.colorScheme.onSurfaceVariant);
     expect(find.bySemanticsLabel('홈 Tab 1 of 5'), findsOneWidget);
 
     await tester.tap(find.byKey(const ValueKey('route-tab-diary')));
@@ -78,6 +91,17 @@ void main() {
     expect(decoration.color, darkTheme.colorScheme.surface);
     expect(decoration.color, isNot(Colors.white));
     expect(decoration.border?.top.color, darkTheme.colorScheme.outlineVariant);
+    expect(decoration.boxShadow, isNotEmpty);
+
+    final activeSurface = tester.widget<AnimatedContainer>(
+      find.byKey(const ValueKey('route-tab-diary-surface')),
+    );
+    final activeDecoration = activeSurface.decoration as BoxDecoration;
+    expect(
+      activeDecoration.color,
+      darkTheme.colorScheme.primary.withValues(alpha: 0.14),
+    );
+    expect(activeDecoration.borderRadius, BorderRadius.circular(14));
 
     final activeIcon = tester.widget<Icon>(
       find.descendant(

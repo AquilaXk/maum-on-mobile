@@ -1,5 +1,7 @@
+// Shadcn UI card & segmented form surface adapted from nank1ro/flutter-shadcn-ui (MIT).
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:shadcn_ui/shadcn_ui.dart';
 
 import '../application/auth_controller.dart';
 import '../deeplink/external_login.dart';
@@ -84,127 +86,140 @@ class _AuthScreenState extends State<AuthScreen> {
       value: overlayStyle,
       child: Theme(
         data: theme,
-        child: Scaffold(
-          body: DecoratedBox(
-            key: const ValueKey('auth-blue-shell'),
-            decoration: BoxDecoration(
-              color: theme.scaffoldBackgroundColor,
-            ),
-            child: SafeArea(
-              child: LayoutBuilder(
-                builder: (context, constraints) {
-                  final minContentHeight =
-                      (constraints.maxHeight - AppSpacing.xxl * 2)
-                          .clamp(0.0, double.infinity)
-                          .toDouble();
-                  return SingleChildScrollView(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: AppSpacing.xl,
-                      vertical: AppSpacing.xxl,
-                    ),
-                    child: Center(
-                      child: ConstrainedBox(
-                        constraints: BoxConstraints(
-                          minHeight: minContentHeight,
-                          maxWidth: 440,
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            const _AuthHeader(),
-                            const SizedBox(height: AppSpacing.xl),
-                            _AuthFormPanel(
-                              title: _modeTitle,
-                              icon: _submitIcon,
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.stretch,
-                                children: [
-                                  if (state.errorMessage != null) ...[
-                                    _MessagePanel(
-                                      message: state.errorMessage!,
-                                      color: theme.colorScheme.errorContainer,
-                                      textColor:
-                                          theme.colorScheme.onErrorContainer,
-                                      isError: true,
+        child: MaumShadThemeScope(
+          child: Scaffold(
+            body: DecoratedBox(
+              key: const ValueKey('auth-blue-shell'),
+              decoration: BoxDecoration(
+                color: theme.scaffoldBackgroundColor,
+              ),
+              child: SafeArea(
+                child: LayoutBuilder(
+                  builder: (context, constraints) {
+                    final minContentHeight =
+                        (constraints.maxHeight - AppSpacing.xxl * 2)
+                            .clamp(0.0, double.infinity)
+                            .toDouble();
+                    final showModeTabs = _mode == AuthFormMode.login ||
+                        _mode == AuthFormMode.signup;
+                    return SingleChildScrollView(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: AppSpacing.xl,
+                        vertical: AppSpacing.xxl,
+                      ),
+                      child: Center(
+                        child: ConstrainedBox(
+                          constraints: BoxConstraints(
+                            minHeight: minContentHeight,
+                            maxWidth: 440,
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              const _AuthHeader(),
+                              const SizedBox(height: AppSpacing.lg),
+                              _AuthFormPanel(
+                                title: _modeTitle,
+                                icon: _submitIcon,
+                                modeSwitcher: showModeTabs
+                                    ? _AuthModeSegmentedBar(
+                                        mode: _mode,
+                                        isBusy: isAuthBusy,
+                                        onChanged: _changeMode,
+                                      )
+                                    : null,
+                                child: Column(
+                                  crossAxisAlignment:
+                                      CrossAxisAlignment.stretch,
+                                  children: [
+                                    if (state.errorMessage != null) ...[
+                                      _MessagePanel(
+                                        message: state.errorMessage!,
+                                        color: theme.colorScheme.errorContainer,
+                                        textColor:
+                                            theme.colorScheme.onErrorContainer,
+                                        isError: true,
+                                      ),
+                                      const SizedBox(height: AppSpacing.lg),
+                                    ],
+                                    if (externalLoginState?.errorMessage !=
+                                        null) ...[
+                                      _MessagePanel(
+                                        message:
+                                            externalLoginState!.errorMessage!,
+                                        color: theme.colorScheme.errorContainer,
+                                        textColor:
+                                            theme.colorScheme.onErrorContainer,
+                                        isError: true,
+                                      ),
+                                      const SizedBox(height: AppSpacing.lg),
+                                    ],
+                                    if (state.infoMessage != null) ...[
+                                      _MessagePanel(
+                                        message: state.infoMessage!,
+                                        color:
+                                            theme.colorScheme.primaryContainer,
+                                        textColor: theme
+                                            .colorScheme.onPrimaryContainer,
+                                      ),
+                                      const SizedBox(height: AppSpacing.lg),
+                                    ],
+                                    ..._fieldsForMode(theme, isAuthBusy),
+                                    const SizedBox(height: AppSpacing.xl),
+                                    FilledButton.icon(
+                                      key: ValueKey(_submitButtonKey),
+                                      onPressed: isAuthBusy ? null : _submit,
+                                      icon: state.isSubmitting
+                                          ? SizedBox.square(
+                                              dimension: 18,
+                                              child: CircularProgressIndicator(
+                                                strokeWidth: 2,
+                                                color:
+                                                    theme.colorScheme.onPrimary,
+                                              ),
+                                            )
+                                          : Icon(_submitIcon),
+                                      label: Text(
+                                        state.isSubmitting
+                                            ? '처리 중'
+                                            : _submitLabel,
+                                      ),
                                     ),
-                                    const SizedBox(height: AppSpacing.lg),
+                                    if (secondaryActions.isNotEmpty) ...[
+                                      const SizedBox(height: AppSpacing.md),
+                                      ...secondaryActions,
+                                    ],
                                   ],
-                                  if (externalLoginState?.errorMessage !=
-                                      null) ...[
-                                    _MessagePanel(
-                                      message:
-                                          externalLoginState!.errorMessage!,
-                                      color: theme.colorScheme.errorContainer,
-                                      textColor:
-                                          theme.colorScheme.onErrorContainer,
-                                      isError: true,
-                                    ),
-                                    const SizedBox(height: AppSpacing.lg),
-                                  ],
-                                  if (state.infoMessage != null) ...[
-                                    _MessagePanel(
-                                      message: state.infoMessage!,
-                                      color: theme.colorScheme.primaryContainer,
-                                      textColor:
-                                          theme.colorScheme.onPrimaryContainer,
-                                    ),
-                                    const SizedBox(height: AppSpacing.lg),
-                                  ],
-                                  ..._fieldsForMode(theme, isAuthBusy),
-                                  const SizedBox(height: AppSpacing.xl),
-                                  FilledButton.icon(
-                                    key: ValueKey(_submitButtonKey),
-                                    onPressed: isAuthBusy ? null : _submit,
-                                    icon: state.isSubmitting
-                                        ? SizedBox.square(
-                                            dimension: 18,
-                                            child: CircularProgressIndicator(
-                                              strokeWidth: 2,
-                                              color:
-                                                  theme.colorScheme.onPrimary,
-                                            ),
-                                          )
-                                        : Icon(_submitIcon),
-                                    label: Text(
-                                      state.isSubmitting
-                                          ? '처리 중'
-                                          : _submitLabel,
-                                    ),
-                                  ),
-                                  if (secondaryActions.isNotEmpty) ...[
-                                    const SizedBox(height: AppSpacing.md),
-                                    ...secondaryActions,
-                                  ],
-                                ],
-                              ),
-                            ),
-                            const SizedBox(height: AppSpacing.lg),
-                            LegalDisclosureLinks(
-                              keyPrefix: 'auth',
-                              onOpenExternalUri: widget.onOpenExternalUri,
-                              showAccountDeletionGuidance: false,
-                            ),
-                            const SizedBox(height: AppSpacing.xs),
-                            Center(
-                              child: TextButton.icon(
-                                key: const ValueKey(
-                                    'auth-account-deletion-link'),
-                                onPressed: () =>
-                                    _showAccountDeletionGuidance(context),
-                                icon: const Icon(
-                                  Icons.person_remove_outlined,
-                                  size: 18,
                                 ),
-                                label: const Text('회원 탈퇴'),
                               ),
-                            ),
-                          ],
+                              const SizedBox(height: AppSpacing.lg),
+                              LegalDisclosureLinks(
+                                keyPrefix: 'auth',
+                                onOpenExternalUri: widget.onOpenExternalUri,
+                                showAccountDeletionGuidance: false,
+                              ),
+                              const SizedBox(height: AppSpacing.xs),
+                              Center(
+                                child: TextButton.icon(
+                                  key: const ValueKey(
+                                      'auth-account-deletion-link'),
+                                  onPressed: () =>
+                                      _showAccountDeletionGuidance(context),
+                                  icon: const Icon(
+                                    Icons.person_remove_outlined,
+                                    size: 18,
+                                  ),
+                                  label: const Text('회원 탈퇴'),
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
                       ),
-                    ),
-                  );
-                },
+                    );
+                  },
+                ),
               ),
             ),
           ),
@@ -475,13 +490,6 @@ class _AuthScreenState extends State<AuthScreen> {
                 ? null
                 : () => _changeMode(AuthFormMode.passwordResetRequest),
             child: const Text('비밀번호를 잊으셨나요?'),
-          ),
-        );
-        actions.add(
-          TextButton(
-            onPressed:
-                isAuthBusy ? null : () => _changeMode(AuthFormMode.signup),
-            child: const Text('새 계정 만들기'),
           ),
         );
         final providers =
@@ -759,14 +767,136 @@ class _AuthHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.center,
-      children: [
-        MaumOnBrandWordmark(
-          height: 44,
-          foregroundColor: Theme.of(context).colorScheme.onSurface,
+    final theme = Theme.of(context);
+
+    return ShadCard(
+      key: const ValueKey('auth-brand-header-card'),
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.lg,
+        vertical: AppSpacing.sm,
+      ),
+      rowMainAxisSize: MainAxisSize.max,
+      rowMainAxisAlignment: MainAxisAlignment.center,
+      columnCrossAxisAlignment: CrossAxisAlignment.center,
+      child: Center(
+        child: MaumOnBrandWordmark(
+          height: 40,
+          foregroundColor: theme.colorScheme.onSurface,
         ),
-      ],
+      ),
+    );
+  }
+}
+
+class _AuthModeSegmentedBar extends StatelessWidget {
+  const _AuthModeSegmentedBar({
+    required this.mode,
+    required this.isBusy,
+    required this.onChanged,
+  });
+
+  final AuthFormMode mode;
+  final bool isBusy;
+  final ValueChanged<AuthFormMode> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    return DecoratedBox(
+      key: const ValueKey('auth-mode-segmented-bar'),
+      decoration: BoxDecoration(
+        color: colorScheme.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: colorScheme.outlineVariant),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(4),
+        child: Row(
+          children: [
+            Expanded(
+              child: _AuthModeSegment(
+                segmentKey: const ValueKey('auth-mode-login'),
+                label: '로그인',
+                selected: mode == AuthFormMode.login,
+                onTap: isBusy ? null : () => onChanged(AuthFormMode.login),
+              ),
+            ),
+            const SizedBox(width: 4),
+            Expanded(
+              child: _AuthModeSegment(
+                segmentKey: const ValueKey('auth-mode-signup'),
+                label: '새 계정 만들기',
+                selected: mode == AuthFormMode.signup,
+                onTap: isBusy ? null : () => onChanged(AuthFormMode.signup),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _AuthModeSegment extends StatelessWidget {
+  const _AuthModeSegment({
+    required this.segmentKey,
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final Key segmentKey;
+  final String label;
+  final bool selected;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    return Semantics(
+      key: segmentKey,
+      button: true,
+      selected: selected,
+      enabled: onTap != null,
+      label: label,
+      onTap: onTap,
+      child: ExcludeSemantics(
+        child: Material(
+          color: selected ? colorScheme.surface : Colors.transparent,
+          borderRadius: BorderRadius.circular(9),
+          child: InkWell(
+            borderRadius: BorderRadius.circular(9),
+            onTap: onTap,
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(minHeight: 44),
+              child: Center(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: AppSpacing.xs,
+                    vertical: AppSpacing.xs,
+                  ),
+                  child: Text(
+                    label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.labelLarge?.copyWith(
+                      color: selected
+                          ? colorScheme.onSurface
+                          : colorScheme.onSurfaceVariant,
+                      fontWeight:
+                          selected ? FontWeight.w800 : FontWeight.w700,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
     );
   }
 }
@@ -776,75 +906,62 @@ class _AuthFormPanel extends StatelessWidget {
     required this.title,
     required this.icon,
     required this.child,
+    this.modeSwitcher,
   });
 
   final String title;
   final IconData icon;
+  final Widget? modeSwitcher;
   final Widget child;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-    final panelColor = theme.cardColor;
-    final shadowColor = theme.brightness == Brightness.dark
-        ? Colors.black.withValues(alpha: 0.35)
-        : AppBrandColors.primaryBlue.withValues(alpha: 0.08);
 
-    return DecoratedBox(
+    return ShadCard(
       key: const ValueKey('auth-form-panel'),
-      decoration: BoxDecoration(
-        color: panelColor,
-        borderRadius: AppRadii.card,
-        border: Border.all(color: colorScheme.outlineVariant),
-        boxShadow: [
-          BoxShadow(
-            color: shadowColor,
-            blurRadius: 18,
-            offset: const Offset(0, 8),
-          ),
-        ],
-      ),
-      child: ClipRRect(
-        borderRadius: AppRadii.card,
-        child: Material(
-          color: Colors.transparent,
-          child: Padding(
-            padding: const EdgeInsets.all(AppSpacing.xl),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
+      padding: const EdgeInsets.all(AppSpacing.xl),
+      rowMainAxisSize: MainAxisSize.max,
+      columnCrossAxisAlignment: CrossAxisAlignment.stretch,
+      child: Material(
+        type: MaterialType.transparency,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (modeSwitcher != null) ...[
+              modeSwitcher!,
+              const SizedBox(height: AppSpacing.lg),
+            ],
+            Row(
+              key: const ValueKey('auth-form-title-row'),
               children: [
-                Row(
-                  key: const ValueKey('auth-form-title-row'),
-                  children: [
-                    DecoratedBox(
-                      key: const ValueKey('auth-form-title-icon'),
-                      decoration: BoxDecoration(
-                        color: theme.colorScheme.primaryContainer,
-                        borderRadius: AppRadii.chip,
-                      ),
-                      child: ExcludeSemantics(
-                        child: Padding(
-                          padding: const EdgeInsets.all(AppSpacing.xs),
-                          child: Icon(
-                            icon,
-                            color: theme.colorScheme.onPrimaryContainer,
-                            size: 20,
-                          ),
-                        ),
+                DecoratedBox(
+                  key: const ValueKey('auth-form-title-icon'),
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.primaryContainer,
+                    borderRadius: AppRadii.chip,
+                  ),
+                  child: ExcludeSemantics(
+                    child: Padding(
+                      padding: const EdgeInsets.all(AppSpacing.xs),
+                      child: Icon(
+                        icon,
+                        color: theme.colorScheme.onPrimaryContainer,
+                        size: 20,
                       ),
                     ),
-                    const SizedBox(width: AppSpacing.sm),
-                    Expanded(
-                      child: Text(title, style: theme.textTheme.titleLarge),
-                    ),
-                  ],
+                  ),
                 ),
-                const SizedBox(height: AppSpacing.lg),
-                child,
+                const SizedBox(width: AppSpacing.sm),
+                Expanded(
+                  child: Text(title, style: theme.textTheme.titleLarge),
+                ),
               ],
             ),
-          ),
+            const SizedBox(height: AppSpacing.lg),
+            child,
+          ],
         ),
       ),
     );
@@ -970,6 +1087,7 @@ class _QuickLoginProviderButton extends StatelessWidget {
     final enabled = !isStarting;
     final opacity = enabled ? 1.0 : 0.55;
     final label = provider.label;
+    final foreground = _providerForeground(provider);
 
     return Semantics(
       key: ValueKey(provider.buttonKey),
@@ -982,15 +1100,46 @@ class _QuickLoginProviderButton extends StatelessWidget {
           opacity: opacity,
           child: Material(
             color: _providerBackground(provider),
-            shape: CircleBorder(side: _providerBorder(provider)),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(14),
+              side: _providerBorder(context, provider),
+            ),
             clipBehavior: Clip.antiAlias,
             child: InkWell(
-              customBorder: const CircleBorder(),
+              borderRadius: BorderRadius.circular(14),
               onTap: enabled ? onPressed : null,
-              child: SizedBox.square(
-                dimension: 58,
-                child: Center(
-                  child: _QuickLoginProviderMark(provider: provider),
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(
+                  minWidth: 112,
+                  minHeight: 52,
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: AppSpacing.md,
+                    vertical: AppSpacing.sm,
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      SizedBox.square(
+                        dimension: 24,
+                        child: Center(
+                          child: _QuickLoginProviderMark(provider: provider),
+                        ),
+                      ),
+                      const SizedBox(width: AppSpacing.xs),
+                      Text(
+                        label,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                              color: foreground,
+                              fontWeight: FontWeight.w800,
+                            ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ),
@@ -1010,11 +1159,23 @@ class _QuickLoginProviderButton extends StatelessWidget {
     };
   }
 
-  BorderSide _providerBorder(LoginProvider provider) {
+  Color _providerForeground(LoginProvider provider) {
+    return switch (provider) {
+      LoginProvider.kakao => const Color(0xFF3C1E1E),
+      LoginProvider.google => const Color(0xFF1E293B),
+      _ => Colors.white,
+    };
+  }
+
+  BorderSide _providerBorder(BuildContext context, LoginProvider provider) {
     return switch (provider) {
       LoginProvider.google => const BorderSide(
           color: Color(0xFF4285F4),
-          width: 1.4,
+          width: 1.2,
+        ),
+      LoginProvider.apple => BorderSide(
+          color: Theme.of(context).colorScheme.outlineVariant,
+          width: 1,
         ),
       _ => BorderSide.none,
     };
@@ -1031,58 +1192,49 @@ class _QuickLoginProviderMark extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return switch (provider) {
-      LoginProvider.naver => const Padding(
-          padding: EdgeInsets.all(10),
-          child: FittedBox(
-            fit: BoxFit.scaleDown,
-            child: Text(
-              'N',
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 30,
-                fontWeight: FontWeight.w900,
-              ),
+      LoginProvider.naver => const FittedBox(
+          fit: BoxFit.scaleDown,
+          child: Text(
+            'N',
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 20,
+              fontWeight: FontWeight.w900,
             ),
           ),
         ),
       LoginProvider.kakao => const Icon(
           Icons.chat_bubble,
           color: Color(0xFF3C1E1E),
-          size: 25,
+          size: 19,
         ),
-      LoginProvider.facebook => const Padding(
-          padding: EdgeInsets.all(10),
-          child: FittedBox(
-            fit: BoxFit.scaleDown,
-            child: Text(
-              'f',
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 38,
-                fontWeight: FontWeight.w800,
-                height: 0.95,
-              ),
+      LoginProvider.facebook => const FittedBox(
+          fit: BoxFit.scaleDown,
+          child: Text(
+            'f',
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 22,
+              fontWeight: FontWeight.w800,
+              height: 1,
             ),
           ),
         ),
-      LoginProvider.google => const Padding(
-          padding: EdgeInsets.all(10),
-          child: FittedBox(
-            fit: BoxFit.scaleDown,
-            child: Text(
-              'G',
-              style: TextStyle(
-                color: Color(0xFF4285F4),
-                fontSize: 28,
-                fontWeight: FontWeight.w800,
-              ),
+      LoginProvider.google => const FittedBox(
+          fit: BoxFit.scaleDown,
+          child: Text(
+            'G',
+            style: TextStyle(
+              color: Color(0xFF4285F4),
+              fontSize: 20,
+              fontWeight: FontWeight.w800,
             ),
           ),
         ),
       LoginProvider.apple => const Icon(
           Icons.apple,
           color: Colors.white,
-          size: 30,
+          size: 22,
         ),
     };
   }

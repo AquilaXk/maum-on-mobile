@@ -204,6 +204,11 @@ class _MaumOnMobileAppState extends State<MaumOnMobileApp>
       theme: buildAppTheme(),
       darkTheme: buildDarkAppTheme(),
       themeMode: ThemeMode.system,
+      builder: (context, child) {
+        return MaumShadThemeScope(
+          child: child ?? const SizedBox.shrink(),
+        );
+      },
       scrollBehavior: const MaterialScrollBehavior().copyWith(
         overscroll: false,
       ),

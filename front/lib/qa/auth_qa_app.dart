@@ -18,6 +18,11 @@ Widget buildAuthQaApp() {
     debugShowCheckedModeBanner: false,
     theme: buildAppTheme(),
     themeMode: ThemeMode.light,
+    builder: (context, child) {
+      return MaumShadThemeScope(
+        child: child ?? const SizedBox.shrink(),
+      );
+    },
     scrollBehavior: const MaterialScrollBehavior().copyWith(
       overscroll: false,
     ),
