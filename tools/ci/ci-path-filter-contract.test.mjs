@@ -94,6 +94,7 @@ test("ios job validates a Flutter iOS scaffold under front", async () => {
   assert.match(ios, /\[\[ -f front\/pubspec\.yaml && -d front\/ios \]\]/);
   assert.match(ios, /echo "stack=flutter"/);
   assert.match(ios, /subosito\/flutter-action@[a-f0-9]{40}/);
+  assert.match(ios, /ruby\/setup-ruby@[a-f0-9]{40}/);
   assert.match(ios, /bundle _2\.4\.22_ install --jobs 4 --retry 3/);
   assert.match(ios, /\.\.\/tools\/flutterw pub get/);
   assert.match(ios, /\.\.\/tools\/flutterw build ios --simulator --no-codesign/);
@@ -108,6 +109,7 @@ test("ci pins GitHub Action references to immutable commits", async () => {
   assert.match(workflow, /actions\/setup-node@[a-f0-9]{40}/);
   assert.match(workflow, /actions\/setup-java@[a-f0-9]{40}/);
   assert.match(workflow, /subosito\/flutter-action@[a-f0-9]{40}/);
+  assert.match(workflow, /ruby\/setup-ruby@[a-f0-9]{40}/);
   assert.match(workflow, /hashicorp\/setup-terraform@[a-f0-9]{40}/);
 });
 

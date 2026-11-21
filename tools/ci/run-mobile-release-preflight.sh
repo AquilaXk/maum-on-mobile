@@ -194,7 +194,7 @@ check_ios() {
   if pod_output="$("${pod}" --version 2>&1)"; then
     record "CocoaPods" "ok" "$(printf '%s\n' "${pod_output}" | tail -n 1)"
   else
-    pod_detail="$(printf '%s\n' "${pod_output}" | head -n 1)"
+    pod_detail="$(printf '%s\n' "${pod_output}" | tail -n 5 | tr '\n' ' ' | tr -s ' ')"
     record "CocoaPods" "missing" "${pod_detail:-pod --version failed}"
   fi
 }
