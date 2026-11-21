@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../../shared/ui/app_design_system.dart';
+import '../../../shared/ui/text_editing_sync.dart';
 import '../../legal/domain/legal_disclosures.dart';
 import '../../legal/presentation/legal_disclosure_links.dart';
 import '../application/settings_controller.dart';
@@ -82,14 +83,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   void _syncText(TextEditingController controller, String value) {
-    if (controller.text == value) {
-      return;
-    }
-
-    controller.value = TextEditingValue(
-      text: value,
-      selection: TextSelection.collapsed(offset: value.length),
-    );
+    syncTextControllerWithImeGuard(controller, value);
   }
 
   @override

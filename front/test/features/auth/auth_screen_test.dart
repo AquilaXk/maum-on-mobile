@@ -636,6 +636,42 @@ void main() {
       isNotNull,
     );
   });
+
+  testWidgets('다크 테마 전달 시 로그인 셸과 시스템 아이콘 밝기를 다크 토큰으로 전환한다', (tester) async {
+    final repository = _FakeAuthRepository();
+    final darkTheme = buildDarkAppTheme();
+    await tester.pumpWidget(
+      _AuthScreenHarness(
+        repository: repository,
+        theme: darkTheme,
+      ),
+    );
+
+    final overlay = tester.widget<AnnotatedRegion<SystemUiOverlayStyle>>(
+      find.byKey(const ValueKey('auth-system-ui-overlay')),
+    );
+    final panelTheme = Theme.of(
+      tester.element(find.byKey(const ValueKey('auth-form-panel'))),
+    );
+
+    expect(overlay.value.statusBarIconBrightness, Brightness.light);
+    expect(panelTheme.colorScheme.brightness, Brightness.dark);
+    expect(panelTheme.scaffoldBackgroundColor, const Color(0xFF18191D));
+    expect(panelTheme.cardColor, const Color(0xFF212529));
+  });
+
+  testWidgets('빈 이메일과 비밀번호 로그인 시 서버 요청 전에 입력 안내를 표시한다', (tester) async {
+    final repository = _FakeAuthRepository();
+    await tester.pumpWidget(
+      _AuthScreenHarness(repository: repository),
+    );
+
+    await tester.tap(find.byKey(const ValueKey('login-submit-button')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('이메일을 입력해 주세요.'), findsOneWidget);
+    expect(find.text('비밀번호를 입력해 주세요.'), findsOneWidget);
+  });
 }
 
 void _expectOnlyQuickLoginProviders(List<String> visibleProviders) {

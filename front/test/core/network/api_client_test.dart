@@ -94,6 +94,48 @@ void main() {
       expect(await tokenStore.readRefreshToken(), 'new-refresh');
     });
 
+    test('retries void requests once after refreshing an expired access token',
+        () async {
+      final transport = _FakeApiTransport([
+        const ApiTransportResponse(statusCode: 401),
+        const ApiTransportResponse(
+          statusCode: 200,
+          body: {'success': true, 'data': null},
+        ),
+        const ApiTransportResponse(statusCode: 401),
+        const ApiTransportResponse(statusCode: 204),
+      ]);
+      final tokenStore = MemoryAuthTokenStore(
+        initialTokens: const TokenPair(
+          accessToken: 'old-access',
+          refreshToken: 'refresh-token',
+        ),
+      );
+      final client = ApiClient(
+        transport: transport,
+        tokenStore: tokenStore,
+        tokenRefresher: const _StaticTokenRefresher(
+          TokenPair(
+            accessToken: 'new-access',
+            refreshToken: 'new-refresh',
+          ),
+        ),
+      );
+
+      await client.postVoid('/api/v1/letters/1/accept');
+      await client.deleteVoid('/api/v1/diaries/1');
+
+      expect(transport.requests, hasLength(4));
+      expect(
+        transport.requests[1].headers['Authorization'],
+        'Bearer new-access',
+      );
+      expect(
+        transport.requests[3].headers['Authorization'],
+        'Bearer new-access',
+      );
+    });
+
     test('shares an in-flight token refresh across concurrent 401s', () async {
       final transport = _FakeApiTransport([
         const ApiTransportResponse(statusCode: 401),
@@ -148,6 +190,48 @@ void main() {
       expect(transport.requests, hasLength(4));
       expect(await tokenStore.readAccessToken(), 'new-access');
       expect(await tokenStore.readRefreshToken(), 'new-refresh');
+    });
+
+    test('retries void requests once after refreshing an expired access token',
+        () async {
+      final transport = _FakeApiTransport([
+        const ApiTransportResponse(statusCode: 401),
+        const ApiTransportResponse(
+          statusCode: 200,
+          body: {'success': true, 'data': null},
+        ),
+        const ApiTransportResponse(statusCode: 401),
+        const ApiTransportResponse(statusCode: 204),
+      ]);
+      final tokenStore = MemoryAuthTokenStore(
+        initialTokens: const TokenPair(
+          accessToken: 'old-access',
+          refreshToken: 'refresh-token',
+        ),
+      );
+      final client = ApiClient(
+        transport: transport,
+        tokenStore: tokenStore,
+        tokenRefresher: const _StaticTokenRefresher(
+          TokenPair(
+            accessToken: 'new-access',
+            refreshToken: 'new-refresh',
+          ),
+        ),
+      );
+
+      await client.postVoid('/api/v1/letters/1/accept');
+      await client.deleteVoid('/api/v1/diaries/1');
+
+      expect(transport.requests, hasLength(4));
+      expect(
+        transport.requests[1].headers['Authorization'],
+        'Bearer new-access',
+      );
+      expect(
+        transport.requests[3].headers['Authorization'],
+        'Bearer new-access',
+      );
     });
 
     test('clears tokens when refresh fails', () async {

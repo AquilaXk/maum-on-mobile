@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 
 import '../../../core/network/api_error.dart';
+import '../../../core/network/idempotency_key.dart';
 import '../../draft_recovery/data/draft_recovery_repository.dart';
 import '../../draft_recovery/domain/draft_recovery_models.dart';
 import '../../moderation/data/content_moderation_repository.dart';
@@ -218,6 +219,8 @@ class LetterController extends ChangeNotifier {
   bool _isDisposed = false;
   int? _writingNotifiedLetterId;
   int _loadRequestId = 0;
+  final ScopedIdempotencyKey _createLetterIdempotencyKey =
+      ScopedIdempotencyKey('letter');
 
   LetterState get state => _state;
 
@@ -396,7 +399,14 @@ class LetterController extends ChangeNotifier {
         return;
       }
 
-      await _letterRepository.createLetter(draft);
+      final idempotencyKey = _createLetterIdempotencyKey.keyFor(
+        '${draft.title}\n${draft.content}',
+      );
+      await _letterRepository.createLetter(
+        draft,
+        idempotencyKey: idempotencyKey,
+      );
+      _createLetterIdempotencyKey.clear();
       await _draftRepository?.delete(_composeDraftKey);
       _setState(
         _state.copyWith(
@@ -474,6 +484,7 @@ class LetterController extends ChangeNotifier {
   }
 
   void cancelCompose() {
+    _createLetterIdempotencyKey.clear();
     _setState(
       _state.copyWith(
         mode: LetterViewMode.mailbox,

@@ -22,6 +22,7 @@ import com.maumonmobile.global.web.ApiException
 import com.maumonmobile.global.web.ErrorCode
 import org.springframework.stereotype.Service
 import java.time.Instant
+import java.util.concurrent.ThreadLocalRandom
 import kotlin.math.ceil
 
 @Service
@@ -35,12 +36,15 @@ class LetterService(
     override fun create(user: AuthenticatedUser, command: LetterSaveCommand): Long {
         val member = findActiveMember(user)
         contentModerationService.ensureAllowed(member.id, ContentModerationTarget.LETTER, command.title, command.content)
-        val receiver = availableLetterReceivers(senderId = member.id).maxByOrNull { receiver -> receiver.id }
-            ?: throw ApiException(
+        val candidates = availableLetterReceivers(senderId = member.id)
+        if (candidates.isEmpty()) {
+            throw ApiException(
                 ErrorCode.NOT_FOUND,
                 "지금은 편지를 받을 수 있는 회원이 없습니다.",
                 reason = "LETTER_NO_AVAILABLE_RECEIVER",
             )
+        }
+        val receiver = candidates[ThreadLocalRandom.current().nextInt(candidates.size)]
 
         val letter = letterRepository.save(
             senderId = member.id,
@@ -171,10 +175,9 @@ class LetterService(
         )
     }
 
-    override fun status(letterId: Long): String {
-        val letter = letterRepository.findById(letterId)
-            ?: throw ApiException(ErrorCode.NOT_FOUND)
-        return letter.status
+    override fun status(user: AuthenticatedUser, letterId: Long): String {
+        val member = findActiveMember(user)
+        return findAccessibleLetter(member.id, letterId).status
     }
 
     private fun findAccessibleLetter(memberId: Long, letterId: Long): Letter {

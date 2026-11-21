@@ -424,7 +424,7 @@ class _FakeReportRepository implements ReportRepository {
   final List<ReportDraft> drafts = [];
 
   @override
-  Future<int> createReport(ReportDraft draft) async {
+  Future<int> createReport(ReportDraft draft, {String? idempotencyKey}) async {
     drafts.add(draft);
     return drafts.length;
   }

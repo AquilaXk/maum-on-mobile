@@ -1,15 +1,35 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:flutter/semantics.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:maum_on_mobile_front/shared/ui/app_design_system.dart';
 import 'package:maum_on_mobile_front/theme/app_theme.dart';
 
+double _contrastRatio(Color foreground, Color background) {
+  double linear(double channel) {
+    return channel <= 0.03928
+        ? channel / 12.92
+        : math.pow((channel + 0.055) / 1.055, 2.4).toDouble();
+  }
+
+  double luminance(Color c) {
+    return 0.2126 * linear(c.r) + 0.7152 * linear(c.g) + 0.0722 * linear(c.b);
+  }
+
+  final l1 = luminance(foreground);
+  final l2 = luminance(background);
+  final lighter = math.max(l1, l2);
+  final darker = math.min(l1, l2);
+  return (lighter + 0.05) / (darker + 0.05);
+}
+
 void main() {
   test('uses the product blue brand colors without changing component scale',
       () {
     final theme = buildAppTheme();
 
-    expect(theme.colorScheme.primary, const Color(0xFF4F8CF0));
+    expect(theme.colorScheme.primary, const Color(0xFF2563EB));
     expect(theme.colorScheme.secondary, const Color(0xFF18A9ED));
     expect(theme.scaffoldBackgroundColor, const Color(0xFFEDF5FF));
     expect(theme.cardTheme.color, Colors.white);
@@ -441,6 +461,36 @@ void main() {
       expect(titleWidget.data, contains('\u200B'));
     } finally {
       semanticsHandle.dispose();
+    }
+  });
+
+  test('라이트 및 다크 테마 주요 전경/배경 조합은 WCAG AA(4.5:1 이상) 대비를 충족한다', () {
+    for (final theme in [buildAppTheme(), buildDarkAppTheme()]) {
+      final scheme = theme.colorScheme;
+      expect(
+        _contrastRatio(scheme.onPrimary, scheme.primary),
+        greaterThanOrEqualTo(4.5),
+      );
+      expect(
+        _contrastRatio(scheme.primary, scheme.surface),
+        greaterThanOrEqualTo(4.5),
+      );
+      expect(
+        _contrastRatio(scheme.onSurface, scheme.surface),
+        greaterThanOrEqualTo(4.5),
+      );
+      expect(
+        _contrastRatio(scheme.onSurfaceVariant, scheme.surface),
+        greaterThanOrEqualTo(4.5),
+      );
+      expect(
+        _contrastRatio(scheme.onPrimaryContainer, scheme.primaryContainer),
+        greaterThanOrEqualTo(4.5),
+      );
+      expect(
+        _contrastRatio(scheme.onSecondaryContainer, scheme.secondaryContainer),
+        greaterThanOrEqualTo(4.5),
+      );
     }
   });
 }

@@ -229,7 +229,9 @@ class AuthService(
             throw inactiveMemberException(member.status)
         }
 
-        authMemberRepository.revokeRefreshToken(command.refreshToken)
+        if (!authMemberRepository.revokeRefreshToken(command.refreshToken)) {
+            throw ApiException(ErrorCode.UNAUTHORIZED, "다시 로그인해 주세요.")
+        }
         return issueSession(member)
     }
 
@@ -322,6 +324,7 @@ class AuthService(
             ),
         )
         val revokedRefreshTokens = authMemberRepository.revokeRefreshTokens(member.id)
+        sseSessionRevocationPort.closeMemberSessions(member.id)
         log.info("Password reset completed for member {}; revoked refresh tokens={}", member.id, revokedRefreshTokens)
 
         return PasswordResetConfirmResult(
@@ -487,11 +490,19 @@ class AuthService(
             .trim('-')
             .take(80)
             .ifBlank { "user" }
-        val email = identity.email
+        val rawEmail = identity.email
             ?.trim()
             ?.lowercase(Locale.ROOT)
             ?.takeIf { candidate -> candidate.matches(OIDC_EMAIL_PATTERN) }
-            ?: "$provider-$subject@social.maumon.local"
+        val fallbackEmail = "$provider-$subject@social.maumon.local"
+        val existingByEmail = if (rawEmail != null) authMemberRepository.findByEmail(rawEmail) else null
+        if (existingByEmail != null) {
+            if (!existingByEmail.socialAccount && !identity.emailVerified) {
+                throw ApiException(ErrorCode.UNAUTHORIZED, "이메일 인증이 완료된 소셜 계정으로만 기존 계정에 연결할 수 있습니다.")
+            }
+            return existingByEmail
+        }
+        val email = if (rawEmail != null && identity.emailVerified) rawEmail else fallbackEmail
         authMemberRepository.findByEmail(email)?.let { member -> return member }
 
         return authMemberRepository.save(

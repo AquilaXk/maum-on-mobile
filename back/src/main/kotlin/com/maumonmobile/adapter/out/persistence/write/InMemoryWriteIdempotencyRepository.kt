@@ -45,6 +45,19 @@ class InMemoryWriteIdempotencyRepository : WriteIdempotencyRepository {
         return records[RecordKey(memberId, operation, idempotencyKey)]
     }
 
+    override fun deletePending(
+        memberId: Long,
+        operation: WriteOperation,
+        idempotencyKey: String,
+    ): Boolean {
+        val key = RecordKey(memberId, operation, idempotencyKey)
+        val existing = records[key] ?: return false
+        if (existing.status != WriteIdempotencyStatus.IN_PROGRESS) {
+            return false
+        }
+        return records.remove(key, existing)
+    }
+
     private fun WriteIdempotencyRecord.key(): RecordKey {
         return RecordKey(memberId, operation, idempotencyKey)
     }

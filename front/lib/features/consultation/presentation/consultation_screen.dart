@@ -9,6 +9,7 @@ import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../../shared/ui/app_design_system.dart';
+import '../../../shared/ui/text_editing_sync.dart';
 import '../application/consultation_controller.dart';
 import '../domain/consultation_models.dart';
 
@@ -109,14 +110,9 @@ class _ConsultationScreenState extends State<ConsultationScreen>
   }
 
   void _syncText() {
-    final nextText = widget.controller.state.draft;
-    if (_textController.text == nextText) {
-      return;
-    }
-
-    _textController.value = TextEditingValue(
-      text: nextText,
-      selection: TextSelection.collapsed(offset: nextText.length),
+    syncTextControllerWithImeGuard(
+      _textController,
+      widget.controller.state.draft,
     );
   }
 

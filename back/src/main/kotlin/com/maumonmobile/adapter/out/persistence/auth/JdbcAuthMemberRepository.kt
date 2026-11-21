@@ -281,11 +281,11 @@ class JdbcAuthMemberRepository(
         ).singleOrNull()
     }
 
-    override fun revokeRefreshToken(refreshToken: String) {
-        jdbc.update(
+    override fun revokeRefreshToken(refreshToken: String): Boolean {
+        return jdbc.update(
             "delete from auth_refresh_tokens where refresh_token = :refreshToken",
             params().withValue("refreshToken", refreshToken),
-        )
+        ) > 0
     }
 
     override fun revokeRefreshTokens(memberId: Long): Int {

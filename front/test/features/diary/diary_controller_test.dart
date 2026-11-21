@@ -946,7 +946,7 @@ class _FakeDiaryRepository implements DiaryRepository {
   }
 
   @override
-  Future<int> createDiary(DiaryDraft draft) async {
+  Future<int> createDiary(DiaryDraft draft, {String? idempotencyKey}) async {
     final error = createError;
     if (error != null) {
       throw error;

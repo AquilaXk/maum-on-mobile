@@ -61,13 +61,16 @@ class _AuthScreenState extends State<AuthScreen> {
   @override
   Widget build(BuildContext context) {
     final rootTheme = Theme.of(context);
-    final theme = buildAppTheme().copyWith(platform: rootTheme.platform);
+    final isDark = rootTheme.brightness == Brightness.dark;
+    final theme = (isDark ? buildDarkAppTheme() : buildAppTheme())
+        .copyWith(platform: rootTheme.platform);
     final overlayStyle = SystemUiOverlayStyle(
       statusBarColor: Colors.transparent,
-      statusBarIconBrightness: Brightness.dark,
-      statusBarBrightness: Brightness.light,
+      statusBarIconBrightness: isDark ? Brightness.light : Brightness.dark,
+      statusBarBrightness: isDark ? Brightness.dark : Brightness.light,
       systemNavigationBarColor: theme.scaffoldBackgroundColor,
-      systemNavigationBarIconBrightness: Brightness.dark,
+      systemNavigationBarIconBrightness:
+          isDark ? Brightness.light : Brightness.dark,
     );
     final state = widget.controller.state;
     final externalLoginState = widget.externalLoginController?.state;
@@ -560,6 +563,9 @@ class _AuthScreenState extends State<AuthScreen> {
         }
         return;
       case AuthFormMode.login:
+        if (!_validateLogin()) {
+          return;
+        }
         await widget.controller.login(
           email: _emailController.text,
           password: _passwordController.text,
@@ -600,6 +606,17 @@ class _AuthScreenState extends State<AuthScreen> {
         }
         return;
     }
+  }
+
+  bool _validateLogin() {
+    final errors = <String, String>{};
+    if (_emailController.text.trim().isEmpty) {
+      errors['email'] = '이메일을 입력해 주세요.';
+    }
+    if (_passwordController.text.isEmpty) {
+      errors['password'] = '비밀번호를 입력해 주세요.';
+    }
+    return _commitFieldErrors(errors);
   }
 
   bool _validateSignup() {
@@ -770,7 +787,9 @@ class _AuthFormPanel extends StatelessWidget {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     final panelColor = theme.cardColor;
-    final shadowColor = AppBrandColors.primaryBlue.withValues(alpha: 0.08);
+    final shadowColor = theme.brightness == Brightness.dark
+        ? Colors.black.withValues(alpha: 0.35)
+        : AppBrandColors.primaryBlue.withValues(alpha: 0.08);
 
     return DecoratedBox(
       key: const ValueKey('auth-form-panel'),
@@ -1012,12 +1031,18 @@ class _QuickLoginProviderMark extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return switch (provider) {
-      LoginProvider.naver => const Text(
-          'N',
-          style: TextStyle(
-            color: Colors.white,
-            fontSize: 30,
-            fontWeight: FontWeight.w900,
+      LoginProvider.naver => const Padding(
+          padding: EdgeInsets.all(10),
+          child: FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Text(
+              'N',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 30,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
           ),
         ),
       LoginProvider.kakao => const Icon(
@@ -1025,21 +1050,33 @@ class _QuickLoginProviderMark extends StatelessWidget {
           color: Color(0xFF3C1E1E),
           size: 25,
         ),
-      LoginProvider.facebook => const Text(
-          'f',
-          style: TextStyle(
-            color: Colors.white,
-            fontSize: 38,
-            fontWeight: FontWeight.w800,
-            height: 0.95,
+      LoginProvider.facebook => const Padding(
+          padding: EdgeInsets.all(10),
+          child: FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Text(
+              'f',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 38,
+                fontWeight: FontWeight.w800,
+                height: 0.95,
+              ),
+            ),
           ),
         ),
-      LoginProvider.google => const Text(
-          'G',
-          style: TextStyle(
-            color: Color(0xFF4285F4),
-            fontSize: 28,
-            fontWeight: FontWeight.w800,
+      LoginProvider.google => const Padding(
+          padding: EdgeInsets.all(10),
+          child: FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Text(
+              'G',
+              style: TextStyle(
+                color: Color(0xFF4285F4),
+                fontSize: 28,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
           ),
         ),
       LoginProvider.apple => const Icon(

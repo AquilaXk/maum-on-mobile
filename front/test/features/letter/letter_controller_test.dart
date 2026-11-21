@@ -428,7 +428,7 @@ class _FakeLetterRepository implements LetterRepository {
   final List<({int id, String replyContent})> replies = [];
 
   @override
-  Future<int> createLetter(LetterDraft draft) async {
+  Future<int> createLetter(LetterDraft draft, {String? idempotencyKey}) async {
     createdDrafts.add(draft);
     final error = createError;
     if (error != null) {
@@ -503,7 +503,11 @@ class _DeferredLoadRepository implements LetterRepository {
   final List<Completer<LetterListPage>> sentCompleters = [];
 
   @override
-  Future<int> createLetter(LetterDraft draft) async => 1;
+  Future<int> createLetter(
+    LetterDraft draft, {
+    String? idempotencyKey,
+  }) async =>
+      1;
 
   @override
   Future<LetterDetail> fetchLetter(int id) async {

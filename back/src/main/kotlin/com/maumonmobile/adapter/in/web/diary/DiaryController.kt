@@ -11,6 +11,8 @@ import com.maumonmobile.domain.write.WriteOperation
 import com.maumonmobile.global.security.AuthenticatedUser
 import com.maumonmobile.global.web.ApiResponse
 import jakarta.validation.Valid
+import jakarta.validation.constraints.Max
+import jakarta.validation.constraints.Min
 import jakarta.validation.constraints.NotBlank
 import jakarta.validation.constraints.Size
 import org.springframework.security.core.Authentication
@@ -121,6 +123,8 @@ data class DiarySaveRequest(
     @param:JsonProperty("isPrivate")
     @get:JsonProperty("isPrivate")
     val isPrivate: Boolean = false,
+    @field:Min(1)
+    @field:Max(5)
     val moodScore: Int? = null,
     @field:Size(max = 500)
     val emotionTags: String? = null,

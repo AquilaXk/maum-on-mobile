@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 
 import '../../../core/network/api_error.dart';
+import '../../../core/network/idempotency_key.dart';
 import '../../../shared/algorithm/bitap_hangul_search.dart';
 import '../../draft_recovery/data/draft_recovery_repository.dart';
 import '../../draft_recovery/domain/draft_recovery_models.dart';
@@ -214,6 +215,9 @@ class StoryController extends ChangeNotifier {
 
   StoryState _state = const StoryState();
   bool _isDisposed = false;
+  final ScopedIdempotencyKey _createStoryIdempotencyKey =
+      ScopedIdempotencyKey('story');
+  final Map<int?, ScopedIdempotencyKey> _commentIdempotencyKeys = {};
 
   StoryState get state => _state;
 
@@ -530,7 +534,13 @@ class StoryController extends ChangeNotifier {
 
       final int storyId;
       if (editingId == null) {
-        storyId = await _storyRepository.createStory(draft);
+        final fingerprint =
+            '${draft.title}\n${draft.content}\n${draft.category.name}';
+        storyId = await _storyRepository.createStory(
+          draft,
+          idempotencyKey: _createStoryIdempotencyKey.keyFor(fingerprint),
+        );
+        _createStoryIdempotencyKey.clear();
       } else {
         await _storyRepository.updateStory(editingId, draft);
         storyId = editingId;
@@ -686,12 +696,22 @@ class StoryController extends ChangeNotifier {
         return;
       }
 
+      final commentText = _state.commentDraft.trim();
+      final keyHolder = _commentIdempotencyKeys.putIfAbsent(
+        parentCommentId,
+        () => ScopedIdempotencyKey('comment'),
+      );
+      final idempotencyKey = keyHolder.keyFor(
+        '${story.id}:${parentCommentId ?? 'root'}:$commentText',
+      );
       await _storyRepository.createComment(
         postId: story.id,
         authorId: _currentMemberId,
-        content: _state.commentDraft.trim(),
+        content: commentText,
         parentCommentId: parentCommentId,
+        idempotencyKey: idempotencyKey,
       );
+      keyHolder.clear();
       await _draftRepository?.delete(_commentDraftKey(story.id));
       final commentsPage = await _storyRepository.fetchComments(story.id);
       _setState(
@@ -727,12 +747,21 @@ class StoryController extends ChangeNotifier {
         return;
       }
 
+      final keyHolder = _commentIdempotencyKeys.putIfAbsent(
+        parentCommentId,
+        () => ScopedIdempotencyKey('reply'),
+      );
+      final idempotencyKey = keyHolder.keyFor(
+        '${story.id}:$parentCommentId:$content',
+      );
       await _storyRepository.createComment(
         postId: story.id,
         authorId: _currentMemberId,
         content: content,
         parentCommentId: parentCommentId,
+        idempotencyKey: idempotencyKey,
       );
+      keyHolder.clear();
       final commentsPage = await _storyRepository.fetchComments(story.id);
       final nextDrafts = Map<int, String>.of(_state.replyDrafts)
         ..remove(parentCommentId);
@@ -969,6 +998,7 @@ class StoryController extends ChangeNotifier {
   }
 
   void _resetEditorSilently() {
+    _createStoryIdempotencyKey.clear();
     _state = _state.copyWith(
       clearEditingStoryId: true,
       storyTitle: '',

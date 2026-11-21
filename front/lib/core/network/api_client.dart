@@ -47,6 +47,7 @@ class ApiClient {
     String path, {
     required T Function(Object? json) parser,
     Object? body,
+    Map<String, String> headers = const {},
     Map<String, Object?> queryParameters = const {},
     bool requiresAuth = true,
     bool retryOnUnauthorized = true,
@@ -55,6 +56,7 @@ class ApiClient {
       ApiRequest(
         method: ApiMethod.post,
         path: path,
+        headers: headers,
         body: body,
         queryParameters: queryParameters,
         requiresAuth: requiresAuth,
@@ -67,6 +69,7 @@ class ApiClient {
   Future<void> postVoid(
     String path, {
     Object? body,
+    Map<String, String> headers = const {},
     Map<String, Object?> queryParameters = const {},
     bool requiresAuth = true,
     bool retryOnUnauthorized = true,
@@ -75,6 +78,7 @@ class ApiClient {
       ApiRequest(
         method: ApiMethod.post,
         path: path,
+        headers: headers,
         body: body,
         queryParameters: queryParameters,
         requiresAuth: requiresAuth,
@@ -162,6 +166,7 @@ class ApiClient {
     String path, {
     required MultipartBody multipart,
     required T Function(Object? json) parser,
+    Map<String, String> headers = const {},
     Map<String, Object?> queryParameters = const {},
     bool requiresAuth = true,
     bool retryOnUnauthorized = true,
@@ -170,6 +175,7 @@ class ApiClient {
       ApiRequest(
         method: ApiMethod.post,
         path: path,
+        headers: headers,
         queryParameters: queryParameters,
         multipart: multipart,
         requiresAuth: requiresAuth,
@@ -274,7 +280,11 @@ class ApiClient {
           !request.retryOnUnauthorized) {
         await _throwSessionInvalidated(exception);
       }
-      return _handleUnauthorized(request, parser, hasRetried: hasRetried);
+      return _handleUnauthorized(
+        request,
+        (retryRequest) => _send(retryRequest, parser, hasRetried: true),
+        hasRetried: hasRetried,
+      );
     }
 
     if (response.statusCode == 403) {
@@ -329,7 +339,10 @@ class ApiClient {
     }
   }
 
-  Future<void> _sendVoid(ApiRequest request) async {
+  Future<void> _sendVoid(
+    ApiRequest request, {
+    bool hasRetried = false,
+  }) async {
     final preparedRequest = await _applyAuthorization(request);
     final response = await _sendTransport(preparedRequest);
 
@@ -342,8 +355,8 @@ class ApiClient {
       }
       await _handleUnauthorized<void>(
         request,
-        (_) {},
-        hasRetried: false,
+        (retryRequest) => _sendVoid(retryRequest, hasRetried: true),
+        hasRetried: hasRetried,
       );
       return;
     }
@@ -418,7 +431,7 @@ class ApiClient {
 
   Future<T> _handleUnauthorized<T>(
     ApiRequest request,
-    T Function(Object? json) parser, {
+    Future<T> Function(ApiRequest retryRequest) retry, {
     required bool hasRetried,
   }) async {
     if (hasRetried || tokenRefresher == null) {
@@ -470,7 +483,7 @@ class ApiClient {
     }
 
     await tokenStore.saveTokens(refreshedTokens);
-    return _send(request, parser, hasRetried: true);
+    return retry(request);
   }
 
   ApiClientException _exceptionFromResponse(

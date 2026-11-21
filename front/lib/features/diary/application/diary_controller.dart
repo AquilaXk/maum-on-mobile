@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 
 import '../../../core/network/api_error.dart';
+import '../../../core/network/idempotency_key.dart';
 import '../../draft_recovery/data/draft_recovery_repository.dart';
 import '../../draft_recovery/domain/draft_recovery_models.dart';
 import '../../moderation/data/content_moderation_repository.dart';
@@ -401,6 +402,8 @@ class DiaryController extends ChangeNotifier {
   final Set<String> _temporaryUploadedImageUrls = {};
   Timer? _draftSaveTimer;
   bool _hasPendingDraftSave = false;
+  final ScopedIdempotencyKey _createIdempotencyKey =
+      ScopedIdempotencyKey('diary');
 
   DiaryState get state => _state;
 
@@ -893,7 +896,13 @@ class DiaryController extends ChangeNotifier {
       );
 
       if (editingId == null) {
-        await _diaryRepository.createDiary(draft);
+        final fingerprint =
+            '${draft.title}\n${draft.content}\n${draft.category.name}\n${draft.isPrivate}\n${draft.imageUrl}\n${draft.moodScore}\n${draft.emotionTags}\n${draft.triggerTags}';
+        await _diaryRepository.createDiary(
+          draft,
+          idempotencyKey: _createIdempotencyKey.keyFor(fingerprint),
+        );
+        _createIdempotencyKey.clear();
       } else {
         await _diaryRepository.updateDiary(editingId, draft);
       }
@@ -1177,6 +1186,7 @@ class DiaryController extends ChangeNotifier {
 
   void _resetFormSilently() {
     _temporaryUploadedImageUrls.clear();
+    _createIdempotencyKey.clear();
     _nextBlockOrdinal = 1;
     _state = _state.copyWith(
       clearEditingDiaryId: true,

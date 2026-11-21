@@ -12,7 +12,7 @@ abstract interface class StoryRepository {
 
   Future<StoryDetail> fetchStory(int id);
 
-  Future<int> createStory(StoryDraft draft);
+  Future<int> createStory(StoryDraft draft, {String? idempotencyKey});
 
   Future<void> updateStory(int id, StoryDraft draft);
 
@@ -34,6 +34,7 @@ abstract interface class StoryRepository {
     required int authorId,
     required String content,
     int? parentCommentId,
+    String? idempotencyKey,
   });
 
   Future<void> updateComment(int commentId, String content);
@@ -81,9 +82,12 @@ class ApiStoryRepository implements StoryRepository {
   }
 
   @override
-  Future<int> createStory(StoryDraft draft) {
+  Future<int> createStory(StoryDraft draft, {String? idempotencyKey}) {
     return _apiClient.post<int>(
       '/api/v1/posts',
+      headers: idempotencyKey == null
+          ? const {}
+          : {'X-Idempotency-Key': idempotencyKey},
       body: draft.toJson(),
       parser: _readCreatedId,
     );
@@ -134,9 +138,13 @@ class ApiStoryRepository implements StoryRepository {
     required int authorId,
     required String content,
     int? parentCommentId,
+    String? idempotencyKey,
   }) {
     return _apiClient.postVoid(
       '/api/v1/posts/$postId/comments',
+      headers: idempotencyKey == null
+          ? const {}
+          : {'X-Idempotency-Key': idempotencyKey},
       body: {
         'content': content,
         'authorId': authorId,

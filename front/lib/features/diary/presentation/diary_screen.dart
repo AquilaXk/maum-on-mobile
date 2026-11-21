@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../../shared/ui/app_design_system.dart';
+import '../../../shared/ui/text_editing_sync.dart';
 import '../../moderation/presentation/content_moderation_feedback_panel.dart';
 import '../application/diary_controller.dart';
 import '../domain/diary_models.dart';
@@ -86,14 +87,7 @@ class _DiaryScreenState extends State<DiaryScreen> {
   }
 
   void _syncTextController(TextEditingController controller, String value) {
-    if (controller.text == value) {
-      return;
-    }
-
-    controller.value = TextEditingValue(
-      text: value,
-      selection: TextSelection.collapsed(offset: value.length),
-    );
+    syncTextControllerWithImeGuard(controller, value);
   }
 
   TextEditingController _textControllerForBlock(DiaryContentBlock block) {
@@ -520,8 +514,11 @@ class _CalendarDayButton extends StatelessWidget {
     final theme = Theme.of(context);
     final colorScheme = Theme.of(context).colorScheme;
     final dateKey = dateKeyFromDate(day);
+    final moodLabel = moodScore != null ? _moodScoreLabel(moodScore!) : null;
     final semanticLabel = count > 0
-        ? '${_formatDateLabel(day)}, 기록 $count개'
+        ? moodLabel != null
+            ? '${_formatDateLabel(day)}, 기록 $count개, 기분 $moodLabel'
+            : '${_formatDateLabel(day)}, 기록 $count개'
         : _formatDateLabel(day);
 
     return Semantics(
@@ -600,18 +597,27 @@ class _CalendarDayButton extends StatelessWidget {
 Color _moodMarkerColor(int moodScore) {
   switch (moodScore) {
     case 1:
-      return const Color(0xFFEF4444);
+      return const Color(0xFFDC2626);
     case 2:
-      return const Color(0xFFF97316);
+      return const Color(0xFFC2410C);
     case 3:
       return const Color(0xFFEAB308);
     case 4:
-      return const Color(0xFF0284C7);
+      return const Color(0xFF0369A1);
     case 5:
-      return const Color(0xFF5C6BC0);
+      return const Color(0xFF2563EB);
     default:
-      return const Color(0xFF5C6BC0);
+      return const Color(0xFF2563EB);
   }
+}
+
+String? _moodScoreLabel(int moodScore) {
+  for (final option in _moodScoreOptions) {
+    if (option.score == moodScore) {
+      return option.label;
+    }
+  }
+  return null;
 }
 
 class _CalendarEntryMarker extends StatelessWidget {

@@ -175,13 +175,20 @@ ThemeData _buildDarkTheme() {
   );
   final colorScheme = baseColorScheme.copyWith(
     primary: const Color(0xFF8E9CE6),
-    onPrimary: const Color(0xFF171C3D),
+    onPrimary: const Color(0xFF141824),
+    primaryContainer: const Color(0xFF283054),
+    onPrimaryContainer: const Color(0xFFE2E7FF),
     secondary: const Color(0xFF8E9CE6),
-    onSecondary: const Color(0xFF171C3D),
+    onSecondary: const Color(0xFF141824),
+    secondaryContainer: const Color(0xFF253042),
+    onSecondaryContainer: const Color(0xFFDCEBFF),
+    tertiaryContainer: const Color(0xFF3A2E1E),
+    onTertiaryContainer: const Color(0xFFFDE68A),
     surface: const Color(0xFF212529),
     onSurface: const Color(0xFFF8F9FA),
     surfaceContainerHighest: const Color(0xFF2A2E33),
     onSurfaceVariant: const Color(0xFFADB5BD),
+    outline: const Color(0xFF495057),
     outlineVariant: const Color(0xFF343A40),
   );
   final textTheme = const TextTheme(

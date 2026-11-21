@@ -2,11 +2,11 @@ import 'package:flutter/material.dart';
 
 abstract final class AppBrandColors {
   static const Color iconBlue = Color(0xFF18A9ED);
-  static const Color primaryBlue = Color(0xFF4F8CF0);
-  static const Color primaryBluePressed = Color(0xFF3F80EB);
-  static const Color brandText = Color(0xFF5B7291);
+  static const Color primaryBlue = Color(0xFF2563EB);
+  static const Color primaryBluePressed = Color(0xFF1D4ED8);
+  static const Color brandText = Color(0xFF334E68);
   static const Color foreground = Color(0xFF25324A);
-  static const Color mutedForeground = Color(0xFF7A8DA9);
+  static const Color mutedForeground = Color(0xFF4A5E78);
   static const Color backgroundBlue = Color(0xFFEDF5FF);
   static const Color surface = Color(0xFFFFFFFF);
   static const Color surfaceStrong = Color(0xFFFBFDFF);

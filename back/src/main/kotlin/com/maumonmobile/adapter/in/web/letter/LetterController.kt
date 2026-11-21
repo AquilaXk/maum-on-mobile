@@ -116,8 +116,11 @@ class LetterController(
     }
 
     @GetMapping("/{id}/status")
-    fun status(@PathVariable id: Long): ApiResponse<String> {
-        return ApiResponse.success(letterUseCase.status(id))
+    fun status(
+        authentication: Authentication,
+        @PathVariable id: Long,
+    ): ApiResponse<String> {
+        return ApiResponse.success(letterUseCase.status(authentication.authenticatedUser(), id))
     }
 }
 

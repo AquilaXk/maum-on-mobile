@@ -137,11 +137,35 @@ class SseStreamRegistry(
         }
     }
 
+    @jakarta.annotation.PostConstruct
+    fun initializeCursor() {
+        runCatching { streamBusPort.findMaxEventId() }
+            .onSuccess { maxId ->
+                if (maxId > 0L) {
+                    lastSeenEventId.accumulateAndGet(maxId, ::maxOf)
+                }
+            }
+            .onFailure { exception ->
+                log.warn("Failed to initialize SSE stream bus cursor.", exception)
+            }
+    }
+
     @Scheduled(fixedDelayString = "\${app.sse.heartbeat-fixed-delay-ms:15000}")
     fun sendHeartbeats() {
-        sessionRepository.expireSessions(now().toString())
+        val currentNow = now()
+        sessionRepository.expireSessions(currentNow.toString())
+        runCatching {
+            streamBusPort.deleteEventsCreatedBefore(currentNow.minus(EVENT_RETENTION_AGE).toString())
+        }.onFailure { exception ->
+            log.warn("Failed to purge expired SSE stream events.", exception)
+        }
         localConnectionsBySessionId.values.forEach { connection ->
-            sendOrRemove(connection, HEARTBEAT_EVENT, """{"intervalSeconds":${properties.heartbeatInterval.seconds}}""")
+            val activeSession = sessionRepository.findActiveSession(connection.session.id, currentNow.toString())
+            if (activeSession == null) {
+                closeLocalSession(connection.session.id, completeEmitter = true)
+            } else {
+                sendOrRemove(connection, HEARTBEAT_EVENT, """{"intervalSeconds":${properties.heartbeatInterval.seconds}}""")
+            }
         }
     }
 
@@ -166,7 +190,14 @@ class SseStreamRegistry(
             .filter { connection ->
                 connection.session.streamType == event.streamType && connection.session.memberId == event.memberId
             }
-            .forEach { connection -> sendOrRemove(connection, event.eventName, event.data) }
+            .forEach { connection ->
+                sendOrRemove(
+                    connection = connection,
+                    eventName = event.eventName,
+                    data = event.data,
+                    eventId = event.id.takeIf { id -> id > 0L },
+                )
+            }
     }
 
     private fun markDelivered(eventId: Long): Boolean {
@@ -191,20 +222,17 @@ class SseStreamRegistry(
         connection: LocalSseConnection,
         eventName: String,
         data: String,
+        eventId: Long? = null,
     ) {
-        val activeSession = sessionRepository.findActiveSession(connection.session.id, now().toString())
-        if (activeSession == null) {
-            closeLocalSession(connection.session.id, completeEmitter = true)
-            return
-        }
-
         try {
-            connection.emitter.send(
-                SseEmitter.event()
-                    .name(eventName)
-                    .reconnectTime(properties.reconnectDelay.toMillis())
-                    .data(data),
-            )
+            val builder = SseEmitter.event()
+                .name(eventName)
+                .reconnectTime(properties.reconnectDelay.toMillis())
+                .data(data)
+            if (eventId != null) {
+                builder.id(eventId.toString())
+            }
+            connection.emitter.send(builder)
         } catch (exception: IOException) {
             closeFailedSession(connection, exception)
         } catch (exception: IllegalStateException) {
@@ -248,6 +276,7 @@ class SseStreamRegistry(
         private const val STREAM_ERROR_RETRYABLE_DATA =
             """{"retryable":true,"message":"스트림 연결이 지연되고 있습니다."}"""
         private const val DELIVERED_EVENT_RETENTION_FACTOR = 20
+        private val EVENT_RETENTION_AGE: Duration = Duration.ofHours(1)
         private val log = LoggerFactory.getLogger(SseStreamRegistry::class.java)
     }
 }

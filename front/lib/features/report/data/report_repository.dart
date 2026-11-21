@@ -2,7 +2,7 @@ import '../../../core/network/api_client.dart';
 import '../domain/report_models.dart';
 
 abstract interface class ReportRepository {
-  Future<int> createReport(ReportDraft draft);
+  Future<int> createReport(ReportDraft draft, {String? idempotencyKey});
 }
 
 class ApiReportRepository implements ReportRepository {
@@ -13,9 +13,12 @@ class ApiReportRepository implements ReportRepository {
   final ApiClient _apiClient;
 
   @override
-  Future<int> createReport(ReportDraft draft) {
+  Future<int> createReport(ReportDraft draft, {String? idempotencyKey}) {
     return _apiClient.post<int>(
       '/api/v1/reports',
+      headers: idempotencyKey == null
+          ? const {}
+          : {'X-Idempotency-Key': idempotencyKey},
       body: draft.toJson(),
       parser: _parseReportId,
     );

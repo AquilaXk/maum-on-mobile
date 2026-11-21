@@ -870,7 +870,7 @@ class _FakeLetterRepository implements LetterRepository {
   final List<({int id, String replyContent})> replies = [];
 
   @override
-  Future<int> createLetter(LetterDraft draft) async {
+  Future<int> createLetter(LetterDraft draft, {String? idempotencyKey}) async {
     createdDrafts.add(draft);
     final error = createError;
     if (error != null) {

@@ -65,6 +65,29 @@ class JdbcSseStreamBus(
         }
     }
 
+    override fun findMaxEventId(): Long {
+        return try {
+            jdbc.queryForObject(
+                "select coalesce(max(id), 0) from sse_stream_events",
+                params(),
+                Long::class.java,
+            ) ?: 0L
+        } catch (exception: DataAccessException) {
+            throw SseStreamBusUnavailableException("SSE 스트림 최신 이벤트 ID 조회에 실패했습니다.", exception)
+        }
+    }
+
+    override fun deleteEventsCreatedBefore(cutoffIso: String): Int {
+        return try {
+            jdbc.update(
+                "delete from sse_stream_events where created_at < :cutoffIso",
+                params().withValue("cutoffIso", cutoffIso),
+            )
+        } catch (exception: DataAccessException) {
+            throw SseStreamBusUnavailableException("만료된 SSE 스트림 이벤트 정리에 실패했습니다.", exception)
+        }
+    }
+
     private fun SseStreamEvent.toParams() = params()
         .withValue("streamType", streamType.name)
         .withValue("memberId", memberId)

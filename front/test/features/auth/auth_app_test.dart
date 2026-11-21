@@ -463,8 +463,8 @@ void main() {
 
     expect(selectedIcon.color, const Color(0xFF111111));
     expect(selectedLabel.style?.color, const Color(0xFF111111));
-    expect(unselectedIcon.color, const Color(0xFF777777));
-    expect(unselectedLabel.style?.color, const Color(0xFF777777));
+    expect(unselectedIcon.color, const Color(0xFF596577));
+    expect(unselectedLabel.style?.color, const Color(0xFF596577));
   });
 
   testWidgets('hides home back action on primary tab landing screens',
@@ -571,7 +571,7 @@ void main() {
                 find.descendant(of: tab, matching: find.byType(Icon)),
               )
               .single;
-          expect(icon.color, const Color(0xFF777777));
+          expect(icon.color, const Color(0xFF596577));
           expect(
             tester.getSemantics(
               find.bySemanticsLabel(
@@ -1278,7 +1278,8 @@ class _FakeDiaryRepository implements DiaryRepository {
   }
 
   @override
-  Future<int> createDiary(DiaryDraft draft) async => 1;
+  Future<int> createDiary(DiaryDraft draft, {String? idempotencyKey}) async =>
+      1;
 
   @override
   Future<void> updateDiary(int id, DiaryDraft draft) async {}
@@ -1466,7 +1467,7 @@ class _FakeReportRepository implements ReportRepository {
   final List<ReportDraft> drafts = [];
 
   @override
-  Future<int> createReport(ReportDraft draft) async {
+  Future<int> createReport(ReportDraft draft, {String? idempotencyKey}) async {
     drafts.add(draft);
     return drafts.length;
   }
@@ -1662,7 +1663,7 @@ class _FakeStoryRepository implements StoryRepository {
   }
 
   @override
-  Future<int> createStory(StoryDraft draft) {
+  Future<int> createStory(StoryDraft draft, {String? idempotencyKey}) {
     throw UnimplementedError();
   }
 
@@ -1707,6 +1708,7 @@ class _FakeStoryRepository implements StoryRepository {
     required int authorId,
     required String content,
     int? parentCommentId,
+    String? idempotencyKey,
   }) {
     throw UnimplementedError();
   }
@@ -1763,7 +1765,7 @@ class _FakeLetterRepository implements LetterRepository {
   final List<int> fetchedLetterIds = [];
 
   @override
-  Future<int> createLetter(LetterDraft draft) {
+  Future<int> createLetter(LetterDraft draft, {String? idempotencyKey}) {
     throw UnimplementedError();
   }
 

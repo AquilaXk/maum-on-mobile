@@ -2,7 +2,7 @@ import '../../../core/network/api_client.dart';
 import '../domain/letter_models.dart';
 
 abstract interface class LetterRepository {
-  Future<int> createLetter(LetterDraft draft);
+  Future<int> createLetter(LetterDraft draft, {String? idempotencyKey});
 
   Future<LetterListPage> fetchReceivedLetters({
     int page = 0,
@@ -36,9 +36,12 @@ class ApiLetterRepository implements LetterRepository {
   final ApiClient _apiClient;
 
   @override
-  Future<int> createLetter(LetterDraft draft) {
+  Future<int> createLetter(LetterDraft draft, {String? idempotencyKey}) {
     return _apiClient.post<int>(
       '/api/v1/letters',
+      headers: idempotencyKey == null
+          ? const {}
+          : {'X-Idempotency-Key': idempotencyKey},
       body: draft.toJson(),
       parser: _readCreatedId,
     );
@@ -118,8 +121,6 @@ class ApiLetterRepository implements LetterRepository {
     return _apiClient.get<LetterStatus>(
       '/api/v1/letters/$id/status',
       parser: LetterStatus.fromApiValue,
-      requiresAuth: false,
-      retryOnUnauthorized: false,
     );
   }
 

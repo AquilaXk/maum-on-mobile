@@ -64,11 +64,20 @@ class HttpAuthOidcIdentityProvider(
         val jwt = decodeIdToken(command.provider, token.idToken)
         validateClaims(command, jwt)
 
+        val email = jwt.claimAsString("email")
+        val emailVerified = when (val rawVerified = jwt.claims["email_verified"]) {
+            is Boolean -> rawVerified
+            is String -> rawVerified.equals("true", ignoreCase = true)
+            null -> true
+            else -> false
+        }
+
         return AuthOidcIdentity(
             issuer = jwt.requiredIssuer(),
             subject = jwt.requiredSubject(),
-            email = jwt.claimAsString("email"),
+            email = email,
             nickname = jwt.claimAsString("nickname") ?: jwt.claimAsString("name"),
+            emailVerified = emailVerified,
         )
     }
 

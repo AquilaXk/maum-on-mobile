@@ -294,7 +294,7 @@ void main() {
         matching: find.byType(DecoratedBox),
       ),
     );
-    expect((marker1.decoration as BoxDecoration).color, const Color(0xFFEF4444));
+    expect((marker1.decoration as BoxDecoration).color, const Color(0xFFDC2626));
     expect((marker1.decoration as BoxDecoration).shape, BoxShape.circle);
 
     final marker5 = tester.widget<DecoratedBox>(
@@ -303,7 +303,7 @@ void main() {
         matching: find.byType(DecoratedBox),
       ),
     );
-    expect((marker5.decoration as BoxDecoration).color, const Color(0xFF5C6BC0));
+    expect((marker5.decoration as BoxDecoration).color, const Color(0xFF2563EB));
     expect((marker5.decoration as BoxDecoration).shape, BoxShape.circle);
   });
 
@@ -853,7 +853,7 @@ class _FakeDiaryRepository implements DiaryRepository {
   }
 
   @override
-  Future<int> createDiary(DiaryDraft draft) async {
+  Future<int> createDiary(DiaryDraft draft, {String? idempotencyKey}) async {
     createdDrafts.add(draft);
     return createdId;
   }

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../shared/ui/app_design_system.dart';
+import '../../../shared/ui/text_editing_sync.dart';
 import '../../moderation/presentation/content_moderation_feedback_panel.dart';
 import '../application/story_controller.dart';
 import '../domain/story_models.dart';
@@ -305,7 +306,10 @@ class _StoryDiscoveryStripState extends State<_StoryDiscoveryStrip> {
         ),
       ),
       child: Padding(
-        padding: const EdgeInsets.all(AppSpacing.md),
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.md,
+          vertical: AppSpacing.sm,
+        ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
@@ -401,7 +405,7 @@ class _StoryCategoryFilter extends StatelessWidget {
             key: ValueKey('story-category-${category.name}'),
             label: Text(category.label),
             selected: selectedCategory == category,
-            visualDensity: VisualDensity.compact,
+            materialTapTargetSize: MaterialTapTargetSize.padded,
             labelStyle: theme.textTheme.labelLarge?.copyWith(
               fontWeight: selectedCategory == category ? FontWeight.w800 : null,
             ),
@@ -857,12 +861,7 @@ class _ReplyComposerState extends State<_ReplyComposer> {
   @override
   void didUpdateWidget(covariant _ReplyComposer oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (_controller.text != widget.draft) {
-      _controller.value = TextEditingValue(
-        text: widget.draft,
-        selection: TextSelection.collapsed(offset: widget.draft.length),
-      );
-    }
+    syncTextControllerWithImeGuard(_controller, widget.draft);
   }
 
   @override
@@ -879,7 +878,10 @@ class _ReplyComposerState extends State<_ReplyComposer> {
         borderRadius: AppRadii.card,
       ),
       child: Padding(
-        padding: const EdgeInsets.all(AppSpacing.md),
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.md,
+          vertical: AppSpacing.sm,
+        ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
@@ -947,7 +949,7 @@ class _ReplyComposerState extends State<_ReplyComposer> {
   }
 }
 
-class _StoryEditorView extends StatelessWidget {
+class _StoryEditorView extends StatefulWidget {
   const _StoryEditorView({
     required this.state,
     required this.controller,
@@ -957,7 +959,36 @@ class _StoryEditorView extends StatelessWidget {
   final StoryController controller;
 
   @override
+  State<_StoryEditorView> createState() => _StoryEditorViewState();
+}
+
+class _StoryEditorViewState extends State<_StoryEditorView> {
+  late final TextEditingController _titleController =
+      TextEditingController(text: widget.state.storyTitle);
+  late final TextEditingController _contentController =
+      TextEditingController(text: widget.state.storyContent);
+
+  @override
+  void didUpdateWidget(covariant _StoryEditorView oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    syncTextControllerWithImeGuard(_titleController, widget.state.storyTitle);
+    syncTextControllerWithImeGuard(
+      _contentController,
+      widget.state.storyContent,
+    );
+  }
+
+  @override
+  void dispose() {
+    _titleController.dispose();
+    _contentController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final state = widget.state;
+    final controller = widget.controller;
     return AppSectionCard(
       key: ValueKey('story-editor-${state.editingStoryId ?? 'new'}'),
       title: state.isEditingStory ? '스토리 수정' : '스토리 작성',
@@ -966,7 +997,7 @@ class _StoryEditorView extends StatelessWidget {
         children: [
           TextFormField(
             key: const ValueKey('story-title-field'),
-            initialValue: state.storyTitle,
+            controller: _titleController,
             decoration: const InputDecoration(
               labelText: '제목',
               border: OutlineInputBorder(),
@@ -976,7 +1007,7 @@ class _StoryEditorView extends StatelessWidget {
           const SizedBox(height: AppSpacing.md),
           TextFormField(
             key: const ValueKey('story-content-field'),
-            initialValue: state.storyContent,
+            controller: _contentController,
             minLines: 6,
             maxLines: 12,
             decoration: const InputDecoration(

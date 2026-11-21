@@ -18,7 +18,7 @@ abstract interface class DiaryRepository {
 
   Future<DiaryEntry> fetchDiary(int id);
 
-  Future<int> createDiary(DiaryDraft draft);
+  Future<int> createDiary(DiaryDraft draft, {String? idempotencyKey});
 
   Future<void> updateDiary(int id, DiaryDraft draft);
 
@@ -72,9 +72,12 @@ class ApiDiaryRepository implements DiaryRepository {
   }
 
   @override
-  Future<int> createDiary(DiaryDraft draft) {
+  Future<int> createDiary(DiaryDraft draft, {String? idempotencyKey}) {
     return _apiClient.postMultipart<int>(
       '/api/v1/diaries',
+      headers: idempotencyKey == null
+          ? const {}
+          : {'X-Idempotency-Key': idempotencyKey},
       multipart: _multipartFromDraft(draft),
       parser: _readCreatedId,
     );

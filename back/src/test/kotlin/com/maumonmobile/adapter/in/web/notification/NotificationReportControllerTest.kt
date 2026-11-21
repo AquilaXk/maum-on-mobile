@@ -482,59 +482,77 @@ class NotificationReportControllerTest @Autowired constructor(
         val sender = signupAndLogin("letter-notify-sender@example.com", "편지보낸이")
         val receiver = signupAndLogin("letter-notify-receiver@example.com", "편지받는이")
 
-        val letterResult = mockMvc.post("/api/v1/letters") {
-            header("Authorization", "Bearer ${sender.accessToken}")
-            contentType = MediaType.APPLICATION_JSON
-            content = """{"title":"오늘의 마음","content":"잘 지내고 있나요?"}"""
-        }
-            .andExpect {
-                status { isOk() }
+        withIsolatedReceivers(sender.memberId.toLong(), receiver.memberId.toLong()) {
+            val letterResult = mockMvc.post("/api/v1/letters") {
+                header("Authorization", "Bearer ${sender.accessToken}")
+                contentType = MediaType.APPLICATION_JSON
+                content = """{"title":"오늘의 마음","content":"잘 지내고 있나요?"}"""
             }
-            .andReturn()
-        val letterId = letterResult.response.readJsonInt("$.data")
+                .andExpect {
+                    status { isOk() }
+                }
+                .andReturn()
+            val letterId = letterResult.response.readJsonInt("$.data")
 
-        assertNotificationsContain(receiver.accessToken, "새로운 랜덤 편지가 도착했습니다!")
+            assertNotificationsContain(receiver.accessToken, "새로운 랜덤 편지가 도착했습니다!")
 
-        mockMvc.post("/api/v1/letters/$letterId/accept") {
-            header("Authorization", "Bearer ${receiver.accessToken}")
-        }
-            .andExpect {
-                status { isOk() }
+            mockMvc.post("/api/v1/letters/$letterId/accept") {
+                header("Authorization", "Bearer ${receiver.accessToken}")
             }
+                .andExpect {
+                    status { isOk() }
+                }
 
-        mockMvc.post("/api/v1/letters/$letterId/writing") {
-            header("Authorization", "Bearer ${receiver.accessToken}")
-        }
-            .andExpect {
-                status { isOk() }
+            mockMvc.post("/api/v1/letters/$letterId/writing") {
+                header("Authorization", "Bearer ${receiver.accessToken}")
             }
+                .andExpect {
+                    status { isOk() }
+                }
 
-        mockMvc.post("/api/v1/letters/$letterId/reply") {
-            header("Authorization", "Bearer ${receiver.accessToken}")
-            contentType = MediaType.APPLICATION_JSON
-            content = """{"replyContent":"답장을 보냅니다."}"""
-        }
-            .andExpect {
-                status { isOk() }
+            mockMvc.post("/api/v1/letters/$letterId/reply") {
+                header("Authorization", "Bearer ${receiver.accessToken}")
+                contentType = MediaType.APPLICATION_JSON
+                content = """{"replyContent":"답장을 보냅니다."}"""
             }
+                .andExpect {
+                    status { isOk() }
+                }
 
-        assertNotificationsContain(sender.accessToken, "상대방이 편지를 읽었습니다.")
-        assertNotificationsContain(sender.accessToken, "상대방이 답장을 작성 중입니다.")
-        assertNotificationsContain(sender.accessToken, "보낸 편지에 답장이 도착했습니다!")
+            assertNotificationsContain(sender.accessToken, "상대방이 편지를 읽었습니다.")
+            assertNotificationsContain(sender.accessToken, "상대방이 답장을 작성 중입니다.")
+            assertNotificationsContain(sender.accessToken, "보낸 편지에 답장이 도착했습니다!")
 
-        mockMvc.post("/api/v1/consultations/chat") {
-            header("Authorization", "Bearer ${sender.accessToken}")
-            contentType = MediaType.APPLICATION_JSON
-            content = """{"message":"마음이 복잡해요"}"""
-        }
-            .andExpect {
-                status { isOk() }
-                jsonPath("$.success") { value(true) }
+            mockMvc.post("/api/v1/consultations/chat") {
+                header("Authorization", "Bearer ${sender.accessToken}")
+                contentType = MediaType.APPLICATION_JSON
+                content = """{"message":"마음이 복잡해요"}"""
             }
+                .andExpect {
+                    status { isOk() }
+                    jsonPath("$.success") { value(true) }
+                }
 
-        assertNotificationsContain(sender.accessToken, "상담 답변이 도착했습니다.")
-        assertThat(notificationEventPublisher.events.map { event -> event.eventName })
-            .contains("new_letter", "letter_read", "writing_status", "reply_arrival", "consultation_reply")
+            assertNotificationsContain(sender.accessToken, "상담 답변이 도착했습니다.")
+            assertThat(notificationEventPublisher.events.map { event -> event.eventName })
+                .contains("new_letter", "letter_read", "writing_status", "reply_arrival", "consultation_reply")
+        }
+    }
+
+    private fun <T> withIsolatedReceivers(vararg allowedMemberIds: Long, block: () -> T): T {
+        val allowedSet = allowedMemberIds.toSet()
+        val disabledOriginals = authMemberRepository.findAllActive()
+            .filter { it.randomReceiveAllowed && it.id !in allowedSet }
+        disabledOriginals.forEach { authMemberRepository.save(it.copy(randomReceiveAllowed = false)) }
+        return try {
+            block()
+        } finally {
+            disabledOriginals.forEach { current ->
+                authMemberRepository.findById(current.id)?.let {
+                    authMemberRepository.save(it.copy(randomReceiveAllowed = true))
+                }
+            }
+        }
     }
 
     @Test

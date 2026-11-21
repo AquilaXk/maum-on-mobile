@@ -97,16 +97,34 @@ class ApiRateLimitFilter(
     }
 
     private fun clientKey(request: HttpServletRequest): String {
+        val remoteAddr = request.remoteAddr?.trim().orEmpty().ifBlank { "unknown" }
         val headerName = properties.clientIpHeader.trim()
-        val headerClient = headerName
-            .takeIf { it.isNotEmpty() }
-            ?.let(request::getHeader)
-            ?.split(",")
-            ?.firstOrNull()
-            ?.trim()
-            ?.takeIf { it.isNotEmpty() }
+        val headerClient = if (headerName.isNotEmpty() && isTrustedProxyAddress(remoteAddr)) {
+            request.getHeader(headerName)
+                ?.split(",")
+                ?.firstOrNull()
+                ?.trim()
+                ?.takeIf { it.isNotEmpty() }
+        } else {
+            null
+        }
 
-        return headerClient ?: request.remoteAddr ?: "unknown"
+        return headerClient ?: remoteAddr
+    }
+
+    private fun isTrustedProxyAddress(remoteAddr: String): Boolean {
+        val normalized = remoteAddr.lowercase()
+        if (normalized == "127.0.0.1" || normalized == "::1" || normalized == "0:0:0:0:0:0:0:1") {
+            return true
+        }
+        if (normalized.startsWith("10.") || normalized.startsWith("192.168.") || normalized.startsWith("fc") || normalized.startsWith("fd")) {
+            return true
+        }
+        if (normalized.startsWith("172.")) {
+            val secondOctet = normalized.substringAfter("172.").substringBefore(".").toIntOrNull()
+            return secondOctet != null && secondOctet in 16..31
+        }
+        return false
     }
 
     private fun writeRateLimitedResponse(response: HttpServletResponse, retryAfterSeconds: Long) {

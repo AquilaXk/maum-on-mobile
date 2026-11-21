@@ -262,7 +262,8 @@ class _QaDiaryRepository implements DiaryRepository {
   Future<DiaryEntry> fetchDiary(int id) async => _qaDiary(id: id);
 
   @override
-  Future<int> createDiary(DiaryDraft draft) async => 10;
+  Future<int> createDiary(DiaryDraft draft, {String? idempotencyKey}) async =>
+      10;
 
   @override
   Future<void> updateDiary(int id, DiaryDraft draft) async {}
@@ -383,7 +384,8 @@ class _QaStoryRepository implements StoryRepository {
   }
 
   @override
-  Future<int> createStory(StoryDraft draft) async => 11;
+  Future<int> createStory(StoryDraft draft, {String? idempotencyKey}) async =>
+      11;
 
   @override
   Future<void> updateStory(int id, StoryDraft draft) async {}
@@ -429,6 +431,7 @@ class _QaStoryRepository implements StoryRepository {
     required int authorId,
     required String content,
     int? parentCommentId,
+    String? idempotencyKey,
   }) async {}
 
   @override
@@ -516,7 +519,11 @@ class _QaLetterRepository implements LetterRepository {
   }
 
   @override
-  Future<int> createLetter(LetterDraft draft) async => 12;
+  Future<int> createLetter(
+    LetterDraft draft, {
+    String? idempotencyKey,
+  }) async =>
+      12;
 
   @override
   Future<void> replyLetter(int id, String replyContent) async {}
@@ -697,7 +704,11 @@ class _QaReportRepository implements ReportRepository {
   const _QaReportRepository();
 
   @override
-  Future<int> createReport(ReportDraft draft) async => 1;
+  Future<int> createReport(
+    ReportDraft draft, {
+    String? idempotencyKey,
+  }) async =>
+      1;
 }
 
 class _QaSettingsRepository implements SettingsRepository {

@@ -87,6 +87,7 @@ void main() {
 
       final id = await repository.createLetter(
         const LetterDraft(title: '제목', content: '본문'),
+        idempotencyKey: 'letter-idem-1',
       );
       await repository.replyLetter(10, '답장');
       await repository.acceptLetter(10);
@@ -97,12 +98,13 @@ void main() {
       expect(id, 10);
       expect(status, LetterStatus.writing);
       expect(transport.requests[0].path, '/api/v1/letters');
+      expect(transport.requests[0].headers['X-Idempotency-Key'], 'letter-idem-1');
       expect(transport.requests[0].body, {'title': '제목', 'content': '본문'});
       expect(transport.requests[1].path, '/api/v1/letters/10/reply');
       expect(transport.requests[2].path, '/api/v1/letters/10/accept');
       expect(transport.requests[3].path, '/api/v1/letters/10/reject');
       expect(transport.requests[4].path, '/api/v1/letters/10/writing');
-      expect(transport.requests[5].requiresAuth, isFalse);
+      expect(transport.requests[5].requiresAuth, isTrue);
     });
 
     test('fails when the create response omits a valid id', () async {

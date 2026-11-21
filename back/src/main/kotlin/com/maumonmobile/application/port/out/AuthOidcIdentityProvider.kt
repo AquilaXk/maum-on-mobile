@@ -15,6 +15,7 @@ data class AuthOidcIdentity(
     val subject: String,
     val email: String?,
     val nickname: String?,
+    val emailVerified: Boolean = true,
 )
 
 interface AuthOidcIdentityProvider {

@@ -465,9 +465,21 @@ List<DiaryContentBlock> legacyDiaryContentBlocks({
 }
 
 abstract final class _DiaryHtmlPatterns {
-  static final RegExp htmlTag = RegExp(r'<[^>]+>');
+  static const int maxHtmlChars = 100000;
+  static final RegExp scriptBlock = RegExp(
+    r'<script\b[^>]*>[\s\S]*?</script>',
+    caseSensitive: false,
+  );
+  static final RegExp styleBlock = RegExp(
+    r'<style\b[^>]*>[\s\S]*?</style>',
+    caseSensitive: false,
+  );
+  static final RegExp htmlComment = RegExp(r'<!--[\s\S]*?-->');
+  static final RegExp htmlTag = RegExp(
+    r'</?[a-zA-Z][a-zA-Z0-9:-]*(?:\s[^<>]*)?/?>',
+  );
   static final RegExp imgTag = RegExp(
-    r'''<img[^>]*src=["']([^"']+)["'][^>]*>''',
+    r'''<img\b[^>]*src=["']([^"']+)["'][^>]*>''',
     caseSensitive: false,
   );
   static final RegExp dataFilenameAttr = RegExp(
@@ -485,30 +497,71 @@ abstract final class _DiaryHtmlPatterns {
   static final RegExp brTag = RegExp(r'<br\s*/?>', caseSensitive: false);
   static final RegExp closingParagraphTag =
       RegExp(r'</p>', caseSensitive: false);
-  static final RegExp stripHtmlTag = RegExp(r'<[^>]+>');
+  static final RegExp htmlEntity = RegExp(
+    r'&(?:nbsp|lt|gt|quot|#0?39|amp);',
+  );
+}
+
+String? _sanitizeDiaryImageUrl(String? rawUrl) {
+  if (rawUrl == null) {
+    return null;
+  }
+  final decoded = rawUrl.trim().replaceAll('&amp;', '&');
+  if (decoded.isEmpty) {
+    return null;
+  }
+  final compact =
+      decoded.replaceAll(RegExp(r'[\u0000-\u0020]+'), '').toLowerCase();
+  if (compact.startsWith('//')) {
+    return null;
+  }
+  if (compact.startsWith('http://') ||
+      compact.startsWith('https://') ||
+      compact.startsWith('/')) {
+    return decoded;
+  }
+  if (compact.contains(':')) {
+    return null;
+  }
+  return decoded;
 }
 
 List<DiaryContentBlock> parseHtmlToDiaryContentBlocks({
   required String content,
   String? imageUrl,
 }) {
-  final trimmed = content.trim();
+  final bounded = content.length > _DiaryHtmlPatterns.maxHtmlChars
+      ? content.substring(0, _DiaryHtmlPatterns.maxHtmlChars)
+      : content;
+  final sanitizedFallbackImageUrl = _sanitizeDiaryImageUrl(imageUrl);
+  final trimmed = bounded.trim();
   if (trimmed.isEmpty) {
     return [
       DiaryContentBlock.text(id: 'text-0', text: ''),
-      if (imageUrl != null)
-        DiaryContentBlock.image(id: 'image-0', imageUrl: imageUrl),
+      if (sanitizedFallbackImageUrl != null)
+        DiaryContentBlock.image(
+          id: 'image-0',
+          imageUrl: sanitizedFallbackImageUrl,
+        ),
     ];
   }
 
   final hasHtml = _DiaryHtmlPatterns.htmlTag.hasMatch(trimmed);
   if (!hasHtml) {
     return [
-      DiaryContentBlock.text(id: 'text-0', text: content),
-      if (imageUrl != null)
-        DiaryContentBlock.image(id: 'image-0', imageUrl: imageUrl),
+      DiaryContentBlock.text(id: 'text-0', text: bounded),
+      if (sanitizedFallbackImageUrl != null)
+        DiaryContentBlock.image(
+          id: 'image-0',
+          imageUrl: sanitizedFallbackImageUrl,
+        ),
     ];
   }
+
+  final withoutUnsafeBlocks = trimmed
+      .replaceAll(_DiaryHtmlPatterns.scriptBlock, '')
+      .replaceAll(_DiaryHtmlPatterns.styleBlock, '')
+      .replaceAll(_DiaryHtmlPatterns.htmlComment, '');
 
   final blocks = <DiaryContentBlock>[];
   var blockIndex = 0;
@@ -516,8 +569,8 @@ List<DiaryContentBlock> parseHtmlToDiaryContentBlocks({
 
   var lastIndex = 0;
 
-  for (final match in _DiaryHtmlPatterns.imgTag.allMatches(trimmed)) {
-    final textBefore = trimmed.substring(lastIndex, match.start);
+  for (final match in _DiaryHtmlPatterns.imgTag.allMatches(withoutUnsafeBlocks)) {
+    final textBefore = withoutUnsafeBlocks.substring(lastIndex, match.start);
     final cleanText = _stripHtmlTags(textBefore);
     if (cleanText.isNotEmpty) {
       blocks.add(DiaryContentBlock.text(
@@ -526,7 +579,7 @@ List<DiaryContentBlock> parseHtmlToDiaryContentBlocks({
       ));
     }
 
-    final imgSrc = match.group(1);
+    final imgSrc = _sanitizeDiaryImageUrl(match.group(1));
     final imgTag = match.group(0) ?? '';
     if (imgSrc != null && imgSrc.isNotEmpty) {
       seenImageUrls.add(imgSrc);
@@ -547,8 +600,8 @@ List<DiaryContentBlock> parseHtmlToDiaryContentBlocks({
     lastIndex = match.end;
   }
 
-  if (lastIndex < trimmed.length) {
-    final textAfter = trimmed.substring(lastIndex);
+  if (lastIndex < withoutUnsafeBlocks.length) {
+    final textAfter = withoutUnsafeBlocks.substring(lastIndex);
     final cleanText = _stripHtmlTags(textAfter);
     if (cleanText.isNotEmpty) {
       blocks.add(DiaryContentBlock.text(
@@ -558,10 +611,11 @@ List<DiaryContentBlock> parseHtmlToDiaryContentBlocks({
     }
   }
 
-  if (imageUrl != null && !seenImageUrls.contains(imageUrl)) {
+  if (sanitizedFallbackImageUrl != null &&
+      !seenImageUrls.contains(sanitizedFallbackImageUrl)) {
     blocks.add(DiaryContentBlock.image(
       id: 'image-${blockIndex++}',
-      imageUrl: imageUrl,
+      imageUrl: sanitizedFallbackImageUrl,
     ));
   }
 
@@ -572,13 +626,18 @@ String _stripHtmlTags(String html) {
   return html
       .replaceAll(_DiaryHtmlPatterns.brTag, '\n')
       .replaceAll(_DiaryHtmlPatterns.closingParagraphTag, '\n')
-      .replaceAll(_DiaryHtmlPatterns.stripHtmlTag, '')
-      .replaceAll('&nbsp;', ' ')
-      .replaceAll('&amp;', '&')
-      .replaceAll('&lt;', '<')
-      .replaceAll('&gt;', '>')
-      .replaceAll('&quot;', '"')
-      .replaceAll('&#039;', "'")
+      .replaceAll(_DiaryHtmlPatterns.htmlTag, '')
+      .replaceAllMapped(_DiaryHtmlPatterns.htmlEntity, (match) {
+        return switch (match.group(0)) {
+          '&nbsp;' => ' ',
+          '&lt;' => '<',
+          '&gt;' => '>',
+          '&quot;' => '"',
+          '&#39;' || '&#039;' => "'",
+          '&amp;' => '&',
+          final other => other ?? '',
+        };
+      })
       .trim();
 }
 

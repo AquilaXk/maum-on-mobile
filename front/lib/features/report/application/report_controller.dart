@@ -1,6 +1,7 @@
 import 'package:flutter/widgets.dart';
 
 import '../../../core/network/api_error.dart';
+import '../../../core/network/idempotency_key.dart';
 import '../../moderation/data/content_moderation_repository.dart';
 import '../../moderation/domain/content_moderation_models.dart';
 import '../data/report_repository.dart';
@@ -109,10 +110,13 @@ class ReportController extends ChangeNotifier {
 
   ReportState _state = const ReportState();
   bool _isDisposed = false;
+  final ScopedIdempotencyKey _reportIdempotencyKey =
+      ScopedIdempotencyKey('report');
 
   ReportState get state => _state;
 
   void selectTarget(ReportTarget target) {
+    _reportIdempotencyKey.clear();
     _setState(
       _state.copyWith(
         target: target,
@@ -205,13 +209,19 @@ class ReportController extends ChangeNotifier {
         return;
       }
 
+      final content = _state.content.trim();
+      final idempotencyKey = _reportIdempotencyKey.keyFor(
+        '${target.type.name}:${target.id}:${_state.reason.name}:$content',
+      );
       final reportId = await _repository.createReport(
         ReportDraft(
           target: target,
           reason: _state.reason,
-          content: _state.content.trim(),
+          content: content,
         ),
+        idempotencyKey: idempotencyKey,
       );
+      _reportIdempotencyKey.clear();
       _setState(
         _state.copyWith(
           isSubmitting: false,

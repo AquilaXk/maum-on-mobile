@@ -311,12 +311,12 @@ class _MoodHeatmapPainter extends CustomPainter {
 
 Color heatmapMoodColor(int moodScore) {
   return switch (moodScore) {
-    1 => const Color(0xFFEF4444),
-    2 => const Color(0xFFF97316),
+    1 => const Color(0xFFDC2626),
+    2 => const Color(0xFFC2410C),
     3 => const Color(0xFFEAB308),
-    4 => const Color(0xFF0284C7),
-    5 => const Color(0xFF5C6BC0),
-    _ => const Color(0xFF5C6BC0),
+    4 => const Color(0xFF0369A1),
+    5 => const Color(0xFF2563EB),
+    _ => const Color(0xFF2563EB),
   };
 }
 

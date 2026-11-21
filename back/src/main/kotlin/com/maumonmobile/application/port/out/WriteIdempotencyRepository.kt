@@ -15,4 +15,6 @@ interface WriteIdempotencyRepository {
     ): WriteIdempotencyRecord?
 
     fun findByKey(memberId: Long, operation: WriteOperation, idempotencyKey: String): WriteIdempotencyRecord?
+
+    fun deletePending(memberId: Long, operation: WriteOperation, idempotencyKey: String): Boolean
 }

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../shared/ui/app_design_system.dart';
+import '../../../shared/ui/text_editing_sync.dart';
 import '../../moderation/presentation/content_moderation_feedback_panel.dart';
 import '../application/letter_controller.dart';
 import '../domain/letter_models.dart';
@@ -376,7 +377,7 @@ class _StatsSection extends StatelessWidget {
                     icon: const Icon(Icons.tune, size: 18),
                     label: const Text('수신 설정'),
                     style: TextButton.styleFrom(
-                      visualDensity: VisualDensity.compact,
+                      minimumSize: const Size(48, 48),
                     ),
                   ),
                 ),
@@ -771,14 +772,7 @@ class _LetterComposeViewState extends State<_LetterComposeView> {
 }
 
 void _syncText(TextEditingController controller, String nextText) {
-  if (controller.text == nextText) {
-    return;
-  }
-
-  controller.value = TextEditingValue(
-    text: nextText,
-    selection: TextSelection.collapsed(offset: nextText.length),
-  );
+  syncTextControllerWithImeGuard(controller, nextText);
 }
 
 Widget? _hideLengthCounter(

@@ -119,6 +119,18 @@ class WriteIdempotencyControllerTest @Autowired constructor(
                 jsonPath("$.error.retryable") { value(false) }
                 jsonPath("$.error.cause") { value("INVALID_REQUEST") }
             }
+
+        // 실패한 요청 뒤 같은 키로 정상 본문을 다시 전송하면 IN_PROGRESS 잔류 없이 성공해야 한다.
+        mockMvc.post("/api/v1/posts") {
+            header("Authorization", "Bearer ${member.accessToken}")
+            header("X-Idempotency-Key", "blocked-post-key")
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"title":"수정된 글","content":"이제 차분히 마음을 정리해 보고 싶어요.","category":"WORRY"}"""
+        }
+            .andExpect {
+                status { isOk() }
+                jsonPath("$.data") { value(greaterThan(0)) }
+            }
     }
 
     @Test

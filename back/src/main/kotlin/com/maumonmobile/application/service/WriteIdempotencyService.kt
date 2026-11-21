@@ -10,23 +10,31 @@ import com.maumonmobile.global.security.AuthenticatedUser
 import com.maumonmobile.global.web.ApiException
 import com.maumonmobile.global.web.ErrorCode
 import org.springframework.stereotype.Service
-import org.springframework.transaction.annotation.Transactional
+import org.springframework.transaction.PlatformTransactionManager
+import org.springframework.transaction.TransactionDefinition
+import org.springframework.transaction.support.TransactionTemplate
 import java.time.Instant
 
 @Service
 class WriteIdempotencyService(
     private val writeIdempotencyRepository: WriteIdempotencyRepository,
     private val metricsRegistry: MobileApiMetricsRegistry,
+    transactionManager: PlatformTransactionManager,
 ) {
+    private val requiresNewTransaction = TransactionTemplate(transactionManager).apply {
+        propagationBehavior = TransactionDefinition.PROPAGATION_REQUIRES_NEW
+    }
+    private val requiredTransaction = TransactionTemplate(transactionManager)
 
-    @Transactional
     fun executeLong(
         user: AuthenticatedUser,
         operation: WriteOperation,
         idempotencyKey: String?,
         action: () -> Long,
     ): Long {
-        val normalizedKey = idempotencyKey?.trim()?.takeIf(String::isNotEmpty) ?: return action()
+        val normalizedKey = idempotencyKey?.trim()?.takeIf(String::isNotEmpty) ?: return requiredTransaction.execute {
+            action()
+        }!!
         if (normalizedKey.length > IDEMPOTENCY_KEY_MAX_LENGTH) {
             throw ApiException(
                 ErrorCode.INVALID_REQUEST,
@@ -37,31 +45,44 @@ class WriteIdempotencyService(
 
         val memberId = user.memberId()
         val now = Instant.now().toUtcIso6()
-        val created = writeIdempotencyRepository.createPending(
-            WriteIdempotencyRecord(
-                id = 0,
-                memberId = memberId,
-                operation = operation,
-                idempotencyKey = normalizedKey,
-                status = WriteIdempotencyStatus.IN_PROGRESS,
-                resourceId = null,
-                createdAt = now,
-                updatedAt = now,
-            ),
-        )
+        val created = requiresNewTransaction.execute {
+            writeIdempotencyRepository.createPending(
+                WriteIdempotencyRecord(
+                    id = 0,
+                    memberId = memberId,
+                    operation = operation,
+                    idempotencyKey = normalizedKey,
+                    status = WriteIdempotencyStatus.IN_PROGRESS,
+                    resourceId = null,
+                    createdAt = now,
+                    updatedAt = now,
+                ),
+            )
+        } == true
 
         if (!created) {
             return resolveExisting(memberId, operation, normalizedKey)
         }
 
-        val resourceId = action()
-        return writeIdempotencyRepository.markSucceeded(
-            memberId = memberId,
-            operation = operation,
-            idempotencyKey = normalizedKey,
-            resourceId = resourceId,
-            updatedAt = Instant.now().toUtcIso6(),
-        )?.resourceId ?: resourceId
+        return try {
+            requiredTransaction.execute {
+                val resourceId = action()
+                writeIdempotencyRepository.markSucceeded(
+                    memberId = memberId,
+                    operation = operation,
+                    idempotencyKey = normalizedKey,
+                    resourceId = resourceId,
+                    updatedAt = Instant.now().toUtcIso6(),
+                )?.resourceId ?: resourceId
+            }!!
+        } catch (failure: Throwable) {
+            runCatching {
+                requiresNewTransaction.execute {
+                    writeIdempotencyRepository.deletePending(memberId, operation, normalizedKey)
+                }
+            }
+            throw failure
+        }
     }
 
     private fun resolveExisting(memberId: Long, operation: WriteOperation, idempotencyKey: String): Long {

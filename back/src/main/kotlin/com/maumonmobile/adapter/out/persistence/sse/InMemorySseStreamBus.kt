@@ -27,4 +27,14 @@ class InMemorySseStreamBus : SseStreamBusPort {
             .take(limit.coerceAtLeast(1))
             .toList()
     }
+
+    override fun findMaxEventId(): Long {
+        return events.maxOfOrNull(SseStreamEvent::id) ?: 0L
+    }
+
+    override fun deleteEventsCreatedBefore(cutoffIso: String): Int {
+        val before = events.size
+        events.removeIf { event -> event.createdAt < cutoffIso }
+        return (before - events.size).coerceAtLeast(0)
+    }
 }

@@ -59,5 +59,39 @@ void main() {
       expect(blocks[0].text, '사진 없는 일기');
       expect(blocks[1].imageUrl, '/images/uploads/fallback.png');
     });
+
+    test('strips script and style blocks while preserving math comparisons and single-decoded entities', () {
+      const html =
+          '<script>alert("xss")</script><style>.x{color:red}</style><p>1 &lt; 2 이고 1 < 2 그리고 &amp;lt;tag&amp;gt;</p>';
+      final blocks = parseHtmlToDiaryContentBlocks(content: html);
+
+      expect(blocks.length, 1);
+      expect(blocks[0].text, '1 < 2 이고 1 < 2 그리고 &lt;tag&gt;');
+      expect(blocks[0].text, isNot(contains('alert')));
+      expect(blocks[0].text, isNot(contains('color:red')));
+    });
+
+    test('preserves Hangul comparison text without HTML tags', () {
+      const plain = '점수는 1 < 2 이거나 3 > 1 이에요.';
+      final blocks = parseHtmlToDiaryContentBlocks(content: plain);
+
+      expect(blocks.length, 1);
+      expect(blocks[0].text, plain);
+    });
+
+    test('decodes &amp; in img src and rejects unsafe javascript or data text URLs', () {
+      const html =
+          '<p>사진</p><img src="https://cdn.example.com/a.jpg?w=400&amp;q=80" alt="정상" />'
+          '<img src="javascript:alert(1)" alt="악성1" />'
+          '<img src="data:text/html,<script>x</script>" alt="악성2" />';
+      final blocks = parseHtmlToDiaryContentBlocks(
+        content: html,
+        imageUrl: 'javascript:evil()',
+      );
+
+      final imageBlocks = blocks.where((block) => block.isImage).toList();
+      expect(imageBlocks.length, 1);
+      expect(imageBlocks.single.imageUrl, 'https://cdn.example.com/a.jpg?w=400&q=80');
+    });
   });
 }

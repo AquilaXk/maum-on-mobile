@@ -587,7 +587,8 @@ class _HomeQuickActionButton extends StatelessWidget {
             const SizedBox(height: AppSpacing.xxs),
             Text(
               title,
-              maxLines: 1,
+              maxLines: 2,
+              textAlign: TextAlign.center,
               overflow: TextOverflow.ellipsis,
               style: theme.textTheme.labelLarge?.copyWith(
                     color: colors.foreground,

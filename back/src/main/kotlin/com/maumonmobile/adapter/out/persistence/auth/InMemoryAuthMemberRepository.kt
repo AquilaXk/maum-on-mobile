@@ -147,8 +147,8 @@ class InMemoryAuthMemberRepository : AuthMemberRepository {
         return membersById[memberId]
     }
 
-    override fun revokeRefreshToken(refreshToken: String) {
-        memberIdsByRefreshToken.remove(refreshToken)
+    override fun revokeRefreshToken(refreshToken: String): Boolean {
+        return memberIdsByRefreshToken.remove(refreshToken) != null
     }
 
     override fun revokeRefreshTokens(memberId: Long): Int {

@@ -647,7 +647,7 @@ class _FakeStoryRepository implements StoryRepository {
   }
 
   @override
-  Future<int> createStory(StoryDraft draft) async {
+  Future<int> createStory(StoryDraft draft, {String? idempotencyKey}) async {
     createdDrafts.add(draft);
     final error = createError;
     if (error != null) {
@@ -689,6 +689,7 @@ class _FakeStoryRepository implements StoryRepository {
     required int authorId,
     required String content,
     int? parentCommentId,
+    String? idempotencyKey,
   }) async {
     createdComments.add((
       postId: postId,

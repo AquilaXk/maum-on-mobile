@@ -1,6 +1,5 @@
 package com.maumonmobile.adapter.out.persistence.write
 
-import com.maumonmobile.adapter.out.persistence.jdbc.insertAndReturnId
 import com.maumonmobile.adapter.out.persistence.jdbc.params
 import com.maumonmobile.adapter.out.persistence.jdbc.withValue
 import com.maumonmobile.application.port.out.WriteIdempotencyRepository
@@ -8,7 +7,6 @@ import com.maumonmobile.domain.write.WriteIdempotencyRecord
 import com.maumonmobile.domain.write.WriteIdempotencyStatus
 import com.maumonmobile.domain.write.WriteOperation
 import org.springframework.context.annotation.Profile
-import org.springframework.dao.DuplicateKeyException
 import org.springframework.jdbc.core.RowMapper
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate
 import org.springframework.stereotype.Repository
@@ -20,33 +18,35 @@ class JdbcWriteIdempotencyRepository(
 ) : WriteIdempotencyRepository {
 
     override fun createPending(record: WriteIdempotencyRecord): Boolean {
-        return try {
-            jdbc.insertAndReturnId(
-                """
-                    insert into write_idempotency_records (
-                        member_id,
-                        operation,
-                        idempotency_key,
-                        status,
-                        resource_id,
-                        created_at,
-                        updated_at
-                    ) values (
-                        :memberId,
-                        :operation,
-                        :idempotencyKey,
-                        :status,
-                        :resourceId,
-                        :createdAt,
-                        :updatedAt
-                    )
-                """.trimIndent(),
-                record.toParams(),
-            )
-            true
-        } catch (exception: DuplicateKeyException) {
-            false
-        }
+        val inserted = jdbc.update(
+            """
+                insert into write_idempotency_records (
+                    member_id,
+                    operation,
+                    idempotency_key,
+                    status,
+                    resource_id,
+                    created_at,
+                    updated_at
+                )
+                select :memberId,
+                       :operation,
+                       :idempotencyKey,
+                       :status,
+                       :resourceId,
+                       :createdAt,
+                       :updatedAt
+                 where not exists (
+                    select 1
+                      from write_idempotency_records
+                     where member_id = :memberId
+                       and operation = :operation
+                       and idempotency_key = :idempotencyKey
+                 )
+            """.trimIndent(),
+            record.toParams(),
+        )
+        return inserted > 0
     }
 
     override fun markSucceeded(
@@ -96,6 +96,28 @@ class JdbcWriteIdempotencyRepository(
                 .withValue("idempotencyKey", idempotencyKey),
             rowMapper,
         ).singleOrNull()
+    }
+
+    override fun deletePending(
+        memberId: Long,
+        operation: WriteOperation,
+        idempotencyKey: String,
+    ): Boolean {
+        val deleted = jdbc.update(
+            """
+                delete from write_idempotency_records
+                 where member_id = :memberId
+                   and operation = :operation
+                   and idempotency_key = :idempotencyKey
+                   and status = :pendingStatus
+            """.trimIndent(),
+            params()
+                .withValue("memberId", memberId)
+                .withValue("operation", operation.name)
+                .withValue("idempotencyKey", idempotencyKey)
+                .withValue("pendingStatus", WriteIdempotencyStatus.IN_PROGRESS.name),
+        )
+        return deleted > 0
     }
 
     private fun WriteIdempotencyRecord.toParams() = params()

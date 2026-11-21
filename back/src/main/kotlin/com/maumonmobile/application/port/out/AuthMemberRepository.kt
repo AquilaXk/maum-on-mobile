@@ -47,7 +47,7 @@ interface AuthMemberRepository {
 
     fun findByRefreshToken(refreshToken: String): AuthMember?
 
-    fun revokeRefreshToken(refreshToken: String)
+    fun revokeRefreshToken(refreshToken: String): Boolean
 
     fun revokeRefreshTokens(memberId: Long): Int
 }

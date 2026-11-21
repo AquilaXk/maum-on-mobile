@@ -46,7 +46,7 @@ void main() {
       ),
     );
     expect(activeIcon.color, const Color(0xFF111111));
-    expect(inactiveIcon.color, const Color(0xFF777777));
+    expect(inactiveIcon.color, const Color(0xFF596577));
     expect(find.bySemanticsLabel('홈 Tab 1 of 5'), findsOneWidget);
 
     await tester.tap(find.byKey(const ValueKey('route-tab-diary')));

@@ -21,7 +21,7 @@ interface LetterUseCase {
 
     fun reply(user: AuthenticatedUser, letterId: Long, replyContent: String)
 
-    fun status(letterId: Long): String
+    fun status(user: AuthenticatedUser, letterId: Long): String
 }
 
 data class LetterSaveCommand(

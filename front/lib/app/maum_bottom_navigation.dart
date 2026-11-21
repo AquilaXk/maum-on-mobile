@@ -88,9 +88,8 @@ class _MaumBottomNavigationItem extends StatelessWidget {
     final colorScheme = theme.colorScheme;
     final iconForeground = isDark
         ? (isSelected ? colorScheme.primary : colorScheme.onSurfaceVariant)
-        : (isSelected ? const Color(0xFF111111) : const Color(0xFF777777));
+        : (isSelected ? const Color(0xFF111111) : const Color(0xFF596577));
     final labelForeground = iconForeground;
-    const visualSurfaceWidth = 64.0;
     void handleTap() {
       HapticFeedback.selectionClick();
       onSelected(route);
@@ -122,9 +121,11 @@ class _MaumBottomNavigationItem extends StatelessWidget {
                     key: ValueKey('route-tab-${route.key}-surface'),
                     duration: const Duration(milliseconds: 180),
                     curve: Curves.easeOut,
-                    width: visualSurfaceWidth,
                     // 사진형 탭바는 배경 캡슐 없이 아이콘과 라벨 색상으로만 선택을 드러낸다.
-                    constraints: const BoxConstraints(minHeight: 62),
+                    constraints: const BoxConstraints(
+                      minWidth: 56,
+                      minHeight: 62,
+                    ),
                     decoration: const BoxDecoration(
                       color: Colors.transparent,
                       borderRadius: BorderRadius.zero,
