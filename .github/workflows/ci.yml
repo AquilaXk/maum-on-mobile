@@ -266,23 +266,24 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          unexpected_markdown="$(git ls-files '*.md' ':!:README.md')"
+          unexpected_markdown="$(git ls-files '*.md' ':!:README.md' ':!:CONTRIBUTING.md' ':!:SECURITY.md' ':!:THIRD_PARTY_NOTICES.md' ':!:TODO.md')"
           if [[ -n "${unexpected_markdown}" ]]; then
             echo "Unexpected tracked Markdown file:"
             echo "${unexpected_markdown}"
             exit 1
           fi
 
-      - name: Validate local agent docs are not tracked
-        shell: bash
+      - name: Run repository hygiene & intake guard
+        run: node tools/ci/check-repo-hygiene.mjs
+
+      - name: Check pushed commit messages
+        if: github.event_name == 'push' && github.event.before != '0000000000000000000000000000000000000000'
+        env:
+          BASE_SHA: ${{ github.event.before }}
+          HEAD_SHA: ${{ github.sha }}
         run: |
-          set -euo pipefail
-          unexpected_agent_files="$(git ls-files AGENTS.md CLAUDE.md GEMINI.md CURSOR.md COPILOT.md docs .codex .claude .cursor .aider .windsurf .ai)"
-          if [[ -n "${unexpected_agent_files}" ]]; then
-            echo "Unexpected tracked local agent file:"
-            echo "${unexpected_agent_files}"
-            exit 1
-          fi
+          git fetch --no-tags --depth=200 origin "${BASE_SHA}" "${HEAD_SHA}"
+          node tools/ci/check-repo-hygiene.mjs --commits "${BASE_SHA}" "${HEAD_SHA}"
 
   backend:
     name: Backend

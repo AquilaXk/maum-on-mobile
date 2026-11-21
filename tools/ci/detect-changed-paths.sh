@@ -16,7 +16,7 @@ saw_file=false
 
 is_docs_file() {
   case "$1" in
-    README.md|LICENSE|LICENSE.*)
+    README.md|CONTRIBUTING.md|SECURITY.md|THIRD_PARTY_NOTICES.md|TODO.md|LICENSE|LICENSE.*)
       return 0
       ;;
     *)
@@ -139,7 +139,7 @@ while IFS= read -r file; do
       ios=true
       repository=true
       ;;
-    .github/**|.gitignore|.coderabbit.yaml)
+    .github/**|.gitignore)
       repository=true
       ;;
   esac

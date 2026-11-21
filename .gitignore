@@ -3,7 +3,10 @@
 # Documentation policy
 *.md
 !/README.md
-!/.github/pull_request_template.md
+!/CONTRIBUTING.md
+!/SECURITY.md
+!/THIRD_PARTY_NOTICES.md
+!/TODO.md
 
 # Local environment
 .env
@@ -19,20 +22,9 @@ vertex-key.json
 *.iml
 *.ipr
 
-# Agent-only local docs and state
-AGENTS.md
-CLAUDE.md
-GEMINI.md
-CURSOR.md
-COPILOT.md
-docs/
-.codex/
-.claude/
-.cursor/
-.aider/
-.aider*
-.windsurf/
-.ai/
+# Local scratch & worktrees
+.worktrees/
+*.local.md
 .playwright-mcp/
 
 # JavaScript / TypeScript
@@ -64,8 +56,9 @@ temp/
 **/*.auto.tfvars.json
 !**/terraform.tfvars.example
 
-# Android / Gradle
+# Android / Gradle / Kotlin
 .gradle/
+back/.kotlin/
 android/.gradle/
 android/build/
 android/app/build/
@@ -87,7 +80,7 @@ front/ios/DerivedData/
 **/*.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/
 *.xcuserstate
 
-# Flutter, if selected later
+# Flutter
 .dart_tool/
 .flutter-plugins
 .flutter-plugins-dependencies
@@ -95,7 +88,7 @@ front/ios/DerivedData/
 pubspec.lock
 !front/pubspec.lock
 
-# React Native / Expo, if selected later
+# Metro / temporary mobile tool caches
 .expo/
 .expo-shared/
 metro-cache/

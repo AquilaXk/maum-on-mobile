@@ -136,7 +136,7 @@ test("repository contracts preserve local docs and issue template policies", asy
   assert.match(repositoryContracts, /ruby -e 'require "yaml"/);
   assert.match(repositoryContracts, /Unexpected tracked Markdown file/);
   assert.doesNotMatch(repositoryContracts, /pull_request_template\.md/);
-  assert.match(repositoryContracts, /Unexpected tracked local agent file/);
+  assert.match(repositoryContracts, /node tools\/ci\/check-repo-hygiene\.mjs/);
 });
 
 test("local Vertex AI credentials stay ignored and default to Gemini 2.5 Flash", async () => {
@@ -177,7 +177,7 @@ test("path classifier treats README as docs-only and PR templates as repository 
 });
 
 test("path classifier enables repository checks for GitHub issue template changes", async () => {
-  const outputs = await classifyChangedFiles([".github/ISSUE_TEMPLATE/feature_request.yml"]);
+  const outputs = await classifyChangedFiles([".github/ISSUE_TEMPLATE/bug_report.yml"]);
 
   assert.equal(outputs.docs_only, "false");
   assert.equal(outputs.repository, "true");
