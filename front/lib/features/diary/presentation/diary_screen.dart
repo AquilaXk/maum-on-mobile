@@ -609,30 +609,13 @@ class _CalendarDayButton extends StatelessWidget {
   }
 }
 
-Color _moodMarkerColor(int moodScore) {
-  switch (moodScore) {
-    case 1:
-      return const Color(0xFFDC2626);
-    case 2:
-      return const Color(0xFFC2410C);
-    case 3:
-      return const Color(0xFFEAB308);
-    case 4:
-      return const Color(0xFF0369A1);
-    case 5:
-      return const Color(0xFF2563EB);
-    default:
-      return const Color(0xFF2563EB);
-  }
-}
+Color _moodMarkerColor(int moodScore) => MaumTokens.moodBackground(moodScore);
 
 String? _moodScoreLabel(int moodScore) {
-  for (final option in _moodScoreOptions) {
-    if (option.score == moodScore) {
-      return option.label;
-    }
+  if (moodScore < 1 || moodScore > 5) {
+    return null;
   }
-  return null;
+  return MaumTokens.moodLabel(moodScore);
 }
 
 class _CalendarEntryMarker extends StatelessWidget {
@@ -1039,21 +1022,19 @@ class _DiaryForm extends StatelessWidget {
             spacing: AppSpacing.xs,
             runSpacing: AppSpacing.xs,
             children: [
-              for (final option in _moodScoreOptions)
+              for (var score = 1; score <= 5; score += 1)
                 ChoiceChip(
-                  key: ValueKey('diary-mood-score-${option.score}'),
-                  label: Text(option.label),
-                  selected: state.moodScore == option.score,
+                  key: ValueKey('diary-mood-score-$score'),
+                  label: Text(MaumTokens.moodLabel(score)),
+                  selected: state.moodScore == score,
                   selectedColor:
-                      _moodMarkerColor(option.score).withValues(alpha: 0.22),
+                      _moodMarkerColor(score).withValues(alpha: 0.22),
                   onSelected: state.isSubmitting
                       ? null
                       : (_) {
                           HapticFeedback.selectionClick();
                           onMoodScoreChanged(
-                            state.moodScore == option.score
-                                ? null
-                                : option.score,
+                            state.moodScore == score ? null : score,
                           );
                         },
                 ),
@@ -1563,14 +1544,6 @@ class _ImageFallbackLabel extends StatelessWidget {
     );
   }
 }
-
-const List<({int score, String label})> _moodScoreOptions = [
-  (score: 1, label: '매우 힘듦'),
-  (score: 2, label: '힘듦'),
-  (score: 3, label: '보통'),
-  (score: 4, label: '좋음'),
-  (score: 5, label: '매우 좋음'),
-];
 
 const List<String> _emotionTagPresets = [
   '기쁨',

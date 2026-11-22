@@ -168,6 +168,7 @@ class _MoodCheckinHeroCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
+    final tokens = context.maumTokens;
     final isDark = theme.brightness == Brightness.dark;
     final summaryText = stats?.summary.recoveryMessage.trim() ?? '';
 
@@ -177,7 +178,7 @@ class _MoodCheckinHeroCard extends StatelessWidget {
         padding: const EdgeInsets.all(AppSpacing.lg),
         backgroundColor: isDark
             ? colorScheme.primaryContainer.withValues(alpha: 0.42)
-            : const Color(0xFFF6FAFF),
+            : tokens.surfaceStrong,
         border: ShadBorder.all(
           color: colorScheme.primary.withValues(alpha: isDark ? 0.35 : 0.22),
           width: 1,
@@ -320,55 +321,23 @@ class _MoodScoreButton extends StatelessWidget {
 class _MoodOption {
   const _MoodOption({
     required this.score,
-    required this.label,
     required this.shortLabel,
-    required this.color,
-    required this.foreground,
   });
 
   final int score;
-  final String label;
   final String shortLabel;
-  final Color color;
-  final Color foreground;
+
+  String get label => MaumTokens.moodLabel(score);
+  Color get color => MaumTokens.moodBackground(score);
+  Color get foreground => MaumTokens.moodForeground(score);
 }
 
 const List<_MoodOption> _moodCheckinOptions = [
-  _MoodOption(
-    score: 1,
-    label: '매우 힘듦',
-    shortLabel: '버거움',
-    color: Color(0xFFDC2626),
-    foreground: Colors.white,
-  ),
-  _MoodOption(
-    score: 2,
-    label: '힘듦',
-    shortLabel: '지침',
-    color: Color(0xFFC2410C),
-    foreground: Colors.white,
-  ),
-  _MoodOption(
-    score: 3,
-    label: '보통',
-    shortLabel: '보통',
-    color: Color(0xFFEAB308),
-    foreground: Color(0xFF1E293B),
-  ),
-  _MoodOption(
-    score: 4,
-    label: '좋음',
-    shortLabel: '편안',
-    color: Color(0xFF0369A1),
-    foreground: Colors.white,
-  ),
-  _MoodOption(
-    score: 5,
-    label: '매우 좋음',
-    shortLabel: '가벼움',
-    color: Color(0xFF2563EB),
-    foreground: Colors.white,
-  ),
+  _MoodOption(score: 1, shortLabel: '버거움'),
+  _MoodOption(score: 2, shortLabel: '지침'),
+  _MoodOption(score: 3, shortLabel: '보통'),
+  _MoodOption(score: 4, shortLabel: '편안'),
+  _MoodOption(score: 5, shortLabel: '가벼움'),
 ];
 
 class _ActionGrid extends StatelessWidget {
@@ -504,7 +473,7 @@ class _BentoActionTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
-    final colors = _homeActionColors(colorScheme, tone);
+    final colors = _homeActionColors(colorScheme, context.maumTokens, tone);
 
     return Semantics(
       button: true,
@@ -685,7 +654,7 @@ class _PulseMetricCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final colors = _homeActionColors(theme.colorScheme, tone);
+    final colors = _homeActionColors(theme.colorScheme, context.maumTokens, tone);
 
     return Semantics(
       label: '$label $value',
@@ -726,7 +695,7 @@ class _PulseMetricCard extends StatelessWidget {
                       color: colors.foreground,
                       fontSize: compact ? 19 : 22,
                       fontWeight: FontWeight.w900,
-                      fontFeatures: const [FontFeature.tabularFigures()],
+                      fontFeatures: AppTypography.tabularFigures,
                     ),
                   ),
                 ),
@@ -1290,37 +1259,17 @@ String _formatBadgeCount(int count) {
 
 _HomeActionColors _homeActionColors(
   ColorScheme colorScheme,
+  MaumTokens tokens,
   AppStatusTone tone,
 ) {
-  if (colorScheme.brightness == Brightness.dark) {
-    return switch (tone) {
-      AppStatusTone.success => const _HomeActionColors(
-          background: Color(0xFF163547),
-          foreground: Color(0xFFBAE6FD),
-        ),
-      AppStatusTone.warning => const _HomeActionColors(
-          background: Color(0xFF1A2F4F),
-          foreground: Color(0xFFBFDBFE),
-        ),
-      AppStatusTone.danger => _HomeActionColors(
-          background: colorScheme.errorContainer,
-          foreground: colorScheme.onErrorContainer,
-        ),
-      AppStatusTone.neutral => _HomeActionColors(
-          background: colorScheme.primaryContainer,
-          foreground: colorScheme.onPrimaryContainer,
-        ),
-    };
-  }
-
   return switch (tone) {
-    AppStatusTone.success => const _HomeActionColors(
-        background: Color(0xFFEAF6FF),
-        foreground: Color(0xFF1F4D72),
+    AppStatusTone.success => _HomeActionColors(
+        background: tokens.quickActionSkyBg,
+        foreground: tokens.quickActionSkyFg,
       ),
-    AppStatusTone.warning => const _HomeActionColors(
-        background: Color(0xFFE8F1FF),
-        foreground: Color(0xFF244C8A),
+    AppStatusTone.warning => _HomeActionColors(
+        background: tokens.quickActionBlueBg,
+        foreground: tokens.quickActionBlueFg,
       ),
     AppStatusTone.danger => _HomeActionColors(
         background: colorScheme.errorContainer,

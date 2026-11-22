@@ -1,6 +1,8 @@
 // Staggered three-dot typing indicator with reduced-motion fallback.
 import 'package:flutter/material.dart';
 
+import '../../../../theme/app_theme.dart';
+
 class JumpingDotsIndicator extends StatefulWidget {
   const JumpingDotsIndicator({
     this.dotSize = 7,
@@ -55,9 +57,7 @@ class _JumpingDotsIndicatorState extends State<JumpingDotsIndicator>
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final dotColor = widget.color ??
-        (isDark ? const Color(0xFF8E9CE6) : const Color(0xFF2563EB));
+    final dotColor = widget.color ?? context.maumTokens.primary;
 
     return Semantics(
       label: widget.semanticLabel,

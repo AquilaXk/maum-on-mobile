@@ -3,6 +3,9 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../../../../shared/ui/app_design_system.dart';
+import '../../../../theme/app_theme.dart';
+
 Future<void> showBreathingGroundingSheet(BuildContext context) {
   return showModalBottomSheet<void>(
     context: context,
@@ -118,18 +121,15 @@ class _BreathingGroundingSheetState extends State<BreathingGroundingSheet> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final tokens = context.maumTokens;
     final isDark = theme.brightness == Brightness.dark;
     final disableAnimations = MediaQuery.disableAnimationsOf(context);
-    final surface =
-        isDark ? const Color(0xFF212529) : const Color(0xFFFFFFFF);
-    final cardSurface =
-        isDark ? const Color(0xFF2A2E33) : const Color(0xFFEDF5FF);
-    final foreground =
-        isDark ? const Color(0xFFF8F9FA) : const Color(0xFF1E293B);
-    final secondary =
-        isDark ? const Color(0xFFADB5BD) : const Color(0xFF4A5E78);
-    final accent = isDark ? const Color(0xFF8E9CE6) : const Color(0xFF2563EB);
-    final border = isDark ? const Color(0xFF343A40) : const Color(0xFFDBE7FB);
+    final surface = tokens.surface;
+    final cardSurface = tokens.elevatedSurface;
+    final foreground = tokens.foreground;
+    final secondary = tokens.mutedForeground;
+    final accent = tokens.primary;
+    final border = tokens.border;
 
     final currentPhase = _phases[_phaseIndex];
     final circleSize = 96 * _targetCircleFactor();
@@ -250,6 +250,7 @@ class _BreathingGroundingSheetState extends State<BreathingGroundingSheet> {
                                   style: theme.textTheme.titleSmall?.copyWith(
                                     color: foreground,
                                     fontWeight: FontWeight.w700,
+                                    fontFeatures: AppTypography.tabularFigures,
                                   ),
                                 ),
                               ],
@@ -278,9 +279,7 @@ class _BreathingGroundingSheetState extends State<BreathingGroundingSheet> {
                         style: FilledButton.styleFrom(
                           minimumSize: const Size(48, 48),
                           backgroundColor: accent,
-                          foregroundColor: isDark
-                              ? const Color(0xFF141824)
-                              : Colors.white,
+                          foregroundColor: tokens.onPrimary,
                         ),
                         onPressed: _toggleBreathing,
                         icon: Icon(
@@ -368,9 +367,7 @@ class _BreathingGroundingSheetState extends State<BreathingGroundingSheet> {
                                   ? Icon(
                                       Icons.check_rounded,
                                       size: 16,
-                                      color: isDark
-                                          ? const Color(0xFF141824)
-                                          : Colors.white,
+                                      color: tokens.onPrimary,
                                     )
                                   : Text(
                                       '${step.count}',

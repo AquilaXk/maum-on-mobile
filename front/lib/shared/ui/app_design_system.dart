@@ -31,6 +31,12 @@ abstract final class AppRadii {
   static BorderRadius get status => BorderRadius.circular(pill);
 }
 
+abstract final class AppTypography {
+  static const List<FontFeature> tabularFigures = <FontFeature>[
+    FontFeature.tabularFigures(),
+  ];
+}
+
 enum AppNoticeTone { neutral, success, warning, error }
 
 enum AppStateKind { loading, empty, error, permission, risk, success, neutral }
@@ -439,6 +445,7 @@ class AppMetricTile extends StatelessWidget {
                 style: theme.textTheme.titleLarge?.copyWith(
                       color: colors.foreground,
                       fontWeight: FontWeight.w800,
+                      fontFeatures: AppTypography.tabularFigures,
                     ),
               ),
             ],

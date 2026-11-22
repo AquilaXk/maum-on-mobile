@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 
 import '../../../../core/platform/external_url_launcher.dart';
 import '../../../../shared/markdown/clean_markdown_body.dart';
+import '../../../../theme/app_theme.dart';
 
 typedef CounselorLinkLauncher = Future<void> Function(Uri uri);
 
@@ -85,18 +86,13 @@ class _CounselorMarkdownMessageState extends State<CounselorMarkdownMessage> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-    final foreground =
-        isDark ? const Color(0xFFF8F9FA) : const Color(0xFF1E293B);
-    final secondary =
-        isDark ? const Color(0xFFADB5BD) : const Color(0xFF4A5E78);
-    final accent = isDark ? const Color(0xFF8E9CE6) : const Color(0xFF2563EB);
-    final quoteBg =
-        isDark ? const Color(0xFF2A2E33) : const Color(0xFFEDF5FF);
-    final codeBg =
-        isDark ? const Color(0xFF18191D) : const Color(0xFFEFF6FF);
-    final borderColor =
-        isDark ? const Color(0xFF343A40) : const Color(0xFFDBE7FB);
+    final tokens = context.maumTokens;
+    final foreground = tokens.foreground;
+    final secondary = tokens.mutedForeground;
+    final accent = tokens.primary;
+    final quoteBg = tokens.elevatedSurface;
+    final codeBg = tokens.codeBlockBackground;
+    final borderColor = tokens.codeBlockBorder;
 
     final baseBody = (theme.textTheme.bodyMedium ?? const TextStyle(fontSize: 15))
         .copyWith(

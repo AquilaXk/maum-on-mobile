@@ -558,19 +558,17 @@ class _ConsultationStatusToolbar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-    final surface = isDark ? const Color(0xFF212529) : const Color(0xFFFFFFFF);
-    final border = isDark ? const Color(0xFF343A40) : const Color(0xFFDBE7FB);
-    final foreground =
-        isDark ? const Color(0xFFF8F9FA) : const Color(0xFF1E293B);
-    final secondary =
-        isDark ? const Color(0xFFADB5BD) : const Color(0xFF4A5E78);
-    final accent = isDark ? const Color(0xFF8E9CE6) : const Color(0xFF2563EB);
+    final tokens = context.maumTokens;
+    final surface = tokens.surface;
+    final border = tokens.border;
+    final foreground = tokens.foreground;
+    final secondary = tokens.mutedForeground;
+    final accent = tokens.primary;
     final statusText = _consultationStatusText(
       state.connectionState,
       state.isStreaming,
     );
-    final dotColor = _consultationDotColor(state.connectionState, isDark);
+    final dotColor = _consultationDotColor(state.connectionState, tokens);
     final useWrap = MediaQuery.textScalerOf(context).scale(1) > 1.35;
 
     final statusLead = Row(
@@ -671,18 +669,15 @@ class _ConsultationStatusToolbar extends StatelessWidget {
 
 Color _consultationDotColor(
   ConsultationConnectionState connectionState,
-  bool isDark,
+  MaumTokens tokens,
 ) {
   return switch (connectionState) {
-    ConsultationConnectionState.connected =>
-      isDark ? const Color(0xFF4ADE80) : const Color(0xFF16A34A),
+    ConsultationConnectionState.connected => tokens.statusSuccessDot,
     ConsultationConnectionState.connecting ||
     ConsultationConnectionState.reconnecting =>
-      isDark ? const Color(0xFFFBBF24) : const Color(0xFFD97706),
-    ConsultationConnectionState.error =>
-      isDark ? const Color(0xFFF87171) : const Color(0xFFDC2626),
-    ConsultationConnectionState.idle =>
-      isDark ? const Color(0xFFADB5BD) : const Color(0xFF64748B),
+      tokens.statusWarningDot,
+    ConsultationConnectionState.error => tokens.statusDangerDot,
+    ConsultationConnectionState.idle => tokens.statusNeutralDot,
   };
 }
 
@@ -793,14 +788,11 @@ class _ConsultationEmptyState extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-    final accent = isDark ? const Color(0xFF8E9CE6) : const Color(0xFF2563EB);
-    final iconBg =
-        isDark ? const Color(0xFF283054) : const Color(0xFFEDF5FF);
-    final foreground =
-        isDark ? const Color(0xFFF8F9FA) : const Color(0xFF1E293B);
-    final secondary =
-        isDark ? const Color(0xFFADB5BD) : const Color(0xFF4A5E78);
+    final tokens = context.maumTokens;
+    final accent = tokens.primary;
+    final iconBg = tokens.softTint;
+    final foreground = tokens.foreground;
+    final secondary = tokens.mutedForeground;
 
     return Padding(
       key: const ValueKey('consultation-empty-state'),
@@ -897,17 +889,14 @@ class _MessageBubble extends StatelessWidget {
     final isAssistant = message.role == ConsultationMessageRole.assistant;
     final isPendingAssistant = isAssistant && message.content.isEmpty;
     final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
     final colorScheme = theme.colorScheme;
-    final userBg = isDark ? const Color(0xFF8E9CE6) : const Color(0xFF2563EB);
-    final userFg = isDark ? const Color(0xFF141824) : Colors.white;
-    final assistantBg =
-        isDark ? const Color(0xFF212529) : const Color(0xFFFFFFFF);
-    final assistantBorder =
-        isDark ? const Color(0xFF343A40) : const Color(0xFFDBE7FB);
-    final avatarBg =
-        isDark ? const Color(0xFF283054) : const Color(0xFFEDF5FF);
-    final avatarFg = isDark ? const Color(0xFF8E9CE6) : const Color(0xFF2563EB);
+    final tokens = context.maumTokens;
+    final userBg = tokens.primary;
+    final userFg = tokens.onPrimary;
+    final assistantBg = tokens.surface;
+    final assistantBorder = tokens.border;
+    final avatarBg = tokens.softTint;
+    final avatarFg = tokens.primary;
 
     final bubbleRadius = isUser
         ? BorderRadius.only(
@@ -1030,9 +1019,9 @@ class _Composer extends StatelessWidget {
   Widget build(BuildContext context) {
     final inputBlocked = state.inputBlockedBySafety;
     final isGenerating = state.isSending || state.isStreaming;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final surface = isDark ? const Color(0xFF212529) : const Color(0xFFFFFFFF);
-    final border = isDark ? const Color(0xFF343A40) : const Color(0xFFDBE7FB);
+    final tokens = context.maumTokens;
+    final surface = tokens.surface;
+    final border = tokens.border;
 
     return SafeArea(
       key: const ValueKey('consultation-composer-section'),

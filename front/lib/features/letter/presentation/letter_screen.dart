@@ -782,7 +782,8 @@ class _LetterComposeViewState extends State<_LetterComposeView> {
       key: const ValueKey('letter-compose-form'),
       child: ShadCard(
         padding: const EdgeInsets.all(AppSpacing.md),
-        backgroundColor: isDark ? colorScheme.surface : const Color(0xFFFBFDFF),
+        backgroundColor:
+            isDark ? colorScheme.surface : context.maumTokens.surfaceStrong,
         border: ShadBorder.all(
           color: colorScheme.primary.withValues(alpha: isDark ? 0.28 : 0.2),
           width: 1,

@@ -3,8 +3,10 @@ import 'package:flutter/material.dart';
 
 import '../shared/ui/brand_identity.dart';
 import '../shared/ui/shad_primitives.dart';
+import 'maum_tokens.dart';
 
 export '../shared/ui/shad_primitives.dart';
+export 'maum_tokens.dart';
 
 ThemeData buildAppTheme() {
   return _buildTheme();
@@ -41,11 +43,11 @@ ShadThemeData buildMaumShadThemeData(Brightness brightness) {
         )
       : const ShadColorScheme(
           background: AppBrandColors.backgroundBlue,
-          foreground: Color(0xFF1E293B),
+          foreground: AppBrandColors.foreground,
           card: AppBrandColors.surface,
-          cardForeground: Color(0xFF1E293B),
+          cardForeground: AppBrandColors.foreground,
           popover: AppBrandColors.surface,
-          popoverForeground: Color(0xFF1E293B),
+          popoverForeground: AppBrandColors.foreground,
           primary: AppBrandColors.primaryBlue,
           primaryForeground: Colors.white,
           secondary: Color(0xFFEAF3FF),
@@ -182,8 +184,8 @@ ThemeData _buildTheme() {
       height: 1.3,
       fontWeight: FontWeight.w800,
     ),
-    bodyLarge: TextStyle(fontSize: 16, height: 1.45),
-    bodyMedium: TextStyle(fontSize: 14, height: 1.45),
+    bodyLarge: TextStyle(fontSize: 16, height: 1.58),
+    bodyMedium: TextStyle(fontSize: 14, height: 1.52),
     bodySmall: TextStyle(fontSize: 12, height: 1.35),
     labelLarge: TextStyle(
       fontSize: 13,
@@ -204,6 +206,7 @@ ThemeData _buildTheme() {
     scaffoldBackgroundColor: AppBrandColors.backgroundBlue,
     textTheme: textTheme,
     dividerColor: colorScheme.outlineVariant,
+    extensions: const <ThemeExtension<dynamic>>[MaumTokens.light],
     cardTheme: CardThemeData(
       elevation: 0,
       color: AppBrandColors.surface,
@@ -343,8 +346,8 @@ ThemeData _buildDarkTheme() {
       height: 1.3,
       fontWeight: FontWeight.w800,
     ),
-    bodyLarge: TextStyle(fontSize: 16, height: 1.45),
-    bodyMedium: TextStyle(fontSize: 14, height: 1.45),
+    bodyLarge: TextStyle(fontSize: 16, height: 1.58),
+    bodyMedium: TextStyle(fontSize: 14, height: 1.52),
     bodySmall: TextStyle(fontSize: 12, height: 1.35),
     labelLarge: TextStyle(
       fontSize: 13,
@@ -366,6 +369,7 @@ ThemeData _buildDarkTheme() {
     scaffoldBackgroundColor: const Color(0xFF18191D),
     textTheme: textTheme,
     dividerColor: colorScheme.outlineVariant,
+    extensions: const <ThemeExtension<dynamic>>[MaumTokens.dark],
     cardTheme: CardThemeData(
       elevation: 0,
       color: const Color(0xFF212529),

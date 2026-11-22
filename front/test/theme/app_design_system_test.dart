@@ -1,8 +1,12 @@
+import 'dart:io';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/semantics.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:maum_on_mobile_front/features/consultation/presentation/widgets/breathing_grounding_sheet.dart';
+import 'package:maum_on_mobile_front/features/diary/domain/mood_year_bitmap.dart';
+import 'package:maum_on_mobile_front/features/diary/presentation/mood_heatmap_strip.dart';
 import 'package:maum_on_mobile_front/shared/ui/app_design_system.dart';
 import 'package:maum_on_mobile_front/theme/app_theme.dart';
 
@@ -46,7 +50,8 @@ void main() {
     expect(theme.colorScheme.brightness, Brightness.light);
     expect(theme.scaffoldBackgroundColor, const Color(0xFFEDF5FF));
     expect(theme.colorScheme.surface, Colors.white);
-    expect(theme.colorScheme.surfaceContainerHighest, const Color(0xFFFBFDFF));
+    expect(theme.colorScheme.surfaceContainerHighest, const Color(0xFFF8FBFF));
+    expect(theme.colorScheme.onSurface, const Color(0xFF1E293B));
     expect(theme.cardTheme.color, Colors.white);
     expect(theme.colorScheme.outlineVariant, const Color(0xFFDBE7FB));
   });
@@ -514,5 +519,289 @@ void main() {
         greaterThanOrEqualTo(4.5),
       );
     }
+  });
+
+  test('MaumTokens는 라이트 및 다크 테마에 등록되고 5단계 감정 팔레트와 WCAG AA 대비를 충족한다', () {
+    final lightTheme = buildAppTheme();
+    final darkTheme = buildDarkAppTheme();
+
+    expect(lightTheme.extension<MaumTokens>(), MaumTokens.light);
+    expect(darkTheme.extension<MaumTokens>(), MaumTokens.dark);
+
+    expect(lightTheme.textTheme.bodyLarge?.fontSize, 16);
+    expect(lightTheme.textTheme.bodyLarge?.height, 1.58);
+    expect(lightTheme.textTheme.bodyMedium?.fontSize, 14);
+    expect(lightTheme.textTheme.bodyMedium?.height, 1.52);
+
+    expect(darkTheme.textTheme.bodyLarge?.fontSize, 16);
+    expect(darkTheme.textTheme.bodyLarge?.height, 1.58);
+    expect(darkTheme.textTheme.bodyMedium?.fontSize, 14);
+    expect(darkTheme.textTheme.bodyMedium?.height, 1.52);
+
+    for (final tokens in [MaumTokens.light, MaumTokens.dark]) {
+      expect(
+        _contrastRatio(tokens.foreground, tokens.background),
+        greaterThanOrEqualTo(4.5),
+      );
+      expect(
+        _contrastRatio(tokens.foreground, tokens.surface),
+        greaterThanOrEqualTo(4.5),
+      );
+      expect(
+        _contrastRatio(tokens.foreground, tokens.surfaceStrong),
+        greaterThanOrEqualTo(4.5),
+      );
+      expect(
+        _contrastRatio(tokens.foreground, tokens.elevatedSurface),
+        greaterThanOrEqualTo(4.5),
+      );
+      expect(
+        _contrastRatio(tokens.foreground, tokens.codeBlockBackground),
+        greaterThanOrEqualTo(4.5),
+      );
+      expect(
+        _contrastRatio(tokens.mutedForeground, tokens.background),
+        greaterThanOrEqualTo(4.5),
+      );
+      expect(
+        _contrastRatio(tokens.mutedForeground, tokens.surface),
+        greaterThanOrEqualTo(4.5),
+      );
+      expect(
+        _contrastRatio(tokens.mutedForeground, tokens.surfaceStrong),
+        greaterThanOrEqualTo(4.5),
+      );
+      expect(
+        _contrastRatio(tokens.mutedForeground, tokens.elevatedSurface),
+        greaterThanOrEqualTo(4.5),
+      );
+      expect(
+        _contrastRatio(tokens.primary, tokens.surface),
+        greaterThanOrEqualTo(4.5),
+      );
+      expect(
+        _contrastRatio(tokens.primary, tokens.softTint),
+        greaterThanOrEqualTo(4.5),
+      );
+      expect(
+        _contrastRatio(tokens.onPrimary, tokens.primary),
+        greaterThanOrEqualTo(4.5),
+      );
+      expect(
+        _contrastRatio(tokens.statusSuccessFg, tokens.statusSuccessBg),
+        greaterThanOrEqualTo(4.5),
+      );
+      expect(
+        _contrastRatio(tokens.statusWarningFg, tokens.statusWarningBg),
+        greaterThanOrEqualTo(4.5),
+      );
+      expect(
+        _contrastRatio(tokens.statusDangerFg, tokens.statusDangerBg),
+        greaterThanOrEqualTo(4.5),
+      );
+      expect(
+        _contrastRatio(tokens.statusInfoFg, tokens.statusInfoBg),
+        greaterThanOrEqualTo(4.5),
+      );
+      expect(
+        _contrastRatio(tokens.statusNeutralFg, tokens.statusNeutralBg),
+        greaterThanOrEqualTo(4.5),
+      );
+      expect(
+        _contrastRatio(tokens.statusSuccessDot, tokens.surface),
+        greaterThanOrEqualTo(3.0),
+      );
+      expect(
+        _contrastRatio(tokens.statusWarningDot, tokens.surface),
+        greaterThanOrEqualTo(3.0),
+      );
+      expect(
+        _contrastRatio(tokens.statusDangerDot, tokens.surface),
+        greaterThanOrEqualTo(3.0),
+      );
+      expect(
+        _contrastRatio(tokens.statusNeutralDot, tokens.surface),
+        greaterThanOrEqualTo(3.0),
+      );
+      expect(
+        _contrastRatio(tokens.quickActionSkyFg, tokens.quickActionSkyBg),
+        greaterThanOrEqualTo(4.5),
+      );
+      expect(
+        _contrastRatio(tokens.quickActionBlueFg, tokens.quickActionBlueBg),
+        greaterThanOrEqualTo(4.5),
+      );
+    }
+
+    for (var score = 1; score <= 5; score += 1) {
+      final bg = MaumTokens.moodBackground(score);
+      final fg = MaumTokens.moodForeground(score);
+      expect(MaumTokens.moodColor(score), bg);
+      expect(_contrastRatio(fg, bg), greaterThanOrEqualTo(4.5));
+    }
+    expect(MaumTokens.moodLabel(1), '매우 힘듦');
+    expect(MaumTokens.moodLabel(2), '지침');
+    expect(MaumTokens.moodLabel(3), '보통');
+    expect(MaumTokens.moodLabel(4), '좋음');
+    expect(MaumTokens.moodLabel(5), '매우 좋음');
+  });
+
+  test('MaumTokens.lerp는 라이트와 다크 토큰 사이의 중간 색상을 생성한다', () {
+    final lerped = MaumTokens.light.lerp(MaumTokens.dark, 0.5);
+
+    expect(
+      lerped.background,
+      Color.lerp(MaumTokens.light.background, MaumTokens.dark.background, 0.5),
+    );
+    expect(lerped.background, isNot(MaumTokens.light.background));
+    expect(lerped.background, isNot(MaumTokens.dark.background));
+    expect(
+      lerped.surface,
+      Color.lerp(MaumTokens.light.surface, MaumTokens.dark.surface, 0.5),
+    );
+    expect(
+      lerped.primary,
+      Color.lerp(MaumTokens.light.primary, MaumTokens.dark.primary, 0.5),
+    );
+    expect(
+      lerped.quickActionBlueBg,
+      Color.lerp(
+        MaumTokens.light.quickActionBlueBg,
+        MaumTokens.dark.quickActionBlueBg,
+        0.5,
+      ),
+    );
+    expect(MaumTokens.light.lerp(null, 0.5), MaumTokens.light);
+    expect(
+      MaumTokens.light.copyWith(primary: MaumTokens.dark.primary).primary,
+      MaumTokens.dark.primary,
+    );
+  });
+
+  test('허용된 토큰 파일 외 lib/**/*.dart에는 인라인 Color(0x...) 리터럴이 없다', () {
+    final frontRoot = Directory('lib').existsSync()
+        ? Directory.current
+        : Directory('front');
+    final libDir = Directory('${frontRoot.path}/lib');
+    expect(libDir.existsSync(), isTrue);
+
+    final colorLiteralPattern = RegExp(r'Color\s*\(\s*0[xX][0-9a-fA-F]+\s*\)');
+    final violations = <String>[];
+
+    for (final entity in libDir.listSync(recursive: true)) {
+      if (entity is! File || !entity.path.endsWith('.dart')) {
+        continue;
+      }
+      final normalized = entity.path.replaceAll('\\', '/');
+      final libIndex = normalized.lastIndexOf('/lib/');
+      final relative =
+          libIndex >= 0 ? normalized.substring(libIndex + 1) : normalized;
+
+      final isAllowed = relative.startsWith('lib/theme/') ||
+          relative == 'lib/shared/ui/brand_identity.dart' ||
+          relative == 'lib/features/auth/presentation/oauth_brand_palette.dart';
+      if (isAllowed) {
+        continue;
+      }
+
+      final contents = entity.readAsStringSync();
+      if (colorLiteralPattern.hasMatch(contents)) {
+        violations.add(relative);
+      }
+    }
+
+    expect(violations, isEmpty, reason: 'Found inline Color(0x...) in: $violations');
+  });
+
+  testWidgets('BuildContext.maumTokens는 등록된 확장과 미등록 폴백을 반환하고 tabularFigures가 숫자 위젯에 적용된다',
+      (tester) async {
+    late MaumTokens fallbackLight;
+    late MaumTokens fallbackDark;
+    late MaumTokens registeredLight;
+    late MaumTokens registeredDark;
+
+    await tester.pumpWidget(
+      MaterialApp(
+        key: const ValueKey('fallback-light'),
+        theme: ThemeData.light(),
+        home: Builder(
+          builder: (context) {
+            fallbackLight = context.maumTokens;
+            return const SizedBox.shrink();
+          },
+        ),
+      ),
+    );
+    expect(fallbackLight, MaumTokens.light);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        key: const ValueKey('fallback-dark'),
+        theme: ThemeData.dark(),
+        home: Builder(
+          builder: (context) {
+            fallbackDark = context.maumTokens;
+            return const SizedBox.shrink();
+          },
+        ),
+      ),
+    );
+    expect(fallbackDark, MaumTokens.dark);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        key: const ValueKey('registered-dark'),
+        theme: buildDarkAppTheme(),
+        home: Builder(
+          builder: (context) {
+            registeredDark = context.maumTokens;
+            return const SizedBox.shrink();
+          },
+        ),
+      ),
+    );
+    expect(registeredDark, MaumTokens.dark);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        key: const ValueKey('registered-light-widgets'),
+        theme: buildAppTheme(),
+        home: Scaffold(
+          body: SingleChildScrollView(
+            child: Column(
+              children: [
+                Builder(
+                  builder: (context) {
+                    registeredLight = context.maumTokens;
+                    return const AppMetricTile(
+                      label: '연속 기록',
+                      value: '12일',
+                    );
+                  },
+                ),
+                MoodHeatmapStrip(
+                  bitmapsByYear: const <int, MoodYearBitmap>{},
+                  anchorDate: DateTime(2026, 5, 20),
+                ),
+                const BreathingGroundingSheet(),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+
+    expect(registeredLight, MaumTokens.light);
+
+    final metricText = tester.widget<Text>(find.text('12일'));
+    expect(metricText.style?.fontFeatures, AppTypography.tabularFigures);
+
+    final streakText = tester.widget<Text>(find.textContaining('연속 0일'));
+    expect(streakText.style?.fontFeatures, AppTypography.tabularFigures);
+
+    final secondsText = tester.widget<Text>(
+      find.byKey(const ValueKey('breathing-seconds-label')),
+    );
+    expect(secondsText.style?.fontFeatures, AppTypography.tabularFigures);
   });
 }

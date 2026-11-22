@@ -5,11 +5,11 @@ abstract final class AppBrandColors {
   static const Color primaryBlue = Color(0xFF2563EB);
   static const Color primaryBluePressed = Color(0xFF1D4ED8);
   static const Color brandText = Color(0xFF334E68);
-  static const Color foreground = Color(0xFF25324A);
+  static const Color foreground = Color(0xFF1E293B);
   static const Color mutedForeground = Color(0xFF4A5E78);
   static const Color backgroundBlue = Color(0xFFEDF5FF);
   static const Color surface = Color(0xFFFFFFFF);
-  static const Color surfaceStrong = Color(0xFFFBFDFF);
+  static const Color surfaceStrong = Color(0xFFF8FBFF);
   static const Color borderSoft = Color(0xFFDBE7FB);
 }
 

@@ -90,6 +90,7 @@ class MoodHeatmapStrip extends StatelessWidget {
                     style: theme.textTheme.labelMedium?.copyWith(
                       color: colorScheme.onSurfaceVariant,
                       fontWeight: FontWeight.w600,
+                      fontFeatures: AppTypography.tabularFigures,
                     ),
                   ),
                 ],
@@ -260,16 +261,7 @@ class _MoodHeatmapPainter extends CustomPainter {
   }
 }
 
-Color heatmapMoodColor(int moodScore) {
-  return switch (moodScore) {
-    1 => const Color(0xFFDC2626),
-    2 => const Color(0xFFC2410C),
-    3 => const Color(0xFFEAB308),
-    4 => const Color(0xFF0369A1),
-    5 => const Color(0xFF2563EB),
-    _ => const Color(0xFF2563EB),
-  };
-}
+Color heatmapMoodColor(int moodScore) => MaumTokens.moodBackground(moodScore);
 
 DateTime _computeGridStartDate(DateTime anchorDate) {
   final sundayOffset =

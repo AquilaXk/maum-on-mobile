@@ -9,6 +9,7 @@ import '../../legal/presentation/legal_disclosure_links.dart';
 import '../../../shared/ui/app_design_system.dart';
 import '../../../shared/ui/brand_identity.dart';
 import '../../../theme/app_theme.dart';
+import 'oauth_brand_palette.dart';
 
 enum AuthFormMode {
   login,
@@ -1150,9 +1151,9 @@ class _QuickLoginProviderButton extends StatelessWidget {
 
   Color _providerBackground(LoginProvider provider) {
     return switch (provider) {
-      LoginProvider.naver => const Color(0xFF03C75A),
-      LoginProvider.kakao => const Color(0xFFFEE500),
-      LoginProvider.facebook => const Color(0xFF4267B2),
+      LoginProvider.naver => OAuthBrandPalette.naverBackground,
+      LoginProvider.kakao => OAuthBrandPalette.kakaoBackground,
+      LoginProvider.facebook => OAuthBrandPalette.facebookBackground,
       LoginProvider.google => Colors.white,
       LoginProvider.apple => Colors.black,
     };
@@ -1160,8 +1161,8 @@ class _QuickLoginProviderButton extends StatelessWidget {
 
   Color _providerForeground(LoginProvider provider) {
     return switch (provider) {
-      LoginProvider.kakao => const Color(0xFF3C1E1E),
-      LoginProvider.google => const Color(0xFF1E293B),
+      LoginProvider.kakao => OAuthBrandPalette.kakaoForeground,
+      LoginProvider.google => AppBrandColors.foreground,
       _ => Colors.white,
     };
   }
@@ -1169,7 +1170,7 @@ class _QuickLoginProviderButton extends StatelessWidget {
   BorderSide _providerBorder(BuildContext context, LoginProvider provider) {
     return switch (provider) {
       LoginProvider.google => const BorderSide(
-          color: Color(0xFF4285F4),
+          color: OAuthBrandPalette.googleAccent,
           width: 1.2,
         ),
       LoginProvider.apple => BorderSide(
@@ -1204,7 +1205,7 @@ class _QuickLoginProviderMark extends StatelessWidget {
         ),
       LoginProvider.kakao => const Icon(
           Icons.chat_bubble,
-          color: Color(0xFF3C1E1E),
+          color: OAuthBrandPalette.kakaoForeground,
           size: 19,
         ),
       LoginProvider.facebook => const FittedBox(
@@ -1224,7 +1225,7 @@ class _QuickLoginProviderMark extends StatelessWidget {
           child: Text(
             'G',
             style: TextStyle(
-              color: Color(0xFF4285F4),
+              color: OAuthBrandPalette.googleAccent,
               fontSize: 20,
               fontWeight: FontWeight.w800,
             ),
