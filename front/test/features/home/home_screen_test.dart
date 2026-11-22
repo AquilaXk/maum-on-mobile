@@ -9,7 +9,6 @@ import 'package:maum_on_mobile_front/features/home/home_screen.dart';
 import 'package:maum_on_mobile_front/shared/ui/app_design_system.dart';
 import 'package:maum_on_mobile_front/shared/ui/brand_identity.dart';
 import 'package:maum_on_mobile_front/theme/app_theme.dart';
-import 'package:shadcn_ui/shadcn_ui.dart';
 
 void main() {
   testWidgets('홈은 스크롤 안에서 체크인 히어로, Bento 카드, 스토리 목록을 렌더링한다', (tester) async {
@@ -224,14 +223,18 @@ void main() {
     );
     expect(
       tester.getSize(find.byKey(const ValueKey('home-action-diary-surface'))),
-      const Size(40, 40),
+      const Size(28, 28),
     );
     expect(
       tester.getSize(
         find.byKey(const ValueKey('home-action-consultation-primary')),
       ),
-      const Size(40, 40),
+      const Size(28, 28),
     );
+    expect(find.text('오늘 마음 체크인'), findsNothing);
+    expect(find.text('바로 시작'), findsNothing);
+    expect(find.text('오늘 요약'), findsNothing);
+    expect(find.text('인기 공감'), findsNothing);
     expect(
       tester.getSize(find.byKey(const ValueKey('home-action-diary'))).height,
       greaterThanOrEqualTo(48),
@@ -376,11 +379,11 @@ void main() {
       tester.getSize(
         find.byKey(const ValueKey('home-action-consultation-primary')),
       ),
-      const Size(40, 40),
+      const Size(28, 28),
     );
     expect(
       tester.getSize(find.byKey(const ValueKey('home-action-diary-surface'))),
-      const Size(40, 40),
+      const Size(28, 28),
     );
 
     final heroShadTheme = ShadTheme.of(

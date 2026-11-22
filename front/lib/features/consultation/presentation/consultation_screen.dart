@@ -1,12 +1,9 @@
-// Streaming chat bubble isolation and near-bottom scroll pinning adapted from:
-// - flyerhq/flutter_chat_ui (Apache-2.0)
-// - flutter/ai (BSD-3-Clause)
+// Streaming chat bubble isolation and near-bottom scroll pinning.
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:shadcn_ui/shadcn_ui.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../../shared/ui/app_design_system.dart';
@@ -14,6 +11,9 @@ import '../../../shared/ui/text_editing_sync.dart';
 import '../../../theme/app_theme.dart';
 import '../application/consultation_controller.dart';
 import '../domain/consultation_models.dart';
+import 'widgets/breathing_grounding_sheet.dart';
+import 'widgets/counselor_markdown_message.dart';
+import 'widgets/jumping_dots_indicator.dart';
 
 typedef ConsultationEmergencyDialer = Future<void> Function(String number);
 
@@ -22,12 +22,14 @@ class ConsultationScreen extends StatefulWidget {
     required this.controller,
     this.onBack,
     this.emergencyDialer,
+    this.closeStreamOnDispose = true,
     super.key,
   });
 
   final ConsultationController controller;
   final VoidCallback? onBack;
   final ConsultationEmergencyDialer? emergencyDialer;
+  final bool closeStreamOnDispose;
 
   @override
   State<ConsultationScreen> createState() => _ConsultationScreenState();
@@ -68,7 +70,9 @@ class _ConsultationScreenState extends State<ConsultationScreen>
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    widget.controller.handleLifecycleState(state);
+    if (widget.closeStreamOnDispose) {
+      widget.controller.handleLifecycleState(state);
+    }
   }
 
   @override
@@ -76,7 +80,9 @@ class _ConsultationScreenState extends State<ConsultationScreen>
     WidgetsBinding.instance.removeObserver(this);
     _detachController(widget.controller);
     _scrollController.removeListener(_handleScrollChanged);
-    widget.controller.close();
+    if (widget.closeStreamOnDispose) {
+      widget.controller.close();
+    }
     _showJumpToBottomNotifier.dispose();
     _scrollController.dispose();
     _textController.dispose();
@@ -138,6 +144,14 @@ class _ConsultationScreenState extends State<ConsultationScreen>
       return;
     }
     _scrollController.jumpTo(_scrollController.position.maxScrollExtent);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !_scrollController.hasClients || !_isNearBottom) {
+        return;
+      }
+      if (_scrollController.position.extentAfter > 1) {
+        _scrollController.jumpTo(_scrollController.position.maxScrollExtent);
+      }
+    });
   }
 
   void _handleEmergencyContact(BuildContext context, String number) {
@@ -224,6 +238,8 @@ class _ConsultationScreenState extends State<ConsultationScreen>
                     child: _ConsultationStatusToolbar(
                       state: state,
                       onReconnect: widget.controller.reconnect,
+                      onOpenBreathing: () => showBreathingGroundingSheet(context),
+                      onStartNewSession: widget.controller.startNewSession,
                     ),
                   ),
                   Expanded(
@@ -240,7 +256,7 @@ class _ConsultationScreenState extends State<ConsultationScreen>
                           onSelectStarterPrompt: state.inputBlockedBySafety
                               ? null
                               : (prompt) {
-                                  widget.controller.updateDraft(prompt);
+                                  widget.controller.selectStarterTopic(prompt);
                                   _syncText();
                                 },
                         ),
@@ -277,8 +293,17 @@ class _ConsultationScreenState extends State<ConsultationScreen>
                   _Composer(
                     controller: _textController,
                     state: state,
+                    showTopicsToggle: !state.inputBlockedBySafety &&
+                        state.messages
+                            .any((message) => !_isInitialSystemMessage(message)),
+                    onToggleTopics: widget.controller.toggleStarterTopics,
+                    onSelectTopic: (prompt) {
+                      widget.controller.selectStarterTopic(prompt);
+                      _syncText();
+                    },
                     onChanged: widget.controller.updateDraft,
                     onSubmitted: widget.controller.submitMessage,
+                    onStop: widget.controller.stopGenerating,
                   ),
                 ],
               ),
@@ -436,7 +461,7 @@ class _SafetyNotice extends StatelessWidget {
               ),
               _EmergencyActionButton(
                 key: const ValueKey('consultation-emergency-1388-button'),
-                icon: Icons.support_agent_outlined,
+                icon: Icons.phone_outlined,
                 label: '1388',
                 semanticLabel: '1388 청소년 상담 연결',
                 onPressed: () => onEmergencyContact(context, '1388'),
@@ -529,163 +554,143 @@ class _ConsultationStatusToolbar extends StatelessWidget {
   const _ConsultationStatusToolbar({
     required this.state,
     required this.onReconnect,
+    required this.onOpenBreathing,
+    required this.onStartNewSession,
   });
 
   final ConsultationState state;
   final Future<void> Function() onReconnect;
+  final VoidCallback onOpenBreathing;
+  final Future<void> Function() onStartNewSession;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
+    final surface = isDark ? const Color(0xFF212529) : const Color(0xFFFFFFFF);
+    final border = isDark ? const Color(0xFF343A40) : const Color(0xFFDBE7FB);
+    final foreground =
+        isDark ? const Color(0xFFF8F9FA) : const Color(0xFF1E293B);
+    final secondary =
+        isDark ? const Color(0xFFADB5BD) : const Color(0xFF4A5E78);
+    final accent = isDark ? const Color(0xFF8E9CE6) : const Color(0xFF2563EB);
     final statusText = _consultationStatusText(
       state.connectionState,
       state.isStreaming,
     );
-    final conversationMessageCount = _conversationMessageCount(state.messages);
-    final inputLabel = state.inputBlockedBySafety
-        ? '안전 확인 필요'
-        : state.isSending
-            ? '전송 중'
-            : state.isStreaming
-                ? '응답 대기'
-                : state.connectionState == ConsultationConnectionState.connected
-                    ? '입력 가능'
-                    : '입력 대기';
+    final dotColor = _consultationDotColor(state.connectionState, isDark);
+    final useWrap = MediaQuery.textScalerOf(context).scale(1) > 1.35;
+
+    final statusLead = Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        DecoratedBox(
+          decoration: BoxDecoration(
+            color: dotColor,
+            shape: BoxShape.circle,
+          ),
+          child: const SizedBox.square(dimension: 8),
+        ),
+        const SizedBox(width: AppSpacing.xs),
+        Flexible(
+          child: Text(
+            statusText,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: theme.textTheme.labelLarge?.copyWith(
+              color: foreground,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ),
+      ],
+    );
+
+    final actionButtons = <Widget>[
+      TextButton.icon(
+        key: const ValueKey('consultation-breathing-button'),
+        style: TextButton.styleFrom(
+          minimumSize: const Size(44, 48),
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+          foregroundColor: accent,
+          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+        ),
+        onPressed: onOpenBreathing,
+        icon: const Icon(Icons.air_rounded, size: 18),
+        label: const Text('호흡·안정'),
+      ),
+      TextButton.icon(
+        key: const ValueKey('consultation-new-session-button'),
+        style: TextButton.styleFrom(
+          minimumSize: const Size(44, 48),
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+          foregroundColor: secondary,
+          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+        ),
+        onPressed: () => onStartNewSession(),
+        icon: const Icon(Icons.edit_square, size: 17),
+        label: const Text('새 대화'),
+      ),
+      if (state.connectionState == ConsultationConnectionState.error)
+        SizedBox.square(
+          dimension: 48,
+          child: IconButton.filledTonal(
+            key: const ValueKey('consultation-reconnect-button'),
+            tooltip: 'AI 상담 다시 연결',
+            onPressed: () => onReconnect(),
+            icon: const Icon(Icons.refresh),
+          ),
+        ),
+    ];
 
     return DecoratedBox(
       key: const ValueKey('consultation-status-toolbar'),
       decoration: BoxDecoration(
-        color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.72),
-        borderRadius: AppRadii.status,
-        border: Border.all(
-          color: colorScheme.outlineVariant.withValues(alpha: 0.72),
-        ),
+        color: surface,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: border),
       ),
       child: Padding(
         padding: const EdgeInsets.symmetric(
           horizontal: AppSpacing.sm,
-          vertical: AppSpacing.xs,
+          vertical: 4,
         ),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            Icon(
-              Icons.support_agent_outlined,
-              color: colorScheme.primary,
-              size: 18,
-            ),
-            const SizedBox(width: AppSpacing.xs),
-            Expanded(
-              child: Wrap(
+        child: useWrap
+            ? Wrap(
                 spacing: AppSpacing.xs,
-                runSpacing: AppSpacing.xxs,
+                runSpacing: 4,
                 crossAxisAlignment: WrapCrossAlignment.center,
+                alignment: WrapAlignment.spaceBetween,
                 children: [
-                  _CompactStatusPill(
-                    label: statusText,
-                    tone: _consultationStatusTone(state.connectionState),
-                  ),
-                  _CompactStatusPill(label: '대화 $conversationMessageCount개'),
-                  _CompactStatusPill(
-                    label: inputLabel,
-                    tone: state.inputBlockedBySafety
-                        ? AppStatusTone.danger
-                        : state.connectionState ==
-                                ConsultationConnectionState.connected
-                            ? AppStatusTone.success
-                            : AppStatusTone.warning,
-                  ),
+                  statusLead,
+                  ...actionButtons,
+                ],
+              )
+            : Row(
+                children: [
+                  Expanded(child: statusLead),
+                  ...actionButtons,
                 ],
               ),
-            ),
-            if (state.connectionState == ConsultationConnectionState.error) ...[
-              const SizedBox(width: AppSpacing.xs),
-              SizedBox.square(
-                dimension: 48,
-                child: IconButton.filledTonal(
-                  key: const ValueKey('consultation-reconnect-button'),
-                  tooltip: 'AI 상담 다시 연결',
-                  onPressed: () => onReconnect(),
-                  icon: const Icon(Icons.refresh),
-                ),
-              ),
-            ],
-          ],
-        ),
       ),
     );
   }
 }
 
-class _CompactStatusPill extends StatelessWidget {
-  const _CompactStatusPill({
-    required this.label,
-    this.tone = AppStatusTone.neutral,
-  });
-
-  final String label;
-  final AppStatusTone tone;
-
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    final colors = _compactStatusColors(colorScheme, tone);
-    final variant = switch (tone) {
-      AppStatusTone.neutral => ShadBadgeVariant.secondary,
-      AppStatusTone.success => ShadBadgeVariant.primary,
-      AppStatusTone.warning => ShadBadgeVariant.outline,
-      AppStatusTone.danger => ShadBadgeVariant.destructive,
-    };
-
-    return ShadBadge.raw(
-      variant: variant,
-      backgroundColor: colors.background,
-      hoverBackgroundColor: colors.background,
-      foregroundColor: colors.foreground,
-      shape: StadiumBorder(side: BorderSide(color: colors.border)),
-      padding: const EdgeInsets.symmetric(
-        horizontal: AppSpacing.sm,
-        vertical: AppSpacing.xxs,
-      ),
-      child: Text(
-        label,
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-        style: Theme.of(context).textTheme.labelMedium?.copyWith(
-              color: colors.foreground,
-              fontWeight: FontWeight.w800,
-            ),
-      ),
-    );
-  }
-}
-
-({Color background, Color foreground, Color border}) _compactStatusColors(
-  ColorScheme colorScheme,
-  AppStatusTone tone,
+Color _consultationDotColor(
+  ConsultationConnectionState connectionState,
+  bool isDark,
 ) {
-  return switch (tone) {
-    AppStatusTone.neutral => (
-        background: colorScheme.surfaceContainerHighest,
-        foreground: colorScheme.onSurfaceVariant,
-        border: colorScheme.outlineVariant,
-      ),
-    AppStatusTone.success => (
-        background: colorScheme.primaryContainer,
-        foreground: colorScheme.onPrimaryContainer,
-        border: colorScheme.primary.withValues(alpha: 0.28),
-      ),
-    AppStatusTone.warning => (
-        background: colorScheme.tertiaryContainer,
-        foreground: colorScheme.onTertiaryContainer,
-        border: colorScheme.tertiary.withValues(alpha: 0.28),
-      ),
-    AppStatusTone.danger => (
-        background: colorScheme.errorContainer,
-        foreground: colorScheme.onErrorContainer,
-        border: colorScheme.error.withValues(alpha: 0.28),
-      ),
+  return switch (connectionState) {
+    ConsultationConnectionState.connected =>
+      isDark ? const Color(0xFF4ADE80) : const Color(0xFF16A34A),
+    ConsultationConnectionState.connecting ||
+    ConsultationConnectionState.reconnecting =>
+      isDark ? const Color(0xFFFBBF24) : const Color(0xFFD97706),
+    ConsultationConnectionState.error =>
+      isDark ? const Color(0xFFF87171) : const Color(0xFFDC2626),
+    ConsultationConnectionState.idle =>
+      isDark ? const Color(0xFFADB5BD) : const Color(0xFF64748B),
   };
 }
 
@@ -694,35 +699,20 @@ String _consultationStatusText(
   bool isStreaming,
 ) {
   return switch (connectionState) {
-    ConsultationConnectionState.idle => 'AI 상담 연결 대기',
-    ConsultationConnectionState.connecting => '자동 연결 중',
+    ConsultationConnectionState.idle => '연결 대기',
+    ConsultationConnectionState.connecting => '연결 중',
     ConsultationConnectionState.connected when isStreaming => '답변 작성 중',
-    ConsultationConnectionState.connected => 'AI 상담 연결됨',
-    ConsultationConnectionState.reconnecting => '자동 재연결 중',
+    ConsultationConnectionState.connected => '연결됨',
+    ConsultationConnectionState.reconnecting => '다시 연결 중',
     ConsultationConnectionState.error => '재연결 필요',
   };
 }
 
-AppStatusTone _consultationStatusTone(
-  ConsultationConnectionState connectionState,
-) {
-  return switch (connectionState) {
-    ConsultationConnectionState.connected => AppStatusTone.success,
-    ConsultationConnectionState.connecting ||
-    ConsultationConnectionState.reconnecting =>
-      AppStatusTone.warning,
-    ConsultationConnectionState.error => AppStatusTone.danger,
-    ConsultationConnectionState.idle => AppStatusTone.neutral,
-  };
-}
-
-int _conversationMessageCount(List<ConsultationMessage> messages) {
-  return messages.where((message) {
-    return (message.role == ConsultationMessageRole.user ||
-            message.role == ConsultationMessageRole.assistant) &&
-        message.content.trim().isNotEmpty;
-  }).length;
-}
+const List<String> _consultationStarterPrompts = [
+  '마음이 지쳐서 쉬고 싶어요',
+  '머릿속이 복잡해요',
+  '조용히 이야기하고 싶어요',
+];
 
 class _ConversationList extends StatelessWidget {
   const _ConversationList({
@@ -779,6 +769,7 @@ class _ConversationList extends StatelessWidget {
                   message: activeMessage,
                   isFirstInGroup: isFirstInGroup,
                   isLastInGroup: isLastInGroup,
+                  isStreamingBubble: true,
                 );
               },
             ),
@@ -807,16 +798,17 @@ class _ConsultationEmptyState extends StatelessWidget {
 
   final ValueChanged<String>? onSelectStarterPrompt;
 
-  static const List<String> _starterPrompts = [
-    '마음이 지쳐서 쉬고 싶어요',
-    '머릿속이 복잡해요',
-    '조용히 이야기하고 싶어요',
-  ];
-
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
+    final accent = isDark ? const Color(0xFF8E9CE6) : const Color(0xFF2563EB);
+    final iconBg =
+        isDark ? const Color(0xFF283054) : const Color(0xFFEDF5FF);
+    final foreground =
+        isDark ? const Color(0xFFF8F9FA) : const Color(0xFF1E293B);
+    final secondary =
+        isDark ? const Color(0xFFADB5BD) : const Color(0xFF4A5E78);
 
     return Padding(
       key: const ValueKey('consultation-empty-state'),
@@ -835,14 +827,14 @@ class _ConsultationEmptyState extends StatelessWidget {
                 children: [
                   DecoratedBox(
                     decoration: BoxDecoration(
-                      color: colorScheme.primaryContainer,
+                      color: iconBg,
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Padding(
                       padding: const EdgeInsets.all(AppSpacing.xs),
                       child: Icon(
-                        Icons.support_agent_outlined,
-                        color: colorScheme.onPrimaryContainer,
+                        Icons.favorite_border_rounded,
+                        color: accent,
                         size: 22,
                       ),
                     ),
@@ -853,16 +845,17 @@ class _ConsultationEmptyState extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          '상담 대기 중',
+                          '오늘 마음을 나눠 볼까요',
                           style: theme.textTheme.titleMedium?.copyWith(
+                            color: foreground,
                             fontWeight: FontWeight.w800,
                           ),
                         ),
                         const SizedBox(height: 2),
                         Text(
-                          '지금 떠오르는 마음을 적어 주세요.',
+                          '지금 떠오르는 마음을 편하게 적어 보세요.',
                           style: theme.textTheme.bodyMedium?.copyWith(
-                            color: colorScheme.onSurfaceVariant,
+                            color: secondary,
                           ),
                         ),
                       ],
@@ -875,7 +868,7 @@ class _ConsultationEmptyState extends StatelessWidget {
                 spacing: AppSpacing.xs,
                 runSpacing: AppSpacing.xs,
                 children: [
-                  for (final prompt in _starterPrompts)
+                  for (final prompt in _consultationStarterPrompts)
                     ActionChip(
                       label: Text(prompt),
                       onPressed: onSelectStarterPrompt == null
@@ -897,21 +890,33 @@ class _MessageBubble extends StatelessWidget {
     required this.message,
     this.isFirstInGroup = true,
     this.isLastInGroup = true,
+    this.isStreamingBubble = false,
   });
 
   final ConsultationMessage message;
   final bool isFirstInGroup;
   final bool isLastInGroup;
+  final bool isStreamingBubble;
 
   @override
   Widget build(BuildContext context) {
     final isUser = message.role == ConsultationMessageRole.user;
     final isSystem = message.role == ConsultationMessageRole.system;
-    final isPendingAssistant =
-        message.role == ConsultationMessageRole.assistant &&
-            message.content.isEmpty;
+    final isAssistant = message.role == ConsultationMessageRole.assistant;
+    final isPendingAssistant = isAssistant && message.content.isEmpty;
     final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
     final colorScheme = theme.colorScheme;
+    final userBg = isDark ? const Color(0xFF8E9CE6) : const Color(0xFF2563EB);
+    final userFg = isDark ? const Color(0xFF141824) : Colors.white;
+    final assistantBg =
+        isDark ? const Color(0xFF212529) : const Color(0xFFFFFFFF);
+    final assistantBorder =
+        isDark ? const Color(0xFF343A40) : const Color(0xFFDBE7FB);
+    final avatarBg =
+        isDark ? const Color(0xFF283054) : const Color(0xFFEDF5FF);
+    final avatarFg = isDark ? const Color(0xFF8E9CE6) : const Color(0xFF2563EB);
+
     final bubbleRadius = isUser
         ? BorderRadius.only(
             topLeft: const Radius.circular(16),
@@ -926,60 +931,46 @@ class _MessageBubble extends StatelessWidget {
             bottomLeft: Radius.circular(isLastInGroup ? 16 : 6),
           );
 
+    final Widget contentChild;
+    if (isPendingAssistant) {
+      contentChild = const Padding(
+        padding: EdgeInsets.symmetric(vertical: 4),
+        child: JumpingDotsIndicator(
+          key: ValueKey('consultation-typing-indicator'),
+        ),
+      );
+    } else if (isAssistant) {
+      contentChild = CounselorMarkdownMessage(
+        data: message.content,
+        showCopyButton: !isStreamingBubble,
+        copyButtonKey: ValueKey('consultation-copy-${message.id}'),
+      );
+    } else {
+      contentChild = Text(
+        message.content,
+        style: TextStyle(
+          color: isUser ? userFg : colorScheme.onErrorContainer,
+          height: 1.45,
+        ),
+      );
+    }
+
     final bubble = DecoratedBox(
       decoration: BoxDecoration(
         color: isUser
-            ? colorScheme.primary
+            ? userBg
             : isSystem
                 ? colorScheme.errorContainer
-                : colorScheme.surface,
+                : assistantBg,
         borderRadius: bubbleRadius,
-        border: isUser || isSystem
-            ? null
-            : Border.all(color: colorScheme.outlineVariant),
+        border: isUser || isSystem ? null : Border.all(color: assistantBorder),
       ),
       child: Padding(
         padding: const EdgeInsets.symmetric(
           horizontal: AppSpacing.md,
           vertical: AppSpacing.sm,
         ),
-        child: isPendingAssistant
-            ? Semantics(
-                container: true,
-                liveRegion: true,
-                label: 'AI가 답변을 작성 중입니다.',
-                child: ExcludeSemantics(
-                  child: Row(
-                    key: const ValueKey('consultation-typing-indicator'),
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      SizedBox(
-                        width: 16,
-                        height: 16,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: colorScheme.primary,
-                        ),
-                      ),
-                      const SizedBox(width: AppSpacing.xs),
-                      Text(
-                        '응답 작성 중입니다.',
-                        style: TextStyle(color: colorScheme.onSurface),
-                      ),
-                    ],
-                  ),
-                ),
-              )
-            : Text(
-                message.content,
-                style: TextStyle(
-                  color: isUser
-                      ? colorScheme.onPrimary
-                      : isSystem
-                          ? colorScheme.onErrorContainer
-                          : colorScheme.onSurface,
-                ),
-              ),
+        child: contentChild,
       ),
     );
 
@@ -994,15 +985,15 @@ class _MessageBubble extends StatelessWidget {
             if (isLastInGroup)
               DecoratedBox(
                 decoration: BoxDecoration(
-                  color: colorScheme.primaryContainer,
+                  color: avatarBg,
                   shape: BoxShape.circle,
                 ),
                 child: SizedBox.square(
                   dimension: 28,
                   child: Icon(
-                    Icons.support_agent_outlined,
+                    Icons.favorite_border_rounded,
                     size: 16,
-                    color: colorScheme.onPrimaryContainer,
+                    color: avatarFg,
                   ),
                 ),
               )
@@ -1026,78 +1017,136 @@ class _Composer extends StatelessWidget {
   const _Composer({
     required this.controller,
     required this.state,
+    required this.showTopicsToggle,
+    required this.onToggleTopics,
+    required this.onSelectTopic,
     required this.onChanged,
     required this.onSubmitted,
+    required this.onStop,
   });
 
   final TextEditingController controller;
   final ConsultationState state;
+  final bool showTopicsToggle;
+  final VoidCallback onToggleTopics;
+  final ValueChanged<String> onSelectTopic;
   final ValueChanged<String> onChanged;
   final Future<void> Function() onSubmitted;
+  final Future<void> Function() onStop;
 
   @override
   Widget build(BuildContext context) {
     final inputBlocked = state.inputBlockedBySafety;
+    final isGenerating = state.isSending || state.isStreaming;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final surface = isDark ? const Color(0xFF212529) : const Color(0xFFFFFFFF);
+    final border = isDark ? const Color(0xFF343A40) : const Color(0xFFDBE7FB);
 
     return SafeArea(
       key: const ValueKey('consultation-composer-section'),
       top: false,
       child: DecoratedBox(
         decoration: BoxDecoration(
-          color: Theme.of(context).colorScheme.surface,
-          border:
-              Border(top: BorderSide(color: Theme.of(context).dividerColor)),
+          color: surface,
+          border: Border(top: BorderSide(color: border)),
         ),
         child: Padding(
           padding: const EdgeInsets.all(AppSpacing.md),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.center,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Expanded(
-                child: TextField(
-                  key: const ValueKey('consultation-message-field'),
-                  controller: controller,
-                  enabled: !inputBlocked && !state.isSending,
-                  minLines: 1,
-                  maxLines: 4,
-                  maxLength: ConsultationController.maxMessageLength,
-                  buildCounter: (
-                    context, {
-                    required currentLength,
-                    required isFocused,
-                    required maxLength,
-                  }) =>
-                      null,
-                  decoration: const InputDecoration(
-                    labelText: '고민을 입력해 주세요',
-                    border: OutlineInputBorder(),
-                    constraints: BoxConstraints(minHeight: 56),
+              if (state.topicsExpanded && !inputBlocked) ...[
+                Padding(
+                  key: const ValueKey('consultation-topics-tray'),
+                  padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+                  child: Wrap(
+                    spacing: AppSpacing.xs,
+                    runSpacing: AppSpacing.xs,
+                    children: [
+                      for (final prompt in _consultationStarterPrompts)
+                        ActionChip(
+                          label: Text(prompt),
+                          onPressed: () => onSelectTopic(prompt),
+                        ),
+                    ],
                   ),
-                  onChanged: inputBlocked ? null : onChanged,
                 ),
-              ),
-              const SizedBox(width: AppSpacing.sm),
-              SizedBox.square(
-                dimension: 52,
-                child: IconButton.filled(
-                  key: const ValueKey('consultation-send-button'),
-                  tooltip: inputBlocked ? '안전 안내 확인 필요' : '전송',
-                  style: IconButton.styleFrom(
-                    fixedSize: const Size.square(52),
-                    minimumSize: const Size.square(52),
-                    maximumSize: const Size.square(52),
-                    padding: EdgeInsets.zero,
-                    shape: const CircleBorder(),
+              ],
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  if (showTopicsToggle && !isGenerating) ...[
+                    SizedBox.square(
+                      dimension: 48,
+                      child: IconButton(
+                        key: const ValueKey('consultation-topics-button'),
+                        tooltip: '추천 주제',
+                        onPressed: onToggleTopics,
+                        icon: Icon(
+                          state.topicsExpanded
+                              ? Icons.expand_more_rounded
+                              : Icons.lightbulb_outline_rounded,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: AppSpacing.xs),
+                  ],
+                  Expanded(
+                    child: TextField(
+                      key: const ValueKey('consultation-message-field'),
+                      controller: controller,
+                      enabled: !inputBlocked && !state.isSending,
+                      minLines: 1,
+                      maxLines: 4,
+                      maxLength: ConsultationController.maxMessageLength,
+                      buildCounter: (
+                        context, {
+                        required currentLength,
+                        required isFocused,
+                        required maxLength,
+                      }) =>
+                          null,
+                      decoration: const InputDecoration(
+                        labelText: '고민을 입력해 주세요',
+                        border: OutlineInputBorder(),
+                        constraints: BoxConstraints(minHeight: 56),
+                      ),
+                      onChanged: inputBlocked ? null : onChanged,
+                    ),
                   ),
-                  onPressed: state.canSubmit ? () => onSubmitted() : null,
-                  icon: state.isSending
-                      ? const SizedBox(
-                          width: 18,
-                          height: 18,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : const Icon(Icons.arrow_upward_rounded),
-                ),
+                  const SizedBox(width: AppSpacing.sm),
+                  SizedBox.square(
+                    dimension: 52,
+                    child: isGenerating
+                        ? IconButton.filled(
+                            key: const ValueKey('consultation-stop-button'),
+                            tooltip: '답변 중단',
+                            style: IconButton.styleFrom(
+                              fixedSize: const Size.square(52),
+                              minimumSize: const Size.square(52),
+                              maximumSize: const Size.square(52),
+                              padding: EdgeInsets.zero,
+                              shape: const CircleBorder(),
+                            ),
+                            onPressed: () => onStop(),
+                            icon: const Icon(Icons.stop_rounded),
+                          )
+                        : IconButton.filled(
+                            key: const ValueKey('consultation-send-button'),
+                            tooltip: inputBlocked ? '안전 안내 확인 필요' : '전송',
+                            style: IconButton.styleFrom(
+                              fixedSize: const Size.square(52),
+                              minimumSize: const Size.square(52),
+                              maximumSize: const Size.square(52),
+                              padding: EdgeInsets.zero,
+                              shape: const CircleBorder(),
+                            ),
+                            onPressed: state.canSubmit ? () => onSubmitted() : null,
+                            icon: const Icon(Icons.arrow_upward_rounded),
+                          ),
+                  ),
+                ],
               ),
             ],
           ),

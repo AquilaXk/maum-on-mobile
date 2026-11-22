@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:shadcn_ui/shadcn_ui.dart';
 
 import '../../../shared/ui/app_design_system.dart';
 import '../../../shared/ui/text_editing_sync.dart';
@@ -576,15 +575,6 @@ class _LetterDetailView extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Align(
-          alignment: Alignment.centerLeft,
-          child: TextButton.icon(
-            key: const ValueKey('letter-list-back-button'),
-            onPressed: controller.backToMailbox,
-            icon: const Icon(Icons.arrow_back),
-            label: const Text('목록'),
-          ),
-        ),
         AppContentCard(
           key: const ValueKey('letter-detail-card'),
           leadingIcon: Icons.mail_outline,

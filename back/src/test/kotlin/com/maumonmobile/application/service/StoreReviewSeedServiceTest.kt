@@ -162,7 +162,9 @@ private data class StoreReviewSeedFixture(
 
 private class InMemoryStoreReviewConsultationRepository : ConsultationRepository {
     private val sequence = AtomicLong(1L)
-    private val messages = mutableListOf<ConsultationMessage>()
+    private val sessionSequence = AtomicLong(1L)
+    private val activeSessionByMember = mutableMapOf<Long, Long>()
+    private val messages = mutableListOf<Pair<Long, ConsultationMessage>>()
 
     override fun appendMessage(
         memberId: Long,
@@ -170,7 +172,9 @@ private class InMemoryStoreReviewConsultationRepository : ConsultationRepository
         content: String,
         sensitive: Boolean,
         retentionUntil: String?,
+        sessionId: Long?,
     ): ConsultationMessage {
+        val targetSessionId = sessionId ?: activeSessionByMember.getOrPut(memberId) { sessionSequence.getAndIncrement() }
         val message = ConsultationMessage(
             id = sequence.getAndIncrement(),
             memberId = memberId,
@@ -180,15 +184,19 @@ private class InMemoryStoreReviewConsultationRepository : ConsultationRepository
             sensitive = sensitive,
             retentionUntil = retentionUntil,
         )
-        messages += message
+        messages += targetSessionId to message
         return message
     }
 
     override fun findByMemberId(memberId: Long, afterId: Long?, limit: Int?): List<ConsultationMessage> {
+        val sessionId = activeSessionByMember[memberId] ?: return emptyList()
         val filtered = messages
-            .filter { message -> message.memberId == memberId }
+            .asSequence()
+            .filter { (msgSessionId, message) -> msgSessionId == sessionId && message.memberId == memberId }
+            .map { (_, message) -> message }
             .filter { message -> afterId?.let { cursor -> message.id > cursor } ?: true }
             .sortedBy { message -> message.id }
+            .toList()
         return limit?.let(filtered::take) ?: filtered
     }
 
@@ -196,22 +204,38 @@ private class InMemoryStoreReviewConsultationRepository : ConsultationRepository
         memberId: Long,
         excludeMessageId: Long,
         limit: Int,
+        sessionId: Long?,
     ): List<ConsultationMessage> {
         if (limit <= 0) {
             return emptyList()
         }
+        val targetSessionId = sessionId ?: activeSessionByMember[memberId] ?: return emptyList()
         return messages
-            .filter { message ->
-                message.memberId == memberId &&
+            .asSequence()
+            .filter { (msgSessionId, message) ->
+                msgSessionId == targetSessionId &&
+                    message.memberId == memberId &&
                     message.id != excludeMessageId &&
                     !message.sensitive
             }
+            .map { (_, message) -> message }
             .sortedBy { message -> message.id }
+            .toList()
             .takeLast(limit)
     }
 
     override fun hideSensitiveByMemberId(memberId: Long): Int {
         return 0
+    }
+
+    override fun ensureActiveSession(memberId: Long): Long {
+        return activeSessionByMember.getOrPut(memberId) { sessionSequence.getAndIncrement() }
+    }
+
+    override fun startNewSession(memberId: Long): Long {
+        val sessionId = sessionSequence.getAndIncrement()
+        activeSessionByMember[memberId] = sessionId
+        return sessionId
     }
 }
 

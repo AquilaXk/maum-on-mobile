@@ -21,14 +21,20 @@ class JdbcConsultationRepository(
 ) : ConsultationRepository {
 
     @Transactional
+    override fun ensureActiveSession(memberId: Long): Long {
+        return findSessionId(memberId) ?: createSession(memberId)
+    }
+
+    @Transactional
     override fun appendMessage(
         memberId: Long,
         sender: ConsultationMessageSender,
         content: String,
         sensitive: Boolean,
         retentionUntil: String?,
+        sessionId: Long?,
     ): ConsultationMessage {
-        val sessionId = findSessionId(memberId) ?: createSession(memberId)
+        val targetSessionId = sessionId ?: (findSessionId(memberId) ?: createSession(memberId))
         val id = jdbc.insertAndReturnId(
             """
                 insert into consultation_messages (
@@ -50,19 +56,25 @@ class JdbcConsultationRepository(
                 )
             """.trimIndent(),
             params()
-                .withValue("sessionId", sessionId)
+                .withValue("sessionId", targetSessionId)
                 .withValue("sender", sender.name)
                 .withValue("content", content)
                 .withValue("createdAt", Instant.now().toUtcIso6())
                 .withValue("sensitive", sensitive)
                 .withValue("retentionUntil", retentionUntil),
         )
-        touchSession(sessionId)
+        val latestSessionId = findSessionId(memberId)
+        if (latestSessionId == null || latestSessionId == targetSessionId) {
+            touchSession(targetSessionId)
+        }
         return findById(id) ?: error("저장된 상담 메시지를 확인하지 못했습니다.")
     }
 
     override fun findByMemberId(memberId: Long, afterId: Long?, limit: Int?): List<ConsultationMessage> {
-        val parameters = params().withValue("memberId", memberId)
+        val sessionId = findSessionId(memberId) ?: return emptyList()
+        val parameters = params()
+            .withValue("memberId", memberId)
+            .withValue("sessionId", sessionId)
         val cursorCondition = if (afterId != null) {
             parameters.withValue("afterId", afterId)
             "and m.id > :afterId"
@@ -87,7 +99,8 @@ class JdbcConsultationRepository(
                        m.retention_until
                   from consultation_messages m
                   join consultation_sessions s on s.id = m.session_id
-                 where s.member_id = :memberId
+                 where s.id = :sessionId
+                   and s.member_id = :memberId
                    and m.hidden = false
                    $cursorCondition
                  order by m.created_at asc, m.id asc
@@ -102,10 +115,12 @@ class JdbcConsultationRepository(
         memberId: Long,
         excludeMessageId: Long,
         limit: Int,
+        sessionId: Long?,
     ): List<ConsultationMessage> {
         if (limit <= 0) {
             return emptyList()
         }
+        val targetSessionId = sessionId ?: findSessionId(memberId) ?: return emptyList()
         return jdbc.query(
             """
                 select m.id,
@@ -117,7 +132,8 @@ class JdbcConsultationRepository(
                        m.retention_until
                   from consultation_messages m
                   join consultation_sessions s on s.id = m.session_id
-                 where s.member_id = :memberId
+                 where s.id = :sessionId
+                   and s.member_id = :memberId
                    and m.hidden = false
                    and m.sensitive = false
                    and m.id <> :excludeMessageId
@@ -125,12 +141,16 @@ class JdbcConsultationRepository(
                  limit :limit
             """.trimIndent(),
             params()
+                .withValue("sessionId", targetSessionId)
                 .withValue("memberId", memberId)
                 .withValue("excludeMessageId", excludeMessageId)
                 .withValue("limit", limit),
             rowMapper,
         ).asReversed()
     }
+
+    @Transactional
+    override fun startNewSession(memberId: Long): Long = createSession(memberId)
 
     override fun hideSensitiveByMemberId(memberId: Long): Int {
         return jdbc.update(

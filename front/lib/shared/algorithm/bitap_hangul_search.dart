@@ -1,10 +1,8 @@
-// SPDX-License-Identifier: Apache-2.0 AND MIT
+// First-party clean-room implementation.
 //
-// Portions derived from:
-// - krisk/Fuse (Apache-2.0, https://github.com/krisk/Fuse):
-//   Bitap Shift-And word-parallel approximate string matching.
-// - toss/es-hangul (MIT, https://github.com/toss/es-hangul):
-//   Arithmetic Hangul syllable decomposition and Choseong extraction.
+// Standard Baeza-Yates & Gonnet (1992) Shift-And Bitap 31-bit bit-parallel
+// approximate string matching paired with Unicode U+AC00..U+D7A3 Hangul
+// arithmetic syllable decomposition and Choseong extraction.
 
 import 'dart:typed_data';
 

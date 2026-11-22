@@ -6,7 +6,7 @@ import 'package:maum_on_mobile_front/features/story/data/story_repository.dart';
 import 'package:maum_on_mobile_front/features/story/domain/story_models.dart';
 import 'package:maum_on_mobile_front/features/story/presentation/story_screen.dart';
 import 'package:maum_on_mobile_front/shared/ui/app_design_system.dart';
-import 'package:shadcn_ui/shadcn_ui.dart';
+import 'package:maum_on_mobile_front/shared/ui/shad_primitives.dart';
 
 void main() {
   testWidgets('스토리 검색 도구는 첫 화면 콘텐츠를 가리지 않는 얇은 표면이다', (tester) async {

@@ -112,6 +112,44 @@ void main() {
       expect(transport.requests.single.method, ApiMethod.delete);
       expect(deletedCount, 2);
     });
+
+    test('starts a new consultation session via POST /sessions', () async {
+      final transport = _FakeApiTransport([
+        ApiTransportResponse.ok({
+          'success': true,
+          'data': {'sessionId': 42},
+        }),
+      ]);
+      final repository = _repository(
+        transport,
+        streamClient: _FakeConsultationStreamClient(),
+      );
+
+      final sessionId = await repository.startNewSession();
+
+      expect(transport.requests.single.path, '/api/v1/consultations/sessions');
+      expect(transport.requests.single.method, ApiMethod.post);
+      expect(sessionId, 42);
+    });
+
+    test('stops active consultation generation via POST /stop', () async {
+      final transport = _FakeApiTransport([
+        ApiTransportResponse.ok({
+          'success': true,
+          'data': {'stopped': true},
+        }),
+      ]);
+      final repository = _repository(
+        transport,
+        streamClient: _FakeConsultationStreamClient(),
+      );
+
+      final stopped = await repository.stopGenerating();
+
+      expect(transport.requests.single.path, '/api/v1/consultations/stop');
+      expect(transport.requests.single.method, ApiMethod.post);
+      expect(stopped, isTrue);
+    });
   });
 
   group('HttpConsultationStreamClient', () {

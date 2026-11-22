@@ -20,6 +20,7 @@ import org.springframework.stereotype.Component
 import tools.jackson.databind.ObjectMapper
 import java.net.URI
 import java.time.Duration
+import java.util.concurrent.CancellationException
 
 @Component
 @Profile("!test & !local")
@@ -66,6 +67,9 @@ class RemoteConsultationAiResponder internal constructor(
 
         var lastFailure: Throwable? = null
         repeat(endpoint.maxAttempts) {
+            if (Thread.currentThread().isInterrupted) {
+                throw CancellationException("상담 모델 호출이 중단되었습니다.")
+            }
             runCatching {
                 val responseBody = generateContentClient.generateContent(
                     endpoint = consultationEndpoint(),
@@ -77,6 +81,10 @@ class RemoteConsultationAiResponder internal constructor(
                     circuitBreaker.recordSuccess()
                 }
             }.onFailure { failure ->
+                if (failure.isInterruptionFailure()) {
+                    Thread.currentThread().interrupt()
+                    throw CancellationException("상담 모델 호출이 중단되었습니다.")
+                }
                 lastFailure = failure
                 circuitBreaker.recordFailure()
             }
@@ -142,10 +150,15 @@ class RemoteConsultationAiResponder internal constructor(
             }
             .ifBlank { "(none)" }
         val repetitionMaterial = recentAssistantRepetitionMaterial(recentMessageWindow)
+        val recentEmotionSummary = request.recentEmotionSummary
+            ?.trim()
+            ?.takeIf(String::isNotBlank)
+        val emotionContext = formatEmotionContextSection(recentEmotionSummary)
         val userMessage = request.message.take(endpoint.maxInputChars)
         val verbosePrompt = promptTemplate(
             conversationState = conversationState,
             recentMessages = recentMessages,
+            emotionContext = emotionContext,
             repetitionMaterial = repetitionMaterial,
             userMessage = userMessage,
             consultationChecklist = verboseConsultationChecklist(),
@@ -154,6 +167,7 @@ class RemoteConsultationAiResponder internal constructor(
             val compactPrompt = compactPrompt(
                 conversationState = conversationState,
                 recentMessages = recentMessages,
+                recentEmotionSummary = recentEmotionSummary,
                 repetitionMaterial = repetitionMaterial,
                 userMessage = userMessage,
             )
@@ -177,12 +191,15 @@ class RemoteConsultationAiResponder internal constructor(
     private fun compactPrompt(
         conversationState: String,
         recentMessages: String,
+        recentEmotionSummary: String?,
         repetitionMaterial: String,
         userMessage: String,
     ): String {
+        val fullEmotionContext = formatEmotionContextSection(recentEmotionSummary)
         val compactWithFullContext = compactPromptTemplate(
             conversationState = conversationState,
             recentMessages = recentMessages,
+            emotionContext = fullEmotionContext,
             repetitionMaterial = repetitionMaterial,
             userMessage = userMessage,
         )
@@ -196,9 +213,14 @@ class RemoteConsultationAiResponder internal constructor(
             .takeLast(COMPACT_RECENT_MESSAGE_LIMIT)
             .joinToString("\n")
             .ifBlank { "(none)" }
+        val compactEmotionContext = formatEmotionContextSection(
+            recentEmotionSummary,
+            maxChars = COMPACT_EMOTION_CONTEXT_CHARS,
+        )
         val compactWithRecentTail = compactPromptTemplate(
             conversationState = conversationState,
             recentMessages = compactRecentMessages,
+            emotionContext = compactEmotionContext,
             repetitionMaterial = compactRepetitionMaterial,
             userMessage = userMessage,
         )
@@ -210,6 +232,7 @@ class RemoteConsultationAiResponder internal constructor(
         val promptWithoutUserMessage = compactPromptTemplate(
             conversationState = conversationState,
             recentMessages = minimumContext,
+            emotionContext = "",
             repetitionMaterial = compactRepetitionMaterial,
             userMessage = "",
         )
@@ -218,6 +241,7 @@ class RemoteConsultationAiResponder internal constructor(
         return compactPromptTemplate(
             conversationState = conversationState,
             recentMessages = minimumContext,
+            emotionContext = "",
             repetitionMaterial = compactRepetitionMaterial,
             userMessage = userMessage.takePromptTail(userMessageBudget),
         )
@@ -226,16 +250,26 @@ class RemoteConsultationAiResponder internal constructor(
     private fun compactPromptTemplate(
         conversationState: String,
         recentMessages: String,
+        emotionContext: String,
         repetitionMaterial: String,
         userMessage: String,
     ): String {
         return promptTemplate(
             conversationState = conversationState,
             recentMessages = recentMessages,
+            emotionContext = emotionContext,
             repetitionMaterial = repetitionMaterial,
             userMessage = userMessage,
             consultationChecklist = compactConsultationChecklist(),
         )
+    }
+
+    private fun formatEmotionContextSection(
+        recentEmotionSummary: String?,
+        maxChars: Int = MAX_EMOTION_CONTEXT_CHARS,
+    ): String {
+        val normalized = recentEmotionSummary?.trim()?.takeIf(String::isNotBlank) ?: return ""
+        return "\n\n[최근 감정 기록 맥락]\n${normalized.take(maxChars)}"
     }
 
     private fun recentAssistantRepetitionMaterial(recentMessages: List<ConsultationMessage>): String {
@@ -337,6 +371,7 @@ class RemoteConsultationAiResponder internal constructor(
     private fun promptTemplate(
         conversationState: String,
         recentMessages: String,
+        emotionContext: String,
         repetitionMaterial: String,
         userMessage: String,
         consultationChecklist: String,
@@ -365,7 +400,7 @@ class RemoteConsultationAiResponder internal constructor(
             chunks 배열은 3~5개로 만들고, 각 항목은 빈 문자열이 아니어야 해.
 
             [이전 대화 맥락]
-            $PROMPT_RECENT_MESSAGES_PLACEHOLDER
+            $PROMPT_RECENT_MESSAGES_PLACEHOLDER$PROMPT_EMOTION_CONTEXT_PLACEHOLDER
 
             [최근 답변 반복 금지 소재]
             $PROMPT_REPETITION_MATERIAL_PLACEHOLDER
@@ -375,6 +410,7 @@ class RemoteConsultationAiResponder internal constructor(
         """.trimIndent()
             .replace(PROMPT_CHECKLIST_PLACEHOLDER, consultationChecklist)
             .replace(PROMPT_RECENT_MESSAGES_PLACEHOLDER, recentMessages)
+            .replace(PROMPT_EMOTION_CONTEXT_PLACEHOLDER, emotionContext)
             .replace(PROMPT_REPETITION_MATERIAL_PLACEHOLDER, repetitionMaterial)
             .replace(PROMPT_USER_MESSAGE_PLACEHOLDER, userMessage)
     }
@@ -554,8 +590,11 @@ class RemoteConsultationAiResponder internal constructor(
         private const val PROMPT_TRUNCATION_MARKER = "(앞부분 축약) "
         private const val PROMPT_CHECKLIST_PLACEHOLDER = "{{CONSULTATION_CHECKLIST}}"
         private const val PROMPT_RECENT_MESSAGES_PLACEHOLDER = "{{RECENT_MESSAGES}}"
+        private const val PROMPT_EMOTION_CONTEXT_PLACEHOLDER = "{{EMOTION_CONTEXT}}"
         private const val PROMPT_REPETITION_MATERIAL_PLACEHOLDER = "{{REPETITION_MATERIAL}}"
         private const val PROMPT_USER_MESSAGE_PLACEHOLDER = "{{USER_MESSAGE}}"
+        private const val MAX_EMOTION_CONTEXT_CHARS = 300
+        private const val COMPACT_EMOTION_CONTEXT_CHARS = 120
         private const val MIN_CHUNK_CHARS = 24
         private const val MAX_CHUNK_CHARS = 420
         private const val MAX_FALLBACK_ANSWER_CHARS = 900
@@ -642,5 +681,20 @@ class RemoteConsultationAiResponder internal constructor(
         return normalizedHost == "aiplatform.googleapis.com" ||
             normalizedHost.endsWith(".aiplatform.googleapis.com") ||
             normalizedHost.endsWith("-aiplatform.googleapis.com")
+    }
+
+    private fun Throwable.isInterruptionFailure(): Boolean {
+        var current: Throwable? = this
+        val visited = HashSet<Throwable>(4)
+        while (current != null && visited.add(current)) {
+            if (current is InterruptedException ||
+                current is java.io.InterruptedIOException ||
+                current is CancellationException
+            ) {
+                return true
+            }
+            current = current.cause
+        }
+        return false
     }
 }

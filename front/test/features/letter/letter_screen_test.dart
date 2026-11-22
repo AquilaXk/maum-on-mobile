@@ -517,7 +517,9 @@ void main() {
 
     expect(repository.requestedDetailIds, [12]);
     expect(
-        find.byKey(const ValueKey('letter-list-back-button')), findsOneWidget);
+        find.byKey(const ValueKey('letter-list-back-button')), findsNothing);
+    expect(find.byKey(const ValueKey('letter-detail-card')), findsOneWidget);
+    expect(find.byTooltip('홈으로'), findsOneWidget);
   });
 
   testWidgets('shows receiver guidance when no recipient is available',

@@ -281,6 +281,7 @@ class _MaumOnMobileAppState extends State<MaumOnMobileApp>
         ),
       AuthenticatedRoute.consultation => ConsultationScreen(
           controller: _consultationControllerFor(memberId),
+          closeStreamOnDispose: false,
           onBack: null,
         ),
       AuthenticatedRoute.notifications => _buildNotificationRoute(memberId),

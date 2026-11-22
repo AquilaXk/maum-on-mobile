@@ -64,7 +64,7 @@ IconData _iconFor(String id) {
   return switch (id) {
     'privacy-policy' => Icons.privacy_tip_outlined,
     'terms' => Icons.article_outlined,
-    'support' => Icons.support_agent_outlined,
+    'support' => Icons.help_outline_rounded,
     _ => Icons.open_in_new,
   };
 }

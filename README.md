@@ -301,19 +301,6 @@ bash tools/ci/run-mobile-release-preflight.sh --platform all
 
 ---
 
-## 📜 오픈소스 참조 및 라이선스 고지 (Third-Party Notices)
+## 📜 오픈소스 및 라이선스 고지 (Third-Party Notices)
 
-본 저장소 일부 모듈은 아래 허용 라이선스(Apache-2.0, MIT, BSD-3-Clause) 오픈소스 알고리즘과 UI 패턴을 참조해 독립적으로 이식·최적화했다.
-
-| 참조 프로젝트 | 라이선스 | 적용 모듈 및 역할 |
-| :--- | :--- | :--- |
-| [robert-bor/aho-corasick](https://github.com/robert-bor/aho-corasick) | Apache-2.0 | `back/.../domain/moderation/ModerationTextEngine.kt` (다중 금칙어 오토마톤 설계 참조) |
-| [hankcs/AhoCorasickDoubleArrayTrie](https://github.com/hankcs/AhoCorasickDoubleArrayTrie) | Apache-2.0 | `back/.../domain/moderation/ModerationTextEngine.kt` (평면 `IntArray` 기반 전이 테이블 최적화) |
-| [krisk/Fuse](https://github.com/krisk/Fuse) (Myers 1999) | Apache-2.0 | `back/.../domain/moderation/ModerationTextEngine.kt`, `front/lib/shared/algorithm/bitap_hangul_search.dart` (64-bit Myers / 31-bit Bitap 비트-병렬 유사 검색) |
-| [toss/es-hangul](https://github.com/toss/es-hangul) | MIT | `back/.../domain/moderation/ModerationTextEngine.kt`, `front/lib/shared/algorithm/bitap_hangul_search.dart` (산술 한글 음절/초성 분해) |
-| [usememos/memos](https://github.com/usememos/memos) | MIT | `front/lib/features/diary/presentation/diary_screen.dart` (감정 히트맵 상단 요약 + 빠른 필터 타임라인 레이아웃 참조) |
-| [devappmin/flutter_heatmap_calendar](https://github.com/devappmin/flutter_heatmap_calendar) | MIT | `front/lib/features/diary/domain/mood_year_bitmap.dart`, `front/lib/features/diary/presentation/mood_heatmap_strip.dart` (연간/주간 히트맵 셀 배치 패턴) |
-| [hashirshoaeb/star_book](https://github.com/hashirshoaeb/star_book) | MIT | `front/lib/features/diary/domain/mood_year_bitmap.dart` (5단계 기분 점수 색상 매핑 참조) |
-| [contribution_heatmap](https://pub.dev/packages/contribution_heatmap) | BSD-3-Clause | `front/lib/features/diary/presentation/mood_heatmap_strip.dart` (단일 `CustomPainter` 캔버스 히트맵 렌더링) |
-| [flyerhq/flutter_chat_ui](https://github.com/flyerhq/flutter_chat_ui) & [flutter/ai](https://github.com/flutter/ai) | Apache-2.0 / BSD-3-Clause | `front/lib/features/consultation/presentation/consultation_screen.dart`, `consultation_controller.dart` (`ValueListenableBuilder` 스트리밍 말풍선 분리 패턴) |
-| [nank1ro/flutter-shadcn-ui](https://github.com/nank1ro/flutter-shadcn-ui) | MIT | `front/lib/shared/ui/app_design_system.dart`, `front/lib/app/maum_bottom_navigation.dart` (다크 모드 대비 토큰 및 카드/내비게이션 계층 참조) |
+UI 표면·카드·배지 프리미티브, 경량 마크다운 파서·렌더러, 호흡·타이핑 인디케이터, 연간 감정 비트맵·히트맵 페인터, 비트-병렬 한글 초성 검색·금칙어 필터는 자체 클린룸 구현으로 동작하며, 런타임 서드파티 패키지 목록은 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)에 관리한다.

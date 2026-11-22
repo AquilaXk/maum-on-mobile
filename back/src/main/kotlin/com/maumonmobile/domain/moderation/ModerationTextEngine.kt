@@ -1,11 +1,10 @@
 /*
- * Ported bit/word algorithms and canonicalization routines with source attribution:
- * 1. robert-bor/aho-corasick (Apache-2.0) & hankcs/AhoCorasickDoubleArrayTrie (Apache-2.0)
- *    - Flat IntArray-backed Aho-Corasick failure-link multi-pattern automaton with bitmask output tags.
- * 2. Myers (1999) / krisk/Fuse (Apache-2.0)
- *    - 64-bit word (Long) bit-parallel approximate string matching (peq, pv, mv, zero heap allocations).
- * 3. toss/es-hangul (MIT)
- *    - Arithmetic Hangul syllable/Jamo canonicalization (0xAC00..0xD7A3, 0x3131..0x3163).
+ * First-party clean-room text moderation engine:
+ * 1. Aho-Corasick (1975) finite-state multi-pattern automaton backed by flat
+ *    IntArray transition tables and bitmask output tags.
+ * 2. Baeza-Yates & Gonnet (1992) Bitap & Myers (1999) 64-bit word (Long)
+ *    bit-parallel approximate edit-distance scanner (peq, pv, mv, zero heap allocations).
+ * 3. Unicode U+AC00..U+D7A3 and U+3131..U+3163 arithmetic Hangul canonicalization.
  */
 package com.maumonmobile.domain.moderation
 
@@ -49,7 +48,7 @@ object ModerationTextEngine {
         (((1L shl 26) - 1L) shl ('A'.code - 64)) or
             (((1L shl 26) - 1L) shl ('a'.code - 64))
 
-    // Arithmetic Hangul code constants (toss/es-hangul).
+    // Unicode Hangul syllable and Jamo block boundaries (U+AC00..U+D7A3, U+3131..U+3163).
     private const val HANGUL_SYLLABLE_START = 0xAC00
     private const val HANGUL_SYLLABLE_END = 0xD7A3
     private const val HANGUL_CONSONANT_START = 0x3131

@@ -50,7 +50,7 @@ void main() {
         findsNothing);
     expect(find.text('알림 확인 흐름'), findsNothing);
     expect(find.text('읽지 않음 2개'), findsOneWidget);
-    expect(find.text('바로 이동 2개'), findsOneWidget);
+    expect(find.text('바로 이동 2개'), findsNothing);
     expect(find.text('푸시 권한 확인'), findsOneWidget);
     expect(find.byKey(const ValueKey('notification-list')), findsOneWidget);
 
@@ -131,7 +131,7 @@ void main() {
         findsOneWidget,
       );
       expect(find.text('읽지 않음 2개'), findsOneWidget);
-      expect(find.text('바로 이동 2개'), findsOneWidget);
+      expect(find.text('바로 이동 2개'), findsNothing);
       expect(find.text('상대방이 편지를 읽었습니다.'), findsOneWidget);
       expect(find.text('보낸 편지에 답장이 도착했습니다!'), findsWidgets);
       expect(find.text('새 알림'), findsWidgets);

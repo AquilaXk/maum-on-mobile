@@ -7,7 +7,7 @@ import 'package:maum_on_mobile_front/features/diary/data/diary_repository.dart';
 import 'package:maum_on_mobile_front/features/diary/domain/diary_models.dart';
 import 'package:maum_on_mobile_front/features/diary/presentation/diary_image_picker.dart';
 import 'package:maum_on_mobile_front/features/diary/presentation/diary_screen.dart';
-import 'package:shadcn_ui/shadcn_ui.dart';
+import 'package:maum_on_mobile_front/shared/ui/shad_primitives.dart';
 
 void main() {
   testWidgets('shows compact write entry controls on a phone viewport',

@@ -1,9 +1,5 @@
-// Bento dashboard & mood check-in hero patterns adapted from:
-// - hashirshoaeb/star_book (MIT)
-// - usememos/memos (MIT)
-// - nank1ro/flutter-shadcn-ui (MIT)
+// Bento dashboard & daily mood check-in hero surface layout.
 import 'package:flutter/material.dart';
-import 'package:shadcn_ui/shadcn_ui.dart';
 
 import '../../shared/ui/app_design_system.dart';
 import '../../theme/app_theme.dart';
@@ -192,22 +188,6 @@ class _MoodCheckinHeroCard extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           mainAxisSize: MainAxisSize.min,
           children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                ShadBadge.secondary(
-                  backgroundColor: colorScheme.primaryContainer,
-                  foregroundColor: colorScheme.onPrimaryContainer,
-                  child: const Text('오늘 마음 체크인'),
-                ),
-                Icon(
-                  Icons.wb_sunny_outlined,
-                  size: 18,
-                  color: colorScheme.primary,
-                ),
-              ],
-            ),
-            const SizedBox(height: AppSpacing.sm),
             Text(
               '$nickname님, 오늘 마음은 어떤가요?',
               style: theme.textTheme.titleLarge?.copyWith(
@@ -411,23 +391,12 @@ class _ActionGrid extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
 
     return Column(
       key: const ValueKey('home-action-launcher'),
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Row(
-          children: [
-            Icon(
-              Icons.bolt_outlined,
-              size: 20,
-              color: colorScheme.primary,
-            ),
-            const SizedBox(width: AppSpacing.xs),
-            Text('바로 시작', style: theme.textTheme.titleMedium),
-          ],
-        ),
+        Text('마음 공간', style: theme.textTheme.titleMedium),
         const SizedBox(height: AppSpacing.xs),
         Column(
           key: const ValueKey('home-primary-actions-panel'),
@@ -450,8 +419,6 @@ class _ActionGrid extends StatelessWidget {
                           ),
                           title: 'AI 상담',
                           subtitle: '24시간 대화',
-                          countLabel:
-                              hasLiveNotificationConnection ? '연결됨' : '대화',
                           icon: Icons.chat_bubble_outline,
                           tone: AppStatusTone.warning,
                           onTap: onOpenConsultation,
@@ -465,7 +432,6 @@ class _ActionGrid extends StatelessWidget {
                               const ValueKey('home-action-diary-surface'),
                           title: '기록',
                           subtitle: '감정 기록',
-                          countLabel: '${stats?.todayDiaryCount ?? 0}건',
                           icon: Icons.edit_note,
                           tone: AppStatusTone.warning,
                           onTap: onWriteDiary,
@@ -486,7 +452,6 @@ class _ActionGrid extends StatelessWidget {
                               const ValueKey('home-action-letter-surface'),
                           title: '편지',
                           subtitle: '익명 우편함',
-                          countLabel: '${stats?.todayLetterCount ?? 0}건',
                           icon: Icons.mail_outline,
                           onTap: onWriteLetter,
                         ),
@@ -499,7 +464,6 @@ class _ActionGrid extends StatelessWidget {
                               const ValueKey('home-action-story-surface'),
                           title: '스토리',
                           subtitle: '공감 피드',
-                          countLabel: '${stats?.todayWorryCount ?? 0}건',
                           icon: Icons.forum_outlined,
                           tone: AppStatusTone.success,
                           onTap: onViewStory,
@@ -523,7 +487,6 @@ class _BentoActionTile extends StatelessWidget {
     required this.surfaceKey,
     required this.title,
     required this.subtitle,
-    required this.countLabel,
     required this.icon,
     required this.onTap,
     this.tone = AppStatusTone.neutral,
@@ -533,7 +496,6 @@ class _BentoActionTile extends StatelessWidget {
   final Key surfaceKey;
   final String title;
   final String subtitle;
-  final String countLabel;
   final IconData icon;
   final VoidCallback onTap;
   final AppStatusTone tone;
@@ -566,49 +528,19 @@ class _BentoActionTile extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          DecoratedBox(
-                            key: surfaceKey,
-                            decoration: BoxDecoration(
-                              color: colors.background,
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: SizedBox.square(
-                              dimension: 40,
-                              child: Icon(
-                                icon,
-                                color: colors.foreground,
-                                size: 22,
-                              ),
-                            ),
+                      SizedBox.square(
+                        key: surfaceKey,
+                        dimension: 28,
+                        child: Align(
+                          alignment: Alignment.centerLeft,
+                          child: Icon(
+                            icon,
+                            color: colors.foreground,
+                            size: 22,
                           ),
-                          const SizedBox(width: AppSpacing.xs),
-                          Flexible(
-                            child: ShadBadge.secondary(
-                              backgroundColor: colors.background,
-                              hoverBackgroundColor: colors.background,
-                              foregroundColor: colors.foreground,
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: AppSpacing.xs,
-                                vertical: 3,
-                              ),
-                              child: Text(
-                                countLabel,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: theme.textTheme.labelSmall?.copyWith(
-                                  color: colors.foreground,
-                                  fontWeight: FontWeight.w800,
-                                ),
-                              ),
-                            ),
-                          ),
-                        ],
+                        ),
                       ),
-                      const SizedBox(height: AppSpacing.sm),
+                      const SizedBox(height: AppSpacing.xs),
                       Text(
                         title,
                         maxLines: 2,
@@ -653,17 +585,7 @@ class _StatsSection extends StatelessWidget {
       key: const ValueKey('home-stats-section'),
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Row(
-          children: [
-            Icon(
-              Icons.insights_outlined,
-              size: 20,
-              color: theme.colorScheme.primary,
-            ),
-            const SizedBox(width: AppSpacing.xs),
-            Text('오늘 요약', style: theme.textTheme.titleMedium),
-          ],
-        ),
+        Text('오늘의 흐름', style: theme.textTheme.titleMedium),
         const SizedBox(height: AppSpacing.xs),
         if (state.statsErrorMessage != null) ...[
           AppNotice(
@@ -944,7 +866,7 @@ class _DraftContinuationSection extends StatelessWidget {
                   statusTone:
                       draft.failed ? AppStatusTone.danger : AppStatusTone.warning,
                   leadingIcon: _draftIcon(draft.surface),
-                  trailingIcon: Icons.play_arrow_rounded,
+                  trailingIcon: Icons.chevron_right_rounded,
                   onTap: () => onContinue(draft.surface),
                   semanticLabel:
                       '${draft.surface.label} 이어쓰기: ${draft.title}, ${draft.failed ? '전송 실패' : '임시 저장'}',
@@ -1148,25 +1070,14 @@ class _PopularStorySection extends StatelessWidget {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            Wrap(
-                              spacing: AppSpacing.xs,
-                              runSpacing: AppSpacing.xxs,
-                              crossAxisAlignment: WrapCrossAlignment.center,
-                              children: [
-                                ShadBadge(
-                                  backgroundColor: colorScheme.primaryContainer,
-                                  hoverBackgroundColor:
-                                      colorScheme.primaryContainer,
-                                  foregroundColor:
-                                      colorScheme.onPrimaryContainer,
-                                  child: const Text('인기 공감'),
-                                ),
-                                ShadBadge.secondary(
-                                  child: Text('#${story.label}'),
-                                ),
-                              ],
+                            Text(
+                              '#${story.label}',
+                              style: theme.textTheme.labelMedium?.copyWith(
+                                color: colorScheme.primary,
+                                fontWeight: FontWeight.w700,
+                              ),
                             ),
-                            const SizedBox(height: AppSpacing.xs),
+                            const SizedBox(height: AppSpacing.xxs),
                             Text(
                               story.title,
                               maxLines: 2,

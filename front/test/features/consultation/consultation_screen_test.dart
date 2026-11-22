@@ -2,12 +2,16 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:maum_on_mobile_front/features/consultation/application/consultation_controller.dart';
 import 'package:maum_on_mobile_front/features/consultation/data/consultation_repository.dart';
 import 'package:maum_on_mobile_front/features/consultation/domain/consultation_models.dart';
 import 'package:maum_on_mobile_front/features/consultation/presentation/consultation_screen.dart';
-import 'package:shadcn_ui/shadcn_ui.dart';
+import 'package:maum_on_mobile_front/features/consultation/presentation/widgets/breathing_grounding_sheet.dart';
+import 'package:maum_on_mobile_front/features/consultation/presentation/widgets/counselor_markdown_message.dart';
+import 'package:maum_on_mobile_front/features/consultation/presentation/widgets/jumping_dots_indicator.dart';
+import 'package:maum_on_mobile_front/theme/app_theme.dart';
 
 void main() {
   testWidgets('shows compact consultation status on a phone viewport',
@@ -43,8 +47,19 @@ void main() {
     expect(find.text('연결'), findsNothing);
     expect(find.text('입력'), findsNothing);
     expect(find.text('응답'), findsNothing);
-    expect(find.text('AI 상담 연결됨'), findsOneWidget);
-    expect(find.text('대화 0개'), findsOneWidget);
+    expect(find.text('AI 상담 연결됨'), findsNothing);
+    expect(find.text('대화 0개'), findsNothing);
+    expect(find.text('입력 가능'), findsNothing);
+    expect(find.text('상담 대기 중'), findsNothing);
+    expect(find.text('연결됨'), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('consultation-breathing-button')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey('consultation-new-session-button')),
+      findsOneWidget,
+    );
     expect(
       find.byKey(const ValueKey('consultation-empty-state')),
       findsOneWidget,
@@ -56,8 +71,7 @@ void main() {
       ),
       findsOneWidget,
     );
-    expect(find.text('상담 대기 중'), findsOneWidget);
-    expect(find.text('입력 가능'), findsOneWidget);
+    expect(find.text('오늘 마음을 나눠 볼까요'), findsOneWidget);
     expect(
       find.byKey(const ValueKey('consultation-composer-section')),
       findsOneWidget,
@@ -114,12 +128,12 @@ void main() {
     await tester.pump();
 
     expect(repository.connectCount, 1);
-    expect(find.text('AI 상담 연결됨'), findsOneWidget);
+    expect(find.text('연결됨'), findsOneWidget);
     expect(
       find.byKey(const ValueKey('consultation-status-toolbar')),
       findsOneWidget,
     );
-    expect(find.text('대화 0개'), findsOneWidget);
+    expect(find.text('대화 0개'), findsNothing);
     expect(find.byKey(const ValueKey('consultation-chat-section')),
         findsOneWidget);
     expect(
@@ -254,11 +268,11 @@ void main() {
     final streamingFieldRect = tester.getRect(
       find.byKey(const ValueKey('consultation-message-field')),
     );
-    final streamingSendButtonRect = tester.getRect(
-      find.byKey(const ValueKey('consultation-send-button')),
+    final streamingStopButtonRect = tester.getRect(
+      find.byKey(const ValueKey('consultation-stop-button')),
     );
     expect(
-      (streamingSendButtonRect.center.dy - streamingFieldRect.center.dy).abs(),
+      (streamingStopButtonRect.center.dy - streamingFieldRect.center.dy).abs(),
       lessThanOrEqualTo(1),
     );
 
@@ -699,6 +713,210 @@ void main() {
 
     expect(scrollPosition.extentAfter, lessThanOrEqualTo(1));
   });
+
+  testWidgets('supports stop generation, new session, and topic reopening',
+      (tester) async {
+    final stalledCompleter = Completer<ConsultationSendResult>();
+    final repository = _FakeConsultationRepository()
+      ..stallSendCompleter = stalledCompleter;
+    final controller = ConsultationController(repository: repository);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: buildAppTheme(),
+        home: ConsultationScreen(
+          controller: controller,
+          onBack: () {},
+        ),
+      ),
+    );
+    await tester.pump();
+    repository.emit(const ConsultationStreamEvent.connect('connected'));
+    await tester.pump();
+
+    await tester.enterText(
+      find.byKey(const ValueKey('consultation-message-field')),
+      '숨 고르기가 필요해요',
+    );
+    await tester.pump();
+    await tester.tap(find.byKey(const ValueKey('consultation-send-button')));
+    await tester.pump();
+
+    expect(
+      find.byKey(const ValueKey('consultation-stop-button')),
+      findsOneWidget,
+    );
+    repository.emit(const ConsultationStreamEvent.chat('천천히 숨을 고르세요.'));
+    await tester.pump();
+
+    await tester.tap(find.byKey(const ValueKey('consultation-stop-button')));
+    stalledCompleter.complete(const ConsultationSendResult(accepted: true));
+    await tester.pump();
+
+    expect(repository.stopGeneratingCount, 1);
+    expect(
+      find.byKey(const ValueKey('consultation-send-button')),
+      findsOneWidget,
+    );
+    expect(find.text('천천히 숨을 고르세요.'), findsOneWidget);
+
+    await tester.tap(find.byKey(const ValueKey('consultation-topics-button')));
+    await tester.pump();
+    expect(
+      find.byKey(const ValueKey('consultation-topics-tray')),
+      findsOneWidget,
+    );
+
+    await tester.tap(find.text('머릿속이 복잡해요'));
+    await tester.pump();
+    expect(controller.state.draft, '머릿속이 복잡해요');
+    expect(
+      find.byKey(const ValueKey('consultation-topics-tray')),
+      findsNothing,
+    );
+
+    await tester
+        .tap(find.byKey(const ValueKey('consultation-new-session-button')));
+    await tester.pump();
+
+    expect(repository.startNewSessionCount, 1);
+    expect(find.byKey(const ValueKey('consultation-empty-state')),
+        findsOneWidget);
+    expect(find.text('오늘 마음을 나눠 볼까요'), findsOneWidget);
+  });
+
+  testWidgets('renders markdown bubble with >=48dp copy button and safe links',
+      (tester) async {
+    String? copiedText;
+    final openedLinks = <Uri>[];
+    tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+      SystemChannels.platform,
+      (call) async {
+        if (call.method == 'Clipboard.setData') {
+          copiedText = (call.arguments as Map)['text'] as String?;
+        }
+        return null;
+      },
+    );
+    addTearDown(
+      () => tester.binding.defaultBinaryMessenger
+          .setMockMethodCallHandler(SystemChannels.platform, null),
+    );
+
+    const sampleMarkdown =
+        '**핵심 정리**\n- [안전 안내](https://maum-on.app/help)\n- [차단 링크](javascript:alert(1))';
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: buildDarkAppTheme(),
+        home: MediaQuery(
+          data: const MediaQueryData(textScaler: TextScaler.linear(2.0)),
+          child: Scaffold(
+            body: SingleChildScrollView(
+              child: CounselorMarkdownMessage(
+                data: sampleMarkdown,
+                copyButtonKey: const ValueKey('test-markdown-copy'),
+                onLinkTap: (uri) async => openedLinks.add(uri),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final copySize =
+        tester.getSize(find.byKey(const ValueKey('test-markdown-copy')));
+    expect(copySize.width, greaterThanOrEqualTo(48));
+    expect(copySize.height, greaterThanOrEqualTo(48));
+
+    await tester.tap(find.text('차단 링크'));
+    await tester.pump();
+    expect(openedLinks, isEmpty);
+
+    await tester.tap(find.text('안전 안내'));
+    await tester.pump();
+    expect(openedLinks, [Uri.parse('https://maum-on.app/help')]);
+
+    await tester.tap(find.byKey(const ValueKey('test-markdown-copy')));
+    await tester.pump();
+    expect(copiedText, sampleMarkdown);
+    expect(find.text('복사됨'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+
+    await tester.pump(const Duration(seconds: 3));
+  });
+
+  testWidgets('jumping dots falls back cleanly when animations are disabled',
+      (tester) async {
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: MediaQuery(
+          data: MediaQueryData(disableAnimations: true),
+          child: Scaffold(
+            body: JumpingDotsIndicator(),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.byType(JumpingDotsIndicator), findsOneWidget);
+  });
+
+  testWidgets('breathing and sensory grounding sheet operates interactively',
+      (tester) async {
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    final repository = _FakeConsultationRepository();
+    final controller = ConsultationController(repository: repository);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: buildDarkAppTheme(),
+        home: MediaQuery(
+          data: const MediaQueryData(
+            disableAnimations: true,
+            textScaler: TextScaler.linear(2.0),
+          ),
+          child: ConsultationScreen(
+            controller: controller,
+            onBack: () {},
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+    repository.emit(const ConsultationStreamEvent.connect('connected'));
+    await tester.pumpAndSettle();
+
+    await tester
+        .tap(find.byKey(const ValueKey('consultation-breathing-button')));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(BreathingGroundingSheet), findsOneWidget);
+    expect(find.text('4-4-4-4 박스 호흡'), findsOneWidget);
+    expect(find.text('들숨'), findsOneWidget);
+    expect(find.text('4초'), findsOneWidget);
+
+    await tester.tap(find.byKey(const ValueKey('breathing-toggle-button')));
+    await tester.pump(const Duration(seconds: 4));
+    expect(find.text('멈춤'), findsOneWidget);
+
+    await tester.tap(find.byKey(const ValueKey('breathing-reset-button')));
+    await tester.pump();
+    expect(find.text('들숨'), findsOneWidget);
+    expect(find.text('4초'), findsOneWidget);
+
+    await tester
+        .ensureVisible(find.byKey(const ValueKey('grounding-step-5')));
+    await tester.tap(find.byKey(const ValueKey('grounding-step-5')));
+    await tester.pump();
+    expect(find.text('1/5 확인'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
 }
 
 SemanticsData? _findSemanticsWithLengthLimit(
@@ -752,7 +970,10 @@ class _FakeConsultationRepository implements ConsultationRepository {
   final List<String> sentMessages = [];
   final List<Object> sendErrors = [];
   int connectCount = 0;
+  int startNewSessionCount = 0;
+  int stopGeneratingCount = 0;
   int deleteSensitiveCount = 0;
+  Completer<ConsultationSendResult>? stallSendCompleter;
   List<ConsultationMessage>? recentMessagesAfterDelete;
   StreamController<ConsultationStreamEvent>? _controller;
 
@@ -769,12 +990,29 @@ class _FakeConsultationRepository implements ConsultationRepository {
     if (sendErrors.isNotEmpty) {
       throw sendErrors.removeAt(0);
     }
+    final stalledSend = stallSendCompleter;
+    if (stalledSend != null) {
+      return stalledSend.future;
+    }
     return sendResult;
   }
 
   @override
   Future<List<ConsultationMessage>> loadRecentMessages() async {
     return recentMessagesAfterDelete ?? const [];
+  }
+
+  @override
+  Future<int> startNewSession() async {
+    startNewSessionCount += 1;
+    return startNewSessionCount + 1;
+  }
+
+  @override
+  Future<bool> stopGenerating() async {
+    stopGeneratingCount += 1;
+    emit(const ConsultationStreamEvent.done());
+    return true;
   }
 
   @override

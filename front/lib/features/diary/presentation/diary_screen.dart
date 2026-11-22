@@ -2,7 +2,6 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:shadcn_ui/shadcn_ui.dart';
 
 import '../../../shared/ui/app_design_system.dart';
 import '../../../shared/ui/text_editing_sync.dart';
@@ -1404,8 +1403,6 @@ class _ImageBlockPanel extends StatelessWidget {
                   ShadBadge.secondary(child: Text(block.displaySource!.label)),
                 if (byteSize != null)
                   ShadBadge.secondary(child: Text(_formatByteSize(byteSize))),
-                if (image?.wasCompressed == true)
-                  const ShadBadge.outline(child: Text('압축됨')),
               ],
             ),
             if (isUploadingImage &&

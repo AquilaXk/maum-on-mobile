@@ -5,7 +5,6 @@ import 'package:flutter/semantics.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:maum_on_mobile_front/shared/ui/app_design_system.dart';
 import 'package:maum_on_mobile_front/theme/app_theme.dart';
-import 'package:shadcn_ui/shadcn_ui.dart';
 
 double _contrastRatio(Color foreground, Color background) {
   double linear(double channel) {

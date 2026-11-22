@@ -11,7 +11,6 @@ import 'package:maum_on_mobile_front/features/auth/domain/login_provider_policy.
 import 'package:maum_on_mobile_front/features/auth/presentation/auth_screen.dart';
 import 'package:maum_on_mobile_front/shared/ui/brand_identity.dart';
 import 'package:maum_on_mobile_front/theme/app_theme.dart';
-import 'package:shadcn_ui/shadcn_ui.dart';
 
 void main() {
   test('login provider policy exposes only configured linked providers', () {

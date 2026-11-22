@@ -1,7 +1,6 @@
-// Shadcn UI card & segmented form surface adapted from nank1ro/flutter-shadcn-ui (MIT).
+// Elevated card & segmented authentication form surface.
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:shadcn_ui/shadcn_ui.dart';
 
 import '../application/auth_controller.dart';
 import '../deeplink/external_login.dart';

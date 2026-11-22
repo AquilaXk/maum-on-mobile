@@ -13,6 +13,7 @@ import org.junit.jupiter.api.Test
 import tools.jackson.databind.ObjectMapper
 import java.net.URI
 import java.time.Duration
+import java.util.concurrent.CancellationException
 
 class RemoteConsultationAiResponderTest {
 
@@ -1333,6 +1334,147 @@ class RemoteConsultationAiResponderTest {
         assertThatThrownBy { responder.generate(request) }
             .isInstanceOf(ConsultationAiUnavailableException::class.java)
         assertThat(client.calls).isEqualTo(1)
+    }
+
+    @Test
+    fun promptIncludesRecentEmotionContextOnlyWhenProvidedAndRespectsCompactBudget() {
+        val client = RecordingVertexAiGenerateContentClient(
+            responseBody = vertexResponse(
+                """{"chunks":["$VALID_REPLY","$VALID_REPLY_ALT","지금 숨을 천천히 내쉬면서 어깨 힘을 살짝 내려놓아 보세요."]}""",
+            ),
+        )
+        val responder = RemoteConsultationAiResponder(
+            properties = aiProperties(),
+            objectMapper = ObjectMapper(),
+            accessTokenProvider = { "vertex-token" },
+            generateContentClient = client,
+        )
+
+        responder.generate(
+            ConsultationAiRequest(
+                memberId = 1L,
+                message = "오늘 너무 긴장돼요.",
+                recentMessages = emptyList(),
+                timeout = Duration.ofSeconds(1),
+                recentEmotionSummary = null,
+            ),
+        )
+        val promptWithoutEmotion = ObjectMapper()
+            .readTree(client.requestBody!!)
+            .path("contents")[0]
+            .path("parts")[0]
+            .path("text")
+            .asString()
+        assertThat(promptWithoutEmotion).doesNotContain("[최근 감정 기록 맥락]")
+
+        responder.generate(
+            ConsultationAiRequest(
+                memberId = 1L,
+                message = "오늘 너무 긴장돼요.",
+                recentMessages = emptyList(),
+                timeout = Duration.ofSeconds(1),
+                recentEmotionSummary = "- 기분 2/5, 감정: 불안, 긴장, 요인: 수면 부족",
+            ),
+        )
+        val promptWithEmotion = ObjectMapper()
+            .readTree(client.requestBody!!)
+            .path("contents")[0]
+            .path("parts")[0]
+            .path("text")
+            .asString()
+        assertThat(promptWithEmotion).contains("[최근 감정 기록 맥락]", "기분 2/5", "수면 부족")
+        val emotionIndex = promptWithEmotion.indexOf("[최근 감정 기록 맥락]")
+        val repetitionIndex = promptWithEmotion.indexOf("[최근 답변 반복 금지 소재]")
+        assertThat(emotionIndex).isLessThan(repetitionIndex)
+
+        val compactProperties = aiProperties().apply {
+            consultation.maxPromptChars = 2_400
+        }
+        val compactClient = RecordingVertexAiGenerateContentClient(
+            responseBody = vertexResponse(
+                """{"chunks":["$VALID_REPLY","$VALID_REPLY_ALT","지금 호흡에 잠시 집중하면서 긴장된 어깨를 천천히 풀어 보세요."]}""",
+            ),
+        )
+        val compactResponder = RemoteConsultationAiResponder(
+            properties = compactProperties,
+            objectMapper = ObjectMapper(),
+            accessTokenProvider = { "vertex-token" },
+            generateContentClient = compactClient,
+        )
+        compactResponder.generate(
+            ConsultationAiRequest(
+                memberId = 1L,
+                message = "잠이 오지 않고 걱정이 계속 이어져요. " + "반복 ".repeat(600),
+                recentMessages = emptyList(),
+                timeout = Duration.ofSeconds(1),
+                recentEmotionSummary = "- 기분 1/5, 감정: " + "불안,".repeat(120),
+            ),
+        )
+        val compactPrompt = ObjectMapper()
+            .readTree(compactClient.requestBody!!)
+            .path("contents")[0]
+            .path("parts")[0]
+            .path("text")
+            .asString()
+        assertThat(compactPrompt.length).isLessThanOrEqualTo(2_400)
+    }
+
+    @Test
+    @DisplayName("인터럽트 취소는 서킷브레이커 실패를 누적하지 않고 즉시 CancellationException을 전파한다")
+    fun interruptionThrowsCancellationWithoutOpeningCircuitBreaker() {
+        var calls = 0
+        var shouldInterrupt = true
+        val client = object : VertexAiGenerateContentClient {
+            override fun generateContent(
+                endpoint: URI,
+                accessToken: String,
+                requestBody: String,
+                timeout: Duration,
+            ): String {
+                calls += 1
+                if (shouldInterrupt) {
+                    throw IllegalStateException("interrupted", InterruptedException("cancelled"))
+                }
+                return vertexResponse("""{"chunks":["$VALID_REPLY","$VALID_REPLY_ALT","$VALID_REPLY"]}""")
+            }
+        }
+        val properties = aiProperties().apply {
+            consultation.maxAttempts = 3
+            circuitBreaker.failureThreshold = 1
+        }
+        val responder = RemoteConsultationAiResponder(
+            properties = properties,
+            objectMapper = ObjectMapper(),
+            accessTokenProvider = { "vertex-token" },
+            generateContentClient = client,
+        )
+
+        try {
+            assertThatThrownBy {
+                responder.generate(
+                    ConsultationAiRequest(
+                        memberId = 7L,
+                        message = "중단 동작을 확인해요.",
+                        recentMessages = emptyList(),
+                        timeout = Duration.ofSeconds(2),
+                    ),
+                )
+            }.isInstanceOf(CancellationException::class.java)
+            assertThat(calls).isEqualTo(1)
+        } finally {
+            Thread.interrupted()
+        }
+
+        shouldInterrupt = false
+        val recovered = responder.generate(
+            ConsultationAiRequest(
+                memberId = 7L,
+                message = "회복 동작을 확인해요.",
+                recentMessages = emptyList(),
+                timeout = Duration.ofSeconds(2),
+            ),
+        )
+        assertThat(recovered.chunks).hasSize(3)
     }
 
     private fun aiProperties(): RemoteAiModelProperties {

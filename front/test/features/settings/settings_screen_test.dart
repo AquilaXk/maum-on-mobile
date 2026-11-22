@@ -39,7 +39,9 @@ void main() {
     expect(find.text('계정 정보, 보안 항목, 지원 채널을 순서대로 확인합니다.'), findsNothing);
     expect(find.text('이메일 계정'), findsOneWidget);
     expect(find.text('랜덤 편지 수신 중'), findsOneWidget);
-    expect(find.text('내보내기 요청 가능'), findsOneWidget);
+    expect(find.text('내보내기 요청 가능'), findsNothing);
+    expect(find.text('위험 작업'), findsNothing);
+    expect(find.text('계정 정리'), findsOneWidget);
     expect(
       find.byKey(const ValueKey('settings-profile-section')),
       findsOneWidget,
@@ -430,8 +432,9 @@ void main() {
     expect(find.bySemanticsLabel('빌드 번호, 45'), findsOneWidget);
     expect(find.text('플랫폼'), findsOneWidget);
     expect(find.bySemanticsLabel('플랫폼, Android'), findsOneWidget);
-    expect(find.text('locale'), findsOneWidget);
-    expect(find.bySemanticsLabel('locale, ko-KR'), findsOneWidget);
+    expect(find.text('locale'), findsNothing);
+    expect(find.text('언어 및 지역'), findsOneWidget);
+    expect(find.bySemanticsLabel('언어 및 지역, ko-KR'), findsOneWidget);
 
     await tester
         .tap(find.byKey(const ValueKey('settings-support-contact-button')));

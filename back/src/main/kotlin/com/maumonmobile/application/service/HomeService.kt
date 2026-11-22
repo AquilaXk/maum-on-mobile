@@ -81,10 +81,10 @@ class HomeService(
 
     private fun recoveryMessage(): String {
         return when (LocalDateTime.now(SERVICE_ZONE).hour) {
-            in 5..10 -> "천천히 시작해도 괜찮아요. 오늘의 마음을 먼저 살펴보세요."
-            in 11..16 -> "잠깐 멈춰 서서 지금의 감정을 짧게 남겨보세요."
-            in 17..21 -> "오늘 지나온 마음을 정리하고 따뜻한 답장을 만나보세요."
-            else -> "늦은 시간에는 짧은 기록만 남겨도 충분합니다."
+            in 5..10 -> "천천히 시작해도 괜찮아요. 오늘 마음을 먼저 살펴보세요."
+            in 11..16 -> "잠깐 멈춰 서서 지금 감정을 짧게 남겨 보세요."
+            in 17..21 -> "오늘 지나온 마음을 정리하고 따뜻한 답장을 만나 보세요."
+            else -> "늦은 밤에는 한 줄만 남겨도 좋아요."
         }
     }
 
@@ -109,9 +109,9 @@ class HomeService(
             categoryCounts[category.apiValue] ?: 0L
         }
         if (topCategory == null || (categoryCounts[topCategory.apiValue] ?: 0L) == 0L) {
-            return "아직 공개된 이야기가 없습니다. 첫 이야기를 남겨보세요."
+            return "아직 공개된 이야기가 없어요. 첫 이야기를 남겨 보세요."
         }
-        return "${topCategory.label} 이야기가 가장 활발합니다."
+        return "${topCategory.label} 이야기가 많이 올라오고 있어요."
     }
 
     private fun labelForCategory(category: String): String {
@@ -129,9 +129,9 @@ class HomeService(
                 label = "마음 기록",
                 actionLabel = "기록 이어가기",
                 description = if (todayDiaryCount == 0L) {
-                    "오늘의 첫 기록을 남길 차례입니다."
+                    "오늘 첫 기록을 가볍게 남겨 보세요."
                 } else {
-                    "오늘 남긴 기록을 이어 정리할 수 있습니다."
+                    "오늘 남긴 기록에 지금 기분을 덧붙여 보세요."
                 },
                 priority = if (todayDiaryCount == 0L) 10 else 4,
             ),
@@ -140,9 +140,9 @@ class HomeService(
                 label = "비밀 편지",
                 actionLabel = "편지 이어가기",
                 description = if (todayLetterCount == 0L) {
-                    "아직 보내지 않은 편지를 시작할 수 있습니다."
+                    "마음속 이야기를 익명 편지로 전해보세요."
                 } else {
-                    "오늘의 편지 흐름을 이어갈 수 있습니다."
+                    "오늘 시작한 편지를 이어서 써보세요."
                 },
                 priority = if (todayLetterCount == 0L) 8 else 3,
             ),
@@ -151,9 +151,9 @@ class HomeService(
                 label = "스토리",
                 actionLabel = "스토리 이어가기",
                 description = if (todayWorryCount == 0L) {
-                    "비슷한 고민을 나누는 이야기를 작성할 수 있습니다."
+                    "비슷한 고민을 안고 있는 분들과 이야기를 나눠 보세요."
                 } else {
-                    "오늘 올라온 고민 흐름에 참여할 수 있습니다."
+                    "오늘 올라온 고민 이야기에 마음을 보태 보세요."
                 },
                 priority = if (todayWorryCount == 0L) 6 else 5,
             ),
@@ -161,7 +161,7 @@ class HomeService(
                 surface = "consultation",
                 label = "상담",
                 actionLabel = "상담 이어가기",
-                description = "짧은 상담으로 지금의 마음을 정리할 수 있습니다.",
+                description = "지금 복잡해진 마음을 상담으로 차분히 정리해 보세요.",
                 priority = 2,
             ),
         ).sortedByDescending(HomeContinueWritingCandidateResult::priority)

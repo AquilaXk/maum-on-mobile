@@ -1,19 +1,24 @@
 package com.maumonmobile.application.service
 
+import com.maumonmobile.adapter.out.sse.consultation.ConsultationStreamRegistry
 import com.maumonmobile.application.port.`in`.ConsultationChatCommand
 import com.maumonmobile.application.port.`in`.ConsultationChatResult
 import com.maumonmobile.application.port.`in`.ConsultationDeleteSensitiveHistoryResult
 import com.maumonmobile.application.port.`in`.ConsultationHistoryResult
 import com.maumonmobile.application.port.`in`.ConsultationMessageResult
+import com.maumonmobile.application.port.`in`.ConsultationNewSessionResult
 import com.maumonmobile.application.port.`in`.ConsultationSafetyResult
 import com.maumonmobile.application.port.`in`.ConsultationSessionResult
+import com.maumonmobile.application.port.`in`.ConsultationStopResult
 import com.maumonmobile.application.port.`in`.ConsultationUseCase
 import com.maumonmobile.application.port.out.AuthMemberRepository
 import com.maumonmobile.application.port.out.ConsultationAiRequest
 import com.maumonmobile.application.port.out.ConsultationAiResponder
+import com.maumonmobile.application.port.out.ConsultationAiResponse
 import com.maumonmobile.application.port.out.ConsultationAiUnavailableException
 import com.maumonmobile.application.port.out.ConsultationRepository
 import com.maumonmobile.application.port.out.ConsultationSafetyAuditRepository
+import com.maumonmobile.application.port.out.DiaryRepository
 import com.maumonmobile.application.port.out.NotificationDeliveryPort
 import com.maumonmobile.domain.auth.AuthMember
 import com.maumonmobile.domain.auth.AuthMemberStatus
@@ -26,6 +31,7 @@ import com.maumonmobile.domain.consultation.ConsultationRiskCategory
 import com.maumonmobile.domain.consultation.ConsultationRiskSeverity
 import com.maumonmobile.domain.consultation.ConsultationSafetyAssessment
 import com.maumonmobile.domain.consultation.ConsultationSafetyAuditEvent
+import com.maumonmobile.domain.diary.Diary
 import com.maumonmobile.domain.moderation.ContentModerationCategory
 import com.maumonmobile.domain.moderation.ContentModerationTarget
 import com.maumonmobile.domain.moderation.ModerationTextEngine
@@ -37,10 +43,13 @@ import org.springframework.beans.factory.annotation.Value
 import org.springframework.stereotype.Service
 import java.time.Duration
 import java.time.Instant
+import java.util.concurrent.CancellationException
 import java.util.concurrent.CompletableFuture
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.ExecutionException
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.TimeoutException
+import java.util.concurrent.atomic.AtomicBoolean
 
 @Service
 class ConsultationService(
@@ -51,12 +60,51 @@ class ConsultationService(
     private val notificationDeliveryPort: NotificationDeliveryPort,
     private val metricsRegistry: MobileApiMetricsRegistry,
     private val contentModerationService: ContentModerationService,
+    private val diaryRepository: DiaryRepository,
+    private val consultationStreamRegistry: ConsultationStreamRegistry,
     @param:Value("\${app.consultation.ai.timeout:PT8S}")
     private val aiTimeout: Duration,
 ) : ConsultationUseCase {
 
+    private val memberLocks = Array(MEMBER_LOCK_STRIPES) { Any() }
+    private val activeTurns = ConcurrentHashMap<Long, ActiveTurnState>()
+
+    private fun lockFor(memberId: Long): Any = memberLocks[(memberId and (MEMBER_LOCK_STRIPES - 1).toLong()).toInt()]
+
     override fun connect(user: AuthenticatedUser): ConsultationSessionResult {
         return ConsultationSessionResult(memberId = findActiveMember(user).id)
+    }
+
+    override fun startNewSession(user: AuthenticatedUser): ConsultationNewSessionResult {
+        val member = findActiveMember(user)
+        synchronized(lockFor(member.id)) {
+            activeTurns.remove(member.id)?.let { active ->
+                active.cancelled.set(true)
+                active.future?.cancel(true)
+            }
+            return ConsultationNewSessionResult(
+                sessionId = consultationRepository.startNewSession(member.id),
+            )
+        }
+    }
+
+    override fun stop(user: AuthenticatedUser): ConsultationStopResult {
+        val member = findActiveMember(user)
+        val stopped = synchronized(lockFor(member.id)) {
+            val active = activeTurns[member.id] ?: return ConsultationStopResult(stopped = false)
+            active.cancelled.set(true)
+            val future = active.future
+            val cancelledNow = future?.cancel(true) ?: false
+            val didStop = future == null || cancelledNow || !future.isDone || future.isCancelled
+            if (didStop) {
+                activeTurns.remove(member.id, active)
+            }
+            didStop
+        }
+        if (stopped) {
+            consultationStreamRegistry.publishStopped(member.id)
+        }
+        return ConsultationStopResult(stopped = stopped)
     }
 
     override fun history(user: AuthenticatedUser, afterId: Long?, limit: Int?): ConsultationHistoryResult {
@@ -77,42 +125,103 @@ class ConsultationService(
         val normalizedMessage = command.message.trim()
         val inputSafety = assessSafety(member.id, normalizedMessage, Instant.now())
         if (inputSafety.actionPolicy != ConsultationActionPolicy.ALLOW) {
-            return handleSafetyIntervention(member, normalizedMessage, inputSafety)
+            return synchronized(lockFor(member.id)) {
+                val activeSessionId = consultationRepository.ensureActiveSession(member.id)
+                handleSafetyIntervention(
+                    member = member,
+                    message = normalizedMessage,
+                    safety = inputSafety,
+                    sessionId = activeSessionId,
+                )
+            }
         }
         val moderationSafety = assessModerationSafety(member.id, normalizedMessage, Instant.now())
         if (moderationSafety.actionPolicy != ConsultationActionPolicy.ALLOW) {
-            return handleSafetyIntervention(member, normalizedMessage, moderationSafety)
+            return synchronized(lockFor(member.id)) {
+                val activeSessionId = consultationRepository.ensureActiveSession(member.id)
+                handleSafetyIntervention(
+                    member = member,
+                    message = normalizedMessage,
+                    safety = moderationSafety,
+                    sessionId = activeSessionId,
+                )
+            }
         }
 
-        val currentUserMessage = consultationRepository.appendMessage(
-            memberId = member.id,
-            sender = ConsultationMessageSender.USER,
-            content = normalizedMessage,
-        )
-        val reply = generateReply(member, normalizedMessage, currentUserMessage.id)
+        val turnState: ActiveTurnState
+        val currentUserMessage: ConsultationMessage
+        synchronized(lockFor(member.id)) {
+            val boundSessionId = consultationRepository.ensureActiveSession(member.id)
+            turnState = ActiveTurnState(sessionId = boundSessionId)
+            activeTurns.put(member.id, turnState)?.let { previous ->
+                previous.cancelled.set(true)
+                previous.future?.cancel(true)
+            }
+            currentUserMessage = consultationRepository.appendMessage(
+                memberId = member.id,
+                sender = ConsultationMessageSender.USER,
+                content = normalizedMessage,
+                sessionId = boundSessionId,
+            )
+        }
+        val reply = generateReply(member, normalizedMessage, currentUserMessage.id, turnState)
+        if (reply.cancelled) {
+            return ConsultationChatResult(
+                memberId = member.id,
+                chunks = emptyList(),
+                accepted = true,
+                safety = inputSafety.toResult(),
+                cancelled = true,
+            )
+        }
         val replySafety = if (reply.errorMessage == null) {
             assessSafety(member.id, reply.content, Instant.now(), assistantResponse = true)
         } else {
             inputSafety
         }
-        if (replySafety.actionPolicy != ConsultationActionPolicy.ALLOW) {
-            return handleSafetyIntervention(
-                member = member,
-                message = normalizedMessage,
-                safety = replySafety,
-                persistUserMessage = false,
-            )
+
+        var safetyResult: ConsultationChatResult? = null
+        var invalidatedBySessionSwitch = false
+        synchronized(lockFor(member.id)) {
+            val currentSessionId = consultationRepository.ensureActiveSession(member.id)
+            if (turnState.cancelled.get() || currentSessionId != turnState.sessionId) {
+                activeTurns.remove(member.id, turnState)
+                invalidatedBySessionSwitch = true
+            } else if (replySafety.actionPolicy != ConsultationActionPolicy.ALLOW) {
+                activeTurns.remove(member.id, turnState)
+                safetyResult = handleSafetyIntervention(
+                    member = member,
+                    message = normalizedMessage,
+                    safety = replySafety,
+                    persistUserMessage = false,
+                    sessionId = turnState.sessionId,
+                )
+            } else {
+                activeTurns.remove(member.id, turnState)
+                consultationRepository.appendMessage(
+                    memberId = member.id,
+                    sender = if (reply.errorMessage == null) {
+                        ConsultationMessageSender.ASSISTANT
+                    } else {
+                        ConsultationMessageSender.SYSTEM
+                    },
+                    content = reply.content,
+                    sessionId = turnState.sessionId,
+                )
+            }
         }
 
-        consultationRepository.appendMessage(
-            memberId = member.id,
-            sender = if (reply.errorMessage == null) {
-                ConsultationMessageSender.ASSISTANT
-            } else {
-                ConsultationMessageSender.SYSTEM
-            },
-            content = reply.content,
-        )
+        if (invalidatedBySessionSwitch) {
+            return ConsultationChatResult(
+                memberId = member.id,
+                chunks = emptyList(),
+                accepted = true,
+                safety = inputSafety.toResult(),
+                cancelled = true,
+            )
+        }
+        safetyResult?.let { return it }
+
         notificationDeliveryPort.deliver(
             memberId = member.id,
             eventName = CONSULTATION_REPLY_EVENT,
@@ -150,6 +259,7 @@ class ConsultationService(
         message: String,
         safety: ConsultationSafetyAssessment,
         persistUserMessage: Boolean = true,
+        sessionId: Long? = null,
     ): ConsultationChatResult {
         val now = Instant.now()
         val retentionUntil = now.plus(SENSITIVE_RETENTION).toUtcIso6()
@@ -160,6 +270,7 @@ class ConsultationService(
                 content = message,
                 sensitive = true,
                 retentionUntil = retentionUntil,
+                sessionId = sessionId,
             )
         }
         consultationRepository.appendMessage(
@@ -168,6 +279,7 @@ class ConsultationService(
             content = safety.message,
             sensitive = true,
             retentionUntil = retentionUntil,
+            sessionId = sessionId,
         )
         consultationSafetyAuditRepository.save(
             ConsultationSafetyAuditEvent(
@@ -346,9 +458,15 @@ class ConsultationService(
         member: AuthMember,
         message: String,
         currentUserMessageId: Long,
+        turnState: ActiveTurnState,
     ): ConsultationReplyResult {
+        val cancelled = turnState.cancelled
         return try {
-            val response = generateWithTimeout(member, message, currentUserMessageId)
+            val response = generateWithTimeout(member, message, currentUserMessageId, turnState)
+            if (cancelled.get()) {
+                metricsRegistry.recordAiModel("consultation", "cancelled")
+                return ConsultationReplyResult(chunks = emptyList(), cancelled = true)
+            }
             val chunks = response.chunks
                 .filter(String::isNotBlank)
                 .readableConsultationChunks()
@@ -359,19 +477,42 @@ class ConsultationService(
                 metricsRegistry.recordAiModel("consultation", "success")
                 ConsultationReplyResult(chunks = chunks)
             }
+        } catch (_: CancellationException) {
+            metricsRegistry.recordAiModel("consultation", "cancelled")
+            ConsultationReplyResult(chunks = emptyList(), cancelled = true)
         } catch (_: ConsultationAiUnavailableException) {
-            metricsRegistry.recordAiModel("consultation", "fallback")
-            fallbackReply(message)
+            if (cancelled.get()) {
+                metricsRegistry.recordAiModel("consultation", "cancelled")
+                ConsultationReplyResult(chunks = emptyList(), cancelled = true)
+            } else {
+                metricsRegistry.recordAiModel("consultation", "fallback")
+                fallbackReply(message)
+            }
         } catch (_: TimeoutException) {
-            metricsRegistry.recordAiModel("consultation", "timeout")
-            fallbackReply(message)
+            if (cancelled.get()) {
+                metricsRegistry.recordAiModel("consultation", "cancelled")
+                ConsultationReplyResult(chunks = emptyList(), cancelled = true)
+            } else {
+                metricsRegistry.recordAiModel("consultation", "timeout")
+                fallbackReply(message)
+            }
         } catch (_: ExecutionException) {
-            metricsRegistry.recordAiModel("consultation", "fallback")
-            fallbackReply(message)
+            if (cancelled.get()) {
+                metricsRegistry.recordAiModel("consultation", "cancelled")
+                ConsultationReplyResult(chunks = emptyList(), cancelled = true)
+            } else {
+                metricsRegistry.recordAiModel("consultation", "fallback")
+                fallbackReply(message)
+            }
         } catch (_: InterruptedException) {
             Thread.currentThread().interrupt()
-            metricsRegistry.recordAiModel("consultation", "interrupted")
-            fallbackReply(message)
+            if (cancelled.get()) {
+                metricsRegistry.recordAiModel("consultation", "cancelled")
+                ConsultationReplyResult(chunks = emptyList(), cancelled = true)
+            } else {
+                metricsRegistry.recordAiModel("consultation", "interrupted")
+                fallbackReply(message)
+            }
         }
     }
 
@@ -379,25 +520,112 @@ class ConsultationService(
         member: AuthMember,
         message: String,
         currentUserMessageId: Long,
-    ) =
-        CompletableFuture.supplyAsync {
+        turnState: ActiveTurnState,
+    ): ConsultationAiResponse {
+        val cancelled = turnState.cancelled
+        if (cancelled.get()) {
+            throw CancellationException("상담 답변 생성이 중단되었습니다.")
+        }
+        val recentMessages = consultationRepository.findRecentNonSensitiveByMemberId(
+            memberId = member.id,
+            excludeMessageId = currentUserMessageId,
+            limit = AI_CONTEXT_MESSAGE_LIMIT,
+            sessionId = turnState.sessionId,
+        ).map { recentMessage ->
+            recentMessage.copy(
+                content = recentMessage.content.minimizeForModel(),
+            )
+        }
+        val recentEmotionSummary = buildRecentEmotionSummary(member.id)
+        val future = CompletableFuture.supplyAsync {
             consultationAiResponder.generate(
                 ConsultationAiRequest(
                     memberId = member.id,
                     message = message.minimizeForModel(),
-                    recentMessages = consultationRepository.findRecentNonSensitiveByMemberId(
-                        memberId = member.id,
-                        excludeMessageId = currentUserMessageId,
-                        limit = AI_CONTEXT_MESSAGE_LIMIT,
-                    ).map { recentMessage ->
-                        recentMessage.copy(
-                            content = recentMessage.content.minimizeForModel(),
-                        )
-                    },
+                    recentMessages = recentMessages,
                     timeout = aiTimeout,
+                    recentEmotionSummary = recentEmotionSummary,
                 ),
             )
-        }.get(aiTimeout.toMillis(), TimeUnit.MILLISECONDS)
+        }
+        turnState.future = future
+        if (cancelled.get()) {
+            future.cancel(true)
+            throw CancellationException("상담 답변 생성이 중단되었습니다.")
+        }
+        try {
+            val deadlineNanos = System.nanoTime() + aiTimeout.toNanos().coerceAtLeast(1L)
+            while (true) {
+                if (cancelled.get() || future.isCancelled) {
+                    throw CancellationException("상담 답변 생성이 중단되었습니다.")
+                }
+                val remainingNanos = deadlineNanos - System.nanoTime()
+                if (remainingNanos <= 0L) {
+                    if (cancelled.get() || future.isCancelled) {
+                        throw CancellationException("상담 답변 생성이 중단되었습니다.")
+                    }
+                    future.cancel(true)
+                    throw TimeoutException("상담 AI 응답 시간이 초과되었습니다.")
+                }
+                val sliceMillis = TimeUnit.NANOSECONDS.toMillis(remainingNanos)
+                    .coerceIn(1L, GENERATION_POLL_INTERVAL_MILLIS)
+                try {
+                    val result = future.get(sliceMillis, TimeUnit.MILLISECONDS)
+                    if (cancelled.get()) {
+                        throw CancellationException("상담 답변 생성이 중단되었습니다.")
+                    }
+                    return result
+                } catch (_: TimeoutException) {
+                    // Continue polling so stop() cancellation takes effect promptly.
+                }
+            }
+        } finally {
+            activeTurns.remove(member.id, turnState)
+        }
+    }
+
+    private fun buildRecentEmotionSummary(memberId: Long): String? {
+        val entries = diaryRepository.findPageByMemberId(
+            memberId = memberId,
+            page = 0,
+            size = RECENT_DIARY_CONTEXT_LIMIT,
+        )
+        if (entries.isEmpty()) {
+            return null
+        }
+        return entries
+            .mapNotNull { diary -> diary.toEmotionSummaryLine() }
+            .takeIf { lines -> lines.isNotEmpty() }
+            ?.joinToString(separator = "\n")
+    }
+
+    private fun Diary.toEmotionSummaryLine(): String? {
+        val parts = buildList {
+            moodScore?.let { score -> add("기분 ${score.coerceIn(1, 5)}/5") }
+            emotionTags.toNormalizedTagSummary()?.let { tags -> add("감정: $tags") }
+            triggerTags.toNormalizedTagSummary()?.let { tags -> add("요인: $tags") }
+        }
+        if (parts.isEmpty()) {
+            return null
+        }
+        return "- ${parts.joinToString(separator = ", ")}"
+    }
+
+    private fun String?.toNormalizedTagSummary(): String? {
+        val normalized = this
+            ?.split(',')
+            ?.map { tag ->
+                tag.trim()
+                    .replace(CONTROL_WHITESPACE_REGEX, " ")
+                    .replace(MULTI_SPACE_REGEX, " ")
+                    .minimizeForModel()
+            }
+            ?.filter(String::isNotBlank)
+            ?.distinct()
+            ?.take(MAX_DIARY_TAG_ITEMS)
+            ?.joinToString(separator = ", ")
+        return normalized?.takeIf(String::isNotBlank)?.take(MAX_DIARY_TAG_SUMMARY_CHARS)
+    }
 
     private fun fallbackReply(message: String): ConsultationReplyResult {
         return ConsultationReplyResult(
@@ -418,18 +646,32 @@ class ConsultationService(
         return member
     }
 
+    private class ActiveTurnState(
+        val sessionId: Long,
+        val cancelled: AtomicBoolean = AtomicBoolean(false),
+        @Volatile var future: CompletableFuture<ConsultationAiResponse>? = null,
+    )
+
     private data class ConsultationReplyResult(
         val chunks: List<String>,
         val errorMessage: String? = null,
         val fallback: Boolean = false,
+        val cancelled: Boolean = false,
     ) {
         val content: String = chunks.joinToString(separator = "")
     }
 
     private companion object {
+        private const val MEMBER_LOCK_STRIPES = 64
+        private val CONTROL_WHITESPACE_REGEX = Regex("""[\r\n\t]+""")
+        private val MULTI_SPACE_REGEX = Regex("""\s{2,}""")
         private const val CONSULTATION_REPLY_EVENT = "consultation_reply"
         private const val SAFETY_AUDIT_PREVIEW_LENGTH = 120
         private const val AI_CONTEXT_MESSAGE_LIMIT = 6
+        private const val RECENT_DIARY_CONTEXT_LIMIT = 3
+        private const val MAX_DIARY_TAG_ITEMS = 5
+        private const val MAX_DIARY_TAG_SUMMARY_CHARS = 120
+        private const val GENERATION_POLL_INTERVAL_MILLIS = 25L
         private const val CRITICAL_RATE_LIMIT = 2
         private const val MIN_HISTORY_LIMIT = 1
         private const val MAX_HISTORY_LIMIT = 100
@@ -442,7 +684,7 @@ class ConsultationService(
         private const val ABUSE_MESSAGE =
             "학대나 폭력 위험이 있다면 안전한 장소로 이동하고 믿을 수 있는 사람이나 전문 기관에 도움을 요청해 주세요. 긴급하면 112 또는 119에 연락해 주세요."
         private const val PROFANITY_MESSAGE =
-            "욕설이나 가족 비하처럼 상대를 해칠 수 있는 표현은 상담에서 다루지 않습니다. 표현을 줄이고 지금 느끼는 감정과 상황을 중심으로 다시 적어 주세요."
+            "욕설이나 가족을 해칠 수 있는 거친 표현이 포함되어 잠시 멈췄어요. 거친 말 대신 지금 느끼는 마음과 상황을 적어 주시면 이어서 함께 정리할게요."
         private const val RATE_LIMIT_MESSAGE =
             "위기 표현이 반복되어 자동 답변을 잠시 중단합니다. 지금은 119, 112, 가까운 응급실 또는 신뢰할 수 있는 사람에게 즉시 도움을 요청해 주세요."
         private const val RESPONSE_REWRITE_MESSAGE =

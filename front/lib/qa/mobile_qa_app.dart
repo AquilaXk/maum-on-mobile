@@ -577,6 +577,15 @@ class _QaConsultationRepository implements ConsultationRepository {
   }
 
   @override
+  Future<int> startNewSession() async => 2;
+
+  @override
+  Future<bool> stopGenerating() async {
+    _events.add(const ConsultationStreamEvent.done());
+    return true;
+  }
+
+  @override
   Future<int> deleteSensitiveMessages() async => 0;
 }
 

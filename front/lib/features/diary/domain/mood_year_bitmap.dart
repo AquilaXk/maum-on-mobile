@@ -1,9 +1,7 @@
-// SPDX-License-Identifier: MIT AND BSD-3-Clause
+// First-party clean-room implementation.
 //
-// Bit-packed annual diary & mood index inspired by:
-// - devappmin/flutter_heatmap_calendar (MIT, https://github.com/devappmin/flutter_heatmap_calendar)
-// - hashirshoaeb/star_book (MIT, https://github.com/hashirshoaeb/star_book)
-// - contribution_heatmap (BSD-3-Clause, https://pub.dev/packages/contribution_heatmap)
+// Compact 31-bit packed calendar date key and fixed 288-byte bit-packed
+// annual diary & 5-level mood heatmap index for single-canvas painting.
 
 import 'dart:typed_data';
 

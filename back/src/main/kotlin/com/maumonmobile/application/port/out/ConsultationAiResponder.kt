@@ -8,6 +8,7 @@ data class ConsultationAiRequest(
     val message: String,
     val recentMessages: List<ConsultationMessage>,
     val timeout: Duration,
+    val recentEmotionSummary: String? = null,
 )
 
 data class ConsultationAiResponse(

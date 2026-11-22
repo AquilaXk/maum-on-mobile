@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:shadcn_ui/shadcn_ui.dart';
 
 import '../../../shared/ui/app_design_system.dart';
 import '../../../shared/ui/text_editing_sync.dart';
@@ -547,15 +546,6 @@ class _StoryDetailView extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Align(
-          alignment: Alignment.centerLeft,
-          child: TextButton.icon(
-            key: const ValueKey('story-list-back-button'),
-            onPressed: controller.backToList,
-            icon: const Icon(Icons.arrow_back),
-            label: const Text('목록'),
-          ),
-        ),
         AppContentCard(
           key: const ValueKey('story-detail-card'),
           leadingIcon: Icons.article_outlined,

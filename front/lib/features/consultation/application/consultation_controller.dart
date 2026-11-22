@@ -39,6 +39,7 @@ class ConsultationState {
     this.draft = '',
     this.isSending = false,
     this.isStreaming = false,
+    this.topicsExpanded = false,
     this.errorMessage,
     this.safetyNotice,
     this.failedMessage,
@@ -49,6 +50,7 @@ class ConsultationState {
   final String draft;
   final bool isSending;
   final bool isStreaming;
+  final bool topicsExpanded;
   final String? errorMessage;
   final ConsultationSafetyResult? safetyNotice;
   final ConsultationFailedMessage? failedMessage;
@@ -70,6 +72,7 @@ class ConsultationState {
     String? draft,
     bool? isSending,
     bool? isStreaming,
+    bool? topicsExpanded,
     String? errorMessage,
     bool clearErrorMessage = false,
     ConsultationSafetyResult? safetyNotice,
@@ -83,6 +86,7 @@ class ConsultationState {
       draft: draft ?? this.draft,
       isSending: isSending ?? this.isSending,
       isStreaming: isStreaming ?? this.isStreaming,
+      topicsExpanded: topicsExpanded ?? this.topicsExpanded,
       errorMessage:
           clearErrorMessage ? null : errorMessage ?? this.errorMessage,
       safetyNotice:
@@ -132,6 +136,7 @@ class ConsultationController extends ChangeNotifier {
 
   ConsultationState _state;
   StreamSubscription<ConsultationStreamEvent>? _streamSubscription;
+  Future<void>? _connectingFuture;
   Timer? _reconnectTimer;
   Timer? _responseTimeoutTimer;
   bool _shouldRestoreConnection = false;
@@ -139,6 +144,7 @@ class ConsultationController extends ChangeNotifier {
   bool _isDisposed = false;
   int _reconnectAttempt = 0;
   int _messageSequence = 0;
+  int _generationEpoch = 0;
   String? _activeAssistantMessageId;
   String? _activeStreamRequestId;
   bool _ignoreStreamEventsUntilDone = false;
@@ -163,6 +169,9 @@ class ConsultationController extends ChangeNotifier {
 
   Future<void> restoreDraft() async {
     final entry = await _draftRepository?.read(_draftKey);
+    if (_isDisposed) {
+      return;
+    }
     final draft = entry?.fields['content'];
     if (draft == null || draft.isEmpty) {
       return;
@@ -178,14 +187,50 @@ class ConsultationController extends ChangeNotifier {
   }
 
   Future<void> connect({bool reloadRecentMessages = false}) async {
+    if (_isDisposed) {
+      return;
+    }
+
+    final existingConnect = _connectingFuture;
+    if (existingConnect != null) {
+      await existingConnect;
+      if (_isDisposed || !_shouldRestoreConnection) {
+        return;
+      }
+      if (reloadRecentMessages && !_state.isSending && !_state.isStreaming) {
+        await _loadRecentMessages(force: true);
+      }
+      return;
+    }
+
     if (_streamSubscription != null) {
+      if (reloadRecentMessages && !_state.isSending && !_state.isStreaming) {
+        await _loadRecentMessages(force: true);
+      }
       return;
     }
 
     _shouldRestoreConnection = true;
+    final connectFuture =
+        _performConnect(reloadRecentMessages: reloadRecentMessages);
+    _connectingFuture = connectFuture;
+    try {
+      await connectFuture;
+    } finally {
+      if (identical(_connectingFuture, connectFuture)) {
+        _connectingFuture = null;
+      }
+    }
+  }
+
+  Future<void> _performConnect({required bool reloadRecentMessages}) async {
     if (reloadRecentMessages || !_hasLoadedRecentMessages) {
       await _loadRecentMessages(force: reloadRecentMessages);
     }
+    if (_isDisposed || !_shouldRestoreConnection || _streamSubscription != null) {
+      return;
+    }
+
     _setState(
       _state.copyWith(
         connectionState: ConsultationConnectionState.connecting,
@@ -194,22 +239,155 @@ class ConsultationController extends ChangeNotifier {
     );
 
     try {
-      _streamSubscription = _repository.connect().listen(
-            _handleStreamEvent,
-            onError: _handleStreamError,
-            onDone: _handleStreamDone,
-          );
+      final stream = _repository.connect();
+      if (_isDisposed || !_shouldRestoreConnection) {
+        return;
+      }
+      _streamSubscription = stream.listen(
+        _handleStreamEvent,
+        onError: _handleStreamError,
+        onDone: _handleStreamDone,
+      );
     } on Object catch (error) {
+      if (_isDisposed || !_shouldRestoreConnection) {
+        return;
+      }
       _handleStreamError(error);
     }
   }
 
   Future<void> reconnect() async {
+    if (_isDisposed) {
+      return;
+    }
     _shouldRestoreConnection = true;
     _reconnectAttempt = 0;
     _cancelPendingReconnect();
     await _cancelStream();
+    if (_isDisposed || !_shouldRestoreConnection) {
+      return;
+    }
     await connect(reloadRecentMessages: true);
+  }
+
+  Future<void> startNewSession() async {
+    _generationEpoch += 1;
+    _cancelResponseTimeout();
+    _setStreamingContent(null);
+    _activeAssistantMessageId = null;
+    _activeStreamRequestId = null;
+    _ignoreStreamEventsUntilDone = false;
+    _processedStreamChunkKeys.clear();
+    _setState(
+      _state.copyWith(
+        isSending: false,
+        isStreaming: false,
+        clearErrorMessage: true,
+      ),
+    );
+
+    try {
+      await _repository.startNewSession();
+      await _draftRepository?.delete(_draftKey);
+      if (_isDisposed) {
+        return;
+      }
+      _hasLoadedRecentMessages = true;
+      _setState(
+        _state.copyWith(
+          messages: _initialMessages(),
+          draft: '',
+          isSending: false,
+          isStreaming: false,
+          topicsExpanded: false,
+          clearErrorMessage: true,
+          clearSafetyNotice: true,
+          clearFailedMessage: true,
+        ),
+      );
+    } on Object catch (error) {
+      if (_isDisposed) {
+        return;
+      }
+      if (error is ApiClientException &&
+          error.kind == ApiErrorKind.unauthorized) {
+        _onUnauthorized?.call();
+      }
+      _setState(
+        _state.copyWith(
+          errorMessage: _messageFromError(error),
+        ),
+      );
+    }
+  }
+
+  Future<void> stopGenerating() async {
+    if (!_state.isSending && !_state.isStreaming) {
+      return;
+    }
+    _generationEpoch += 1;
+    _cancelResponseTimeout();
+    _clearPendingAssistantMessage();
+    final syncedMessages = _messagesWithSyncedStreamingContent();
+    _activeAssistantMessageId = null;
+    _activeStreamRequestId = null;
+    _ignoreStreamEventsUntilDone = true;
+    _setStreamingContent(null);
+    _setState(
+      _state.copyWith(
+        messages: syncedMessages,
+        isSending: false,
+        isStreaming: false,
+        clearErrorMessage: true,
+      ),
+    );
+    try {
+      await _repository.stopGenerating();
+    } on Object catch (error) {
+      if (error is ApiClientException &&
+          error.kind == ApiErrorKind.unauthorized) {
+        _onUnauthorized?.call();
+      }
+    }
+  }
+
+  void toggleStarterTopics() {
+    if (_state.inputBlockedBySafety) {
+      return;
+    }
+    _setState(
+      _state.copyWith(
+        topicsExpanded: !_state.topicsExpanded,
+        clearErrorMessage: true,
+      ),
+    );
+  }
+
+  void reopenStarterTopics() {
+    if (_state.inputBlockedBySafety) {
+      return;
+    }
+    _setState(
+      _state.copyWith(
+        topicsExpanded: true,
+        clearErrorMessage: true,
+      ),
+    );
+  }
+
+  void selectStarterTopic(String prompt) {
+    if (_state.inputBlockedBySafety) {
+      return;
+    }
+    _setState(
+      _state.copyWith(
+        draft: prompt,
+        topicsExpanded: false,
+        clearErrorMessage: true,
+        clearSafetyNotice: true,
+      ),
+    );
+    _saveDraft();
   }
 
   void close() {
@@ -288,6 +466,7 @@ class ConsultationController extends ChangeNotifier {
         draft: '',
         isSending: true,
         isStreaming: true,
+        topicsExpanded: false,
         clearErrorMessage: true,
         clearFailedMessage: true,
       ),
@@ -367,6 +546,7 @@ class ConsultationController extends ChangeNotifier {
     required String userMessageId,
     required String assistantMessageId,
   }) async {
+    final sendEpoch = _generationEpoch;
     try {
       final result = await _repository.sendMessage(content).timeout(
         _sendTimeout,
@@ -374,12 +554,18 @@ class ConsultationController extends ChangeNotifier {
           throw TimeoutException('consultation send timed out');
         },
       );
+      if (sendEpoch != _generationEpoch || _isDisposed) {
+        return;
+      }
       final safety = result.safety;
       if (safety != null && safety.blocksConversation) {
         await _draftRepository?.delete(_draftKey);
+        if (_isDisposed || sendEpoch != _generationEpoch) {
+          return;
+        }
         _replaceActiveAssistantWithSystem(safety.message);
         _activeAssistantMessageId = null;
-        _streamingContentNotifier.value = null;
+        _setStreamingContent(null);
         _setState(
           _state.copyWith(
             isSending: false,
@@ -399,6 +585,9 @@ class ConsultationController extends ChangeNotifier {
       }
 
       await _draftRepository?.delete(_draftKey);
+      if (sendEpoch != _generationEpoch || _isDisposed) {
+        return;
+      }
       _setState(
         _state.copyWith(
           isSending: false,
@@ -408,11 +597,17 @@ class ConsultationController extends ChangeNotifier {
       );
       _startResponseTimeout();
     } on Object catch (error) {
+      if (sendEpoch != _generationEpoch || _isDisposed) {
+        return;
+      }
       final errorMessage = _messageFromError(error);
       await _markDraftFailed(content, error);
+      if (sendEpoch != _generationEpoch || _isDisposed) {
+        return;
+      }
       _replaceActiveAssistantWithSystem('전송 실패: $errorMessage');
       _activeAssistantMessageId = null;
-      _streamingContentNotifier.value = null;
+      _setStreamingContent(null);
       _ignoreStreamEventsUntilDone = true;
       _cancelResponseTimeout();
       _setState(
@@ -435,7 +630,13 @@ class ConsultationController extends ChangeNotifier {
     try {
       await _repository.deleteSensitiveMessages();
       await _draftRepository?.delete(_draftKey);
+      if (_isDisposed) {
+        return;
+      }
       final messages = await _repository.loadRecentMessages();
+      if (_isDisposed) {
+        return;
+      }
       _setState(
         _state.copyWith(
           messages: messages.isEmpty ? _initialMessages() : messages,
@@ -444,6 +645,9 @@ class ConsultationController extends ChangeNotifier {
         ),
       );
     } on Object catch (error) {
+      if (_isDisposed) {
+        return;
+      }
       _setState(
         _state.copyWith(
           errorMessage: _messageFromError(error),
@@ -478,7 +682,9 @@ class ConsultationController extends ChangeNotifier {
   }
 
   void _handleStreamEvent(ConsultationStreamEvent event) {
-    if (_shouldIgnoreCompletedStreamEvent(event)) {
+    if (_isDisposed ||
+        !_shouldRestoreConnection ||
+        _shouldIgnoreCompletedStreamEvent(event)) {
       return;
     }
 
@@ -507,6 +713,13 @@ class ConsultationController extends ChangeNotifier {
         _appendAssistantChunk(event);
         return;
       case ConsultationStreamEventType.done:
+        final requestId = event.requestId;
+        if (requestId != null &&
+            requestId.startsWith('stop-') &&
+            !_ignoreStreamEventsUntilDone) {
+          _completedStreamRequestIds.add(requestId);
+          return;
+        }
         _finishStreaming(event);
         return;
       case ConsultationStreamEventType.error:
@@ -535,6 +748,9 @@ class ConsultationController extends ChangeNotifier {
   }
 
   void _handleStreamError(Object error) {
+    if (_isDisposed) {
+      return;
+    }
     final currentSubscription = _streamSubscription;
     _streamSubscription = null;
     if (currentSubscription != null) {
@@ -559,6 +775,9 @@ class ConsultationController extends ChangeNotifier {
   }
 
   void _handleStreamDone() {
+    if (_isDisposed) {
+      return;
+    }
     _streamSubscription = null;
     _handleRecoverableStreamFailure('AI 상담 연결이 종료되었습니다.');
   }
@@ -650,7 +869,7 @@ class ConsultationController extends ChangeNotifier {
           message.role == ConsultationMessageRole.assistant &&
           message.content.isEmpty;
     });
-    final buffered = _streamingContentNotifier.value;
+    final buffered = _currentStreamingContent;
     if (buffered != null && buffered.isNotEmpty) {
       _setState(
         _state.copyWith(messages: _messagesWithSyncedStreamingContent()),
@@ -685,7 +904,7 @@ class ConsultationController extends ChangeNotifier {
     if (messageId == null) {
       final message = _createMessage(ConsultationMessageRole.assistant, '');
       _activeAssistantMessageId = message.id;
-      _streamingContentNotifier.value = chunk;
+      _setStreamingContent(chunk);
       _setState(
         _state.copyWith(
           messages: [..._state.messages, message],
@@ -702,7 +921,7 @@ class ConsultationController extends ChangeNotifier {
       _activeStreamingText(),
       chunk,
     );
-    _streamingContentNotifier.value = nextContent;
+    _setStreamingContent(nextContent);
     if (!_state.isStreaming ||
         _state.connectionState != ConsultationConnectionState.connected ||
         _state.errorMessage != null) {
@@ -730,7 +949,7 @@ class ConsultationController extends ChangeNotifier {
   }
 
   void _replaceActiveAssistantWithSystem(String content) {
-    _streamingContentNotifier.value = null;
+    _setStreamingContent(null);
     final messageId = _activeAssistantMessageId;
     if (messageId == null) {
       _appendSystemMessage(content);
@@ -764,7 +983,7 @@ class ConsultationController extends ChangeNotifier {
     _activeStreamRequestId = null;
     _ignoreStreamEventsUntilDone = false;
     _processedStreamChunkKeys.clear();
-    _streamingContentNotifier.value = null;
+    _setStreamingContent(null);
     _setState(
       _state.copyWith(
         messages: syncedMessages,
@@ -774,13 +993,16 @@ class ConsultationController extends ChangeNotifier {
   }
 
   Future<void> _loadRecentMessages({bool force = false}) async {
-    if (_hasLoadedRecentMessages && !force) {
+    if (_isDisposed || (_hasLoadedRecentMessages && !force)) {
       return;
     }
 
     _hasLoadedRecentMessages = true;
     try {
       final messages = await _repository.loadRecentMessages();
+      if (_isDisposed) {
+        return;
+      }
       if (messages.isNotEmpty) {
         _setState(
           _state.copyWith(
@@ -791,6 +1013,9 @@ class ConsultationController extends ChangeNotifier {
       }
     } on Object catch (error) {
       _hasLoadedRecentMessages = false;
+      if (_isDisposed) {
+        return;
+      }
       _setState(
         _state.copyWith(
           errorMessage: _messageFromError(error),
@@ -837,7 +1062,10 @@ class ConsultationController extends ChangeNotifier {
     _activeStreamRequestId = null;
     _ignoreStreamEventsUntilDone = false;
     _processedStreamChunkKeys.clear();
-    _streamingContentNotifier.value = null;
+    _setStreamingContent(null);
+    if (_isDisposed) {
+      return;
+    }
     _setState(
       _state.copyWith(
         messages: syncedMessages,
@@ -865,7 +1093,7 @@ class ConsultationController extends ChangeNotifier {
     _activeStreamRequestId = null;
     _ignoreStreamEventsUntilDone = false;
     _processedStreamChunkKeys.clear();
-    _streamingContentNotifier.value = null;
+    _setStreamingContent(null);
     _setState(
       _state.copyWith(
         messages: syncedMessages,
@@ -919,11 +1147,11 @@ class ConsultationController extends ChangeNotifier {
     _activeStreamRequestId = null;
     _ignoreStreamEventsUntilDone = false;
     _processedStreamChunkKeys.clear();
-    _streamingContentNotifier.value = '';
+    _setStreamingContent('');
   }
 
   String _activeStreamingText() {
-    final buffered = _streamingContentNotifier.value;
+    final buffered = _currentStreamingContent;
     if (buffered != null) {
       return buffered;
     }
@@ -942,7 +1170,7 @@ class ConsultationController extends ChangeNotifier {
 
   List<ConsultationMessage> _messagesWithSyncedStreamingContent() {
     final messageId = _activeAssistantMessageId;
-    final streamedContent = _streamingContentNotifier.value;
+    final streamedContent = _currentStreamingContent;
     if (messageId == null ||
         streamedContent == null ||
         streamedContent.isEmpty) {
@@ -994,6 +1222,16 @@ class ConsultationController extends ChangeNotifier {
         event.type == ConsultationStreamEventType.error;
   }
 
+  String? get _currentStreamingContent =>
+      _isDisposed ? null : _streamingContentNotifier.value;
+
+  void _setStreamingContent(String? value) {
+    if (_isDisposed) {
+      return;
+    }
+    _streamingContentNotifier.value = value;
+  }
+
   void _setState(ConsultationState nextState) {
     if (_isDisposed) {
       return;
@@ -1006,6 +1244,7 @@ class ConsultationController extends ChangeNotifier {
   @override
   void dispose() {
     _isDisposed = true;
+    _shouldRestoreConnection = false;
     _cancelPendingReconnect();
     _cancelResponseTimeout();
     _streamSubscription?.cancel();
@@ -1056,7 +1295,7 @@ class ConsultationController extends ChangeNotifier {
     _activeStreamRequestId = null;
     _ignoreStreamEventsUntilDone = false;
     _processedStreamChunkKeys.clear();
-    _streamingContentNotifier.value = null;
+    _setStreamingContent(null);
     _setState(
       _state.copyWith(
         isSending: false,

@@ -223,7 +223,13 @@ void main() {
       const ConsultationStreamEvent.connect('connected'),
     );
     await tester.pump();
-    expect(find.text('AI 상담 연결됨'), findsOneWidget);
+    expect(
+      find.descendant(
+        of: find.byKey(const ValueKey('consultation-status-toolbar')),
+        matching: find.text('연결됨'),
+      ),
+      findsOneWidget,
+    );
     await _returnHome(tester);
 
     await _tapVisibleKey(
@@ -750,8 +756,54 @@ void main() {
       find.byKey(const ValueKey('consultation-message-field')),
       findsOneWidget,
     );
-    expect(find.text('AI 상담 연결됨'), findsOneWidget);
+    expect(
+      find.descendant(
+        of: find.byKey(const ValueKey('consultation-status-toolbar')),
+        matching: find.text('연결됨'),
+      ),
+      findsOneWidget,
+    );
     expect(consultationRepository.connectCount, 1);
+  });
+
+  testWidgets('preserves consultation SSE stream when switching primary tabs',
+      (tester) async {
+    final consultationRepository = _FakeConsultationRepository();
+    await tester.pumpWidget(
+      MaumOnMobileApp(
+        authRepository: _FakeAuthRepository(restoredSession: _session()),
+        homeRepository: const _FakeHomeRepository(),
+        consultationRepository: consultationRepository,
+        diaryRepository: _FakeDiaryRepository(),
+        diaryImagePicker: const _FakeDiaryImagePicker(),
+        storyRepository: _FakeStoryRepository(),
+        letterRepository: _FakeLetterRepository(),
+        listenForDeepLinks: false,
+      ),
+    );
+
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('route-tab-consultation')));
+    await tester.pump();
+    consultationRepository.emit(
+      const ConsultationStreamEvent.connect('connected'),
+    );
+    await tester.pump();
+    expect(consultationRepository.connectCount, 1);
+
+    await tester.tap(find.byKey(const ValueKey('route-tab-diary')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('route-tab-consultation')));
+    await tester.pump();
+
+    expect(consultationRepository.connectCount, 1);
+    expect(
+      find.descendant(
+        of: find.byKey(const ValueKey('consultation-status-toolbar')),
+        matching: find.text('연결됨'),
+      ),
+      findsOneWidget,
+    );
   });
 
   testWidgets('navigates authenticated users from home to notifications',
@@ -1341,6 +1393,12 @@ class _FakeConsultationRepository implements ConsultationRepository {
 
   @override
   Future<List<ConsultationMessage>> loadRecentMessages() async => const [];
+
+  @override
+  Future<int> startNewSession() async => 2;
+
+  @override
+  Future<bool> stopGenerating() async => true;
 
   @override
   Future<int> deleteSensitiveMessages() async => 0;

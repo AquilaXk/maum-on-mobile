@@ -15,6 +15,10 @@ abstract interface class ConsultationRepository {
 
   Future<List<ConsultationMessage>> loadRecentMessages();
 
+  Future<int> startNewSession();
+
+  Future<bool> stopGenerating();
+
   Future<int> deleteSensitiveMessages();
 }
 
@@ -61,6 +65,39 @@ class ApiConsultationRepository implements ConsultationRepository {
         return messages
             .map(ConsultationMessage.fromJson)
             .toList(growable: false);
+      },
+    );
+  }
+
+  @override
+  Future<int> startNewSession() {
+    return _apiClient.post<int>(
+      '/api/v1/consultations/sessions',
+      parser: (json) {
+        if (json is! Map) {
+          throw const FormatException('Expected new session result.');
+        }
+        final sessionId = json['sessionId'];
+        if (sessionId is int) {
+          return sessionId;
+        }
+        if (sessionId is num) {
+          return sessionId.toInt();
+        }
+        return int.tryParse(sessionId?.toString() ?? '') ?? 0;
+      },
+    );
+  }
+
+  @override
+  Future<bool> stopGenerating() {
+    return _apiClient.post<bool>(
+      '/api/v1/consultations/stop',
+      parser: (json) {
+        if (json is! Map) {
+          throw const FormatException('Expected consultation stop result.');
+        }
+        return json['stopped'] == true;
       },
     );
   }

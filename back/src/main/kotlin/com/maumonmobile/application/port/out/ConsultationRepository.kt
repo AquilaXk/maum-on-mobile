@@ -10,6 +10,7 @@ interface ConsultationRepository {
         content: String,
         sensitive: Boolean = false,
         retentionUntil: String? = null,
+        sessionId: Long? = null,
     ): ConsultationMessage
 
     fun findByMemberId(memberId: Long, afterId: Long? = null, limit: Int? = null): List<ConsultationMessage>
@@ -18,7 +19,12 @@ interface ConsultationRepository {
         memberId: Long,
         excludeMessageId: Long,
         limit: Int,
+        sessionId: Long? = null,
     ): List<ConsultationMessage>
 
     fun hideSensitiveByMemberId(memberId: Long): Int
+
+    fun ensureActiveSession(memberId: Long): Long
+
+    fun startNewSession(memberId: Long): Long
 }

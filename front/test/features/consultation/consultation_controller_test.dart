@@ -792,6 +792,145 @@ void main() {
       expect(controller.streamingContentNotifier.value, isNull);
       expect(controller.state.messages.last.content, '한 조각씩 전달돼요.');
     });
+
+    test('startNewSession clears messages, draft, and calls repository',
+        () async {
+      final repository = _FakeConsultationRepository(
+        recentMessages: [
+          ConsultationMessage(
+            id: 'old-1',
+            role: ConsultationMessageRole.user,
+            content: '이전 질문',
+            createdAt: DateTime(2026, 6, 1),
+          ),
+        ],
+      );
+      final controller = ConsultationController(repository: repository);
+
+      await controller.connect();
+      repository.emit(const ConsultationStreamEvent.connect('connected'));
+      controller.updateDraft('작성 중 초안');
+
+      await controller.startNewSession();
+
+      expect(repository.startNewSessionCount, 1);
+      expect(controller.state.draft, isEmpty);
+      expect(controller.state.messages, hasLength(1));
+      expect(controller.state.messages.single.id, 'system-0');
+      expect(controller.state.errorMessage, isNull);
+    });
+
+    test(
+        'stopGenerating halts stalled request cleanly and preserves streamed partial chunks',
+        () async {
+      final stalledCompleter = Completer<ConsultationSendResult>();
+      final repository = _FakeConsultationRepository()
+        ..stallSendCompleter = stalledCompleter;
+      final controller = ConsultationController(repository: repository);
+
+      await controller.connect();
+      repository.emit(const ConsultationStreamEvent.connect('connected'));
+      controller.updateDraft('길게 답해주세요');
+
+      final submitFuture = controller.submitMessage();
+      await Future<void>.delayed(Duration.zero);
+      repository.emit(const ConsultationStreamEvent.chat('일부 답변입니다.'));
+
+      await controller.stopGenerating();
+      stalledCompleter.complete(const ConsultationSendResult(accepted: true));
+      await submitFuture;
+
+      expect(repository.stopGeneratingCount, 1);
+      expect(controller.state.isSending, isFalse);
+      expect(controller.state.isStreaming, isFalse);
+      expect(controller.state.failedMessage, isNull);
+      expect(controller.state.messages.last.content, '일부 답변입니다.');
+    });
+
+    test('reopening and selecting starter topic fills draft and collapses tray',
+        () async {
+      final repository = _FakeConsultationRepository();
+      final controller = ConsultationController(repository: repository);
+
+      controller.reopenStarterTopics();
+      expect(controller.state.topicsExpanded, isTrue);
+
+      controller.selectStarterTopic('머릿속이 복잡해요');
+      expect(controller.state.topicsExpanded, isFalse);
+      expect(controller.state.draft, '머릿속이 복잡해요');
+    });
+
+    test(
+        'single-flight connect prevents duplicate SSE streams during in-flight loadRecentMessages',
+        () async {
+      final loadRecentCompleter = Completer<List<ConsultationMessage>>();
+      final repository = _FakeConsultationRepository()
+        ..loadRecentCompleter = loadRecentCompleter;
+      final controller = ConsultationController(repository: repository);
+
+      final firstConnect = controller.connect();
+      final secondConnect = controller.connect();
+      await Future<void>.delayed(Duration.zero);
+
+      expect(repository.loadRecentCount, 1);
+      expect(repository.connectCount, 0);
+
+      loadRecentCompleter.complete(const []);
+      await Future.wait([firstConnect, secondConnect]);
+
+      expect(repository.connectCount, 1);
+      expect(repository.cancelCount, 0);
+    });
+
+    test(
+        'close and dispose during in-flight loadRecentMessages skip stream connection without errors',
+        () async {
+      final loadRecentCompleter = Completer<List<ConsultationMessage>>();
+      final repository = _FakeConsultationRepository()
+        ..loadRecentCompleter = loadRecentCompleter;
+      final controller = ConsultationController(repository: repository);
+
+      final connectFuture = controller.connect();
+      await Future<void>.delayed(Duration.zero);
+
+      controller.close();
+      controller.dispose();
+      loadRecentCompleter.complete(const []);
+      await connectFuture;
+
+      expect(repository.connectCount, 0);
+      expect(repository.cancelCount, 0);
+    });
+
+    test(
+        'delayed stop done event does not interrupt a newly started streaming turn',
+        () async {
+      final repository = _FakeConsultationRepository();
+      final controller = ConsultationController(repository: repository);
+
+      await controller.connect();
+      repository.emit(const ConsultationStreamEvent.connect('connected'));
+
+      controller.updateDraft('첫 질문');
+      await controller.submitMessage();
+      await controller.stopGenerating();
+
+      controller.updateDraft('두 번째 질문');
+      await controller.submitMessage();
+
+      // 이전 stop()에서 뒤늦게 도착한 chat_done(stop-*)이 새 턴 스트리밍을 끊지 않아야 한다.
+      repository.emit(const ConsultationStreamEvent.done(requestId: 'stop-1'));
+      expect(controller.state.isStreaming, isTrue);
+
+      repository
+        ..emit(const ConsultationStreamEvent.chat('새 턴 응답입니다.',
+            requestId: 'req-next', sequence: 0))
+        ..emit(const ConsultationStreamEvent.done(
+            requestId: 'req-next', sequence: 1));
+
+      expect(controller.state.isStreaming, isFalse);
+      expect(controller.state.messages.last.content, '새 턴 응답입니다.');
+    });
   });
 }
 
@@ -806,9 +945,12 @@ class _FakeConsultationRepository implements ConsultationRepository {
   final List<String> sentMessages = [];
   final List<Object> sendErrors = [];
   Completer<ConsultationSendResult>? stallSendCompleter;
+  Completer<List<ConsultationMessage>>? loadRecentCompleter;
   int connectCount = 0;
   int cancelCount = 0;
   int loadRecentCount = 0;
+  int startNewSessionCount = 0;
+  int stopGeneratingCount = 0;
   int deleteSensitiveCount = 0;
   List<ConsultationMessage>? latestRecentMessages;
   final List<StreamController<ConsultationStreamEvent>> streamControllers = [];
@@ -843,7 +985,23 @@ class _FakeConsultationRepository implements ConsultationRepository {
   @override
   Future<List<ConsultationMessage>> loadRecentMessages() async {
     loadRecentCount += 1;
+    final pendingLoad = loadRecentCompleter;
+    if (pendingLoad != null) {
+      return pendingLoad.future;
+    }
     return latestRecentMessages ?? recentMessages;
+  }
+
+  @override
+  Future<int> startNewSession() async {
+    startNewSessionCount += 1;
+    return startNewSessionCount + 1;
+  }
+
+  @override
+  Future<bool> stopGenerating() async {
+    stopGeneratingCount += 1;
+    return true;
   }
 
   @override

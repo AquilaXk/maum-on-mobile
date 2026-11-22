@@ -26,14 +26,20 @@ import org.springframework.http.MediaType
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate
 import org.springframework.mock.web.MockHttpServletResponse
+import org.springframework.mock.web.MockMultipartFile
 import org.springframework.test.context.ActiveProfiles
 import org.springframework.test.context.TestPropertySource
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.delete
 import org.springframework.test.web.servlet.get
 import org.springframework.test.web.servlet.post
+import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart
+import org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath
+import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
 import tools.jackson.core.type.TypeReference
 import tools.jackson.databind.ObjectMapper
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
 
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -609,6 +615,116 @@ class ConsultationControllerTest @Autowired constructor(
             }
     }
 
+    @Test
+    fun startNewSessionIsolatesRecentHistoryAndModelContext() {
+        val member = signupAndLogin("consultation-new-session@example.com", "새세션")
+
+        mockMvc.post("/api/v1/consultations/chat") {
+            header("Authorization", "Bearer ${member.accessToken}")
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"message":"이전 세션의 고민이에요."}"""
+        }
+            .andExpect {
+                status { isOk() }
+                jsonPath("$.data.accepted") { value(true) }
+            }
+
+        mockMvc.get("/api/v1/consultations/recent") {
+            header("Authorization", "Bearer ${member.accessToken}")
+        }
+            .andExpect {
+                status { isOk() }
+                jsonPath("$.data.messages.length()") { value(2) }
+            }
+
+        val sessionResponse = mockMvc.post("/api/v1/consultations/sessions") {
+            header("Authorization", "Bearer ${member.accessToken}")
+        }
+            .andExpect {
+                status { isOk() }
+                jsonPath("$.data.sessionId") { value(org.hamcrest.Matchers.greaterThan(0)) }
+            }
+            .andReturn()
+            .response
+        val newSessionId = sessionResponse.readJsonLong("$.data.sessionId")
+        assertThat(newSessionId).isPositive()
+
+        mockMvc.get("/api/v1/consultations/recent") {
+            header("Authorization", "Bearer ${member.accessToken}")
+        }
+            .andExpect {
+                status { isOk() }
+                jsonPath("$.data.messages.length()") { value(0) }
+            }
+
+        mockMvc.post("/api/v1/consultations/chat") {
+            header("Authorization", "Bearer ${member.accessToken}")
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"message":"새 세션에서 다시 시작해요."}"""
+        }
+            .andExpect {
+                status { isOk() }
+                jsonPath("$.data.accepted") { value(true) }
+            }
+
+        val secondRequest = consultationAiResponder.requests.last()
+        assertThat(secondRequest.recentMessages).isEmpty()
+
+        mockMvc.get("/api/v1/consultations/recent") {
+            header("Authorization", "Bearer ${member.accessToken}")
+        }
+            .andExpect {
+                status { isOk() }
+                jsonPath("$.data.messages.length()") { value(2) }
+                jsonPath("$.data.messages[0].content") { value("새 세션에서 다시 시작해요.") }
+            }
+    }
+
+    @Test
+    fun injectsRecentDiaryEmotionSummaryWithoutPiiOrBodyText() {
+        val member = signupAndLogin("consultation-diary-emotion@example.com", "민감닉네임")
+
+        val diaryPayload = MockMultipartFile(
+            "data",
+            "data.json",
+            MediaType.APPLICATION_JSON_VALUE,
+            """
+                {
+                  "title": "비공개일기제목",
+                  "content": "팀장님 홍길동과 다투고 너무 힘들었어요.",
+                  "categoryName": "일상",
+                  "isPrivate": true,
+                  "moodScore": 2,
+                  "emotionTags": "불안,긴장",
+                  "triggerTags": "업무"
+                }
+            """.trimIndent().toByteArray(),
+        )
+        mockMvc.perform(
+            multipart("/api/v1/diaries")
+                .file(diaryPayload)
+                .header("Authorization", "Bearer ${member.accessToken}"),
+        )
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.success").value(true))
+
+        mockMvc.post("/api/v1/consultations/chat") {
+            header("Authorization", "Bearer ${member.accessToken}")
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"message":"오늘 마음을 정리하고 싶어요."}"""
+        }
+            .andExpect {
+                status { isOk() }
+                jsonPath("$.data.accepted") { value(true) }
+            }
+
+        val modelRequest = consultationAiResponder.requests.last()
+        assertThat(modelRequest.recentEmotionSummary)
+            .isNotNull()
+            .contains("기분 2/5", "불안, 긴장", "업무")
+            .doesNotContain("비공개일기제목", "팀장님", "홍길동", "민감닉네임")
+    }
+
     private fun signupAndLogin(email: String, nickname: String): TestMember {
         val signupResult = mockMvc.signupVerifiedMember(
             email = email,
@@ -706,10 +822,14 @@ class CapturingContentModerationClassifier : ContentModerationClassifier {
 class CapturingConsultationAiResponder : ConsultationAiResponder {
     val requests = mutableListOf<ConsultationAiRequest>()
     var responseDelayMs: Long = 0
+    var startedLatch: CountDownLatch? = null
+    var blockUntilLatch: CountDownLatch? = null
     var responseChunks: List<String> = listOf("함께 ", "살펴볼게요.")
 
     override fun generate(request: ConsultationAiRequest): ConsultationAiResponse {
         requests += request
+        startedLatch?.countDown()
+        blockUntilLatch?.await(5, TimeUnit.SECONDS)
         if (responseDelayMs > 0) {
             Thread.sleep(responseDelayMs)
         }
@@ -722,6 +842,8 @@ class CapturingConsultationAiResponder : ConsultationAiResponder {
     fun clear() {
         requests.clear()
         responseDelayMs = 0
+        startedLatch = null
+        blockUntilLatch = null
         responseChunks = listOf("함께 ", "살펴볼게요.")
     }
 }

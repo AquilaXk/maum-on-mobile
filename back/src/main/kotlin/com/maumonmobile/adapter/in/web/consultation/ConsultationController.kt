@@ -6,7 +6,9 @@ import com.maumonmobile.application.port.`in`.ConsultationChatResult
 import com.maumonmobile.application.port.`in`.ConsultationDeleteSensitiveHistoryResult
 import com.maumonmobile.application.port.`in`.ConsultationHistoryResult
 import com.maumonmobile.application.port.`in`.ConsultationMessageResult
+import com.maumonmobile.application.port.`in`.ConsultationNewSessionResult
 import com.maumonmobile.application.port.`in`.ConsultationSafetyResult
+import com.maumonmobile.application.port.`in`.ConsultationStopResult
 import com.maumonmobile.application.port.`in`.ConsultationUseCase
 import com.maumonmobile.global.security.AuthenticatedUser
 import com.maumonmobile.global.web.ApiResponse
@@ -38,6 +40,13 @@ class ConsultationController(
         return streamRegistry.open(session.memberId)
     }
 
+    @PostMapping("/sessions")
+    fun startNewSession(authentication: Authentication): ApiResponse<ConsultationNewSessionResponse> {
+        return ApiResponse.success(
+            consultationUseCase.startNewSession(authentication.authenticatedUser()).toResponse(),
+        )
+    }
+
     @GetMapping("/recent")
     fun recent(
         authentication: Authentication,
@@ -59,12 +68,19 @@ class ConsultationController(
             command = request.toCommand(),
         )
         val requestId = UUID.randomUUID().toString()
-        if (result.safety?.actionPolicy !in SAFETY_BLOCKING_POLICIES && result.errorMessage == null) {
+        if (result.safety?.actionPolicy !in SAFETY_BLOCKING_POLICIES && result.errorMessage == null && !result.cancelled) {
             streamRegistry.publishReply(result.memberId, requestId = requestId, chunks = result.chunks)
         } else if (result.safety?.actionPolicy !in SAFETY_BLOCKING_POLICIES && result.errorMessage != null) {
             streamRegistry.publishError(result.memberId, requestId = requestId, message = result.errorMessage)
         }
         return ApiResponse.success(result.toResponse())
+    }
+
+    @PostMapping("/stop")
+    fun stop(authentication: Authentication): ApiResponse<ConsultationStopResponse> {
+        return ApiResponse.success(
+            consultationUseCase.stop(authentication.authenticatedUser()).toResponse(),
+        )
     }
 
     @DeleteMapping("/sensitive")
@@ -74,6 +90,14 @@ class ConsultationController(
         )
     }
 }
+
+data class ConsultationNewSessionResponse(
+    val sessionId: Long,
+)
+
+data class ConsultationStopResponse(
+    val stopped: Boolean,
+)
 
 data class ConsultationChatRequest(
     @field:NotBlank
@@ -151,6 +175,14 @@ private fun ConsultationSafetyResult.toResponse(): ConsultationSafetyResponse {
 
 private fun ConsultationDeleteSensitiveHistoryResult.toResponse(): ConsultationDeleteSensitiveHistoryResponse {
     return ConsultationDeleteSensitiveHistoryResponse(deletedCount = deletedCount)
+}
+
+private fun ConsultationNewSessionResult.toResponse(): ConsultationNewSessionResponse {
+    return ConsultationNewSessionResponse(sessionId = sessionId)
+}
+
+private fun ConsultationStopResult.toResponse(): ConsultationStopResponse {
+    return ConsultationStopResponse(stopped = stopped)
 }
 
 private fun Authentication.authenticatedUser(): AuthenticatedUser {

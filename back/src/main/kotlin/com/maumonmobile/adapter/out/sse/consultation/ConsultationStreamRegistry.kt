@@ -54,6 +54,15 @@ class ConsultationStreamRegistry(
         )
     }
 
+    fun publishStopped(memberId: Long, requestId: String = "stop-${UUID.randomUUID()}") {
+        streamRegistry.publish(
+            SseStreamType.CONSULTATION,
+            memberId,
+            "chat_done",
+            objectMapper.writeValueAsString(ChatDonePayload(requestId, sequence = 0)),
+        )
+    }
+
     private fun SseStreamSession.toConnectPayload(): ConnectPayload {
         return ConnectPayload(
             status = "connected",

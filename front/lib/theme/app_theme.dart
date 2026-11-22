@@ -1,8 +1,10 @@
-// Shadcn UI theme mapping tokens inspired by nank1ro/flutter-shadcn-ui (MIT).
+// Light Sky-Blue & Dark Slate-Periwinkle Material and surface theme tokens.
 import 'package:flutter/material.dart';
-import 'package:shadcn_ui/shadcn_ui.dart';
 
 import '../shared/ui/brand_identity.dart';
+import '../shared/ui/shad_primitives.dart';
+
+export '../shared/ui/shad_primitives.dart';
 
 ThemeData buildAppTheme() {
   return _buildTheme();

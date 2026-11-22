@@ -235,7 +235,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                               const SizedBox(height: AppSpacing.lg),
                               const _SettingsGroupHeader(
                                 key: ValueKey('settings-support-group-header'),
-                                icon: Icons.support_agent_outlined,
+                                icon: Icons.help_outline_rounded,
                                 title: '도움과 정책',
                               ),
                               const SizedBox(height: AppSpacing.sm),
@@ -251,8 +251,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                               const SizedBox(height: AppSpacing.lg),
                               const _SettingsGroupHeader(
                                 key: ValueKey('settings-danger-group-header'),
-                                icon: Icons.warning_amber_outlined,
-                                title: '위험 작업',
+                                icon: Icons.manage_history_outlined,
+                                title: '계정 정리',
                               ),
                               const SizedBox(height: AppSpacing.sm),
                               _WithdrawalSection(
@@ -342,7 +342,7 @@ class _SupportContactSection extends StatelessWidget {
         AppDetailRow(label: '앱 버전', value: diagnostics.appVersion),
         AppDetailRow(label: '빌드 번호', value: diagnostics.buildNumber),
         AppDetailRow(label: '플랫폼', value: diagnostics.platform),
-        AppDetailRow(label: 'locale', value: diagnostics.locale),
+        AppDetailRow(label: '언어 및 지역', value: diagnostics.locale),
         const SizedBox(height: AppSpacing.md),
         _SupportActionButtons(
           contactInfo: contactInfo,
@@ -376,7 +376,7 @@ class _SupportActionButtons extends StatelessWidget {
         FilledButton.icon(
           key: const ValueKey('settings-support-contact-button'),
           onPressed: () => _open(contactInfo.supportMailUri()),
-          icon: const Icon(Icons.support_agent_outlined),
+          icon: const Icon(Icons.mail_outline_rounded),
           label: const Text('고객지원'),
         ),
         OutlinedButton.icon(
@@ -471,9 +471,13 @@ class _AccountSummary extends StatelessWidget {
     final colorScheme = theme.colorScheme;
     final accountType = isSocialAccount ? '소셜 계정' : '이메일 계정';
     final randomStatus = randomReceiveAllowed ? '랜덤 편지 수신 중' : '랜덤 편지 중지';
-    final exportStatus = dataExport == null
-        ? '내보내기 요청 가능'
+    final exportSuffix = dataExport == null
+        ? null
         : '내보내기 ${_exportStatusLabel(dataExport!.status)}';
+    final metaStyle = theme.textTheme.bodySmall?.copyWith(
+      color: colorScheme.onSurfaceVariant,
+      fontWeight: FontWeight.w600,
+    );
 
     return KeyedSubtree(
       key: const ValueKey('settings-account-section'),
@@ -523,27 +527,16 @@ class _AccountSummary extends StatelessWidget {
               const SizedBox(height: AppSpacing.xs),
               Wrap(
                 spacing: AppSpacing.xs,
-                runSpacing: AppSpacing.xs,
+                runSpacing: AppSpacing.xxs,
                 crossAxisAlignment: WrapCrossAlignment.center,
                 children: [
-                  AppStatusPill(
-                    label: accountType,
-                    tone: isSocialAccount
-                        ? AppStatusTone.warning
-                        : AppStatusTone.success,
-                  ),
-                  AppStatusPill(
-                    label: randomStatus,
-                    tone: randomReceiveAllowed
-                        ? AppStatusTone.success
-                        : AppStatusTone.neutral,
-                  ),
-                  AppStatusPill(
-                    label: exportStatus,
-                    tone: dataExport?.canDownload == true
-                        ? AppStatusTone.success
-                        : AppStatusTone.neutral,
-                  ),
+                  Text(accountType, style: metaStyle),
+                  Text('·', style: metaStyle),
+                  Text(randomStatus, style: metaStyle),
+                  if (exportSuffix != null) ...[
+                    Text('·', style: metaStyle),
+                    Text(exportSuffix, style: metaStyle),
+                  ],
                 ],
               ),
               if (onLogout != null) ...[

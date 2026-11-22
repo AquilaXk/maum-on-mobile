@@ -405,28 +405,43 @@ class _NotificationStatusToolbar extends StatelessWidget {
             const SizedBox(height: AppSpacing.xs),
             Wrap(
               spacing: AppSpacing.xs,
-              runSpacing: AppSpacing.xs,
+              runSpacing: AppSpacing.xxs,
               crossAxisAlignment: WrapCrossAlignment.center,
               children: [
-                AppStatusPill(
-                  label: '읽지 않음 $unreadCount개',
-                  tone: unreadCount > 0
-                      ? AppStatusTone.warning
-                      : AppStatusTone.success,
+                Text(
+                  '읽지 않음 $unreadCount개',
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: unreadCount > 0
+                        ? colorScheme.primary
+                        : colorScheme.onSurfaceVariant,
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
-                AppStatusPill(
-                  label: '바로 이동 $directCount개',
-                  tone: directCount > 0
-                      ? AppStatusTone.success
-                      : AppStatusTone.neutral,
+                Text(
+                  '·',
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: colorScheme.onSurfaceVariant,
+                  ),
                 ),
-                AppStatusPill(
-                  label: _connectionStatusLabel(connectionState),
-                  tone: _connectionStatusTone(connectionState),
+                Text(
+                  _connectionStatusLabel(connectionState),
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: colorScheme.onSurfaceVariant,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
-                AppStatusPill(
-                  label: pushLabel,
-                  tone: _pushStatusTone(pushNotificationState),
+                Text(
+                  '·',
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: colorScheme.onSurfaceVariant,
+                  ),
+                ),
+                Text(
+                  pushLabel,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: colorScheme.onSurfaceVariant,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
               ],
             ),
@@ -651,15 +666,6 @@ String _connectionStatusLabel(NotificationConnectionState state) {
   };
 }
 
-AppStatusTone _connectionStatusTone(NotificationConnectionState state) {
-  return switch (state) {
-    NotificationConnectionState.connected => AppStatusTone.success,
-    NotificationConnectionState.connecting => AppStatusTone.warning,
-    NotificationConnectionState.error => AppStatusTone.danger,
-    NotificationConnectionState.idle => AppStatusTone.neutral,
-  };
-}
-
 String _pushStatusLabel(PushNotificationState state) {
   return switch (state) {
     PushNotificationState.idle => '푸시 권한 확인',
@@ -677,17 +683,6 @@ IconData _pushStatusIcon(PushNotificationState state) {
     PushNotificationState.denied => Icons.notifications_off_outlined,
     PushNotificationState.error => Icons.notification_important_outlined,
     PushNotificationState.idle => Icons.notifications_outlined,
-  };
-}
-
-AppStatusTone _pushStatusTone(PushNotificationState state) {
-  return switch (state) {
-    PushNotificationState.registered => AppStatusTone.success,
-    PushNotificationState.requesting => AppStatusTone.warning,
-    PushNotificationState.denied ||
-    PushNotificationState.error =>
-      AppStatusTone.danger,
-    PushNotificationState.idle => AppStatusTone.neutral,
   };
 }
 
