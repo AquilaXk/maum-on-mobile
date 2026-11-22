@@ -1,8 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 
-import 'package:flutter_secure_storage/flutter_secure_storage.dart';
-
+import '../../../core/storage/secure_key_value_storage.dart';
 import '../domain/draft_recovery_models.dart';
 
 abstract interface class DraftRecoveryRepository {
@@ -339,24 +338,24 @@ class MemoryDraftRecoveryStorage implements DraftRecoveryStorage {
 
 class SecureDraftRecoveryStorage implements DraftRecoveryStorage {
   const SecureDraftRecoveryStorage({
-    FlutterSecureStorage storage = const FlutterSecureStorage(),
+    SecureKeyValueStorage storage = const PlatformSecureKeyValueStorage(),
   }) : _storage = storage;
 
-  final FlutterSecureStorage _storage;
+  final SecureKeyValueStorage _storage;
 
   @override
   Future<String?> read(String key) {
-    return _storage.read(key: key);
+    return _storage.read(key);
   }
 
   @override
   Future<void> write(String key, String value) {
-    return _storage.write(key: key, value: value);
+    return _storage.write(key, value);
   }
 
   @override
   Future<void> delete(String key) {
-    return _storage.delete(key: key);
+    return _storage.delete(key);
   }
 
   @override

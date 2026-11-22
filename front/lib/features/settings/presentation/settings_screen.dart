@@ -2,8 +2,8 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:url_launcher/url_launcher.dart';
 
+import '../../../core/platform/external_url_launcher.dart';
 import '../../../shared/ui/app_design_system.dart';
 import '../../../shared/ui/text_editing_sync.dart';
 import '../../legal/domain/legal_disclosures.dart';
@@ -402,11 +402,7 @@ class _SupportActionButtons extends StatelessWidget {
   }
 
   Future<void> _open(Uri uri) async {
-    final opener = onOpenExternalUri ??
-        (Uri target) => launchUrl(
-              target,
-              mode: LaunchMode.externalApplication,
-            );
+    final opener = onOpenExternalUri ?? launchExternalUri;
     await opener(uri);
   }
 

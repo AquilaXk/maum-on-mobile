@@ -106,9 +106,9 @@ test("release security gate fails on high or higher vulnerabilities", async () =
     flutter: [
       {
         id: "CVE-2099-0001",
-        package: "dio",
+        package: "flutter",
         severity: "high",
-        fixedVersion: "5.9.1",
+        fixedVersion: "3.44.1",
       },
     ],
   });

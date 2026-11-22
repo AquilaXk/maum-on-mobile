@@ -1,18 +1,17 @@
 import 'dart:async';
 
-import 'package:flutter_secure_storage/flutter_secure_storage.dart';
-
+import '../storage/secure_key_value_storage.dart';
 import 'auth_token_store.dart';
 
 class SecureAuthTokenStore implements AuthTokenStore {
   SecureAuthTokenStore({
-    FlutterSecureStorage storage = const FlutterSecureStorage(),
+    SecureKeyValueStorage storage = const PlatformSecureKeyValueStorage(),
   }) : _storage = storage;
 
   static const _accessTokenKey = 'auth.accessToken';
   static const _refreshTokenKey = 'auth.refreshToken';
 
-  final FlutterSecureStorage _storage;
+  final SecureKeyValueStorage _storage;
   bool _hasCachedAccessToken = false;
   String? _cachedAccessToken;
   int _accessCacheEpoch = 0;
@@ -35,12 +34,12 @@ class SecureAuthTokenStore implements AuthTokenStore {
       return _cachedAccessToken;
     }
     final readEpoch = _accessCacheEpoch;
-    final token = await _storage.read(key: _accessTokenKey);
+    final token = await _storage.read(_accessTokenKey);
     if (_accessCacheEpoch != readEpoch) {
       if (_hasCachedAccessToken) {
         return _cachedAccessToken;
       }
-      return await _storage.read(key: _accessTokenKey);
+      return await _storage.read(_accessTokenKey);
     }
     if (!_hasCachedAccessToken) {
       _cachedAccessToken = token;
@@ -55,12 +54,12 @@ class SecureAuthTokenStore implements AuthTokenStore {
       return _cachedRefreshToken;
     }
     final readEpoch = _refreshCacheEpoch;
-    final token = await _storage.read(key: _refreshTokenKey);
+    final token = await _storage.read(_refreshTokenKey);
     if (_refreshCacheEpoch != readEpoch) {
       if (_hasCachedRefreshToken) {
         return _cachedRefreshToken;
       }
-      return await _storage.read(key: _refreshTokenKey);
+      return await _storage.read(_refreshTokenKey);
     }
     if (!_hasCachedRefreshToken) {
       _cachedRefreshToken = token;
@@ -78,8 +77,8 @@ class SecureAuthTokenStore implements AuthTokenStore {
     _cachedRefreshToken = null;
     _hasCachedRefreshToken = false;
     return _enqueueMutation(() async {
-      await _storage.write(key: _accessTokenKey, value: tokens.accessToken);
-      await _storage.write(key: _refreshTokenKey, value: tokens.refreshToken);
+      await _storage.write(_accessTokenKey, tokens.accessToken);
+      await _storage.write(_refreshTokenKey, tokens.refreshToken);
       if (_accessCacheEpoch == accessEpoch) {
         _accessCacheEpoch += 1;
         _cachedAccessToken = tokens.accessToken;
@@ -102,8 +101,8 @@ class SecureAuthTokenStore implements AuthTokenStore {
     _cachedRefreshToken = null;
     _hasCachedRefreshToken = false;
     return _enqueueMutation(() async {
-      await _storage.delete(key: _accessTokenKey);
-      await _storage.delete(key: _refreshTokenKey);
+      await _storage.delete(_accessTokenKey);
+      await _storage.delete(_refreshTokenKey);
       if (_accessCacheEpoch == accessEpoch) {
         _accessCacheEpoch += 1;
         _cachedAccessToken = null;

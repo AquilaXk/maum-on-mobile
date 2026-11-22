@@ -1,9 +1,9 @@
 import 'dart:async';
 
-import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:maum_on_mobile_front/core/network/auth_token_store.dart';
 import 'package:maum_on_mobile_front/core/network/secure_auth_token_store.dart';
+import 'package:maum_on_mobile_front/core/storage/secure_key_value_storage.dart';
 
 void main() {
   group('SecureAuthTokenStore', () {
@@ -79,7 +79,7 @@ void main() {
   });
 }
 
-class _CountingSecureStorage extends Fake implements FlutterSecureStorage {
+class _CountingSecureStorage implements SecureKeyValueStorage {
   _CountingSecureStorage({
     Map<String, String> initialValues = const {},
     this.readGate,
@@ -92,15 +92,7 @@ class _CountingSecureStorage extends Fake implements FlutterSecureStorage {
   int deleteCount = 0;
 
   @override
-  Future<String?> read({
-    required String key,
-    AppleOptions? iOptions,
-    AndroidOptions? aOptions,
-    LinuxOptions? lOptions,
-    WebOptions? webOptions,
-    AppleOptions? mOptions,
-    WindowsOptions? wOptions,
-  }) async {
+  Future<String?> read(String key) async {
     readCount += 1;
     final snapshot = values[key];
     final gate = readGate;
@@ -111,35 +103,19 @@ class _CountingSecureStorage extends Fake implements FlutterSecureStorage {
   }
 
   @override
-  Future<void> write({
-    required String key,
-    required String? value,
-    AppleOptions? iOptions,
-    AndroidOptions? aOptions,
-    LinuxOptions? lOptions,
-    WebOptions? webOptions,
-    AppleOptions? mOptions,
-    WindowsOptions? wOptions,
-  }) async {
+  Future<void> write(String key, String value) async {
     writeCount += 1;
-    if (value == null) {
-      values.remove(key);
-    } else {
-      values[key] = value;
-    }
+    values[key] = value;
   }
 
   @override
-  Future<void> delete({
-    required String key,
-    AppleOptions? iOptions,
-    AndroidOptions? aOptions,
-    LinuxOptions? lOptions,
-    WebOptions? webOptions,
-    AppleOptions? mOptions,
-    WindowsOptions? wOptions,
-  }) async {
+  Future<void> delete(String key) async {
     deleteCount += 1;
     values.remove(key);
+  }
+
+  @override
+  Future<Map<String, String>> readAll() async {
+    return Map<String, String>.unmodifiable(values);
   }
 }

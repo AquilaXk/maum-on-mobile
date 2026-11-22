@@ -7,8 +7,9 @@ import '../core/network/api_client.dart';
 import '../core/network/api_config.dart';
 import '../core/network/api_error.dart';
 import '../core/network/auth_token_store.dart';
-import '../core/network/dio_api_transport.dart';
+import '../core/network/http_api_transport.dart';
 import '../core/network/secure_auth_token_store.dart';
+import '../core/platform/deep_link_channel.dart';
 import '../features/auth/application/auth_controller.dart';
 import '../features/auth/data/auth_repository.dart';
 import '../features/auth/deeplink/external_login.dart';
@@ -107,7 +108,7 @@ class _MaumOnMobileAppState extends State<MaumOnMobileApp>
   late final SecureAuthTokenStore _tokenStore = SecureAuthTokenStore();
   late final AuthTokenRefreshCoordinator _tokenRefreshCoordinator =
       AuthTokenRefreshCoordinator();
-  late final DioApiTransport _apiTransport = DioApiTransport.fromConfig(
+  late final HttpApiTransport _apiTransport = HttpApiTransport.fromConfig(
     _apiConfig,
   );
   late final AuthController _authController = AuthController(
@@ -124,6 +125,7 @@ class _MaumOnMobileAppState extends State<MaumOnMobileApp>
       widget.pushNotificationPermissionClient ??
           MethodChannelPushNotificationPermissionClient();
   StreamSubscription<Uri>? _deepLinkSubscription;
+  MethodChannelDeepLinkSource? _ownedDeepLinkSource;
   StreamSubscription<NotificationTapPayload>? _pushTapSubscription;
   HomeController? _homeController;
   int? _homeMemberId;
@@ -132,7 +134,7 @@ class _MaumOnMobileAppState extends State<MaumOnMobileApp>
   HttpConsultationStreamClient? _defaultConsultationStreamClient;
   NotificationController? _notificationController;
   int? _notificationMemberId;
-  DioNotificationStreamClient? _defaultNotificationStreamClient;
+  HttpNotificationStreamClient? _defaultNotificationStreamClient;
   ReportController? _reportController;
   int? _reportMemberId;
   SettingsController? _settingsController;
@@ -176,6 +178,8 @@ class _MaumOnMobileAppState extends State<MaumOnMobileApp>
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _deepLinkSubscription?.cancel();
+    _ownedDeepLinkSource?.dispose();
+    _ownedDeepLinkSource = null;
     _pushTapSubscription?.cancel();
     _externalLoginController.dispose();
     _authController.dispose();
@@ -187,6 +191,7 @@ class _MaumOnMobileAppState extends State<MaumOnMobileApp>
     _disposeDiaryController();
     _disposeStoryController();
     _disposeLetterController();
+    _apiTransport.close();
     super.dispose();
   }
 
@@ -681,7 +686,7 @@ class _MaumOnMobileAppState extends State<MaumOnMobileApp>
   }
 
   Future<void> _unregisterCurrentPushToken() async {
-    DioNotificationStreamClient? tempStreamClient;
+    HttpNotificationStreamClient? tempStreamClient;
     try {
       final token =
           (await _pushNotificationClient.getPermissionStatus()).token?.trim();
@@ -692,7 +697,7 @@ class _MaumOnMobileAppState extends State<MaumOnMobileApp>
       if (widget.notificationRepository != null) {
         repository = widget.notificationRepository!;
       } else {
-        tempStreamClient = DioNotificationStreamClient(apiConfig: _apiConfig);
+        tempStreamClient = HttpNotificationStreamClient(apiConfig: _apiConfig);
         repository = ApiNotificationRepository(
           apiClient: _sessionApiClient(tokenRefresher: _tokenRefresher()),
           streamClient: tempStreamClient,
@@ -881,7 +886,7 @@ class _MaumOnMobileAppState extends State<MaumOnMobileApp>
 
   NotificationRepository _buildDefaultNotificationRepository() {
     _defaultNotificationStreamClient?.close();
-    final streamClient = DioNotificationStreamClient(apiConfig: _apiConfig);
+    final streamClient = HttpNotificationStreamClient(apiConfig: _apiConfig);
     _defaultNotificationStreamClient = streamClient;
     return ApiNotificationRepository(
       apiClient: _sessionApiClient(tokenRefresher: _tokenRefresher()),
@@ -958,16 +963,23 @@ class _MaumOnMobileAppState extends State<MaumOnMobileApp>
   }
 
   Future<void> _bindDeepLinks() async {
-    final source =
-        widget.deepLinkSource ?? AppLinksExternalLoginDeepLinkSource();
-    final initialUri = await source.getInitialUri();
-    if (initialUri != null) {
-      await _externalLoginController.handleIncomingUri(initialUri);
+    if (!mounted) {
+      return;
     }
-
+    final ownedSource =
+        widget.deepLinkSource == null ? MethodChannelDeepLinkSource() : null;
+    _ownedDeepLinkSource = ownedSource;
+    final source = widget.deepLinkSource ?? ownedSource!;
     _deepLinkSubscription = source.uriStream.listen(
       _externalLoginController.handleIncomingUri,
     );
+    final initialUri = await source.getInitialUri();
+    if (!mounted) {
+      return;
+    }
+    if (initialUri != null) {
+      await _externalLoginController.handleIncomingUri(initialUri);
+    }
   }
 
   Future<void> _bindPushNotifications() async {

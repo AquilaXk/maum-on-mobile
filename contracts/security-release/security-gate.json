@@ -54,20 +54,13 @@
   ],
   "licenseOverrides": {
     "flutter": {
-      "app_links": "BSD-3-Clause",
-      "dio": "MIT",
-      "file_picker": "MIT",
       "flutter": "BSD-3-Clause",
       "flutter_lints": "BSD-3-Clause",
-      "flutter_secure_storage": "BSD-3-Clause",
-      "flutter_test": "BSD-3-Clause",
-      "url_launcher": "BSD-3-Clause"
+      "flutter_test": "BSD-3-Clause"
     },
     "gradle": {
       "androidx.core:core": "Apache-2.0",
-      "com.google.api-client:google-api-client": "Apache-2.0",
       "com.google.firebase:firebase-messaging": "Apache-2.0",
-      "com.google.http-client:google-http-client-gson": "Apache-2.0",
       "com.h2database:h2": "MPL-2.0",
       "org.jetbrains.kotlin:kotlin-reflect": "Apache-2.0",
       "org.junit.platform:junit-platform-launcher": "Apache-2.0",

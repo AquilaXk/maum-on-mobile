@@ -160,8 +160,8 @@ test("iOS CocoaPods and privacy manifest stay release ready", () => {
   assert.match(gemfileLock, /BUNDLED WITH\s+2\./);
   assert.doesNotMatch(gemfileLock, /BUNDLED WITH\s+1\./);
 
-  assert.match(packageResolved, /"identity" : "dkimagepickercontroller"/);
-  assert.match(packageResolved, /"identity" : "sdwebimage"/);
+  assert.match(packageResolved, /"pins"\s*:\s*\[\s*\]/);
+  assert.match(packageResolved, /"version"\s*:\s*2/);
 
   assert.match(workspace, /Runner\.xcodeproj/);
   assert.match(workspace, /Pods\/Pods\.xcodeproj/);

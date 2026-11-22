@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:url_launcher/url_launcher.dart';
 
+import '../../../core/platform/external_url_launcher.dart';
 import '../../../shared/ui/app_design_system.dart';
 import '../domain/legal_disclosures.dart';
 
@@ -51,11 +51,7 @@ class LegalDisclosureLinks extends StatelessWidget {
   }
 
   Future<void> _open(Uri uri) async {
-    final launcher = onOpenExternalUri ??
-        (Uri target) => launchUrl(
-              target,
-              mode: LaunchMode.externalApplication,
-            );
+    final launcher = onOpenExternalUri ?? launchExternalUri;
     await launcher(uri);
   }
 }

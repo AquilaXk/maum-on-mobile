@@ -3,8 +3,8 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:url_launcher/url_launcher.dart';
 
+import '../../../../core/platform/external_url_launcher.dart';
 import '../../../../shared/markdown/clean_markdown_body.dart';
 
 typedef CounselorLinkLauncher = Future<void> Function(Uri uri);
@@ -76,11 +76,9 @@ class _CounselorMarkdownMessageState extends State<CounselorMarkdownMessage> {
       return;
     }
     try {
-      await launchUrl(uri, mode: LaunchMode.externalApplication);
-    } on PlatformException {
-      // Headless tests and environments without a browser handler safely ignore.
-    } on MissingPluginException {
-      // Headless tests without url_launcher keep UI responsive.
+      await launchExternalUri(uri);
+    } on Object {
+      // Headless tests and environments without a browser handler keep UI responsive.
     }
   }
 

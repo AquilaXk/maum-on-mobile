@@ -3,9 +3,8 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
-import 'package:url_launcher/url_launcher.dart';
 
+import '../../../core/platform/external_url_launcher.dart';
 import '../../../shared/ui/app_design_system.dart';
 import '../../../shared/ui/text_editing_sync.dart';
 import '../../../theme/app_theme.dart';
@@ -179,14 +178,7 @@ class _ConsultationScreenState extends State<ConsultationScreen>
       return;
     }
     try {
-      await launchUrl(
-        Uri(scheme: 'tel', path: digitsOnly),
-        mode: LaunchMode.externalApplication,
-      );
-    } on MissingPluginException {
-      // Headless tests and platforms without url_launcher plugin keep snackbar feedback.
-    } on PlatformException {
-      // Emulators without telephony fall back gracefully to snackbar feedback.
+      await launchExternalUri(Uri(scheme: 'tel', path: digitsOnly));
     } on Object {
       // Preserve fail-safe emergency guidance when OS dialer cannot open.
     }

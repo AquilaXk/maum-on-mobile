@@ -5,7 +5,7 @@ import '../../../core/network/api_client.dart';
 import '../../../core/network/api_config.dart';
 import '../../../core/network/api_transport.dart';
 import '../../../core/network/auth_token_store.dart';
-import '../../../core/network/dio_api_transport.dart';
+import '../../../core/network/http_api_transport.dart';
 import '../../../core/network/secure_auth_token_store.dart';
 import '../../auth/data/auth_repository.dart';
 import '../../auth/domain/auth_models.dart';
@@ -73,7 +73,7 @@ AdminWebDependencies buildAdminWebDependencies({
 }) {
   final resolvedTokenStore = tokenStore ?? SecureAuthTokenStore();
   final rawApiClient = ApiClient(
-    transport: rawTransport ?? DioApiTransport.fromConfig(apiConfig),
+    transport: rawTransport ?? HttpApiTransport.fromConfig(apiConfig),
     tokenStore: resolvedTokenStore,
   );
   final rawAuthRepository = ApiAuthRepository(
@@ -84,7 +84,7 @@ AdminWebDependencies buildAdminWebDependencies({
     authRepository: rawAuthRepository,
   );
   final sessionApiClient = ApiClient(
-    transport: sessionTransport ?? DioApiTransport.fromConfig(apiConfig),
+    transport: sessionTransport ?? HttpApiTransport.fromConfig(apiConfig),
     tokenStore: resolvedTokenStore,
     tokenRefresher: tokenRefresher,
   );

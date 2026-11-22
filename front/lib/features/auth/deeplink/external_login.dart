@@ -1,9 +1,8 @@
 import 'dart:async';
 
-import 'package:app_links/app_links.dart';
 import 'package:flutter/foundation.dart';
-import 'package:url_launcher/url_launcher.dart';
 
+import '../../../core/platform/external_url_launcher.dart';
 import '../application/auth_controller.dart';
 
 class ExternalLoginConfig {
@@ -84,7 +83,7 @@ class UrlExternalLoginLauncher implements ExternalLoginLauncher {
 
   @override
   Future<bool> launch(Uri uri) {
-    return launchUrl(uri, mode: LaunchMode.externalApplication);
+    return launchExternalUri(uri);
   }
 }
 
@@ -92,23 +91,6 @@ abstract interface class ExternalLoginDeepLinkSource {
   Future<Uri?> getInitialUri();
 
   Stream<Uri> get uriStream;
-}
-
-class AppLinksExternalLoginDeepLinkSource
-    implements ExternalLoginDeepLinkSource {
-  AppLinksExternalLoginDeepLinkSource({
-    AppLinks? appLinks,
-  }) : _appLinks = appLinks ?? AppLinks();
-
-  final AppLinks _appLinks;
-
-  @override
-  Future<Uri?> getInitialUri() {
-    return _appLinks.getInitialLink();
-  }
-
-  @override
-  Stream<Uri> get uriStream => _appLinks.uriLinkStream;
 }
 
 class ExternalLoginController extends ChangeNotifier {
